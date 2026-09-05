@@ -5,7 +5,7 @@ import {
   Track,
   Participant,
   VideoPresets,
-  ScreenSharePresets,
+  VideoPreset,
   type LocalParticipant,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
@@ -25,9 +25,11 @@ function getAudioRoot() {
   return audioRoot;
 }
 
-// Compartilhar vídeo é diferente de compartilhar planilha: 1080p a 30 fps e até 5 Mb/s,
-// em vez dos 15 fps de antes, que engasgam qualquer filme.
-const PRESET_DE_TELA = ScreenSharePresets.h1080fps30;
+// Compartilhar vídeo é diferente de compartilhar planilha. O preset mais alto que o
+// LiveKit traz pronto é 1080p30, então este é montado à mão: 1080p a 60 fps, com
+// 8 Mb/s de teto — dobrar os quadros sem subir o bitrate só trocaria travamento por
+// borrão. Quem tiver internet ou máquina fraca cai sozinho pelos ajustes abaixo.
+const PRESET_DE_TELA = new VideoPreset(1920, 1080, 8_000_000, 60, 'medium');
 
 // Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
 // engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
