@@ -4,6 +4,13 @@ import { setupUpdates } from './update';
 
 let pendingSource: { id: string; audio: boolean } | null = null;
 
+// No macOS 15+ a captura pelo desktopCapturer depende da permissão persistente de
+// Gravação de Tela, que o sistema volta a pedir sozinho de tempos em tempos — daí o
+// "já autorizei e ele pede de novo". Com o seletor nativo, escolher a janela é a própria
+// autorização: não há permissão para guardar, nem para o sistema revogar.
+// No Windows não existe seletor nativo, então lá seguimos com o nosso.
+const SELETOR_DO_SISTEMA = process.platform === 'darwin';
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -43,7 +50,8 @@ app.whenReady().then(async () => {
     callback(['media', 'display-capture', 'notifications'].includes(permission));
   });
 
-  // Quando o renderer chama getDisplayMedia(), usamos a fonte escolhida no nosso seletor
+  // Com o seletor nativo ligado, este handler não é chamado — o macOS resolve sozinho.
+  // Ele continua aqui para o Windows e para macOS antigo, onde o seletor não existe.
   session.defaultSession.setDisplayMediaRequestHandler(
     async (_request, callback) => {
       const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
@@ -57,7 +65,7 @@ app.whenReady().then(async () => {
       // 'loopback' = áudio do sistema. Windows: nativo. macOS 14.2+: via Core Audio Taps (Electron ≥ 39).
       callback(audio ? { video: chosen, audio: 'loopback' } : { video: chosen });
     },
-    { useSystemPicker: false },
+    { useSystemPicker: SELETOR_DO_SISTEMA },
   );
 
   ipcMain.handle('sources:list', async () => {
@@ -80,6 +88,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('sources:choose', (_e, id: string, audio: boolean) => {
     pendingSource = { id, audio };
   });
+
+  ipcMain.handle('screen:seletorDoSistema', () => SELETOR_DO_SISTEMA);
 
   ipcMain.handle('screen:permission', () => {
     if (process.platform !== 'darwin') return 'granted';

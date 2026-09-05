@@ -5,6 +5,7 @@ const desktop = {
   listSources: () => ipcRenderer.invoke('sources:list'),
   chooseSource: (id: string, audio: boolean) => ipcRenderer.invoke('sources:choose', id, audio),
   screenPermission: (): Promise<string> => ipcRenderer.invoke('screen:permission'),
+  usaSeletorDoSistema: (): Promise<boolean> => ipcRenderer.invoke('screen:seletorDoSistema'),
   openScreenSettings: () => ipcRenderer.invoke('screen:openSettings'),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
   onUpdate: (cb: (s: unknown) => void) => { ipcRenderer.on('update:state', (_e, s) => cb(s)); },

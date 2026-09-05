@@ -15,6 +15,8 @@ declare global {
       listSources: () => Promise<SourceInfo[]>;
       chooseSource: (id: string, audio: boolean) => Promise<void>;
       screenPermission: () => Promise<string>;
+      /** No macOS o próprio sistema escolhe a janela; nosso seletor não deve aparecer. */
+      usaSeletorDoSistema: () => Promise<boolean>;
       openScreenSettings: () => Promise<void>;
       version: () => Promise<string>;
       onUpdate: (cb: (s: UpdateState) => void) => void;

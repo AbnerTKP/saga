@@ -166,7 +166,8 @@ export function useRoom() {
     bump();
   }, [room]);
 
-  const startScreen = useCallback(async (sourceId: string, audio: boolean) => {
+  // sourceId nulo = o macOS vai perguntar qual janela; não há fonte para reservar.
+  const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
     const captura: ScreenShareCaptureOptions = {
       resolution: PRESET_DE_TELA.resolution,
@@ -180,13 +181,13 @@ export function useRoom() {
       // Se a banda apertar, prefira borrar a imagem a perder fluidez.
       degradationPreference: 'maintain-framerate',
     };
-    await window.desktop.chooseSource(sourceId, audio);
+    if (sourceId) await window.desktop.chooseSource(sourceId, audio);
     try {
       await lp().setScreenShareEnabled(true, captura, publicacao);
     } catch (e) {
       if (!audio) throw e;
       // sem áudio do sistema neste computador: tenta só o vídeo
-      await window.desktop.chooseSource(sourceId, false);
+      if (sourceId) await window.desktop.chooseSource(sourceId, false);
       await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
       setError('Compartilhando sem o áudio do sistema (não disponível neste computador).');
     }

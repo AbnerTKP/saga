@@ -24,7 +24,10 @@ export function App() {
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
   const [painel, setPainel] = useState(false);
+  const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const rm = useRoom();
+
+  useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 
   // Abrir já logado: se existe um crachá guardado, pergunta ao servidor se ainda vale.
   // Ele pode não valer mais — a pessoa foi expulsa ou banida enquanto o app estava fechado.
@@ -87,6 +90,14 @@ export function App() {
   const fotos = new Map<string, string | null>();
   for (const sala of rooms) for (const p of sala.participants) fotos.set(p.identity, p.foto ?? null);
 
+  // No Mac quem escolhe a janela é o próprio sistema, então abrir o nosso seletor
+  // significaria escolher duas vezes. No Windows ele continua sendo o caminho.
+  const compartilhar = useCallback(async () => {
+    if (rm.screenOn) return rm.stopScreen();
+    if (!seletorDoSistema) return setPicker(true);
+    try { await rm.startScreen(null, true); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
+  }, [rm, seletorDoSistema]);
+
   const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
   const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
 
@@ -113,7 +124,7 @@ export function App() {
         servidor={sessao.servidor}
         rm={rm}
         onJoin={joinRoom}
-        onShare={() => (rm.screenOn ? rm.stopScreen() : setPicker(true))}
+        onShare={compartilhar}
         onSettings={() => setDevices(true)}
         fotos={fotos}
         onPainel={() => setPainel(true)}
