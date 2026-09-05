@@ -12,7 +12,7 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts"
+    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts src/renderer/src/erros.test.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

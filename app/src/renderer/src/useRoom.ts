@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
+import { explicarFalhaDeAudio } from './erros';
 import {
   Room,
   RoomEvent,
@@ -271,7 +272,7 @@ export function useRoom() {
       try {
         if (sourceId) await window.desktop.chooseSource(sourceId, false);
         await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
-        setError('Compartilhando, mas sem o áudio do sistema. No Windows isso costuma ser janela escolhida em vez de tela inteira; no Mac, versão anterior ao 14.2.');
+        setError(explicarFalhaDeAudio(motivo));
       } catch (e2) {
         const motivo2 = (e2 as Error).message || String(e2);
         anotar('erro', 'tela', `falhou também sem áudio: ${motivo2}`);
