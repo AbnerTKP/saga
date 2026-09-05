@@ -5,7 +5,10 @@
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { createReadStream, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
+import { salvarImagem, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
 import { CARGO, NOME_DO_CARGO } from './cargos.mjs';
@@ -17,6 +20,7 @@ const SALAS_INICIAIS = (process.env.ROOMS ?? 'Geral').split(',').map((s) => s.tr
 const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Cantinho do Vorcaro';
 const DONO = process.env.DONO ?? '';            // apelido que vira dono; vazio = o primeiro a entrar
 const BANCO = process.env.BANCO ?? './dados/cantinho.db';
+const ARQUIVOS = process.env.ARQUIVOS ?? './dados/arquivos';
 const KEY = process.env.LIVEKIT_API_KEY;
 const SECRET = process.env.LIVEKIT_API_SECRET;
 const HOST = process.env.LIVEKIT_HOST ?? 'http://localhost:7880';
@@ -52,6 +56,21 @@ function lerCorpo(req) {
     let dados = '';
     req.on('data', (c) => { dados += c; if (dados.length > 100_000) req.destroy(); });
     req.on('end', () => { try { resolve(dados ? JSON.parse(dados) : {}); } catch (e) { reject(e); } });
+    req.on('error', reject);
+  });
+}
+
+/** Corpo cru, para upload de imagem. Corta na hora se passar do teto, sem juntar tudo antes. */
+function lerBinario(req, limite) {
+  return new Promise((resolve, reject) => {
+    const pedacos = [];
+    let total = 0;
+    req.on('data', (c) => {
+      total += c.length;
+      if (total > limite) { req.destroy(); reject(new ErroDeArquivo('A imagem é grande demais.', 413)); return; }
+      pedacos.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(pedacos)));
     req.on('error', reject);
   });
 }
@@ -130,6 +149,24 @@ async function ondeEsta(usuarioId) {
   return null;
 }
 
+/** Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor. */
+async function trocarImagem(req, de, papel) {
+  const eu = exigirSessao(req);
+  if (de === 'servidor' && eu.cargo < CARGO.DONO) {
+    throw new ErroDeConta('Só o dono muda a imagem do servidor.', 403);
+  }
+  const bruto = await lerBinario(req, LIMITES[papel] + 1024);
+  // Corpo vazio significa "tirar a imagem": é como o app pede a remoção.
+  const nome = bruto.length ? salvarImagem(ARQUIVOS, bruto, papel) : null;
+
+  if (de === 'servidor') {
+    db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, SERVIDOR.id);
+    return { servidor: verServidor() };
+  }
+  db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
+  return { eu: verMembro(membros.buscarMembro(db, SERVIDOR.id, eu.id)) };
+}
+
 const ROTAS = {
   'POST /cadastrar': async (req) => {
     const c = await lerCorpo(req);
@@ -195,6 +232,11 @@ const ROTAS = {
     return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
+  'POST /eu/foto':   (req) => trocarImagem(req, 'usuario', 'foto'),
+  'POST /eu/banner': (req) => trocarImagem(req, 'usuario', 'banner'),
+  'POST /servidor/foto':   (req) => trocarImagem(req, 'servidor', 'foto'),
+  'POST /servidor/banner': (req) => trocarImagem(req, 'servidor', 'banner'),
+
   'POST /moderar': async (req) => {
     const eu = exigirSessao(req);
     const { acao, alvo, minutos, cargo } = await lerCorpo(req);
@@ -240,6 +282,28 @@ const servidor = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
   if (url.pathname === '/health') return json(res, 200, { ok: true });
 
+  // As imagens são públicas de propósito: o <img> do app não manda cabeçalho de sessão.
+  // O nome é o hash do conteúdo, então não dá para descobrir a de alguém por adivinhação.
+  if (req.method === 'GET' && url.pathname.startsWith('/arquivos/')) {
+    const arquivo = nomeValido(decodeURIComponent(url.pathname.slice('/arquivos/'.length)));
+    if (!arquivo) return json(res, 404, { error: 'não encontrado' });
+    // Conferir antes de responder: escrever o cabeçalho 200 e só então descobrir que o
+    // arquivo sumiu deixa o cliente com uma resposta truncada em vez de um 404.
+    let tamanho;
+    try { tamanho = statSync(join(ARQUIVOS, arquivo.nome)).size; }
+    catch { return json(res, 404, { error: 'não encontrado' }); }
+    res.writeHead(200, {
+      'content-length': tamanho,
+      'content-type': arquivo.tipo,
+      // O nome muda quando a imagem muda, então o cache pode ser eterno.
+      'cache-control': 'public, max-age=31536000, immutable',
+      ...CORS,
+    });
+    return createReadStream(join(ARQUIVOS, arquivo.nome))
+      .on('error', () => { res.destroy(); })
+      .pipe(res);
+  }
+
   const chave = `${req.method} ${url.pathname}`;
   const rota = ROTAS[chave];
   if (!rota) return json(res, 404, { error: 'não encontrado' });
@@ -252,7 +316,7 @@ const servidor = http.createServer(async (req, res) => {
   try {
     return json(res, 200, await rota(req));
   } catch (e) {
-    if (e instanceof ErroDeConta) return json(res, e.status, { error: e.message });
+    if (e instanceof ErroDeConta || e instanceof ErroDeArquivo) return json(res, e.status, { error: e.message });
     console.error(chave, e);
     return json(res, 500, { error: 'erro no servidor' });
   }

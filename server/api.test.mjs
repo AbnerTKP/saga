@@ -196,6 +196,90 @@ test('a lista de membros sai ordenada por cargo e sem dados internos', async () 
   assert.ok(!JSON.stringify(r.corpo).includes('senha_hash'));
 });
 
+// --- imagens ----------------------------------------------------------------
+
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(56)]);
+const GIF = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(58)]);
+
+async function subir(rota, sessao, dados) {
+  const r = await fetch(base + rota, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', 'x-sessao': sessao },
+    body: dados,
+  });
+  return { status: r.status, corpo: await r.json().catch(() => ({})) };
+}
+
+test('sobe foto de perfil e ela passa a ser servida', async () => {
+  const { token } = await sessaoDe('abner');
+  const r = await subir('/eu/foto', token, PNG);
+  assert.equal(r.status, 200);
+  assert.match(r.corpo.eu.foto, /^[0-9a-f]{32}\.png$/);
+
+  const img = await fetch(`${base}/arquivos/${r.corpo.eu.foto}`);
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await img.arrayBuffer()), PNG);
+});
+
+test('banner aceita GIF', async () => {
+  const { token } = await sessaoDe('abner');
+  const r = await subir('/eu/banner', token, GIF);
+  assert.equal(r.status, 200);
+  assert.match(r.corpo.eu.banner, /\.gif$/);
+});
+
+test('corpo vazio remove a imagem', async () => {
+  const { token } = await sessaoDe('abner');
+  await subir('/eu/foto', token, PNG);
+  const r = await subir('/eu/foto', token, Buffer.alloc(0));
+  assert.equal(r.corpo.eu.foto, null);
+});
+
+test('arquivo que não é imagem é recusado', async () => {
+  const { token } = await sessaoDe('abner');
+  const r = await subir('/eu/foto', token, Buffer.from('#!/bin/sh\necho oi\n'.padEnd(64)));
+  assert.equal(r.status, 400);
+  assert.match(r.corpo.error, /PNG, JPG, GIF ou WEBP/);
+});
+
+test('imagem grande demais é cortada com 413', async () => {
+  const { token } = await sessaoDe('abner');
+  const gorda = Buffer.concat([PNG, Buffer.alloc(4 * 1024 * 1024)]);
+  const r = await subir('/eu/foto', token, gorda).catch(() => ({ status: 413, corpo: {} }));
+  assert.equal(r.status, 413);
+});
+
+test('sem sessão não se sobe imagem', async () => {
+  const r = await fetch(`${base}/eu/foto`, { method: 'POST', body: PNG });
+  assert.equal(r.status, 401);
+});
+
+test('só o dono troca a imagem do servidor', async () => {
+  const bruno = await sessaoDe('bruno');
+  assert.equal((await subir('/servidor/foto', bruno.token, PNG)).status, 403);
+  const dono = await sessaoDe('abner');
+  const r = await subir('/servidor/foto', dono.token, PNG);
+  assert.equal(r.status, 200);
+  assert.match(r.corpo.servidor.foto, /\.png$/);
+});
+
+test('não dá para pescar arquivo de fora da pasta', async () => {
+  for (const tentativa of [
+    '../../../etc/passwd', '..%2F..%2Fetc%2Fpasswd', '%2e%2e%2f%2e%2e%2fetc%2fpasswd',
+    'cantinho.db', '../cantinho.db', 'aaaa.png',
+  ]) {
+    const r = await fetch(`${base}/arquivos/${tentativa}`);
+    assert.equal(r.status, 404, `${tentativa} respondeu ${r.status}`);
+  }
+});
+
+test('imagem inexistente com nome válido não derruba o servidor', async () => {
+  const r = await fetch(`${base}/arquivos/${'0'.repeat(32)}.png`);
+  assert.ok(r.status === 200 || r.status === 404);
+  assert.equal((await fetch(`${base}/health`)).status, 200, 'o servidor caiu');
+});
+
 test('/rooms responde mesmo com o LiveKit fora do ar', async () => {
   // O LiveKit aponta para uma porta morta de propósito: a lista de salas tem de vir
   // assim mesmo, vazia, senão a barra lateral quebraria junto com a voz.
