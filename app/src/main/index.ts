@@ -63,9 +63,14 @@ app.whenReady().then(async () => {
       const audio = pendingSource?.audio ?? false;
       pendingSource = null;
       if (!chosen) {
+        registrar('erro', 'tela', 'nenhuma fonte de captura disponível');
         callback({});
         return;
       }
+      // Registrado porque "o áudio não sai só no PC dele" só se investiga sabendo o que
+      // foi pedido: tela inteira ou janela, e com ou sem o áudio do sistema.
+      registrar('info', 'tela',
+        `capturando ${chosen.id.startsWith('screen') ? 'tela inteira' : 'janela'} "${chosen.name}" | áudio do sistema: ${audio ? 'pedido' : 'não'}`);
       // 'loopback' = áudio do sistema. Windows: nativo. macOS 14.2+: via Core Audio Taps (Electron ≥ 39).
       callback(audio ? { video: chosen, audio: 'loopback' } : { video: chosen });
     },

@@ -57,9 +57,10 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
               {sources !== null && shown.length === 0 && <div className="muted pad">Nada encontrado.</div>}
             </div>
             <div className="modal-foot">
-              <label className="check">
+              <label className="check" title={tab === 'window' ? 'Escolhendo uma janela, o áudio do sistema costuma não vir junto' : undefined}>
                 <input type="checkbox" checked={audio} onChange={(e) => setAudio(e.target.checked)} />
                 Compartilhar áudio do sistema
+                {tab === 'window' && <span className="muted small"> — mais confiável com a tela inteira</span>}
               </label>
               <div className="spacer" />
               <button onClick={onClose}>Cancelar</button>
