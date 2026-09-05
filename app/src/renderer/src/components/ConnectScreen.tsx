@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { SERVIDOR_PADRAO } from '../api';
 
-export type Settings = { server: string; password: string; name: string };
+export type Settings = { password: string; name: string };
 
 export function ConnectScreen({ initial, onEnter }: { initial: Settings; onEnter: (s: Settings) => Promise<void> }) {
   const [s, setS] = useState<Settings>(initial);
@@ -27,15 +26,11 @@ export function ConnectScreen({ initial, onEnter }: { initial: Settings; onEnter
         <h1>Cantinho do Vorcaro</h1>
         <p className="muted">Voz, vídeo e tela entre amigos.</p>
         <label>
-          Servidor
-          <input value={s.server} onChange={(e) => setS({ ...s, server: e.target.value })} placeholder={SERVIDOR_PADRAO} required />
-        </label>
-        <label>
           Senha do grupo
           <input type="password" value={s.password} onChange={(e) => setS({ ...s, password: e.target.value })} required />
         </label>
         <label>
-          Seu nome
+          Seu apelido
           <input value={s.name} onChange={(e) => setS({ ...s, name: e.target.value })} maxLength={32} required />
         </label>
         {err && <div className="error">{err}</div>}

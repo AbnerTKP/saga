@@ -1,6 +1,7 @@
-// Endereço do servidor do grupo, já preenchido para quem instala: o amigo só digita
-// a senha e o nome. Se o servidor mudar de IP (ou ganhar um domínio), troque aqui.
-export const SERVIDOR_PADRAO = '76.13.225.79:3001';
+// Endereço do servidor do grupo. Não é perguntado a ninguém: quem instala digita só a
+// senha e o apelido. Se o servidor mudar de IP ou ganhar um domínio, é aqui que se troca
+// — e é preciso publicar uma versão nova para todo mundo receber.
+export const SERVIDOR = '76.13.225.79:3001';
 
 export type RoomParticipant = { identity: string; name: string; camera: boolean; screen: boolean; muted: boolean };
 export type RoomInfo = { name: string; participants: RoomParticipant[] };

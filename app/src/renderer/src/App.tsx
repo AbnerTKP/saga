@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchRooms, fetchToken, normalizeServer, SERVIDOR_PADRAO, type RoomInfo } from './api';
+import { fetchRooms, fetchToken, normalizeServer, SERVIDOR, type RoomInfo } from './api';
 import { useRoom } from './useRoom';
 import { ConnectScreen, type Settings } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
@@ -15,7 +15,7 @@ function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignora */ }
-  return { server: SERVIDOR_PADRAO, password: '', name: '' };
+  return { password: '', name: '' };
 }
 
 export function App() {
@@ -27,13 +27,12 @@ export function App() {
   const [devices, setDevices] = useState(false);
   const rm = useRoom();
 
-  const server = normalizeServer(settings.server || SERVIDOR_PADRAO);
+  const server = normalizeServer(SERVIDOR);
 
   const enter = useCallback(async (s: Settings) => {
-    const norm = { ...s, server: normalizeServer(s.server) };
-    const list = await fetchRooms(norm.server, norm.password);
-    localStorage.setItem(KEY, JSON.stringify(norm));
-    setSettings(norm);
+    const list = await fetchRooms(normalizeServer(SERVIDOR), s.password);
+    localStorage.setItem(KEY, JSON.stringify(s));
+    setSettings(s);
     setRooms(list);
     setEntered(true);
   }, []);

@@ -5,7 +5,10 @@ import {
   Track,
   Participant,
   VideoPresets,
+  ScreenSharePresets,
   type LocalParticipant,
+  type ScreenShareCaptureOptions,
+  type TrackPublishOptions,
 } from 'livekit-client';
 
 export type ChatMessage = { id: string; from: string; text: string; ts: number; mine: boolean };
@@ -21,6 +24,10 @@ function getAudioRoot() {
   }
   return audioRoot;
 }
+
+// Compartilhar vídeo é diferente de compartilhar planilha: 1080p a 30 fps e até 5 Mb/s,
+// em vez dos 15 fps de antes, que engasgam qualquer filme.
+const PRESET_DE_TELA = ScreenSharePresets.h1080fps30;
 
 // Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
 // engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
@@ -159,15 +166,26 @@ export function useRoom() {
 
   const startScreen = useCallback(async (sourceId: string, audio: boolean) => {
     setError(null);
-    const opts = { resolution: { width: 1920, height: 1080, frameRate: 15 } };
+    const captura: ScreenShareCaptureOptions = {
+      resolution: PRESET_DE_TELA.resolution,
+      // 'motion' avisa o codificador que ali corre vídeo. Sem isso ele assume texto e
+      // protege a nitidez sacrificando quadros — que é exatamente o travamento em filme.
+      contentHint: 'motion',
+      audio,
+    };
+    const publicacao: TrackPublishOptions = {
+      screenShareEncoding: PRESET_DE_TELA.encoding,
+      // Se a banda apertar, prefira borrar a imagem a perder fluidez.
+      degradationPreference: 'maintain-framerate',
+    };
     await window.desktop.chooseSource(sourceId, audio);
     try {
-      await lp().setScreenShareEnabled(true, { ...opts, audio });
+      await lp().setScreenShareEnabled(true, captura, publicacao);
     } catch (e) {
       if (!audio) throw e;
       // sem áudio do sistema neste computador: tenta só o vídeo
       await window.desktop.chooseSource(sourceId, false);
-      await lp().setScreenShareEnabled(true, { ...opts, audio: false });
+      await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
       setError('Compartilhando sem o áudio do sistema (não disponível neste computador).');
     }
     bump();

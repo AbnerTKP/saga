@@ -146,4 +146,7 @@ código (a senha do grupo fica no `.env` do servidor, que não é enviado).
 - Salas: variável `ROOMS` no `.env` do servidor.
 - Endereço do servidor que já vem preenchido no app: `SERVIDOR_PADRAO` em
   `app/src/renderer/src/api.ts` (hoje `76.13.225.79:3001`, a VPS na Hostinger).
-- Resolução da tela compartilhada: `startScreen` em `app/src/renderer/src/useRoom.ts` (padrão 1080p / 15 fps).
+- Qualidade da tela compartilhada: `PRESET_DE_TELA` em `app/src/renderer/src/useRoom.ts`
+  (padrão `h1080fps30`: 1080p, 30 fps, até 5 Mb/s). Baixe para `h720fps30` se a internet de
+  alguém sofrer — vale lembrar que o servidor reenvia esse fluxo para *cada* pessoa na sala,
+  então 5 Mb/s com 5 espectadores são 25 Mb/s saindo do VPS.
