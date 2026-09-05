@@ -1,0 +1,45 @@
+appId: br.com.vorcaro.cantinho
+productName: Cantinho do Vorcaro
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asar: true
+
+# Assina o app em ad-hoc depois de empacotar. Sem isso o macOS não tem identidade de
+# código para o app e as permissões de microfone, câmera e tela não ficam guardadas.
+afterPack: ./build/afterPack.js
+
+# Onde os instaladores são publicados (GitHub Releases). Mesmo repositório de src/main/update.ts.
+publish:
+  provider: github
+  owner: AbnerTKP
+  repo: cantinho-do-vorcaro
+
+# Sem assinatura: é só entre amigos. Ver README para abrir no Mac e no Windows.
+mac:
+  target:
+    - { target: dmg, arch: [universal] }
+  category: public.app-category.social-networking
+  identity: null            # sem certificado da Apple; quem assina (ad-hoc) é o afterPack
+  hardenedRuntime: false
+  extendInfo:
+    NSMicrophoneUsageDescription: "Para falar nas salas de voz."
+    NSCameraUsageDescription: "Para ligar a webcam."
+dmg:
+  contents:
+    - { x: 130, y: 220 }
+    - { x: 410, y: 220, type: link, path: /Applications }
+
+win:
+  target:
+    - { target: nsis, arch: [x64] }
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+
+toolsets:
+  nsis: "1.2.1"

@@ -1,0 +1,12 @@
+{
+  "name": "app-comunicacao",
+  "private": true,
+  "scripts": {
+    "dev:livekit": "livekit-server --dev --bind 0.0.0.0",
+    "dev:server": "pnpm --filter server dev",
+    "dev:app": "pnpm --filter app dev",
+    "build:app": "pnpm --filter app build",
+    "dist:mac": "pnpm --filter app dist:mac",
+    "dist:win": "pnpm --filter app dist:win"
+  }
+}

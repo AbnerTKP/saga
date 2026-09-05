@@ -1,0 +1,33 @@
+# Gera os instaladores de Windows e Mac e publica num GitHub Release.
+# Como usar: mude a versão em app/package.json, faça commit e crie a tag:
+#   git tag v0.2.0 && git push --tags
+# Em ~10 min o Release aparece com o .exe, o .dmg e o latest.yml (usado pela atualização automática).
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            cmd: dist:win
+          - os: macos-latest
+            cmd: dist:mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter app ${{ matrix.cmd }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # sem assinatura no Mac

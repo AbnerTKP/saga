@@ -1,0 +1,125 @@
+# Cantinho do Vorcaro — voz, vídeo e tela entre amigos
+
+App de desktop (Windows e Mac) no estilo Discord, sem cadastro e sem servidores de comunidade:
+uma senha compartilhada, algumas salas de voz fixas, câmera, compartilhamento de tela com áudio
+e chat da sala. Feito para até ~10 pessoas ao mesmo tempo.
+
+```
+app/      Electron + React (o programa que os amigos instalam)
+server/   servidor de token (um arquivo Node) + configuração do LiveKit + docker-compose
+docs/     plano original, versão grande (arquivado)
+```
+
+Como funciona: o app pede a senha e o nome, o servidor de token devolve um passe do LiveKit,
+e o LiveKit (servidor de mídia) distribui áudio, vídeo e tela entre todo mundo.
+
+## Rodar no seu computador (para testar)
+
+Precisa de Node 22, pnpm e livekit-server (`brew install node@22 pnpm livekit`).
+
+```bash
+pnpm install
+pnpm dev:livekit     # terminal 1: LiveKit em modo dev (chave devkey/secret)
+pnpm dev:server      # terminal 2: token server em http://localhost:3001, senha "amigos"
+pnpm dev:app         # terminal 3: abre o app
+```
+
+No app: servidor `localhost:3001`, senha `amigos`, seu nome. Salas: Geral, Jogos, Filmes
+(mude em `server/.env.dev`, variável `ROOMS`).
+
+## Hospedar para os amigos (uma vez só)
+
+O que fica ligado 24 h é o **servidor de voz** (pasta `server/`). Precisa de uma máquina Linux
+pequena com IP público: Oracle Cloud Always Free (grátis, São Paulo), AWS Lightsail São Paulo
+(~US$ 6/mês) ou Hetzner/DigitalOcean (~US$ 6/mês, EUA). 1 vCPU / 1 GB atende 10 pessoas.
+
+1. **Crie a máquina** com Ubuntu 24.04 e anote o IP público.
+2. **No painel do provedor, libere as portas** (Security List / Security Group / Firewall):
+   `22, 80, 443, 3001, 7880, 7881` em TCP e `3478, 40000–40100, 50000–50100` em UDP.
+3. **Opcional:** aponte um subdomínio (ex.: `voz.seudominio.com.br`) para o IP. Com domínio o
+   instalador liga HTTPS sozinho; sem domínio funciona só pelo IP.
+4. **Copie a pasta `server/` para a máquina e rode o instalador**, do seu Mac:
+   ```bash
+   scp -r ~/Documents/app-comunicacao/server ubuntu@IP_DA_MAQUINA:~/
+   ssh ubuntu@IP_DA_MAQUINA
+   sudo bash ~/server/instalar.sh
+   ```
+   Ele instala o Docker, gera as chaves, pergunta a senha e as salas, abre o firewall da máquina
+   e sobe tudo. No fim mostra o endereço e a senha para passar aos amigos.
+   (Na Oracle o usuário costuma ser `ubuntu`; na DigitalOcean, `root`.)
+5. No app, os amigos digitam o endereço mostrado e a senha.
+
+Para trocar senha ou salas: edite `~/server/.env` na máquina e rode
+`docker compose -f docker-compose.ip.yml up -d` (ou `docker-compose.yml` se usou domínio).
+Logs: `docker compose -f docker-compose.ip.yml logs -f`.
+
+### Se alguém não consegue conectar na voz
+Quase sempre é rede corporativa ou 4G com CGNAT. O TURN embutido resolve. Para o caso mais
+teimoso (firewall que só deixa 443), troque no `livekit.yaml` `tls_port: 5349` por `443` e no
+`Caddyfile` mova o Caddy para a porta 8443 — ou simplesmente peça para a pessoa usar outra rede.
+
+## Gerar os instaladores
+
+```bash
+pnpm dist:mac   # gera "app/dist/Cantinho do Vorcaro-0.1.0-universal.dmg" (Intel + Apple Silicon)
+pnpm dist:win   # gera "app/dist/Cantinho do Vorcaro Setup 0.1.0.exe" (dá para gerar no Mac mesmo)
+```
+
+Os instaladores **não são assinados por uma autoridade** (o certificado custa US$ 99/ano na
+Apple e ~US$ 10/mês na Microsoft), então o aviso de "app não verificado" aparece nos dois
+sistemas. No Mac, ainda assim, o `afterPack` de `app/build/afterPack.js` assina o pacote em
+**ad-hoc**: isso não vem da Apple e não tira o aviso, mas dá ao app um CDHash estável, sem o
+qual o macOS não consegue guardar as permissões de microfone, câmera e gravação de tela e
+volta a pedi-las a cada abertura. Não remova esse hook.
+
+Para amigos, basta explicar:
+
+- **Mac**: arraste para Aplicativos. Na primeira vez, o macOS diz que "não pôde verificar".
+  Abra **Ajustes do Sistema › Privacidade e Segurança**, role até o aviso e clique em
+  **Abrir Mesmo Assim**. Alternativa no Terminal: `xattr -d com.apple.quarantine "/Applications/Cantinho do Vorcaro.app"`.
+  Ao compartilhar tela pela primeira vez, o macOS pede permissão de **Gravação de Tela**; o app
+  mostra o caminho e o botão que abre o painel certo. Depois de ligar, feche e abra o app.
+- **Windows**: o SmartScreen mostra "Windows protegeu o seu PC". Clique em **Mais informações ›
+  Executar mesmo assim**. O instalador é de um clique, sem admin.
+
+Para distribuir, suba os dois arquivos num Google Drive, num GitHub Release ou no próprio VPS.
+
+## Atualizações (como os amigos recebem versão nova)
+
+O app olha o GitHub Releases do repositório a cada 6 horas (e 5 s depois de abrir):
+
+- **Windows**: baixa a versão nova em silêncio e mostra "Reiniciar e atualizar". Se a pessoa
+  ignorar, instala sozinho na próxima vez que fechar o app.
+- **Mac**: como o app não é assinado pela Apple, ele não pode se substituir sozinho. Aparece o
+  aviso "Versão X disponível" com o botão **Baixar**, que abre o DMG novo; a pessoa arrasta por
+  cima do antigo. (Assinar e notarizar, US$ 99/ano, destrava a atualização automática no Mac.)
+
+Para isso funcionar, uma configuração única:
+
+1. Já feito: o repositório público é `AbnerTKP/cantinho-do-vorcaro`.
+2. Já feito: `REPO` em `app/src/main/update.ts` e `owner`/`repo` em `app/electron-builder.yml`
+   apontam para ele. (Se um dia mudar de repositório, são esses dois lugares.)
+3. Para lançar uma versão: mude `version` em `app/package.json` (ex.: `0.2.0`), faça commit e
+   crie a tag `v0.2.0` (`git tag v0.2.0 && git push --tags`). O GitHub Actions
+   (`.github/workflows/release.yml`) gera o `.exe`, o `.dmg` e o `latest.yml` e publica o Release
+   sozinho, em cerca de 10 minutos, sem precisar de Mac nem de Windows na sua mão.
+
+O repositório precisa ser público só para o download não exigir login; não há nada secreto no
+código (a senha do grupo fica no `.env` do servidor, que não é enviado).
+
+## Limites conhecidos
+
+- Chat some quando a sala esvazia (fica só na memória de quem está dentro). Foi de propósito: sem banco.
+- Áudio do sistema no compartilhamento: Windows sempre funciona; Mac precisa de macOS 14.2+ e, se
+  falhar, o app compartilha só o vídeo e avisa.
+- No Mac a atualização é semiautomática (aviso + download), por falta de assinatura.
+- Sem cargos, permissões, DMs ou histórico: qualquer um com a senha entra em qualquer sala.
+
+## Mudar nome, ícone e salas
+
+- Nome do app: `productName` em `app/package.json` e `app/electron-builder.yml`.
+- Ícone: coloque `icon.icns` (Mac) e `icon.ico` (Windows) em `app/build/`.
+- Salas: variável `ROOMS` no `.env` do servidor.
+- Endereço do servidor que já vem preenchido no app: `SERVIDOR_PADRAO` em
+  `app/src/renderer/src/api.ts` (hoje `76.13.225.79:3001`, a VPS na Hostinger).
+- Resolução da tela compartilhada: `startScreen` em `app/src/renderer/src/useRoom.ts` (padrão 1080p / 15 fps).

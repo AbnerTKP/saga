@@ -1,0 +1,31 @@
+# Sobe tudo num VPS: LiveKit (mídia), servidor de token e Caddy (HTTPS automático).
+# 1) copie .env.example para .env e preencha
+# 2) edite livekit.yaml (chaves) e Caddyfile (domínio)
+# 3) docker compose up -d
+services:
+  livekit:
+    image: livekit/livekit-server:v1.9
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    network_mode: host          # precisa das portas UDP direto no IP público
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  token:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LIVEKIT_HOST: http://127.0.0.1:7880
+    network_mode: host          # fala com o livekit em localhost, escuta em :3001
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro   # gerado pelo instalar.sh a partir do Caddyfile.template
+      - caddy_data:/data
+
+volumes:
+  caddy_data:
