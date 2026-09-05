@@ -391,3 +391,25 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   flex: none; width: 42px; font-size: 10px; text-transform: uppercase;
   letter-spacing: .06em; color: var(--text3); font-weight: 700;
 }
+
+/* ---- cargos na configuração ---- */
+
+.lista-cargos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lista-cargos li { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.lista-cargos li.intocavel { opacity: .7; }
+.bolinha-cargo { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.nome-cargo { font-weight: 600; color: var(--white); flex: 1; min-width: 0; }
+.lista-cargos button {
+  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.lista-cargos button.danger { background: #6a2b2b; color: #f5c4c4; }
+
+.editor-cargo { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 10px; }
+.cor-cargo { width: 44px; padding: 2px; flex: none; }
+.nivel-cargo { width: 68px; flex: none; text-align: center; }
+.permissoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }
+.permissoes .check { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+
+/* O raio do Turbo, roxo, junto dos outros ícones da pessoa. */
+.raio-turbo { color: #c084fc; display: flex; }

@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  CARGO, verServidor, renomearServidor, mudarMeuNome, moderar,
+  pode, podeSobre, verServidor, renomearServidor, mudarMeuNome, moderar,
   minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif,
   criarSala, renomearSala, apagarSala,
-  type Acao, type AcaoDeModeracao, type Membro, type Servidor, type Sala, type TipoDeSala,
+  criarCargo, editarCargo, apagarCargo,
+  type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
+  type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherImagem } from './EscolherImagem';
 
-// Espelho da regra do servidor, só para não mostrar botão que vai ser recusado.
-// Quem decide de verdade é o servidor: aqui é conveniência, não segurança.
-const EXIGE: Record<AcaoDeModeracao, number> = {
-  mutar: CARGO.MODERADOR, desconectar: CARGO.MODERADOR, timeout: CARGO.MODERADOR,
-  tirarTimeout: CARGO.MODERADOR, expulsar: CARGO.MODERADOR,
-  banir: CARGO.DONO, desbanir: CARGO.DONO, cargo: CARGO.DONO,
+// Espelho da regra do servidor, só para não mostrar botão que será recusado. Quem decide
+// de verdade é o servidor: aqui é conveniência, não segurança.
+const PERMISSAO_DE: Record<AcaoDeModeracao, Permissao> = {
+  mutar: 'mutar', desconectar: 'desconectar', timeout: 'timeout', tirarTimeout: 'timeout',
+  expulsar: 'expulsar', banir: 'banir', desbanir: 'banir', cargo: 'definirCargo',
 };
 const posso = (eu: Membro, acao: AcaoDeModeracao, alvo: Membro) =>
-  eu.id !== alvo.id && eu.cargo >= EXIGE[acao] && alvo.cargo < eu.cargo;
+  podeSobre(eu, PERMISSAO_DE[acao], alvo);
 
 const emCastigo = (m: Membro) => !!m.castigoAte && m.castigoAte > Date.now();
 
@@ -28,6 +29,9 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
 }) {
   const [membros, setMembros] = useState<Membro[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [permissoes, setPermissoes] = useState<Record<string, string>>({});
+  const [editando, setEditando] = useState<CargoNovo & { id?: number } | null>(null);
   const [novaSala, setNovaSala] = useState('');
   const [tipoNovo, setTipoNovo] = useState<TipoDeSala>('voz');
   const [nomeServidor, setNomeServidor] = useState(servidor.nome);
@@ -41,6 +45,8 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
       const r = await verServidor();
       setMembros(r.membros);
       setSalas(r.salas);
+      setCargos(r.cargos);
+      setPermissoes(r.permissoes);
     } catch (e) { setErro((e as Error).message); }
   }, []);
 
@@ -112,7 +118,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           </div>
         </section>
 
-        {eu.cargo >= CARGO.DONO && (
+        {pode(eu.cargo, 'gerirServidor') && (
           <section className="painel-bloco">
             <h3>O servidor</h3>
             <div className="imagens">
@@ -134,7 +140,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           </section>
         )}
 
-        {eu.cargo >= CARGO.DONO && (
+        {pode(eu.cargo, 'gerirSalas') && (
           <section className="painel-bloco">
             <h3>Salas <span className="count">{salas.length}</span></h3>
             <p className="muted small">
@@ -200,6 +206,122 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           </section>
         )}
 
+        {pode(eu.cargo, 'gerirCargos') && (
+          <section className="painel-bloco">
+            <h3>Cargos <span className="count">{cargos.length}</span></h3>
+            <p className="muted small">
+              O nível decide a hierarquia: ninguém age sobre alguém de nível igual ou
+              maior. O cargo de dono tem tudo e não se edita.
+            </p>
+
+            <ul className="lista-cargos">
+              {cargos.map((c) => (
+                <li key={c.id} className={c.dono ? 'intocavel' : ''}>
+                  <span className="bolinha-cargo" style={{ background: c.cor ?? 'var(--text3)' }} />
+                  <span className="nome-cargo">{c.nome}</span>
+                  <span className="muted small">nível {c.nivel}</span>
+                  <span className="muted small">
+                    {c.dono ? 'tudo' : `${c.permissoes.length} permiss${c.permissoes.length === 1 ? 'ão' : 'ões'}`}
+                  </span>
+                  {!c.dono && (
+                    <>
+                      <button disabled={ocupado} onClick={() => setEditando({ ...c })}>editar</button>
+                      <button
+                        className="danger"
+                        disabled={ocupado}
+                        title={`Apagar ${c.nome}. Quem estiver nele desce para o cargo mais baixo.`}
+                        onClick={async () => {
+                          setErro(null); setOcupado(true);
+                          try { await apagarCargo(c.id); setAviso('Cargo apagado.'); await recarregar(); }
+                          catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                        }}
+                      >
+                        apagar
+                      </button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {editando ? (
+              <div className="editor-cargo">
+                <div className="linha-campo">
+                  <input
+                    placeholder="Nome do cargo"
+                    value={editando.nome}
+                    maxLength={24}
+                    onChange={(e) => setEditando({ ...editando, nome: e.target.value })}
+                  />
+                  <input
+                    type="color"
+                    className="cor-cargo"
+                    value={editando.cor ?? '#99aab5'}
+                    title="Cor do nome"
+                    onChange={(e) => setEditando({ ...editando, cor: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    className="nivel-cargo"
+                    min={1}
+                    max={99}
+                    value={editando.nivel}
+                    title="Nível: 1 a 99"
+                    onChange={(e) => setEditando({ ...editando, nivel: Number(e.target.value) })}
+                  />
+                </div>
+
+                <div className="permissoes">
+                  {Object.entries(permissoes).map(([chave, descricao]) => (
+                    <label key={chave} className="check">
+                      <input
+                        type="checkbox"
+                        checked={editando.permissoes.includes(chave as Permissao)}
+                        onChange={(e) => setEditando({
+                          ...editando,
+                          permissoes: e.target.checked
+                            ? [...editando.permissoes, chave as Permissao]
+                            : editando.permissoes.filter((p) => p !== chave),
+                        })}
+                      />
+                      {descricao}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="linha-campo">
+                  <button
+                    className="primary"
+                    disabled={ocupado || !editando.nome.trim()}
+                    onClick={async () => {
+                      setErro(null); setOcupado(true);
+                      try {
+                        const dados = {
+                          nome: editando.nome, cor: editando.cor,
+                          nivel: editando.nivel, permissoes: editando.permissoes,
+                        };
+                        if (editando.id) await editarCargo(editando.id, dados);
+                        else await criarCargo(dados);
+                        setEditando(null); setAviso('Cargo salvo.'); await recarregar();
+                      } catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                    }}
+                  >
+                    Salvar
+                  </button>
+                  <button onClick={() => setEditando(null)}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() => setEditando({ nome: '', cor: '#99aab5', nivel: 20, permissoes: [] })}
+              >
+                Criar cargo
+              </button>
+            )}
+          </section>
+        )}
+
         <section className="painel-bloco">
           <h3>Pessoas <span className="count">{membros.length}</span></h3>
           <ul className="membros">
@@ -213,7 +335,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                     {m.id === eu.id && <span className="muted small"> (você)</span>}
                   </div>
                   <div className="muted small">
-                    {m.cargoNome} · {m.apelido}
+                    <span style={m.cargo?.cor ? { color: m.cargo.cor } : undefined}>{m.cargoNome}</span> · {m.apelido}
                     {m.banido && ` · banido por ${m.banidoPor ?? 'alguém'}`}
                     {emCastigo(m) && ` · de castigo até ${new Date(m.castigoAte!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
                   </div>
@@ -241,7 +363,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                     ? <button title="Desbanir" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
                     : <button className="danger" title="Banir para sempre" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
                   )}
-                  {eu.cargo >= CARGO.DONO && (
+                  {pode(eu.cargo, 'concederTurbo') && (
                     <button
                       className={m.turbo ? 'turbo-on' : ''}
                       title={m.turbo ? 'Tirar o Vorcaro Turbo' : 'Dar Vorcaro Turbo'}
@@ -251,7 +373,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                       turbo
                     </button>
                   )}
-                  {eu.cargo >= CARGO.DONO && (
+                  {pode(eu.cargo, 'definirId') && (
                     <input
                       className="campo-id"
                       defaultValue={m.idExibido ?? ''}
@@ -267,13 +389,14 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                   )}
                   {posso(eu, 'cargo', m) && (
                     <select
-                      value={m.cargo}
+                      value={m.cargo?.id ?? ''}
                       disabled={ocupado}
                       onChange={(e) => agir('cargo', m, { cargo: Number(e.target.value) })}
                       title="Cargo"
                     >
-                      <option value={CARGO.MEMBRO}>Membro</option>
-                      <option value={CARGO.MODERADOR}>Moderador</option>
+                      {cargos
+                        .filter((c) => !c.dono && c.nivel < (eu.cargo?.nivel ?? 0))
+                        .map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </select>
                   )}
                 </div>

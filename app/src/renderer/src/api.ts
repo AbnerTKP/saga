@@ -11,13 +11,37 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
   ? SERVIDOR.replace(/\/+$/, '')
   : `${/^\d+\.\d+\.\d+\.\d+/.test(SERVIDOR) || SERVIDOR.startsWith('localhost') ? 'http' : 'https'}://${SERVIDOR}`;
 
-export const CARGO = { MEMBRO: 10, MODERADOR: 50, DONO: 100 } as const;
+export type Permissao =
+  | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
+  | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
+  | 'gerirServidor' | 'concederTurbo' | 'definirId';
+
+export type Cargo = {
+  id: number;
+  nome: string;
+  cor: string | null;
+  /** Hierarquia: ninguém age sobre alguém de nível igual ou maior. */
+  nivel: number;
+  dono: boolean;
+  permissoes: Permissao[];
+};
+
+/** O dono tem tudo por ser dono, não por constar na lista. */
+export const pode = (cargo: Cargo | null | undefined, p: Permissao) =>
+  !!cargo && (cargo.dono || cargo.permissoes.includes(p));
+
+/** Ações que recaem sobre alguém passam também pela hierarquia. */
+export const SOBRE_ALGUEM: Permissao[] = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo'];
+
+export const podeSobre = (eu: Membro, p: Permissao, alvo: { id: number; cargo: Cargo | null }) =>
+  pode(eu.cargo, p)
+  && (!SOBRE_ALGUEM.includes(p) || (eu.id !== alvo.id && (alvo.cargo?.nivel ?? 0) < (eu.cargo?.nivel ?? 0)));
 
 export type Membro = {
   id: number;
   apelido: string;
   nome: string;
-  cargo: number;
+  cargo: Cargo | null;
   cargoNome: string;
   foto: string | null;
   banner: string | null;
@@ -33,7 +57,7 @@ export type Servidor = { id: number; nome: string; foto: string | null; banner: 
 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
-  usuarioId?: number; cargo?: number; foto?: string | null;
+  usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
   banner?: string | null; turbo?: boolean; idExibido?: string | null;
 };
 export type TipoDeSala = 'voz' | 'texto';
@@ -108,7 +132,18 @@ export const quemSou = () =>
 export const mudarMeuNome = (nome: string) => pedir<{ eu: Membro }>('PATCH', '/eu', { nome });
 
 export const verServidor = () =>
-  pedir<{ servidor: Servidor; salas: Sala[]; membros: Membro[] }>('GET', '/servidor');
+  pedir<{
+    servidor: Servidor; salas: Sala[]; membros: Membro[];
+    cargos: Cargo[]; permissoes: Record<Permissao, string>;
+  }>('GET', '/servidor');
+
+// --- cargos -----------------------------------------------------------------
+
+export type CargoNovo = { nome: string; cor: string | null; nivel: number; permissoes: Permissao[] };
+
+export const criarCargo = (c: CargoNovo) => pedir<{ cargo: Cargo }>('POST', '/cargos/criar', c);
+export const editarCargo = (id: number, c: CargoNovo) => pedir<{ cargo: Cargo }>('POST', '/cargos/editar', { id, ...c });
+export const apagarCargo = (id: number) => pedir<{ ok: true }>('POST', '/cargos/apagar', { id });
 
 // --- salas ------------------------------------------------------------------
 

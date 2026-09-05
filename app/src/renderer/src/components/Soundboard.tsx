@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CARGO, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som } from '../api';
+import { pode, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som } from '../api';
 import { Icon } from './Icon';
 
 export function Soundboard({ eu, naSala, onTocar, onClose }: {
@@ -14,7 +14,7 @@ export function Soundboard({ eu, naSala, onTocar, onClose }: {
   const [ocupado, setOcupado] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
 
-  const podeGerir = eu.cargo >= CARGO.MODERADOR;
+  const podeGerir = pode(eu.cargo, 'gerirSons');
 
   const recarregar = () => listarSons().then(setSons).catch((e) => setErro((e as Error).message));
   useEffect(() => { recarregar(); }, []);
@@ -56,7 +56,7 @@ export function Soundboard({ eu, naSala, onTocar, onClose }: {
           {sons === null && <p className="muted small">Carregando…</p>}
           {sons?.length === 0 && (
             <p className="muted small">
-              Nenhum som ainda.{podeGerir ? ' Suba o primeiro aí embaixo.' : ' Peça a um moderador para subir.'}
+              Nenhum som ainda.{podeGerir ? ' Suba o primeiro aí embaixo.' : ' Peça a quem pode subir.'}
             </p>
           )}
           <div className="sons">

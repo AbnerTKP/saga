@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
   type Acao,
-  type RoomInfo, type Sessao, type Membro, type Servidor,
+  verServidor,
+  type Cargo, type RoomInfo, type Sessao, type Membro, type Servidor,
 } from './api';
 import { useRoom } from './useRoom';
 import { useChat } from './useChat';
@@ -36,6 +37,9 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
+  // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
+  // porque mudam quando alguém os edita.
+  const [cargos, setCargos] = useState<Cargo[]>([]);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -143,6 +147,11 @@ export function App() {
     try { await rm.startScreen(null, true); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
   }, [rm, seletorDoSistema]);
 
+  useEffect(() => {
+    if (!sessao) return;
+    verServidor().then((r) => setCargos(r.cargos)).catch(() => undefined);
+  }, [sessao]);
+
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   const chat = useChat(salaAberta?.id ?? null);
 
@@ -231,6 +240,7 @@ export function App() {
         <MenuDaPessoa
           pessoa={menu.pessoa}
           eu={sessao.eu}
+          cargos={cargos.filter((c) => !c.dono && c.nivel < (sessao.eu.cargo?.nivel ?? 0))}
           em={menu.em}
           volume={rm.volumeDe(menu.pessoa.identity)}
           onVolume={(v) => rm.definirVolume(menu.pessoa.identity, v)}

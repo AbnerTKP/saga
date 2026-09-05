@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CARGO, type Acao, type AcaoDeModeracao, type Membro } from '../api';
+import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } from '../api';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { urlDoArquivo } from '../api';
@@ -8,23 +8,18 @@ export type PessoaNaCall = {
   identity: string;
   nome: string;
   usuarioId?: number;
-  cargo?: number;
+  cargo?: Cargo | null;
   foto?: string | null;
   banner?: string | null;
   turbo?: boolean;
   idExibido?: string | null;
 };
 
-// Espelho da regra do servidor, só para não mostrar botão que vai ser recusado.
-const EXIGE: Record<AcaoDeModeracao, number> = {
-  mutar: CARGO.MODERADOR, desconectar: CARGO.MODERADOR, timeout: CARGO.MODERADOR,
-  tirarTimeout: CARGO.MODERADOR, expulsar: CARGO.MODERADOR,
-  banir: CARGO.DONO, desbanir: CARGO.DONO, cargo: CARGO.DONO,
-};
-
-export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose }: {
+export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onClose }: {
   pessoa: PessoaNaCall;
   eu: Membro;
+  /** Os cargos que podem ser dados: os abaixo do meu, e nunca o de dono. */
+  cargos: Cargo[];
   em: { x: number; y: number };
   volume: number;
   onVolume: (v: number) => void;
@@ -36,9 +31,15 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
   const souEu = pessoa.usuarioId === eu.id;
   const banner = urlDoArquivo(pessoa.banner);
 
+  // Espelho da regra do servidor, só para não mostrar botão que será recusado. Tirar e
+  // pôr castigo são a mesma permissão; desbanir é a mesma de banir.
+  const permissaoDe: Record<AcaoDeModeracao, 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir' | 'definirCargo'> = {
+    mutar: 'mutar', desconectar: 'desconectar', timeout: 'timeout', tirarTimeout: 'timeout',
+    expulsar: 'expulsar', banir: 'banir', desbanir: 'banir', cargo: 'definirCargo',
+  };
   const posso = (acao: AcaoDeModeracao) =>
-    pessoa.usuarioId !== undefined && pessoa.cargo !== undefined &&
-    !souEu && eu.cargo >= EXIGE[acao] && pessoa.cargo < eu.cargo;
+    pessoa.usuarioId !== undefined
+    && podeSobre(eu, permissaoDe[acao], { id: pessoa.usuarioId, cargo: pessoa.cargo ?? null });
 
   useEffect(() => {
     const fora = (e: MouseEvent) => { if (!caixa.current?.contains(e.target as Node)) onClose(); };
@@ -71,7 +72,7 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
             <Nome nome={pessoa.nome} id={pessoa.idExibido} turbo={pessoa.turbo} />
           </div>
           <div className="muted small">
-            {souEu ? 'você' : nomeDoCargo(pessoa.cargo)}
+            {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
             {pessoa.turbo && <span className="selo-turbo">TURBO</span>}
           </div>
         </div>
@@ -96,16 +97,15 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
           {posso('timeout') && <button disabled={ocupado} onClick={() => agir('timeout', { minutos: 10 })}>Castigo de 10 min</button>}
           {posso('expulsar') && <button disabled={ocupado} onClick={() => agir('expulsar')}>Expulsar</button>}
           {posso('banir') && <button className="perigo" disabled={ocupado} onClick={() => agir('banir')}>Banir</button>}
-          {posso('cargo') && (
+          {posso('cargo') && cargos.length > 0 && (
             <label className="menu-cargo">
               <span className="muted small">Cargo</span>
               <select
-                value={pessoa.cargo}
+                value={pessoa.cargo?.id ?? ''}
                 disabled={ocupado}
                 onChange={(e) => agir('cargo', { cargo: Number(e.target.value) })}
               >
-                <option value={CARGO.MEMBRO}>Membro</option>
-                <option value={CARGO.MODERADOR}>Moderador</option>
+                {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </label>
           )}
@@ -114,6 +114,3 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
     </div>
   );
 }
-
-const nomeDoCargo = (cargo?: number) =>
-  cargo === CARGO.DONO ? 'Dono' : cargo === CARGO.MODERADOR ? 'Moderador' : 'Membro';
