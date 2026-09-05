@@ -81,6 +81,12 @@ export function App() {
     setRooms([]);
   }, [rm]);
 
+  // Um mapa só de identidade -> foto, montado do que o servidor manda. O LiveKit sabe
+  // quem está falando mas não sabe de foto; a barra lateral e o palco precisam das duas
+  // coisas, então o mapa é montado aqui, uma vez, em vez de em cada componente.
+  const fotos = new Map<string, string | null>();
+  for (const sala of rooms) for (const p of sala.participants) fotos.set(p.identity, p.foto ?? null);
+
   const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
   const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
 
@@ -109,10 +115,11 @@ export function App() {
         onJoin={joinRoom}
         onShare={() => (rm.screenOn ? rm.stopScreen() : setPicker(true))}
         onSettings={() => setDevices(true)}
+        fotos={fotos}
         onPainel={() => setPainel(true)}
         onLogout={logout}
       />
-      <Stage rm={rm} />
+      <Stage rm={rm} fotos={fotos} />
       {picker && (
         <ScreenPicker
           onClose={() => setPicker(false)}

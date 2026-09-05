@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CARGO, verServidor, renomearServidor, mudarMeuNome, moderar,
+  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor,
   type Acao, type Membro, type Servidor,
 } from '../api';
 import { Icon } from './Icon';
+import { Avatar } from './Avatar';
+import { EscolherImagem } from './EscolherImagem';
 
 // Espelho da regra do servidor, só para não mostrar botão que vai ser recusado.
 // Quem decide de verdade é o servidor: aqui é conveniência, não segurança.
@@ -73,9 +76,19 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
         {aviso && <div className="aviso-ok">{aviso}</div>}
 
         <section className="painel-bloco">
-          <h3>Seu nome aqui</h3>
+          <h3>Seu perfil</h3>
+          <div className="imagens">
+            <EscolherImagem
+              rotulo="Sua foto" formato="redondo" atual={eu.foto}
+              onEnviar={async (a) => { setErro(null); try { onEu((await minhaFoto(a)).eu); await recarregar(); } catch (e) { setErro((e as Error).message); } }}
+            />
+            <EscolherImagem
+              rotulo="Seu banner (aceita GIF)" formato="faixa" atual={eu.banner}
+              onEnviar={async (a) => { setErro(null); try { onEu((await meuBanner(a)).eu); } catch (e) { setErro((e as Error).message); } }}
+            />
+          </div>
           <p className="muted small">
-            É o que os outros veem. Seu apelido de entrada continua <b>{eu.apelido}</b> e não muda.
+            Seu nome aqui é o que os outros veem. O apelido de entrada continua <b>{eu.apelido}</b> e não muda.
           </p>
           <div className="linha-campo">
             <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
@@ -85,7 +98,17 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
 
         {eu.cargo >= CARGO.DONO && (
           <section className="painel-bloco">
-            <h3>Nome do servidor</h3>
+            <h3>O servidor</h3>
+            <div className="imagens">
+              <EscolherImagem
+                rotulo="Foto do servidor" formato="redondo" atual={servidor.foto}
+                onEnviar={async (a) => { setErro(null); try { onServidor((await fotoDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
+              />
+              <EscolherImagem
+                rotulo="Banner do servidor (aceita GIF)" formato="faixa" atual={servidor.banner}
+                onEnviar={async (a) => { setErro(null); try { onServidor((await bannerDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
+              />
+            </div>
             <div className="linha-campo">
               <input value={nomeServidor} onChange={(e) => setNomeServidor(e.target.value)} maxLength={40} />
               <button onClick={salvarNomeServidor} disabled={ocupado || nomeServidor === servidor.nome}>Salvar</button>
@@ -98,7 +121,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           <ul className="membros">
             {membros.map((m) => (
               <li key={m.id} className={m.banido ? 'banido' : ''}>
-                <span className="avatar">{m.nome.slice(0, 1).toUpperCase()}</span>
+                <Avatar nome={m.nome} foto={m.foto} />
                 <div className="quem">
                   <div className="strong">
                     {m.nome}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
+import { Avatar } from './Avatar';
 
 type RM = ReturnType<typeof useRoom>;
 
@@ -26,7 +27,7 @@ function VideoTile({ tile, big, onClick }: { tile: Tile; big?: boolean; onClick?
   );
 }
 
-export function Stage({ rm }: { rm: RM }) {
+export function Stage({ rm, fotos }: { rm: RM; fotos: Map<string, string | null> }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [text, setText] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
@@ -62,7 +63,8 @@ export function Stage({ rm }: { rm: RM }) {
             <div className="empty">
               <div className="avatars">
                 {rm.participants.map((p) => (
-                  <div key={p.identity} className={`avatar huge ${p.isSpeaking ? 'speaking' : ''}`} title={p.name}>{(p.name || p.identity).slice(0, 1).toUpperCase()}</div>
+                  <Avatar key={p.identity} nome={p.name || p.identity} foto={fotos.get(p.identity)}
+                    tamanho="huge" extra={p.isSpeaking ? 'speaking' : ''} titulo={p.name} />
                 ))}
               </div>
               <div className="muted">Só voz por enquanto. Ligue a câmera ou compartilhe a tela.</div>
@@ -76,7 +78,7 @@ export function Stage({ rm }: { rm: RM }) {
                   {rest.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} />)}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
-                      <span className="avatar big">{(p.name || p.identity).slice(0, 1).toUpperCase()}</span>
+                      <Avatar nome={p.name || p.identity} foto={fotos.get(p.identity)} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>
                   ))}
@@ -89,7 +91,7 @@ export function Stage({ rm }: { rm: RM }) {
               {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
-                  <span className="avatar huge">{(p.name || p.identity).slice(0, 1).toUpperCase()}</span>
+                  <Avatar nome={p.name || p.identity} foto={fotos.get(p.identity)} tamanho="huge" />
                   <div className="tile-label">{p.name || p.identity}</div>
                 </div>
               ))}

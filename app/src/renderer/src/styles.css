@@ -183,3 +183,28 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-size: 11px; color: #8a8f98; opacity: .35; pointer-events: none;
   font-variant-numeric: tabular-nums; user-select: none;
 }
+
+/* ---- fotos ---- */
+
+.avatar.com-foto { padding: 0; overflow: hidden; background: none; }
+.avatar.com-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.imagens { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+
+.escolher-imagem { display: flex; align-items: center; gap: 10px; }
+.escolher-imagem .previa {
+  display: grid; place-items: center; overflow: hidden; flex: none;
+  background: #232428; border: 1px solid #3a3c42; color: #7c828c;
+}
+.escolher-imagem .previa.redondo { width: 56px; height: 56px; border-radius: 50%; }
+.escolher-imagem .previa.faixa { width: 140px; height: 56px; border-radius: 6px; }
+.escolher-imagem .previa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.escolher-imagem .escolher-acoes { display: flex; flex-direction: column; gap: 4px; }
+.escolher-imagem .escolher-acoes > div { display: flex; align-items: center; gap: 8px; }
+.escolher-imagem button {
+  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  padding: 4px 10px; font-size: 12px; cursor: pointer;
+}
+.escolher-imagem button:hover:not(:disabled) { background: #4a4d55; }
+.escolher-imagem button:disabled { opacity: .5; cursor: default; }
+.escolher-imagem button.link { background: none; padding: 0; color: #949ba4; text-decoration: underline; }

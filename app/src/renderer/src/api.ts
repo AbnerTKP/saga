@@ -99,6 +99,40 @@ export const buscarSalas = async () => (await pedir<{ rooms: RoomInfo[] }>('GET'
 export const pedirTokenDaSala = (room: string) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });
 
+// --- imagens ----------------------------------------------------------------
+
+/** Endereço público da imagem. O nome é o hash do conteúdo, então pode ser cacheado. */
+export const urlDaImagem = (nome: string | null | undefined) =>
+  nome ? `${BASE}/arquivos/${nome}` : null;
+
+/** Envia os bytes crus. Passar null remove a imagem. */
+async function enviarImagem<T>(rota: string, arquivo: File | null): Promise<T> {
+  const token = lerToken();
+  const corpo = arquivo ? await arquivo.arrayBuffer() : new ArrayBuffer(0);
+  let res: Response;
+  try {
+    res = await fetch(BASE + rota, {
+      method: 'POST',
+      headers: {
+        'content-type': arquivo?.type || 'application/octet-stream',
+        ...(token ? { 'x-sessao': token } : {}),
+      },
+      body: corpo,
+    });
+  } catch {
+    // Quando o servidor corta um envio grande demais, a conexão morre antes da resposta.
+    throw new ErroDoServidor('A imagem é grande demais ou a conexão caiu no meio.', 413);
+  }
+  const dados = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+  return dados as T;
+}
+
+export const minhaFoto = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/foto', a);
+export const meuBanner = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/banner', a);
+export const fotoDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/foto', a);
+export const bannerDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/banner', a);
+
 export type Acao = 'mutar' | 'desconectar' | 'timeout' | 'tirarTimeout' | 'expulsar' | 'banir' | 'desbanir' | 'cargo';
 
 export const moderar = (acao: Acao, alvo: number, extra?: { minutos?: number; cargo?: number }) =>
