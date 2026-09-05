@@ -44,7 +44,13 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  setupUpdates(win);
+  // Carregar a tela é o essencial; atualização é acessório. Se algo falhar aqui, a janela
+  // tem de abrir do mesmo jeito — antes, uma exceção aqui deixava a janela em branco.
+  try {
+    setupUpdates(win);
+  } catch (e) {
+    registrar('erro', 'principal', `setupUpdates falhou: ${(e as Error).message}`);
+  }
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);

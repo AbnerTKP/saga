@@ -32,13 +32,27 @@ function maisNova(a: string, b: string): boolean {
   return false;
 }
 
+// O estado fica guardado porque a tela que o escuta pode montar depois do primeiro aviso;
+// sem isso a mensagem se perde e a tela fica esperando para sempre.
+let ultimo: UpdateState = { fase: 'procurando' };
+
+// A janela atual. No Mac, fechar e clicar no ícone do Dock cria outra, e é para ela que
+// os avisos passam a ir.
+let janela: BrowserWindow | null = null;
+let jaIniciado = false;
+
 export function setupUpdates(win: BrowserWindow) {
-  // O estado fica guardado porque a tela que o escuta pode montar depois do primeiro
-  // aviso; sem isso a mensagem se perde e a tela fica esperando para sempre.
-  let ultimo: UpdateState = { fase: 'procurando' };
+  janela = win;
+
+  // Canais e temporizadores são do app, não da janela. Registrá-los de novo estoura com
+  // "second handler", e como isso acontecia antes de a janela carregar, ela abria em
+  // branco — bastava fechar e reabrir pelo Dock no Mac para cair nisso.
+  if (jaIniciado) return;
+  jaIniciado = true;
+
   const enviar = (s: UpdateState) => {
     ultimo = s;
-    if (!win.isDestroyed()) win.webContents.send('update:state', s);
+    if (janela && !janela.isDestroyed()) janela.webContents.send('update:state', s);
   };
 
   ipcMain.handle('update:atual', () => ultimo);
