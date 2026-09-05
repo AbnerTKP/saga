@@ -19,8 +19,16 @@ function isNewer(a: string, b: string): boolean {
 }
 
 export function setupUpdates(win: BrowserWindow) {
-  const send = (s: UpdateState) => { if (!win.isDestroyed()) win.webContents.send('update:state', s); };
+  // O aviso é disparado 5s depois de abrir. Se a janela ainda estiver na tela de entrada,
+  // o componente que escuta nem existe e a mensagem se perderia até a próxima checagem,
+  // seis horas depois. Por isso o último estado fica guardado e pode ser perguntado.
+  let ultimoAviso: UpdateState | null = null;
+  const send = (s: UpdateState) => {
+    ultimoAviso = s;
+    if (!win.isDestroyed()) win.webContents.send('update:state', s);
+  };
 
+  ipcMain.handle('update:atual', () => ultimoAviso);
   ipcMain.handle('update:install', () => autoUpdater.quitAndInstall());
   ipcMain.handle('open:external', (_e, url: string) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);

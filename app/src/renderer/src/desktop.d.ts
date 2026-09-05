@@ -18,6 +18,8 @@ declare global {
       openScreenSettings: () => Promise<void>;
       version: () => Promise<string>;
       onUpdate: (cb: (s: UpdateState) => void) => void;
+      /** Último aviso já anunciado, para quem montar depois do disparo não perdê-lo. */
+      updateAtual: () => Promise<UpdateState | null>;
       installUpdate: () => Promise<void>;
       openExternal: (url: string) => Promise<void>;
     };

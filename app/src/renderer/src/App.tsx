@@ -69,7 +69,14 @@ export function App() {
     setEntered(false);
   }, [rm]);
 
-  if (!entered) return <ConnectScreen initial={settings} onEnter={enter} />;
+  if (!entered) {
+    return (
+      <>
+        <ConnectScreen initial={settings} onEnter={enter} />
+        <UpdateToast />
+      </>
+    );
+  }
 
   return (
     <div className="app">

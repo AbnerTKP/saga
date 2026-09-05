@@ -6,7 +6,11 @@ export function UpdateToast() {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    window.desktop.onUpdate((s) => setU((prev) => ({ ...(prev ?? { version: '' }), ...s, version: s.version || prev?.version || '' })));
+    const aplicar = (s: UpdateState) =>
+      setU((prev) => ({ ...(prev ?? { version: '' }), ...s, version: s.version || prev?.version || '' }));
+    // Pergunta o que já foi anunciado antes deste componente existir, e só então escuta.
+    window.desktop.updateAtual().then((s) => { if (s) aplicar(s); });
+    window.desktop.onUpdate(aplicar);
   }, []);
 
   if (!u || hidden) return null;

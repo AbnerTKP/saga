@@ -8,6 +8,7 @@ const desktop = {
   openScreenSettings: () => ipcRenderer.invoke('screen:openSettings'),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
   onUpdate: (cb: (s: unknown) => void) => { ipcRenderer.on('update:state', (_e, s) => cb(s)); },
+  updateAtual: (): Promise<unknown> => ipcRenderer.invoke('update:atual'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
 };
