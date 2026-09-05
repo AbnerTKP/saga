@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node --env-file=.env.dev index.mjs",
     "start": "node index.mjs",
-    "test": "node --test participantes.test.mjs cargos.test.mjs contas.test.mjs membros.test.mjs arquivos.test.mjs api.test.mjs",
+    "test": "node --test participantes.test.mjs cargos.test.mjs banco.test.mjs contas.test.mjs membros.test.mjs arquivos.test.mjs api.test.mjs",
     "test:sala": "node --test sala.test.mjs"
   },
   "dependencies": {

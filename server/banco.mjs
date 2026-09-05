@@ -9,9 +9,12 @@
 import { DatabaseSync } from 'node:sqlite';
 import { CARGO } from './cargos.mjs';
 
-// Cada migração roda uma vez, em ordem, e fica registrada. Nunca edite uma que já subiu
-// para produção: acrescente outra abaixo.
-const MIGRACOES = [
+// Cada migração roda uma vez, em ordem, e fica registrada pela POSIÇÃO na lista. Por isso
+// nunca se edita, remove ou insere no meio: acrescenta-se no fim, sempre. Inserir no meio
+// faz a produção considerar aplicada uma migração que nunca rodou, e a seguinte quebra
+// contra um banco pela metade — foi o que aconteceu ao acrescentar a tabela de sons.
+// O teste em banco.test.mjs trava essa ordem justamente para isso não se repetir.
+export const MIGRACOES = [
   // Conta global: o apelido é a identidade de login e não muda.
   `CREATE TABLE usuarios (
      id            INTEGER PRIMARY KEY,
@@ -54,6 +57,15 @@ const MIGRACOES = [
      PRIMARY KEY (servidor_id, usuario_id)
    )`,
 
+  // Salas deixam de vir do .env: assim o dono pode renomear e reordenar sem redeploy.
+  `CREATE TABLE salas (
+     id          INTEGER PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     nome        TEXT    NOT NULL,
+     ordem       INTEGER NOT NULL DEFAULT 0,
+     UNIQUE (servidor_id, nome)
+   )`,
+
   // Sons do soundboard. O arquivo é content-addressed como as imagens; aqui fica só o
   // nome que as pessoas veem e quem subiu.
   `CREATE TABLE sons (
@@ -65,15 +77,6 @@ const MIGRACOES = [
      criado_em   INTEGER NOT NULL
    )`,
   `CREATE INDEX sons_servidor ON sons(servidor_id)`,
-
-  // Salas deixam de vir do .env: assim o dono pode renomear e reordenar sem redeploy.
-  `CREATE TABLE salas (
-     id          INTEGER PRIMARY KEY,
-     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
-     nome        TEXT    NOT NULL,
-     ordem       INTEGER NOT NULL DEFAULT 0,
-     UNIQUE (servidor_id, nome)
-   )`,
 ];
 
 export function abrirBanco(caminho) {
