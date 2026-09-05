@@ -1,7 +1,7 @@
 {
   "name": "app",
   "productName": "Cantinho do Vorcaro",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Voz, vídeo e tela entre amigos",
   "private": true,
   "main": "./out/main/index.js",
@@ -12,7 +12,7 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts src/renderer/src/erros.test.ts"
+    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts src/renderer/src/erros.test.ts src/renderer/src/volume.test.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

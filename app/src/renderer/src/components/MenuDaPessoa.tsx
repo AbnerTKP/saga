@@ -67,7 +67,7 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
         <label className="menu-volume">
           <span className="muted small">Volume · {Math.round(volume * 100)}%</span>
           <input
-            type="range" min={0} max={150} value={Math.round(volume * 100)}
+            type="range" min={0} max={100} value={Math.round(volume * 100)}
             onChange={(e) => onVolume(Number(e.target.value) / 100)}
           />
         </label>

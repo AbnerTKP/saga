@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
 import { explicarFalhaDeAudio } from './erros';
+import { VOLUME } from './volume';
 import {
   Room,
   RoomEvent,
@@ -105,14 +106,19 @@ export function useRoom() {
    */
   const aplicarAudio = useCallback(() => {
     getAudioRoot().querySelectorAll<HTMLMediaElement>('audio').forEach((el) => {
-      const identity = el.dataset.identity ?? '';
-      const ehTela = el.dataset.source === Track.Source.ScreenShareAudio;
-      if (ehTela) {
-        el.volume = volumesDaTela.current.get(identity) ?? 1;
-        el.muted = deafenedRef.current || (!!focoDaTela.current && identity !== focoDaTela.current);
-      } else {
-        el.volume = volumes.current.get(identity) ?? 1;
-        el.muted = deafenedRef.current;
+      // Um elemento problemático não pode derrubar a tela inteira. Já derrubou: um volume
+      // acima de 1 lançava exceção aqui dentro de um efeito do React, e a janela ficava
+      // cinza. Ajustar áudio é acessório; ficar sem o app, não.
+      try {
+        const identity = el.dataset.identity ?? '';
+        const ehTela = el.dataset.source === Track.Source.ScreenShareAudio;
+        const guardado = (ehTela ? volumesDaTela : volumes).current.get(identity) ?? 1;
+        el.volume = VOLUME(guardado);
+        el.muted = ehTela
+          ? deafenedRef.current || (!!focoDaTela.current && identity !== focoDaTela.current)
+          : deafenedRef.current;
+      } catch (e) {
+        anotar('erro', 'audio', e);
       }
     });
   }, []);
@@ -360,7 +366,7 @@ export function useRoom() {
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
   const definirVolume = useCallback((identity: string, valor: number) => {
-    volumes.current.set(identity, Math.min(1.5, Math.max(0, valor)));
+    volumes.current.set(identity, VOLUME(valor));
     aplicarAudio();
     bump();
   }, [aplicarAudio]);
@@ -368,7 +374,7 @@ export function useRoom() {
   const volumeDaTelaDe = useCallback((identity: string) => volumesDaTela.current.get(identity) ?? 1, []);
 
   const definirVolumeDaTela = useCallback((identity: string, valor: number) => {
-    volumesDaTela.current.set(identity, Math.min(1.5, Math.max(0, valor)));
+    volumesDaTela.current.set(identity, VOLUME(valor));
     aplicarAudio();
     redesenharVolumes();
   }, [aplicarAudio]);
