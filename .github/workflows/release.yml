@@ -11,12 +11,33 @@ permissions:
   contents: write
 
 jobs:
+  # Cria o Release vazio antes de qualquer build. Sem isto, o electron-builder sobe os
+  # arquivos em paralelo e cada upload que não acha um Release existente cria um novo —
+  # o resultado são dois Releases com os arquivos divididos entre eles. Com o Release já
+  # pronto, todos os uploads (dos dois sistemas) caem no mesmo lugar.
+  criar-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          gh release view "$TAG" >/dev/null 2>&1 && exit 0
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes "$NOTAS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          NOTAS: |
+            **Windows:** baixe o arquivo `.exe`. O Windows vai avisar "Windows protegeu o seu PC" —
+            clique em **Mais informações › Executar mesmo assim**. É só porque o app não tem
+            certificado pago; não há nada de errado com ele.
+
+            **Mac:** baixe o `.dmg` e arraste para Aplicativos. Na primeira vez, abra pelo menu
+            **Ajustes do Sistema › Privacidade e Segurança › Abrir Mesmo Assim**.
+
+            Ao abrir, o endereço do servidor já vem preenchido: basta a senha do grupo e o seu nome.
+
   build:
+    needs: criar-release
     strategy:
-      # Em paralelo, os dois jobs criam um Release cada um no mesmo instante e os
-      # arquivos ficam divididos entre eles. Em sequência, o segundo encontra o
-      # Release que o primeiro criou e só anexa os seus arquivos.
-      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
