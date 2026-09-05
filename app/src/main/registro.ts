@@ -1,5 +1,5 @@
 import { app, ipcMain, shell, clipboard } from 'electron';
-import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync, existsSync } from 'node:fs';
+import { accessSync, appendFileSync, constants, mkdirSync, readFileSync, renameSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { EOL } from 'node:os';
 import { limparSegredos } from './segredos';
@@ -23,6 +23,23 @@ export function registrar(nivel: 'erro' | 'aviso' | 'info', origem: string, mens
   if (nivel === 'erro') console.error(linha.trim());
 }
 
+/**
+ * Rodar como administrador é conhecido por quebrar a captura de tela e de áudio no
+ * Windows — a mesma máquina funciona sem elevação e falha com ela. Como o app não precisa
+ * de administrador para nada, isso costuma ser um "executar como administrador" acidental,
+ * e sem estar no registro ninguém desconfia.
+ */
+function comoAdministrador(): string {
+  if (process.platform !== 'win32') return '';
+  try {
+    // Só um processo elevado consegue escrever aqui.
+    accessSync(`${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\drivers\\etc\\hosts`, constants.W_OK);
+    return ' | COMO ADMINISTRADOR (pode quebrar captura de tela e áudio)';
+  } catch {
+    return '';
+  }
+}
+
 export function iniciarRegistro() {
   const pasta = join(app.getPath('userData'), 'registro');
   try {
@@ -35,7 +52,7 @@ export function iniciarRegistro() {
   } catch { arquivo = ''; }
 
   // Cabeçalho: sem isto, um log compartilhado não diz de qual versão nem de qual sistema veio.
-  registrar('info', 'app', `--- abriu | versão ${app.getVersion()} | ${process.platform} ${process.getSystemVersion()} | electron ${process.versions.electron} ---`);
+  registrar('info', 'app', `--- abriu | versão ${app.getVersion()} | ${process.platform} ${process.getSystemVersion()} | electron ${process.versions.electron}${comoAdministrador()} ---`);
 
   process.on('uncaughtException', (e) => registrar('erro', 'principal', `${e.message}\n${e.stack ?? ''}`));
   process.on('unhandledRejection', (e) => registrar('erro', 'principal', String(e instanceof Error ? `${e.message}\n${e.stack}` : e)));
