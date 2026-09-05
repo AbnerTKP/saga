@@ -2,13 +2,15 @@ import type { Membro, RoomInfo, Servidor } from '../api';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
+import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
+export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa, onJoin, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   onJoin: (room: string) => void; onShare: () => void; onSettings: () => void;
-  fotos: Map<string, string | null>;
+  pessoas: Map<string, PessoaNaCall>;
+  onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
   onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
 }) {
   const connected = rm.status !== 'idle';
@@ -26,7 +28,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onS
           const live = rm.roomName === r.name;
           const people = live
             ? rm.participants.map((p) => ({
-                identity: p.identity, name: p.name || p.identity, foto: fotos.get(p.identity) ?? null,
+                identity: p.identity, name: p.name || p.identity, foto: pessoas.get(p.identity)?.foto ?? null,
                 speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
               }))
             : r.participants.map((p) => ({ ...p, foto: p.foto ?? null, speaking: false }));
@@ -38,7 +40,12 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onS
               </button>
               <ul className="people">
                 {people.map((p) => (
-                  <li key={p.identity} className={p.speaking ? 'speaking' : ''}>
+                  <li
+                    key={p.identity}
+                    className={`clicavel ${p.speaking ? 'speaking' : ''}`}
+                    title={`${p.name} — clique para opções`}
+                    onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
+                  >
                     <Avatar nome={p.name} foto={p.foto} />
                     <span className="pname">{p.name}</span>
                     <span className="pico">

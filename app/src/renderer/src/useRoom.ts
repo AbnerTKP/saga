@@ -63,6 +63,11 @@ export function useRoom() {
   const faixaDoSom = useRef<MediaStreamTrack | null>(null);
   const buffers = useRef(new Map<string, AudioBuffer>());
 
+  // Volume por pessoa, de 0 a 1. Aplicado nos elementos de áudio que nós mesmos criamos,
+  // e não pelo setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e
+  // deixaria o soundboard de fora, que anda numa faixa própria.
+  const volumes = useRef(new Map<string, number>());
+
   const room = useMemo(() => {
     const r = new Room({
       adaptiveStream: true,
@@ -75,10 +80,12 @@ export function useRoom() {
   }, []);
 
   useEffect(() => {
-    const onSubscribed = (track: Track) => {
+    const onSubscribed = (track: Track, _pub: unknown, participante: Participant) => {
       if (track.kind === Track.Kind.Audio) {
         const el = track.attach() as HTMLMediaElement;
+        el.dataset.identity = participante.identity;
         el.muted = deafenedRef.current;
+        el.volume = volumes.current.get(participante.identity) ?? 1;
         getAudioRoot().appendChild(el);
       }
       bump();
@@ -264,6 +271,18 @@ export function useRoom() {
     }
   }, [room]);
 
+  const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
+
+  const definirVolume = useCallback((identity: string, valor: number) => {
+    const v = Math.min(1, Math.max(0, valor));
+    volumes.current.set(identity, v);
+    // Vale para tudo que a pessoa publica: microfone, áudio de tela e soundboard.
+    getAudioRoot()
+      .querySelectorAll<HTMLMediaElement>(`audio[data-identity="${CSS.escape(identity)}"]`)
+      .forEach((el) => { el.volume = v; });
+    bump();
+  }, []);
+
   const sendMessage = useCallback(async (text: string) => {
     const t = text.trim();
     if (!t || room.state !== 'connected') return;
@@ -287,6 +306,6 @@ export function useRoom() {
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
-    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom,
+    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom, volumeDe, definirVolume,
   };
 }

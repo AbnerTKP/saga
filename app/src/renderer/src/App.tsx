@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken,
+  buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
+  type Acao,
   type RoomInfo, type Sessao, type Membro, type Servidor,
 } from './api';
 import { useRoom } from './useRoom';
@@ -12,6 +13,7 @@ import { DeviceSettings } from './components/DeviceSettings';
 import { UpdateToast } from './components/UpdateToast';
 import { PainelDoServidor } from './components/PainelDoServidor';
 import { Soundboard } from './components/Soundboard';
+import { MenuDaPessoa, type PessoaNaCall } from './components/MenuDaPessoa';
 import { Versao } from './components/Versao';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -27,6 +29,7 @@ export function App() {
   const [painel, setPainel] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
+  const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const rm = useRoom();
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
@@ -86,11 +89,27 @@ export function App() {
     setRooms([]);
   }, [rm]);
 
-  // Um mapa só de identidade -> foto, montado do que o servidor manda. O LiveKit sabe
-  // quem está falando mas não sabe de foto; a barra lateral e o palco precisam das duas
-  // coisas, então o mapa é montado aqui, uma vez, em vez de em cada componente.
-  const fotos = new Map<string, string | null>();
-  for (const sala of rooms) for (const p of sala.participants) fotos.set(p.identity, p.foto ?? null);
+  // Identidade -> quem é a pessoa, montado do que o servidor manda. O LiveKit sabe quem
+  // está falando mas não sabe de foto nem de cargo; a barra lateral, o palco e o menu
+  // precisam das duas coisas, então o mapa é montado aqui, uma vez.
+  const pessoas = new Map<string, PessoaNaCall>();
+  for (const sala of rooms) {
+    for (const p of sala.participants) {
+      pessoas.set(p.identity, {
+        identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo, foto: p.foto ?? null,
+      });
+    }
+  }
+
+  const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }) => {
+    setMenu({ pessoa: pessoas.get(identity) ?? { identity, nome }, em });
+  // pessoas é remontado a cada render; depender dele aqui só criaria a função à toa.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rooms]);
+
+  const moderarPeloMenu = useCallback(async (alvo: number, acao: Acao, extra?: { minutos?: number; cargo?: number }) => {
+    try { await moderar(acao, alvo, extra); } catch (e) { rm.setError((e as Error).message); }
+  }, [rm]);
 
   // No Mac quem escolhe a janela é o próprio sistema, então abrir o nosso seletor
   // significaria escolher duas vezes. No Windows ele continua sendo o caminho.
@@ -128,12 +147,13 @@ export function App() {
         onJoin={joinRoom}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}
-        fotos={fotos}
+        pessoas={pessoas}
+        onPessoa={abrirMenu}
         onPainel={() => setPainel(true)}
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
       />
-      <Stage rm={rm} fotos={fotos} />
+      <Stage rm={rm} pessoas={pessoas} onPessoa={abrirMenu} />
       {picker && (
         <ScreenPicker
           onClose={() => setPicker(false)}
@@ -159,6 +179,19 @@ export function App() {
           naSala={rm.status === 'connected'}
           onTocar={rm.tocarSom}
           onClose={() => setSoundboard(false)}
+        />
+      )}
+      {menu && (
+        <MenuDaPessoa
+          pessoa={menu.pessoa}
+          eu={sessao.eu}
+          em={menu.em}
+          volume={rm.volumeDe(menu.pessoa.identity)}
+          onVolume={(v) => rm.definirVolume(menu.pessoa.identity, v)}
+          onAcao={async (acao, extra) => {
+            if (menu.pessoa.usuarioId !== undefined) await moderarPeloMenu(menu.pessoa.usuarioId, acao, extra);
+          }}
+          onClose={() => setMenu(null)}
         />
       )}
       <UpdateToast />

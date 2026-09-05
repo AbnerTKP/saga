@@ -228,3 +228,35 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   color: #949ba4; padding: 0 8px; cursor: pointer;
 }
 .som .apagar:hover:not(:disabled) { background: #6a2b2b; color: #f5c4c4; }
+
+/* ---- menu ao clicar numa pessoa ---- */
+
+.menu-pessoa {
+  -webkit-app-region: no-drag;
+  position: fixed; z-index: 30;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  padding: 10px; display: flex; flex-direction: column; gap: 10px;
+}
+.menu-topo { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.menu-topo .quem { min-width: 0; }
+.menu-topo .quem div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.menu-volume { display: flex; flex-direction: column; gap: 5px; }
+.menu-volume input { width: 100%; padding: 0; background: none; border: none; }
+.menu-nota { padding-bottom: 2px; }
+
+.menu-acoes { display: flex; flex-direction: column; gap: 3px; border-top: 1px solid var(--line); padding-top: 8px; }
+.menu-acoes button {
+  text-align: left; padding: 6px 8px; border-radius: 4px; font-size: 13px; color: var(--text);
+}
+.menu-acoes button:hover:not(:disabled) { background: var(--bg3); }
+.menu-acoes button.perigo { color: #fa777c; }
+.menu-acoes button.perigo:hover:not(:disabled) { background: rgba(242,63,67,.15); }
+.menu-cargo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
+.menu-cargo select { padding: 4px 6px; font-size: 12px; }
+
+/* Tudo que abre o menu da pessoa. O .tile.audio volta a ter cursor de clique. */
+.clicavel { cursor: pointer; }
+.people li.clicavel:hover { background: var(--bg3); color: var(--text); }
+.tile.audio.clicavel { cursor: pointer; }
