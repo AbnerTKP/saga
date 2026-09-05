@@ -65,6 +65,20 @@ Publicar servidor: `scp *.mjs Dockerfile root@…:/root/server/` e
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
 
+## Limitação conhecida, encerrada
+
+Numa das cinco máquinas (Windows 11 25H2, headset USB Logitech como único dispositivo de
+áudio), o áudio do sistema no compartilhamento falha com `Could not start audio source`.
+Investigado a fundo e **encerrado por decisão do dono** — não reabrir sem pedido.
+
+Descartados por evidência do registro: escolha de tela ou janela, modo exclusivo, elevação
+de privilégio, ausência de dispositivo, nossas opções de captura e as do LiveKit. Os dois
+modos do Chromium (`loopback` e `loopbackWithMute`) falham igual; Chrome, Meet e Teams
+funcionam na mesma máquina porque usam o seletor interno do navegador, um caminho que um
+app Electron não alcança. A máquina não tem "Mixagem estéreo", então o plano B pela entrada
+de áudio também não se aplica. Um build com Electron 35 foi preparado para testar a
+hipótese de regressão, e descartado sem teste.
+
 ## Testes
 
 ```bash
