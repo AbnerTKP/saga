@@ -26,6 +26,10 @@ declare global {
       usaSeletorDoSistema: () => Promise<boolean>;
       openScreenSettings: () => Promise<void>;
       version: () => Promise<string>;
+      registrar: (nivel: 'erro' | 'aviso' | 'info', origem: string, mensagem: string) => Promise<void>;
+      lerRegistro: () => Promise<string>;
+      copiarRegistro: (texto: string) => Promise<void>;
+      abrirPastaDoRegistro: () => Promise<void>;
       onUpdate: (cb: (s: UpdateState) => void) => void;
       /** Último aviso já anunciado, para quem montar depois do disparo não perdê-lo. */
       updateAtual: () => Promise<UpdateState | null>;

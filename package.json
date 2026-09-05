@@ -8,7 +8,7 @@
     "build:app": "pnpm --filter app build",
     "dist:mac": "pnpm --filter app dist:mac",
     "dist:win": "pnpm --filter app dist:win",
-    "test": "pnpm --filter server test",
+    "test": "pnpm --filter server test && pnpm --filter app test",
     "test:sala": "pnpm --filter server test:sala"
   }
 }

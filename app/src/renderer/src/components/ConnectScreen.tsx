@@ -3,9 +3,10 @@ import { cadastrar, entrar, guardarToken, type Sessao } from '../api';
 
 type Modo = 'entrar' | 'criar';
 
-export function ConnectScreen({ apelidoInicial, onPronto }: {
+export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   apelidoInicial: string;
   onPronto: (s: Sessao) => void;
+  onRegistro: () => void;
 }) {
   const [modo, setModo] = useState<Modo>(apelidoInicial ? 'entrar' : 'criar');
   const [apelido, setApelido] = useState(apelidoInicial);
@@ -112,6 +113,10 @@ export function ConnectScreen({ apelidoInicial, onPronto }: {
         <button className="primary" disabled={ocupado}>
           {ocupado ? (criando ? 'Criando…' : 'Entrando…') : (criando ? 'Criar conta' : 'Entrar')}
         </button>
+
+        <div className="registro-link">
+          <button type="button" className="link" onClick={onRegistro}>deu erro? ver o registro</button>
+        </div>
       </form>
     </div>
   );

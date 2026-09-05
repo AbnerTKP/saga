@@ -55,6 +55,13 @@ export class ErroDoServidor extends Error {
   constructor(mensagem: string, readonly status: number) { super(mensagem); }
 }
 
+// Toda falha de servidor entra no registro. 401 fica de fora: é o caminho normal de
+// "sessão expirou", e encheria o arquivo de ruído.
+function anotarFalha(rota: string, e: ErroDoServidor) {
+  if (e.status === 401) return;
+  window.desktop?.registrar('erro', 'servidor', `${rota} → ${e.status} ${e.message}`).catch(() => undefined);
+}
+
 async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<T> {
   const token = lerToken();
   let res: Response;
@@ -68,10 +75,16 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<
       body: corpo ? JSON.stringify(corpo) : undefined,
     });
   } catch {
-    throw new ErroDoServidor('Não consegui falar com o servidor. Confira sua internet.', 0);
+    const falha = new ErroDoServidor('Não consegui falar com o servidor. Confira sua internet.', 0);
+    anotarFalha(`${metodo} ${rota}`, falha);
+    throw falha;
   }
   const dados = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+  if (!res.ok) {
+    const falha = new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+    anotarFalha(`${metodo} ${rota}`, falha);
+    throw falha;
+  }
   return dados as T;
 }
 

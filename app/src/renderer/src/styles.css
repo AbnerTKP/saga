@@ -277,3 +277,14 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .partida-caixa p { margin: 0; }
 .barra { width: 100%; height: 6px; border-radius: 3px; background: var(--bg0); overflow: hidden; }
 .barra-cheia { height: 100%; background: var(--accent); transition: width .25s ease; }
+
+/* ---- registro de erros ---- */
+
+.registro-corpo { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+.registro {
+  flex: 1; margin: 0; overflow: auto; user-select: text;
+  background: var(--bg0); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px 12px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text2); white-space: pre-wrap; word-break: break-word;
+}
+.registro-link { margin-top: 4px; text-align: center; }

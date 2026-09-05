@@ -13,10 +13,11 @@ const COMO_SE_LE: Record<Qualidade, string> = {
   '1080p60': '1080p · 60 quadros — a melhor, e a mais pesada',
 };
 
-export function DeviceSettings({ room, volumeDaTela, onVolumeDaTela, onClose }: {
+export function DeviceSettings({ room, volumeDaTela, onVolumeDaTela, onRegistro, onClose }: {
   room: Room;
   volumeDaTela: number;
   onVolumeDaTela: (v: number) => void;
+  onRegistro: () => void;
   onClose: () => void;
 }) {
   const [qualidade, setQualidade] = useState<Qualidade>(lerQualidade);
@@ -82,6 +83,10 @@ export function DeviceSettings({ room, volumeDaTela, onVolumeDaTela, onClose }: 
               transmissão em destaque — as outras ficam mudas.
             </small>
           </label>
+
+          <div className="linha-campo">
+            <button type="button" onClick={onRegistro}>Ver registro de erros</button>
+          </div>
 
           {(Object.keys(labels) as Kind[]).map((kind) => (
             <label key={kind}>

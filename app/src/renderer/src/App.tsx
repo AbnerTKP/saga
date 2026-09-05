@@ -15,6 +15,7 @@ import { TelaDeAtualizacao } from './components/TelaDeAtualizacao';
 import { PainelDoServidor } from './components/PainelDoServidor';
 import { Soundboard } from './components/Soundboard';
 import { MenuDaPessoa, type PessoaNaCall } from './components/MenuDaPessoa';
+import { RegistroDeErros } from './components/RegistroDeErros';
 import { Versao } from './components/Versao';
 import type { UpdateState } from './desktop';
 
@@ -30,6 +31,7 @@ export function App() {
   const [devices, setDevices] = useState(false);
   const [painel, setPainel] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
+  const [registro, setRegistro] = useState(false);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -147,7 +149,8 @@ export function App() {
     try { ultimo = localStorage.getItem(ULTIMO_APELIDO) ?? ''; } catch { /* sem storage */ }
     return (
       <>
-        <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} />
+        <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} onRegistro={() => setRegistro(true)} />
+        {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
         <UpdateToast estado={atualizacao} />
         <Versao />
       </>
@@ -186,6 +189,7 @@ export function App() {
           room={rm.room}
           volumeDaTela={rm.volumeDaTela}
           onVolumeDaTela={rm.definirVolumeDaTela}
+          onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}
         />
       )}
@@ -219,6 +223,7 @@ export function App() {
           onClose={() => setMenu(null)}
         />
       )}
+      {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
       <UpdateToast estado={atualizacao} />
       <Versao />
     </div>
