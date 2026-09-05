@@ -139,7 +139,19 @@ async function participantesDaSala(nome) {
     const base = verParticipante(p);
     const membro = membros.buscarMembro(db, SERVIDOR.id, idDaIdentidade(p.identity));
     // Cargo e foto vêm do banco; microfone e tela, do LiveKit.
-    return { ...base, ...(membro ? { usuarioId: membro.id, name: membro.nome, cargo: membro.cargo, foto: membro.foto ?? null } : {}) };
+    // O LiveKit sabe microfone e tela; quem a pessoa é vem do banco.
+    return {
+      ...base,
+      ...(membro ? {
+        usuarioId: membro.id,
+        name: membro.nome,
+        cargo: membro.cargo,
+        foto: membro.foto ?? null,
+        banner: membro.banner ?? null,
+        turbo: !!membro.turbo,
+        idExibido: membro.id_exibido ?? null,
+      } : {}),
+    };
   });
 }
 

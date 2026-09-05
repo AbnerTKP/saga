@@ -113,7 +113,8 @@ export function App() {
   for (const sala of rooms) {
     for (const p of sala.participants) {
       pessoas.set(p.identity, {
-        identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo, foto: p.foto ?? null,
+        identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo,
+        foto: p.foto ?? null, banner: p.banner ?? null, turbo: p.turbo, idExibido: p.idExibido ?? null,
       });
     }
   }

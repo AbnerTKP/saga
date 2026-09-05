@@ -302,3 +302,54 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .sinal.medio { color: var(--warn); }
 .sinal.ruim { color: var(--danger); }
 .sinal.sem { color: var(--text3); }
+
+/* ---- identificador, Turbo e cartão de perfil ---- */
+
+/* O identificador vem antes do nome e precisa ceder o lugar a ele: fica menor e apagado. */
+.id-do-membro {
+  margin-right: 5px; padding: 0 4px; border-radius: 3px;
+  background: rgba(255,255,255,.07); color: var(--text3);
+  font-size: .82em; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+/* Arco-íris do Vorcaro Turbo. O gradiente anda devagar de propósito: nome é para ler. */
+.nome-turbo {
+  background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
+  background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; font-weight: 700;
+  animation: arco-iris 8s linear infinite;
+}
+@keyframes arco-iris { to { background-position: 300% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .nome-turbo { animation: none; background-position: 30% 0; }
+}
+
+.selo-turbo {
+  margin-left: 6px; padding: 1px 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+  color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .06em; vertical-align: middle;
+}
+
+.membros .acoes button.turbo-on { background: linear-gradient(90deg, #a855f7, #ec4899); color: #fff; }
+.membros .acoes .campo-id {
+  width: 56px; padding: 3px 6px; font-size: 12px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* O banner ocupa o topo do cartão, sangrando até as bordas. */
+.cartao-banner { margin: -10px -10px 0; height: 84px; overflow: hidden; border-radius: 8px 8px 0 0; }
+.cartao-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.menu-topo.sob-banner { margin-top: -20px; }
+.menu-topo.sob-banner .avatar {
+  border: 3px solid var(--bg2); width: 44px; height: 44px; font-size: 16px;
+}
+
+/* ---- grade de GIFs ---- */
+
+.grade-gifs-area { flex: 1; min-height: 0; overflow-y: auto; }
+.grade-gifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.gif { padding: 0; border-radius: 6px; overflow: hidden; background: var(--bg0); aspect-ratio: 1; }
+.gif img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gif:hover:not(:disabled) { outline: 2px solid var(--accent); }
+.gif.enviando { opacity: .4; }

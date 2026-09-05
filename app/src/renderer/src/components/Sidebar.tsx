@@ -2,6 +2,7 @@ import type { Membro, RoomInfo, Servidor } from '../api';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
+import { Nome } from './Nome';
 import { Sinal } from './Sinal';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
@@ -29,10 +30,16 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
           const live = rm.roomName === r.name;
           const people = live
             ? rm.participants.map((p) => ({
-                identity: p.identity, name: p.name || p.identity, foto: pessoas.get(p.identity)?.foto ?? null,
+                identity: p.identity, name: p.name || p.identity,
+                foto: pessoas.get(p.identity)?.foto ?? null,
+                turbo: pessoas.get(p.identity)?.turbo ?? false,
+                idExibido: pessoas.get(p.identity)?.idExibido ?? null,
                 speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
               }))
-            : r.participants.map((p) => ({ ...p, foto: p.foto ?? null, speaking: false }));
+            : r.participants.map((p) => ({
+                ...p, foto: p.foto ?? null, turbo: p.turbo ?? false,
+                idExibido: p.idExibido ?? null, speaking: false,
+              }));
           return (
             <div key={r.name} className="room-block">
               <button className={`room ${live ? 'active' : ''}`} onClick={() => onJoin(r.name)} disabled={rm.status === 'connecting'}>
@@ -48,7 +55,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
                     onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
                   >
                     <Avatar nome={p.name} foto={p.foto} />
-                    <span className="pname">{p.name}</span>
+                    <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                     <span className="pico">
                       {p.screen && <Icon name="screen" />}
                       {p.camera && <Icon name="camera" />}
@@ -85,7 +92,9 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
       <div className="user-panel">
         <Avatar nome={eu.nome} foto={eu.foto} tamanho="big" />
         <div className="uname">
-          <div className="strong" title={`${eu.cargoNome} · entra como ${eu.apelido}`}>{eu.nome}</div>
+          <div className="strong" title={`${eu.cargoNome} · entra como ${eu.apelido}`}>
+            <Nome membro={eu} />
+          </div>
           <button className="link" onClick={onLogout}>sair</button>
         </div>
         <div className="user-actions">

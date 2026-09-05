@@ -21,6 +21,9 @@ export type Membro = {
   cargoNome: string;
   foto: string | null;
   banner: string | null;
+  turbo: boolean;
+  /** Identificador curto que aparece antes do nome. */
+  idExibido: string | null;
   banido: boolean;
   banidoPor: string | null;
   castigoAte: number | null;
@@ -31,6 +34,7 @@ export type Servidor = { id: number; nome: string; foto: string | null; banner: 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
   usuarioId?: number; cargo?: number; foto?: string | null;
+  banner?: string | null; turbo?: boolean; idExibido?: string | null;
 };
 export type RoomInfo = { name: string; participants: RoomParticipant[] };
 
@@ -188,7 +192,34 @@ export async function subirSom(nome: string, arquivo: File): Promise<Som> {
   return (dados as { som: Som }).som;
 }
 
-export type Acao = 'mutar' | 'desconectar' | 'timeout' | 'tirarTimeout' | 'expulsar' | 'banir' | 'desbanir' | 'cargo';
+/**
+ * Ações de moderação: exigem cargo mínimo e nunca valem sobre si mesmo nem sobre um igual.
+ */
+export type AcaoDeModeracao =
+  | 'mutar' | 'desconectar' | 'timeout' | 'tirarTimeout' | 'expulsar' | 'banir' | 'desbanir' | 'cargo';
 
-export const moderar = (acao: Acao, alvo: number, extra?: { minutos?: number; cargo?: number }) =>
-  pedir<{ alvo?: Membro; ok?: boolean }>('POST', '/moderar', { acao, alvo, ...extra });
+/**
+ * Turbo e identificador são distinção, não punição: o dono aplica em quem quiser,
+ * inclusive em si. Por isso ficam fora da régua de moderação.
+ */
+export type AcaoDoDono = 'turbo' | 'id';
+
+export type Acao = AcaoDeModeracao | AcaoDoDono;
+
+export const moderar = (
+  acao: Acao,
+  alvo: number,
+  extra?: { minutos?: number; cargo?: number; turbo?: boolean; idExibido?: string },
+) => pedir<{ alvo?: Membro; ok?: boolean }>('POST', '/moderar', { acao, alvo, ...extra });
+
+// --- Giphy ------------------------------------------------------------------
+
+export type Gif = { id: string; titulo: string; previa: string | null; arquivo: string };
+
+export const buscarGifs = async (termo: string) =>
+  (await pedir<{ gifs: Gif[] }>('GET', `/giphy?q=${encodeURIComponent(termo)}`)).gifs;
+
+export type OndeAImagemVai = 'usuario.foto' | 'usuario.banner' | 'servidor.foto' | 'servidor.banner';
+
+export const usarGif = (onde: OndeAImagemVai, url: string) =>
+  pedir<{ eu?: Membro; servidor?: Servidor }>('POST', '/giphy/usar', { onde, url });

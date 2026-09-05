@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { CARGO, type Acao, type Membro } from '../api';
+import { CARGO, type Acao, type AcaoDeModeracao, type Membro } from '../api';
 import { Avatar } from './Avatar';
+import { Nome } from './Nome';
+import { urlDoArquivo } from '../api';
 
 export type PessoaNaCall = {
   identity: string;
@@ -8,10 +10,13 @@ export type PessoaNaCall = {
   usuarioId?: number;
   cargo?: number;
   foto?: string | null;
+  banner?: string | null;
+  turbo?: boolean;
+  idExibido?: string | null;
 };
 
 // Espelho da regra do servidor, só para não mostrar botão que vai ser recusado.
-const EXIGE: Record<Acao, number> = {
+const EXIGE: Record<AcaoDeModeracao, number> = {
   mutar: CARGO.MODERADOR, desconectar: CARGO.MODERADOR, timeout: CARGO.MODERADOR,
   tirarTimeout: CARGO.MODERADOR, expulsar: CARGO.MODERADOR,
   banir: CARGO.DONO, desbanir: CARGO.DONO, cargo: CARGO.DONO,
@@ -29,8 +34,9 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
   const caixa = useRef<HTMLDivElement>(null);
   const [ocupado, setOcupado] = useState(false);
   const souEu = pessoa.usuarioId === eu.id;
+  const banner = urlDoArquivo(pessoa.banner);
 
-  const posso = (acao: Acao) =>
+  const posso = (acao: AcaoDeModeracao) =>
     pessoa.usuarioId !== undefined && pessoa.cargo !== undefined &&
     !souEu && eu.cargo >= EXIGE[acao] && pessoa.cargo < eu.cargo;
 
@@ -55,11 +61,19 @@ export function MenuDaPessoa({ pessoa, eu, em, volume, onVolume, onAcao, onClose
 
   return (
     <div ref={caixa} className="menu-pessoa" style={{ left: x, top: Math.max(8, y), width: largura }}>
-      <div className="menu-topo">
+      {/* O banner vira o topo do cartão, como num perfil — é onde ele faz sentido. */}
+      {banner && <div className="cartao-banner"><img src={banner} alt="" draggable={false} /></div>}
+
+      <div className={`menu-topo ${banner ? 'sob-banner' : ''}`}>
         <Avatar nome={pessoa.nome} foto={pessoa.foto} tamanho="big" />
         <div className="quem">
-          <div className="strong">{pessoa.nome}</div>
-          <div className="muted small">{souEu ? 'você' : nomeDoCargo(pessoa.cargo)}</div>
+          <div className="strong">
+            <Nome nome={pessoa.nome} id={pessoa.idExibido} turbo={pessoa.turbo} />
+          </div>
+          <div className="muted small">
+            {souEu ? 'você' : nomeDoCargo(pessoa.cargo)}
+            {pessoa.turbo && <span className="selo-turbo">TURBO</span>}
+          </div>
         </div>
       </div>
 

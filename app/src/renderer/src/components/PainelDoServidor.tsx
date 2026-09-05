@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CARGO, verServidor, renomearServidor, mudarMeuNome, moderar,
-  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor,
-  type Acao, type Membro, type Servidor,
+  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif,
+  type Acao, type AcaoDeModeracao, type Membro, type Servidor,
 } from '../api';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
+import { Nome } from './Nome';
 import { EscolherImagem } from './EscolherImagem';
 
 // Espelho da regra do servidor, só para não mostrar botão que vai ser recusado.
 // Quem decide de verdade é o servidor: aqui é conveniência, não segurança.
-const EXIGE: Record<Acao, number> = {
+const EXIGE: Record<AcaoDeModeracao, number> = {
   mutar: CARGO.MODERADOR, desconectar: CARGO.MODERADOR, timeout: CARGO.MODERADOR,
   tirarTimeout: CARGO.MODERADOR, expulsar: CARGO.MODERADOR,
   banir: CARGO.DONO, desbanir: CARGO.DONO, cargo: CARGO.DONO,
 };
-const posso = (eu: Membro, acao: Acao, alvo: Membro) =>
+const posso = (eu: Membro, acao: AcaoDeModeracao, alvo: Membro) =>
   eu.id !== alvo.id && eu.cargo >= EXIGE[acao] && alvo.cargo < eu.cargo;
 
 const emCastigo = (m: Membro) => !!m.castigoAte && m.castigoAte > Date.now();
@@ -40,7 +41,11 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
 
   useEffect(() => { recarregar(); }, [recarregar]);
 
-  const agir = async (acao: Acao, alvo: Membro, extra?: { minutos?: number; cargo?: number }) => {
+  const agir = async (
+    acao: Acao,
+    alvo: Membro,
+    extra?: { minutos?: number; cargo?: number; turbo?: boolean; idExibido?: string },
+  ) => {
     setErro(null); setAviso(null); setOcupado(true);
     try {
       await moderar(acao, alvo.id, extra);
@@ -84,14 +89,17 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
             <EscolherImagem
               rotulo="Sua foto" formato="redondo" atual={eu.foto}
               onEnviar={async (a) => { setErro(null); try { onEu((await minhaFoto(a)).eu); await recarregar(); } catch (e) { setErro((e as Error).message); } }}
+              onGif={async (url) => { setErro(null); const r = await usarGif('usuario.foto', url); if (r.eu) { onEu(r.eu); await recarregar(); } }}
             />
             <EscolherImagem
-              rotulo="Seu banner (aceita GIF)" formato="faixa" atual={eu.banner}
+              rotulo="Seu banner" formato="faixa" atual={eu.banner}
               onEnviar={async (a) => { setErro(null); try { onEu((await meuBanner(a)).eu); } catch (e) { setErro((e as Error).message); } }}
+              onGif={async (url) => { setErro(null); const r = await usarGif('usuario.banner', url); if (r.eu) onEu(r.eu); }}
             />
           </div>
           <p className="muted small">
             Seu nome aqui é o que os outros veem. O apelido de entrada continua <b>{eu.apelido}</b> e não muda.
+            {!eu.turbo && ' Imagem animada é do Vorcaro Turbo; parada, todo mundo pode.'}
           </p>
           <div className="linha-campo">
             <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
@@ -106,10 +114,12 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
               <EscolherImagem
                 rotulo="Foto do servidor" formato="redondo" atual={servidor.foto}
                 onEnviar={async (a) => { setErro(null); try { onServidor((await fotoDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
+                onGif={async (url) => { setErro(null); const r = await usarGif('servidor.foto', url); if (r.servidor) onServidor(r.servidor); }}
               />
               <EscolherImagem
-                rotulo="Banner do servidor (aceita GIF)" formato="faixa" atual={servidor.banner}
+                rotulo="Banner do servidor" formato="faixa" atual={servidor.banner}
                 onEnviar={async (a) => { setErro(null); try { onServidor((await bannerDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
+                onGif={async (url) => { setErro(null); const r = await usarGif('servidor.banner', url); if (r.servidor) onServidor(r.servidor); }}
               />
             </div>
             <div className="linha-campo">
@@ -127,7 +137,8 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                 <Avatar nome={m.nome} foto={m.foto} />
                 <div className="quem">
                   <div className="strong">
-                    {m.nome}
+                    <Nome membro={m} />
+                    {m.turbo && <span className="selo-turbo" title="Vorcaro Turbo">TURBO</span>}
                     {m.id === eu.id && <span className="muted small"> (você)</span>}
                   </div>
                   <div className="muted small">
@@ -158,6 +169,30 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                   {posso(eu, 'banir', m) && (m.banido
                     ? <button title="Desbanir" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
                     : <button className="danger" title="Banir para sempre" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
+                  )}
+                  {eu.cargo >= CARGO.DONO && (
+                    <button
+                      className={m.turbo ? 'turbo-on' : ''}
+                      title={m.turbo ? 'Tirar o Vorcaro Turbo' : 'Dar Vorcaro Turbo'}
+                      disabled={ocupado}
+                      onClick={() => agir('turbo', m, { turbo: !m.turbo })}
+                    >
+                      turbo
+                    </button>
+                  )}
+                  {eu.cargo >= CARGO.DONO && (
+                    <input
+                      className="campo-id"
+                      defaultValue={m.idExibido ?? ''}
+                      placeholder="id"
+                      maxLength={8}
+                      title="Identificador que aparece antes do nome. ENTER salva."
+                      disabled={ocupado}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        agir('id', m, { idExibido: (e.target as HTMLInputElement).value });
+                      }}
+                    />
                   )}
                   {posso(eu, 'cargo', m) && (
                     <select
