@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>Cantinho do Vorcaro</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src *;" />
+    <!--
+      A página vem de file://, então 'self' não cobre o servidor do grupo: sem liberar
+      http e https aqui, as fotos sobem mas não aparecem, e o mesmo valeria para GIFs
+      vindos de fora. O script continua preso a 'self' — nada externo executa.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob: mediastream: https: http:; connect-src *;" />
   </head>
   <body>
     <div id="root"></div>
