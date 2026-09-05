@@ -140,3 +140,46 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 /* Aviso de atualização */
 .toast { position: fixed; right: 16px; bottom: 16px; background: var(--bg1); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 20; font-size: 14px; }
 .primary.sm { padding: 6px 12px; font-size: 13px; }
+
+/* ---- painel de pessoas e servidor ---- */
+
+.painel { width: min(46rem, 92vw); max-height: 86vh; display: flex; flex-direction: column; }
+.painel .painel-bloco { padding: 14px 18px; border-top: 1px solid #2b2d31; }
+.painel .painel-bloco:first-of-type { border-top: none; }
+.painel .painel-bloco h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #b5bac1; }
+.painel .painel-bloco h3 .count { margin-left: 6px; }
+
+.linha-campo { display: flex; gap: 8px; }
+.linha-campo input { flex: 1; min-width: 0; }
+
+.aviso-ok { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; background: #1d3a2c; color: #9fe0bf; font-size: 13px; }
+
+.membros { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.membros li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; }
+.membros li:hover { background: #2b2d31; }
+.membros li.banido { opacity: .55; }
+.membros .quem { flex: 1; min-width: 0; }
+.membros .quem .strong { font-size: 14px; }
+.membros .quem div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.membros .acoes { display: flex; align-items: center; gap: 4px; flex: none; }
+.membros .acoes button,
+.membros .acoes select {
+  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px; cursor: pointer; line-height: 1.5;
+}
+.membros .acoes button:hover:not(:disabled) { background: #4a4d55; }
+.membros .acoes button:disabled { opacity: .5; cursor: default; }
+.membros .acoes button.danger { background: #6a2b2b; color: #f5c4c4; }
+.membros .acoes button.danger:hover:not(:disabled) { background: #8a3535; }
+
+/* ---- avulsos ---- */
+
+.carregando { display: grid; place-items: center; height: 100vh; color: #b5bac1; }
+
+/* Discreta de propósito: serve para conferir a versão, não para ser lida. */
+.marca-versao {
+  position: fixed; right: 8px; bottom: 6px; z-index: 50;
+  font-size: 11px; color: #8a8f98; opacity: .35; pointer-events: none;
+  font-variant-numeric: tabular-nums; user-select: none;
+}

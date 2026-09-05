@@ -1,12 +1,13 @@
-import type { RoomInfo } from '../api';
+import type { Membro, RoomInfo, Servidor } from '../api';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, pollError, me, rm, onJoin, onShare, onSettings, onLogout }: {
-  rooms: RoomInfo[]; pollError: string | null; me: string; rm: RM;
-  onJoin: (room: string) => void; onShare: () => void; onSettings: () => void; onLogout: () => void;
+export function Sidebar({ rooms, pollError, eu, servidor, rm, onJoin, onShare, onSettings, onPainel, onLogout }: {
+  rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
+  onJoin: (room: string) => void; onShare: () => void; onSettings: () => void;
+  onPainel: () => void; onLogout: () => void;
 }) {
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
@@ -14,7 +15,7 @@ export function Sidebar({ rooms, pollError, me, rm, onJoin, onShare, onSettings,
   return (
     <aside className="sidebar">
       <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
-        <span>Salas de voz</span>
+        <span title={servidor.nome}>{servidor.nome}</span>
         {pollError && <span className="dot-warn" title={pollError} />}
       </div>
 
@@ -70,9 +71,9 @@ export function Sidebar({ rooms, pollError, me, rm, onJoin, onShare, onSettings,
       )}
 
       <div className="user-panel">
-        <span className="avatar big">{me.slice(0, 1).toUpperCase()}</span>
+        <span className="avatar big">{eu.nome.slice(0, 1).toUpperCase()}</span>
         <div className="uname">
-          <div className="strong">{me}</div>
+          <div className="strong" title={`${eu.cargoNome} · entra como ${eu.apelido}`}>{eu.nome}</div>
           <button className="link" onClick={onLogout}>sair</button>
         </div>
         <div className="user-actions">
@@ -82,6 +83,7 @@ export function Sidebar({ rooms, pollError, me, rm, onJoin, onShare, onSettings,
           <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
             <Icon name={rm.deafened ? 'headOff' : 'head'} />
           </button>
+          <button onClick={onPainel} title="Pessoas e servidor"><Icon name="pessoas" /></button>
           <button onClick={onSettings} title="Dispositivos"><Icon name="gear" /></button>
         </div>
       </div>

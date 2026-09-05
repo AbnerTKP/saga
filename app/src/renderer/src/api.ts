@@ -1,33 +1,105 @@
-// Endereço do servidor do grupo. Não é perguntado a ninguém: quem instala digita só a
-// senha e o apelido. Se o servidor mudar de IP ou ganhar um domínio, é aqui que se troca
-// — e é preciso publicar uma versão nova para todo mundo receber.
-export const SERVIDOR = '76.13.225.79:3001';
+// Conversa com o servidor do grupo.
+//
+// O endereço não é perguntado a ninguém: quem instala digita só apelido e senha. Se o
+// servidor mudar de IP ou ganhar um domínio, troca-se aqui — e é preciso publicar uma
+// versão nova para todo mundo receber.
+// Em desenvolvimento aponta para a máquina local, senão testar qualquer mudança
+// significaria mexer no servidor de produção, onde o pessoal está conversando.
+export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
-export type RoomParticipant = { identity: string; name: string; camera: boolean; screen: boolean; muted: boolean };
+const BASE = /^https?:\/\//i.test(SERVIDOR)
+  ? SERVIDOR.replace(/\/+$/, '')
+  : `${/^\d+\.\d+\.\d+\.\d+/.test(SERVIDOR) || SERVIDOR.startsWith('localhost') ? 'http' : 'https'}://${SERVIDOR}`;
+
+export const CARGO = { MEMBRO: 10, MODERADOR: 50, DONO: 100 } as const;
+
+export type Membro = {
+  id: number;
+  apelido: string;
+  nome: string;
+  cargo: number;
+  cargoNome: string;
+  foto: string | null;
+  banner: string | null;
+  banido: boolean;
+  banidoPor: string | null;
+  castigoAte: number | null;
+};
+
+export type Servidor = { id: number; nome: string; foto: string | null; banner: string | null };
+
+export type RoomParticipant = {
+  identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
+  usuarioId?: number; cargo?: number; foto?: string | null;
+};
 export type RoomInfo = { name: string; participants: RoomParticipant[] };
 
-export function normalizeServer(input: string): string {
-  let s = input.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//i.test(s)) s = (s.startsWith('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(s) ? 'http://' : 'https://') + s;
-  return s;
+export type Sessao = { token: string; eu: Membro; servidor: Servidor; salas: string[]; impedimento?: string | null };
+
+// --- guardar a sessão -------------------------------------------------------
+
+// Fica no computador para o app abrir já logado. É um crachá, não a senha: quem
+// for banido ou expulso perde o dele no servidor, e ele deixa de valer na hora.
+const CHAVE = 'cantinho.sessao';
+
+export const lerToken = (): string | null => {
+  try { return localStorage.getItem(CHAVE); } catch { return null; }
+};
+export const guardarToken = (token: string | null) => {
+  try { token ? localStorage.setItem(CHAVE, token) : localStorage.removeItem(CHAVE); } catch { /* sem storage */ }
+};
+
+// --- chamadas ---------------------------------------------------------------
+
+export class ErroDoServidor extends Error {
+  constructor(mensagem: string, readonly status: number) { super(mensagem); }
 }
 
-async function handle<T>(res: Response): Promise<T> {
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `erro ${res.status}`);
-  return body as T;
+async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<T> {
+  const token = lerToken();
+  let res: Response;
+  try {
+    res = await fetch(BASE + rota, {
+      method: metodo,
+      headers: {
+        ...(corpo ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { 'x-sessao': token } : {}),
+      },
+      body: corpo ? JSON.stringify(corpo) : undefined,
+    });
+  } catch {
+    throw new ErroDoServidor('Não consegui falar com o servidor. Confira sua internet.', 0);
+  }
+  const dados = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+  return dados as T;
 }
 
-export async function fetchRooms(server: string, password: string): Promise<RoomInfo[]> {
-  const res = await fetch(`${server}/rooms`, { headers: { 'x-password': password } });
-  return (await handle<{ rooms: RoomInfo[] }>(res)).rooms;
-}
+export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string; senhaDoGrupo: string }) =>
+  pedir<Sessao>('POST', '/cadastrar', c);
 
-export async function fetchToken(server: string, password: string, name: string, room: string) {
-  const res = await fetch(`${server}/token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ password, name, room }),
-  });
-  return handle<{ url: string; token: string; identity: string }>(res);
-}
+export const entrar = (c: { apelido: string; senha: string }) =>
+  pedir<Sessao>('POST', '/entrar', c);
+
+export const sair = () => pedir<{ ok: true }>('POST', '/sair');
+
+export const quemSou = () =>
+  pedir<{ eu: Membro; servidor: Servidor; salas: string[]; impedimento: string | null }>('GET', '/eu');
+
+export const mudarMeuNome = (nome: string) => pedir<{ eu: Membro }>('PATCH', '/eu', { nome });
+
+export const verServidor = () =>
+  pedir<{ servidor: Servidor; salas: string[]; membros: Membro[] }>('GET', '/servidor');
+
+export const renomearServidor = (nome: string) =>
+  pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });
+
+export const buscarSalas = async () => (await pedir<{ rooms: RoomInfo[] }>('GET', '/rooms')).rooms;
+
+export const pedirTokenDaSala = (room: string) =>
+  pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });
+
+export type Acao = 'mutar' | 'desconectar' | 'timeout' | 'tirarTimeout' | 'expulsar' | 'banir' | 'desbanir' | 'cargo';
+
+export const moderar = (acao: Acao, alvo: number, extra?: { minutos?: number; cargo?: number }) =>
+  pedir<{ alvo?: Membro; ok?: boolean }>('POST', '/moderar', { acao, alvo, ...extra });

@@ -1,40 +1,117 @@
 import { useState, type FormEvent } from 'react';
+import { cadastrar, entrar, guardarToken, type Sessao } from '../api';
 
-export type Settings = { password: string; name: string };
+type Modo = 'entrar' | 'criar';
 
-export function ConnectScreen({ initial, onEnter }: { initial: Settings; onEnter: (s: Settings) => Promise<void> }) {
-  const [s, setS] = useState<Settings>(initial);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+export function ConnectScreen({ apelidoInicial, onPronto }: {
+  apelidoInicial: string;
+  onPronto: (s: Sessao) => void;
+}) {
+  const [modo, setModo] = useState<Modo>(apelidoInicial ? 'entrar' : 'criar');
+  const [apelido, setApelido] = useState(apelidoInicial);
+  const [senha, setSenha] = useState('');
+  const [senhaRepetida, setSenhaRepetida] = useState('');
+  const [senhaDoGrupo, setSenhaDoGrupo] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
-  const submit = async (e: FormEvent) => {
+  const criando = modo === 'criar';
+
+  const enviar = async (e: FormEvent) => {
     e.preventDefault();
-    setErr(null);
-    setBusy(true);
+    setErro(null);
+    setOcupado(true);
     try {
-      await onEnter(s);
+      const sessao = criando
+        ? await cadastrar({ apelido, senha, senhaRepetida, senhaDoGrupo })
+        : await entrar({ apelido, senha });
+      guardarToken(sessao.token);
+      onPronto(sessao);
     } catch (e) {
-      setErr((e as Error).message === 'Failed to fetch' ? 'Servidor não respondeu. Confira o endereço.' : (e as Error).message);
+      setErro((e as Error).message);
     } finally {
-      setBusy(false);
+      setOcupado(false);
     }
+  };
+
+  const trocarModo = (novo: Modo) => {
+    setModo(novo);
+    setErro(null);
+    setSenhaRepetida('');
+    setSenhaDoGrupo('');
   };
 
   return (
     <div className="connect">
-      <form className="connect-card" onSubmit={submit}>
+      <form className="connect-card" onSubmit={enviar}>
         <h1>Cantinho do Vorcaro</h1>
         <p className="muted">Voz, vídeo e tela entre amigos.</p>
+
+        <div className="tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={!criando}
+            className={!criando ? 'active' : ''} onClick={() => trocarModo('entrar')}>
+            Entrar
+          </button>
+          <button type="button" role="tab" aria-selected={criando}
+            className={criando ? 'active' : ''} onClick={() => trocarModo('criar')}>
+            Criar conta
+          </button>
+        </div>
+
         <label>
-          Senha do grupo
-          <input type="password" value={s.password} onChange={(e) => setS({ ...s, password: e.target.value })} required />
+          Apelido
+          <input
+            value={apelido}
+            onChange={(e) => setApelido(e.target.value)}
+            autoComplete="username"
+            maxLength={24}
+            required
+            autoFocus
+          />
+          {criando && <small className="muted">De 3 a 24 caracteres, sem espaços. Não dá para mudar depois — mas o nome que os outros veem, sim.</small>}
         </label>
+
         <label>
-          Seu apelido
-          <input value={s.name} onChange={(e) => setS({ ...s, name: e.target.value })} maxLength={32} required />
+          Senha
+          <input
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            autoComplete={criando ? 'new-password' : 'current-password'}
+            required
+          />
         </label>
-        {err && <div className="error">{err}</div>}
-        <button className="primary" disabled={busy}>{busy ? 'Conectando…' : 'Entrar'}</button>
+
+        {criando && (
+          <>
+            <label>
+              Repita a senha
+              <input
+                type="password"
+                value={senhaRepetida}
+                onChange={(e) => setSenhaRepetida(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </label>
+            <label>
+              Senha do grupo
+              <input
+                type="password"
+                value={senhaDoGrupo}
+                onChange={(e) => setSenhaDoGrupo(e.target.value)}
+                required
+              />
+              <small className="muted">É o convite, pedida só desta vez. Peça a quem te chamou.</small>
+            </label>
+          </>
+        )}
+
+        {erro && <div className="error">{erro}</div>}
+
+        <button className="primary" disabled={ocupado}>
+          {ocupado ? (criando ? 'Criando…' : 'Entrando…') : (criando ? 'Criar conta' : 'Entrar')}
+        </button>
       </form>
     </div>
   );

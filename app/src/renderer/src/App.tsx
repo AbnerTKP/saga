@@ -1,79 +1,99 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchRooms, fetchToken, normalizeServer, SERVIDOR, type RoomInfo } from './api';
+import {
+  buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken,
+  type RoomInfo, type Sessao, type Membro, type Servidor,
+} from './api';
 import { useRoom } from './useRoom';
-import { ConnectScreen, type Settings } from './components/ConnectScreen';
+import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
 import { UpdateToast } from './components/UpdateToast';
+import { PainelDoServidor } from './components/PainelDoServidor';
+import { Versao } from './components/Versao';
 
-const KEY = 'cantinho.settings';
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignora */ }
-  return { password: '', name: '' };
-}
+// Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
+const ULTIMO_APELIDO = 'cantinho.apelido';
 
 export function App() {
-  const [settings, setSettings] = useState<Settings>(loadSettings);
-  const [entered, setEntered] = useState(false);
+  const [sessao, setSessao] = useState<Sessao | null>(null);
+  const [conferindo, setConferindo] = useState(!!lerToken());
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [pollError, setPollError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
+  const [painel, setPainel] = useState(false);
   const rm = useRoom();
 
-  const server = normalizeServer(SERVIDOR);
-
-  const enter = useCallback(async (s: Settings) => {
-    const list = await fetchRooms(normalizeServer(SERVIDOR), s.password);
-    localStorage.setItem(KEY, JSON.stringify(s));
-    setSettings(s);
-    setRooms(list);
-    setEntered(true);
+  // Abrir já logado: se existe um crachá guardado, pergunta ao servidor se ainda vale.
+  // Ele pode não valer mais — a pessoa foi expulsa ou banida enquanto o app estava fechado.
+  useEffect(() => {
+    if (!lerToken()) return;
+    let vivo = true;
+    quemSou()
+      .then((r) => { if (vivo) setSessao({ token: lerToken()!, ...r }); })
+      .catch(() => { guardarToken(null); })
+      .finally(() => { if (vivo) setConferindo(false); });
+    return () => { vivo = false; };
   }, []);
 
-  // Atualiza quem está em cada sala
+  const entrou = useCallback((s: Sessao) => {
+    try { localStorage.setItem(ULTIMO_APELIDO, s.eu.apelido); } catch { /* sem storage */ }
+    setSessao(s);
+  }, []);
+
+  // Quem está em cada sala
   useEffect(() => {
-    if (!entered) return;
-    let alive = true;
+    if (!sessao) return;
+    let vivo = true;
     const tick = async () => {
       try {
-        const list = await fetchRooms(server, settings.password);
-        if (alive) { setRooms(list); setPollError(null); }
+        const lista = await buscarSalas();
+        if (vivo) { setRooms(lista); setPollError(null); }
       } catch (e) {
-        if (alive) setPollError((e as Error).message);
+        if (!vivo) return;
+        // Sessão derrubada com o app aberto (expulso ou banido): volta para o login.
+        if ((e as { status?: number }).status === 401) { guardarToken(null); setSessao(null); return; }
+        setPollError((e as Error).message);
       }
     };
     tick();
     const id = setInterval(tick, 4000);
-    return () => { alive = false; clearInterval(id); };
-  }, [entered, server, settings.password]);
+    return () => { vivo = false; clearInterval(id); };
+  }, [sessao]);
 
-  const joinRoom = useCallback(async (name: string) => {
-    if (rm.roomName === name) return;
+  const joinRoom = useCallback(async (nome: string) => {
+    if (rm.roomName === nome) return;
     try {
-      const { url, token } = await fetchToken(server, settings.password, settings.name, name);
-      await rm.join(url, token, name);
+      const { url, token } = await pedirTokenDaSala(nome);
+      await rm.join(url, token, nome);
     } catch (e) {
       rm.setError((e as Error).message);
     }
-  }, [rm, server, settings]);
+  }, [rm]);
 
   const logout = useCallback(async () => {
     await rm.leave();
-    setEntered(false);
+    await sair().catch(() => undefined);
+    guardarToken(null);
+    setSessao(null);
+    setRooms([]);
   }, [rm]);
 
-  if (!entered) {
+  const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
+  const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
+
+  if (conferindo) return <div className="carregando">Entrando…</div>;
+
+  if (!sessao) {
+    let ultimo = '';
+    try { ultimo = localStorage.getItem(ULTIMO_APELIDO) ?? ''; } catch { /* sem storage */ }
     return (
       <>
-        <ConnectScreen initial={settings} onEnter={enter} />
+        <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} />
         <UpdateToast />
+        <Versao />
       </>
     );
   }
@@ -83,11 +103,13 @@ export function App() {
       <Sidebar
         rooms={rooms}
         pollError={pollError}
-        me={settings.name}
+        eu={sessao.eu}
+        servidor={sessao.servidor}
         rm={rm}
         onJoin={joinRoom}
         onShare={() => (rm.screenOn ? rm.stopScreen() : setPicker(true))}
         onSettings={() => setDevices(true)}
+        onPainel={() => setPainel(true)}
         onLogout={logout}
       />
       <Stage rm={rm} />
@@ -101,7 +123,17 @@ export function App() {
         />
       )}
       {devices && <DeviceSettings room={rm.room} onClose={() => setDevices(false)} />}
+      {painel && (
+        <PainelDoServidor
+          eu={sessao.eu}
+          servidor={sessao.servidor}
+          onEu={atualizarEu}
+          onServidor={atualizarServidor}
+          onClose={() => setPainel(false)}
+        />
+      )}
       <UpdateToast />
+      <Versao />
     </div>
   );
 }
