@@ -90,42 +90,12 @@ pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor n
 
 ## Próximos passos
 
-Ordenados por dependência, não por vontade. Cargos configuráveis mexem em toda regra de
-permissão; construir telas que exibem cargos antes disso significa refazê-las depois.
+Tudo que estava planejado (v0.12.0 a v0.16.0) está no ar. O que sobrou:
 
-### v0.12.0 — no ar
-Giphy nas quatro imagens, Vorcaro Turbo, identificador antes do nome, cartão de perfil com
-banner ao clicar na pessoa, e o modal de configuração que transbordava.
-
-### v0.13.0 — Salas e chat em evidência (no ar)
-- Criar, renomear e apagar salas (hoje vêm do banco mas não há tela)
-- Salas de **texto**, além das de voz; a de texto ocupa a área principal, como no Discord
-- Mensagens que não somem — hoje evaporam quando a sala esvazia, por não haver banco. Agora há
-- Opção de **não assistir transmissão nenhuma**, para quem só quer a voz
-
-### v0.14.0 — Cargos configuráveis
-Substitui os três níveis fixos (Dono, Moderador, Membro) por cargos criados pelo dono, com
-nome, cor, ordem e permissões marcáveis uma a uma. É a fundação: `cargos.mjs` deixa de ser
-uma escala numérica e passa a ser conjunto de permissões, e todo `cargo >=` do código muda.
-Manter a regra de ouro: ninguém age sobre alguém de cargo igual ou superior.
-
-### v0.15.0 — A cara do Cantinho
-- Barra do servidor **à direita** e **quadrada** — de propósito diferente do Discord
-- Lista de pessoas do servidor com seus cargos, também à direita
-- Com um servidor só, por enquanto
-
-### v0.16.0 — Vários servidores
-Criar servidores, convidar, entrar. O banco já foi construído para isto desde a v0.2.0:
-cargo e banimento pertencem ao vínculo pessoa↔servidor, não à pessoa.
-
-### v0.17.0 — Design dos avisos
-Hoje todo aviso é a mesma tarja vermelha, inclusive os que não são erro: "isso é do
-Vorcaro Turbo" é convite, não falha. Separar por natureza — erro, aviso, sucesso,
-convite ao Turbo — cada um com sua cor e seu peso, e o do Turbo com o tratamento que a
-distinção merece.
-
-### Sem data
-- Atualização automática no Mac (hoje só avisa, por falta de certificado da Apple)
-- Ícone do Mac em retângulo arredondado, como manda o sistema
-- Atalhos de teclado no soundboard
-- "Modo música": desligar cancelamento de eco para quem toca instrumento
+1. **Design dos avisos** — hoje todo aviso é a mesma tarja vermelha, inclusive os que não
+   são erro: "isso é do Vorcaro Turbo" é convite, não falha.
+2. **Atualização automática no Mac** — hoje só avisa e abre o download, porque o mecanismo
+   do macOS confere assinatura e recusa a nossa, que é ad-hoc.
+3. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
+4. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
+5. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
