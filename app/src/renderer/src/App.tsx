@@ -19,6 +19,8 @@ import { Soundboard } from './components/Soundboard';
 import { MenuDaPessoa, type PessoaNaCall } from './components/MenuDaPessoa';
 import { RegistroDeErros } from './components/RegistroDeErros';
 import { Versao } from './components/Versao';
+import { ListaDeMembros } from './components/ListaDeMembros';
+import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -40,6 +42,7 @@ export function App() {
   // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
   // porque mudam quando alguém os edita.
   const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [membrosDoServidor, setMembrosDoServidor] = useState<Membro[]>([]);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -129,6 +132,10 @@ export function App() {
     }
   }
 
+  // Quem está em alguma sala de voz agora: a lista da direita marca essas pessoas.
+  const naVoz = new Set<number>();
+  for (const sala of rooms) for (const p of sala.participants) if (p.usuarioId) naVoz.add(p.usuarioId);
+
   const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }) => {
     setMenu({ pessoa: pessoas.get(identity) ?? { identity, nome }, em });
   // pessoas é remontado a cada render; depender dele aqui só criaria a função à toa.
@@ -147,9 +154,17 @@ export function App() {
     try { await rm.startScreen(null, true); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
   }, [rm, seletorDoSistema]);
 
+  // Quem faz parte do servidor muda devagar — cargo novo, alguém que entrou. De dez em
+  // dez segundos basta, e não concorre com a busca de salas, que é de quatro.
   useEffect(() => {
     if (!sessao) return;
-    verServidor().then((r) => setCargos(r.cargos)).catch(() => undefined);
+    let vivo = true;
+    const buscar = () => verServidor()
+      .then((r) => { if (vivo) { setCargos(r.cargos); setMembrosDoServidor(r.membros); } })
+      .catch(() => undefined);
+    buscar();
+    const id = setInterval(buscar, 10_000);
+    return () => { vivo = false; clearInterval(id); };
   }, [sessao]);
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
@@ -236,6 +251,27 @@ export function App() {
           onClose={() => setSoundboard(false)}
         />
       )}
+      <ListaDeMembros
+        membros={membrosDoServidor}
+        cargos={cargos}
+        naVoz={naVoz}
+        eu={sessao.eu}
+        onPessoa={(m, em) => setMenu({
+          pessoa: {
+            identity: `u${m.id}`, nome: m.nome, usuarioId: m.id, cargo: m.cargo,
+            foto: m.foto, banner: m.banner, turbo: m.turbo, idExibido: m.idExibido,
+          },
+          em,
+        })}
+      />
+
+      <TrilhaDeServidores
+        servidores={[sessao.servidor]}
+        atual={sessao.servidor.id}
+        onEscolher={() => undefined}
+        onConfigurar={() => setPainel(true)}
+      />
+
       {menu && (
         <MenuDaPessoa
           pessoa={menu.pessoa}

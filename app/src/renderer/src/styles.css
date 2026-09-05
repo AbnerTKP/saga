@@ -413,3 +413,52 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* O raio do Turbo, roxo, junto dos outros ícones da pessoa. */
 .raio-turbo { color: #c084fc; display: flex; }
+
+/* ---- lista de pessoas e trilha, à direita ---- */
+
+/* A trilha fica na ponta direita e é quadrada: a cara do Cantinho, não a do Discord. */
+.app { grid-template-columns: 240px 1fr 220px 60px; }
+
+.lista-membros { background: var(--bg1); display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); }
+.lista-membros-topo {
+  height: 48px; display: flex; align-items: center; gap: 6px; padding: 0 14px;
+  font-weight: 600; color: var(--white); box-shadow: 0 1px 0 var(--line); -webkit-app-region: drag;
+}
+.lista-membros-corpo { flex: 1; overflow-y: auto; padding: 10px 6px; }
+
+.grupo-de-cargo { margin-bottom: 12px; }
+.cabecalho-do-grupo {
+  padding: 0 8px 4px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text3);
+}
+
+.membro-linha {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 4px; text-align: left; color: var(--text2); font-size: 14px;
+}
+.membro-linha:hover { background: var(--bg3); color: var(--text); }
+/* Quem não está na voz aparece apagado, como no Discord: dá para ver quem está sem ler. */
+.membro-linha:not(.na-voz) { opacity: .45; }
+.membro-linha.banido { text-decoration: line-through; }
+.membro-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.trilha {
+  background: var(--bg0); display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 10px 0; overflow-y: auto; border-left: 1px solid var(--line);
+}
+.quadro-servidor {
+  width: 42px; height: 42px; flex: none; border-radius: 8px;
+  background: var(--bg3); color: var(--white); font-weight: 700; font-size: 13px;
+  display: grid; place-items: center; overflow: hidden; transition: border-radius .15s;
+}
+.quadro-servidor img { width: 100%; height: 100%; object-fit: cover; }
+.quadro-servidor:hover { border-radius: 12px; }
+.quadro-servidor.atual { box-shadow: 0 0 0 2px var(--accent); }
+.quadro-servidor.acao { background: none; border: 1px dashed var(--bg4); color: var(--text3); font-size: 20px; }
+.quadro-servidor.acao:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 1100px) {
+  /* Em janela estreita a lista de pessoas some antes da trilha: a trilha é navegação. */
+  .app { grid-template-columns: 240px 1fr 60px; }
+  .lista-membros { display: none; }
+}
