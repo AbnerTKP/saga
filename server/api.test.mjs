@@ -172,6 +172,22 @@ test('banir derruba a sessão de quem está com o app aberto', async () => {
   assert.match(volta.corpo.impedimento ?? '', /banido/, 'o banido devia ver o motivo ao entrar');
 });
 
+test('banir e castigo valem mesmo com o LiveKit fora do ar', async () => {
+  // Banir e dar castigo agora também tiram a pessoa da sala de voz. Se essa parte
+  // falhar — LiveKit fora, pessoa em nenhuma sala — a punição não pode se perder:
+  // o que vale é o registro, e tirar da sala é consequência.
+  const dono = await sessaoDe('abner');
+  const alvo = (await cadastrar('fabio')).corpo;
+
+  const castigo = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'timeout', alvo: alvo.eu.id, minutos: 5 } });
+  assert.equal(castigo.status, 200, 'o castigo falhou junto com o LiveKit');
+  assert.ok(castigo.corpo.alvo.castigoAte > Date.now());
+
+  const ban = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'banir', alvo: alvo.eu.id } });
+  assert.equal(ban.status, 200, 'o banimento falhou junto com o LiveKit');
+  assert.equal(ban.corpo.alvo.banido, true);
+});
+
 test('o nome exibido troca sem mexer no apelido de login', async () => {
   const bruno = await sessaoDe('bruno');
   const r = await chamar('PATCH', '/eu', { sessao: bruno.token, corpo: { nome: 'Bruno das Antigas' } });

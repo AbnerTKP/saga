@@ -139,6 +139,12 @@ async function participantesDaSala(nome) {
   });
 }
 
+/** Tira da sala de voz, se estiver em alguma. Não estar em nenhuma não é erro. */
+async function tirarDaSala(usuarioId) {
+  const onde = await ondeEsta(usuarioId);
+  if (onde) await svc.removeParticipant(onde.sala, identidadeDe(usuarioId)).catch(() => {});
+}
+
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
 async function ondeEsta(usuarioId) {
   const alvo = identidadeDe(usuarioId);
@@ -264,16 +270,26 @@ const ROTAS = {
     const sid = SERVIDOR.id;
 
     switch (acao) {
-      case 'banir':      return { alvo: verMembro(membros.banir(db, sid, eu.id, alvo)) };
+      // Banir e dar castigo também tiram da call. Sem isso a pessoa continua conversando
+      // depois de banida — some só quando o app dela percebe — e quem clicou conclui,
+      // com razão, que o botão não funcionou.
+      case 'banir': {
+        const r = membros.banir(db, sid, eu.id, alvo);
+        await tirarDaSala(alvo);
+        return { alvo: verMembro(r) };
+      }
+      case 'timeout': {
+        const r = membros.darTimeout(db, sid, eu.id, alvo, minutos);
+        await tirarDaSala(alvo);
+        return { alvo: verMembro(r) };
+      }
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
-      case 'timeout':    return { alvo: verMembro(membros.darTimeout(db, sid, eu.id, alvo, minutos)) };
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
       case 'cargo':      return { alvo: verMembro(membros.definirCargo(db, sid, eu.id, alvo, cargo)) };
 
       case 'expulsar': {
         membros.expulsar(db, sid, eu.id, alvo);
-        const onde = await ondeEsta(alvo);
-        if (onde) await svc.removeParticipant(onde.sala, identidadeDe(alvo)).catch(() => {});
+        await tirarDaSala(alvo);
         return { ok: true };
       }
       case 'desconectar': {
