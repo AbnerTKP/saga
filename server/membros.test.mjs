@@ -6,6 +6,7 @@ import { CARGO } from './cargos.mjs';
 import {
   garantirMembro, buscarMembro, listarMembros, impedimento, mudarNomeExibido,
   banir, desbanir, darTimeout, tirarTimeout, expulsar, definirCargo,
+  definirTurbo, definirIdExibido,
 } from './membros.mjs';
 
 function cenario({ dono } = {}) {
@@ -135,4 +136,73 @@ test('a lista sai do cargo mais alto para o mais baixo', () => {
 test('quem não é membro do servidor não entra', () => {
   const { db, sid } = cenario();
   assert.match(impedimento(buscarMembro(db, sid, 999)), /não faz parte/);
+});
+
+// --- Vorcaro Turbo e identificador ---------------------------------------------
+
+test('ninguém nasce Turbo', () => {
+  const { db, sid, cria } = cenario();
+  const a = cria('abner');
+  assert.equal(buscarMembro(db, sid, a.id).turbo, 0);
+});
+
+test('o dono concede e tira o Turbo', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner'), caio = cria('caio');
+  assert.equal(definirTurbo(db, sid, dono.id, caio.id, true).turbo, 1);
+  assert.equal(definirTurbo(db, sid, dono.id, caio.id, false).turbo, 0);
+});
+
+test('o dono pode dar Turbo a si mesmo', () => {
+  // Turbo é distinção, não moderação: a regra de "não agir sobre si" não se aplica.
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner');
+  assert.equal(definirTurbo(db, sid, dono.id, dono.id, true).turbo, 1);
+});
+
+test('moderador não concede Turbo', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
+  definirCargo(db, sid, dono.id, bruno.id, CARGO.MODERADOR);
+  assert.throws(() => definirTurbo(db, sid, bruno.id, caio.id, true), /Só o dono/);
+});
+
+test('membro não dá Turbo a si mesmo', () => {
+  const { db, sid, cria } = cenario();
+  cria('abner');
+  const caio = cria('caio');
+  assert.throws(() => definirTurbo(db, sid, caio.id, caio.id, true), /Só o dono/);
+});
+
+test('o dono define e limpa o identificador', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner'), caio = cria('caio');
+  assert.equal(definirIdExibido(db, sid, dono.id, caio.id, '007').id_exibido, '007',
+    'zero à esquerda tem de sobreviver');
+  assert.equal(definirIdExibido(db, sid, dono.id, caio.id, '  ').id_exibido, null);
+});
+
+test('identificador aceita letra e símbolo curto, recusa o resto', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner'), caio = cria('caio');
+  for (const bom of ['1', '42', 'A7', '#9', 'zé']) {
+    assert.equal(definirIdExibido(db, sid, dono.id, caio.id, bom).id_exibido, bom, bom);
+  }
+  for (const ruim of ['com espaço', '123456789', 'a/b']) {
+    assert.throws(() => definirIdExibido(db, sid, dono.id, caio.id, ruim), /identificador/, ruim);
+  }
+});
+
+test('moderador não define identificador', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
+  definirCargo(db, sid, dono.id, bruno.id, CARGO.MODERADOR);
+  assert.throws(() => definirIdExibido(db, sid, bruno.id, caio.id, '1'), /Só o dono/);
+});
+
+test('Turbo e identificador em quem não é do servidor dá erro claro', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner');
+  assert.throws(() => definirTurbo(db, sid, dono.id, 999, true), /não faz parte/);
+  assert.throws(() => definirIdExibido(db, sid, dono.id, 999, '1'), /não faz parte/);
 });

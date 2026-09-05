@@ -19,6 +19,8 @@ const IMPRESSOES = [
   '78e4601defeb',  // 6  salas
   'a2cbe6c4eacf',  // 7  sons
   '8b0535660d75',  // 8  índice de sons
+  '89541d4a2506',  // 9  coluna turbo
+  'dc92e35733c9',  // 10 coluna id_exibido
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -39,6 +41,15 @@ test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   assert.deepEqual(tabelas, ['membros', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+});
+
+test('as colunas acrescentadas depois existem e têm padrão seguro', () => {
+  const db = abrirBanco(':memory:');
+  const colunas = db.prepare('PRAGMA table_info(membros)').all();
+  const turbo = colunas.find((c) => c.name === 'turbo');
+  assert.ok(turbo, 'a coluna turbo sumiu');
+  assert.equal(turbo.dflt_value, '0', 'ninguém pode nascer Turbo por omissão');
+  assert.ok(colunas.find((c) => c.name === 'id_exibido'), 'a coluna id_exibido sumiu');
 });
 
 test('abrir de novo não repete migração', () => {

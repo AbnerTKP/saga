@@ -72,6 +72,9 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           <button className="link" onClick={onClose}><Icon name="close" size={16} /></button>
         </div>
 
+        {/* O cabeçalho fica; o resto rola. Antes as seções cresciam junto com a lista de
+            pessoas e transbordavam para fora do modal. */}
+        <div className="painel-corpo">
         {erro && <div className="error">{erro}</div>}
         {aviso && <div className="aviso-ok">{aviso}</div>}
 
@@ -172,6 +175,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
             ))}
           </ul>
         </section>
+        </div>
       </div>
     </div>
   );

@@ -238,11 +238,65 @@ test('sobe foto de perfil e ela passa a ser servida', async () => {
   assert.deepEqual(Buffer.from(await img.arrayBuffer()), PNG);
 });
 
-test('banner aceita GIF', async () => {
+test('imagem animada é recusada a quem não é Turbo', async () => {
   const { token } = await sessaoDe('abner');
   const r = await subir('/eu/banner', token, GIF);
+  assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /Turbo/);
+});
+
+test('imagem parada continua livre para todos', async () => {
+  const { token } = await sessaoDe('bruno');
+  assert.equal((await subir('/eu/foto', token, PNG)).status, 200);
+});
+
+test('com Turbo, a imagem animada passa', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'turbo', alvo: dono.eu.id, turbo: true } });
   assert.equal(r.status, 200);
-  assert.match(r.corpo.eu.banner, /\.gif$/);
+  assert.equal(r.corpo.alvo.turbo, true, 'o dono pode dar Turbo a si mesmo');
+
+  const b = await subir('/eu/banner', dono.token, GIF);
+  assert.equal(b.status, 200);
+  assert.match(b.corpo.eu.banner, /\.gif$/);
+});
+
+test('membro não concede Turbo a si mesmo', async () => {
+  const bruno = await sessaoDe('bruno');
+  const r = await chamar('POST', '/moderar', { sessao: bruno.token, corpo: { acao: 'turbo', alvo: bruno.eu.id, turbo: true } });
+  assert.equal(r.status, 403);
+});
+
+test('o dono define o identificador, e ele volta na lista', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const r = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'id', alvo: bruno.eu.id, idExibido: '007' } });
+  assert.equal(r.corpo.alvo.idExibido, '007');
+
+  const lista = await chamar('GET', '/servidor', { sessao: dono.token });
+  assert.equal(lista.corpo.membros.find((m) => m.id === bruno.eu.id).idExibido, '007');
+});
+
+test('membro não define identificador de ninguém', async () => {
+  const bruno = await sessaoDe('bruno');
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/moderar', { sessao: bruno.token, corpo: { acao: 'id', alvo: dono.eu.id, idExibido: 'x' } });
+  assert.equal(r.status, 403);
+});
+
+test('sem chave configurada, a busca de GIF avisa em vez de quebrar', async () => {
+  const { token } = await sessaoDe('abner');
+  const r = await chamar('GET', '/giphy?q=gato', { sessao: token });
+  assert.equal(r.status, 503);
+  assert.match(r.corpo.error, /não está configurada/);
+});
+
+test('não dá para fazer o servidor baixar de qualquer endereço', async () => {
+  const { token } = await sessaoDe('abner');
+  for (const url of ['http://127.0.0.1:3001/eu', 'https://evil.com/x.gif', 'file:///etc/passwd']) {
+    const r = await chamar('POST', '/giphy/usar', { sessao: token, corpo: { onde: 'usuario.foto', url } });
+    assert.equal(r.status, 400, url);
+  }
 });
 
 test('corpo vazio remove a imagem', async () => {

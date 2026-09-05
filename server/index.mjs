@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
 import { salvarImagem, salvarSom, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
+import { buscarGifs, baixarGif } from './giphy.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
 import { CARGO, NOME_DO_CARGO } from './cargos.mjs';
@@ -22,6 +23,7 @@ const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Cantinho do Vorcaro';
 const DONO = process.env.DONO ?? '';            // apelido que vira dono; vazio = o primeiro a entrar
 const BANCO = process.env.BANCO ?? './dados/cantinho.db';
 const ARQUIVOS = process.env.ARQUIVOS ?? './dados/arquivos';
+const GIPHY = process.env.GIPHY_KEY ?? '';   // vazio = busca de GIF desligada
 const KEY = process.env.LIVEKIT_API_KEY;
 const SECRET = process.env.LIVEKIT_API_SECRET;
 const HOST = process.env.LIVEKIT_HOST ?? 'http://localhost:7880';
@@ -95,6 +97,8 @@ const verMembro = (m) => m && ({
   cargoNome: NOME_DO_CARGO[m.cargo] ?? 'Membro',
   foto: m.foto ?? null,
   banner: m.banner ?? null,
+  turbo: !!m.turbo,
+  idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
   castigoAte: m.silenciado_ate ?? null,
@@ -156,6 +160,20 @@ async function ondeEsta(usuarioId) {
   return null;
 }
 
+/**
+ * Imagem animada é privilégio do Vorcaro Turbo. O servidor confere, e não a tela: do
+ * contrário bastaria alterar o app para contornar.
+ */
+function guardarComRegraDoTurbo(eu, bruto, papel, de) {
+  const nome = salvarImagem(ARQUIVOS, bruto, papel);
+  const animada = nome.endsWith('.gif');
+  // O servidor é do dono, então a imagem dele não passa por essa régua.
+  if (animada && de === 'usuario' && !eu.turbo) {
+    throw new ErroDeConta('Imagem animada é do Vorcaro Turbo. Peça ao dono, ou use PNG, JPG ou WEBP.', 403);
+  }
+  return nome;
+}
+
 /** Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor. */
 async function trocarImagem(req, de, papel) {
   const eu = exigirSessao(req);
@@ -164,7 +182,7 @@ async function trocarImagem(req, de, papel) {
   }
   const bruto = await lerBinario(req, LIMITES[papel] + 1024);
   // Corpo vazio significa "tirar a imagem": é como o app pede a remoção.
-  const nome = bruto.length ? salvarImagem(ARQUIVOS, bruto, papel) : null;
+  const nome = bruto.length ? guardarComRegraDoTurbo(eu, bruto, papel, de) : null;
 
   if (de === 'servidor') {
     db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, SERVIDOR.id);
@@ -264,9 +282,38 @@ const ROTAS = {
     return sons.removerSom(db, SERVIDOR.id, eu, id);
   },
 
+  'GET /giphy': async (req) => {
+    exigirSessao(req);
+    const q = new URL(req.url, 'http://x').searchParams;
+    return { gifs: await buscarGifs({ chave: GIPHY, termo: q.get('q'), limite: q.get('limite') }) };
+  },
+
+  // O GIF escolhido é baixado e guardado aqui: assim continua funcionando se sumir do
+  // Giphy, e passa pelas mesmas conferências de qualquer imagem enviada.
+  'POST /giphy/usar': async (req) => {
+    const eu = exigirSessao(req);
+    const { onde, url } = await lerCorpo(req);
+    const [de, papel] = String(onde ?? '').split('.');
+    if (!['usuario', 'servidor'].includes(de) || !['foto', 'banner'].includes(papel)) {
+      throw new ErroDeConta('Não sei onde pôr essa imagem.', 400);
+    }
+    if (de === 'servidor' && eu.cargo < CARGO.DONO) {
+      throw new ErroDeConta('Só o dono muda a imagem do servidor.', 403);
+    }
+    const bruto = await baixarGif(url, LIMITES[papel]);
+    const nome = guardarComRegraDoTurbo(eu, bruto, papel, de);
+
+    if (de === 'servidor') {
+      db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, SERVIDOR.id);
+      return { servidor: verServidor() };
+    }
+    db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
+    return { eu: verMembro(membros.buscarMembro(db, SERVIDOR.id, eu.id)) };
+  },
+
   'POST /moderar': async (req) => {
     const eu = exigirSessao(req);
-    const { acao, alvo, minutos, cargo } = await lerCorpo(req);
+    const { acao, alvo, minutos, cargo, turbo, idExibido } = await lerCorpo(req);
     const sid = SERVIDOR.id;
 
     switch (acao) {
@@ -286,6 +333,8 @@ const ROTAS = {
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
       case 'cargo':      return { alvo: verMembro(membros.definirCargo(db, sid, eu.id, alvo, cargo)) };
+      case 'turbo':      return { alvo: verMembro(membros.definirTurbo(db, sid, eu.id, alvo, turbo)) };
+      case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };
 
       case 'expulsar': {
         membros.expulsar(db, sid, eu.id, alvo);

@@ -1,7 +1,7 @@
 // Tudo que é da pessoa *dentro de um servidor*: nome exibido, cargo, banimento e castigo.
 // Separado da conta porque a mesma conta poderá estar em vários servidores com cargos
 // diferentes — hoje só existe um, mas o formato já é esse.
-import { CARGO, podeAgir, podeDefinirCargo } from './cargos.mjs';
+import { CARGO, podeAgir, podeDefinirCargo, podeConfigurarMembro } from './cargos.mjs';
 import { ErroDeConta, derrubarSessoes } from './contas.mjs';
 
 /**
@@ -28,6 +28,7 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
 const SELECT_MEMBRO = `
   SELECT u.id, u.apelido, u.foto, u.banner,
          m.servidor_id, m.cargo, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
+         m.turbo, m.id_exibido,
          COALESCE(NULLIF(m.nome_exibido, ''), u.apelido) AS nome
     FROM membros m JOIN usuarios u ON u.id = m.usuario_id`;
 
@@ -59,6 +60,37 @@ export function mudarNomeExibido(db, servidorId, usuarioId, nome) {
   db.prepare('UPDATE membros SET nome_exibido = ? WHERE servidor_id = ? AND usuario_id = ?')
     .run(limpo || null, servidorId, usuarioId);
   return buscarMembro(db, servidorId, usuarioId);
+}
+
+const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, não pode roubar a linha
+
+/** Turbo é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo. */
+export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
+  if (!podeConfigurarMembro(buscarMembro(db, servidorId, quemId))) {
+    throw new ErroDeConta('Só o dono concede Vorcaro Turbo.', 403);
+  }
+  const alvo = buscarMembro(db, servidorId, Number(alvoId));
+  if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
+  db.prepare('UPDATE membros SET turbo = ? WHERE servidor_id = ? AND usuario_id = ?')
+    .run(ligado ? 1 : 0, servidorId, alvo.id);
+  return buscarMembro(db, servidorId, alvo.id);
+}
+
+/** Identificador curto que aparece antes do nome. Vazio remove. */
+export function definirIdExibido(db, servidorId, quemId, alvoId, id) {
+  if (!podeConfigurarMembro(buscarMembro(db, servidorId, quemId))) {
+    throw new ErroDeConta('Só o dono define o identificador.', 403);
+  }
+  const alvo = buscarMembro(db, servidorId, Number(alvoId));
+  if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
+
+  const limpo = String(id ?? '').trim();
+  if (limpo && !ID_VALIDO.test(limpo)) {
+    throw new ErroDeConta('O identificador precisa ter de 1 a 8 caracteres, sem espaços.');
+  }
+  db.prepare('UPDATE membros SET id_exibido = ? WHERE servidor_id = ? AND usuario_id = ?')
+    .run(limpo || null, servidorId, alvo.id);
+  return buscarMembro(db, servidorId, alvo.id);
 }
 
 // --- moderação --------------------------------------------------------------

@@ -30,6 +30,11 @@ export const ACOES = Object.keys(EXIGE);
 export const CARGO_PARA_GERIR_SONS = CARGO.MODERADOR;
 export const podeGerirSons = (membro) => !!membro && membro.cargo >= CARGO_PARA_GERIR_SONS;
 
+// Turbo e identificador não são moderação: são distinção e enfeite, que o dono concede a
+// quem quiser — inclusive a si mesmo. Por isso ficam fora de EXIGE, cuja regra é
+// justamente impedir que alguém aja sobre si ou sobre um igual.
+export const podeConfigurarMembro = (membro) => !!membro && membro.cargo >= CARGO.DONO;
+
 /**
  * Diz se `quem` pode fazer `acao` em `alvo`, ou por que não pode.
  * Recebe apenas { id, cargo } de cada lado — nada de objeto de banco inteiro.
