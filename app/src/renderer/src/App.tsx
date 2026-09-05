@@ -174,7 +174,7 @@ export function App() {
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
       />
-      <Stage rm={rm} pessoas={pessoas} onPessoa={abrirMenu} />
+      <Stage rm={rm} pessoas={pessoas} onPessoa={abrirMenu} onRegistro={() => setRegistro(true)} />
       {picker && (
         <ScreenPicker
           onClose={() => setPicker(false)}

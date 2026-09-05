@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { anotar } from './registro';
 import {
   Room,
   RoomEvent,
@@ -254,11 +255,29 @@ export function useRoom() {
     try {
       await lp().setScreenShareEnabled(true, captura, publicacao);
     } catch (e) {
-      if (!audio) throw e;
-      // sem áudio do sistema neste computador: tenta só o vídeo
-      if (sourceId) await window.desktop.chooseSource(sourceId, false);
-      await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
-      setError('Compartilhando sem o áudio do sistema (não disponível neste computador).');
+      const motivo = (e as Error).message || String(e);
+      // O erro real precisa ir para o registro. Antes ele era descartado aqui, e toda
+      // falha — fosse ela qual fosse — virava "áudio não disponível neste computador",
+      // o que mandava a pessoa investigar o lugar errado.
+      anotar('erro', 'tela', `falhou com áudio=${audio}: ${motivo}`);
+
+      if (!audio) {
+        setError(`Não consegui compartilhar: ${motivo}`);
+        throw e;
+      }
+
+      // Segunda tentativa sem o áudio do sistema. Se esta passar, o problema era mesmo
+      // o áudio; se falhar também, o problema é outro e a mensagem diz qual.
+      try {
+        if (sourceId) await window.desktop.chooseSource(sourceId, false);
+        await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
+        setError('Compartilhando, mas sem o áudio do sistema. No Windows isso costuma ser janela escolhida em vez de tela inteira; no Mac, versão anterior ao 14.2.');
+      } catch (e2) {
+        const motivo2 = (e2 as Error).message || String(e2);
+        anotar('erro', 'tela', `falhou também sem áudio: ${motivo2}`);
+        setError(`Não consegui compartilhar: ${motivo2}`);
+        throw e2;
+      }
     }
     bump();
   }, [room]);

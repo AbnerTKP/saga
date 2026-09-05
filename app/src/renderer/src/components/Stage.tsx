@@ -37,10 +37,11 @@ function VideoTile({ tile, big, onClick, onMenu }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa }: {
+export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
+  onRegistro: () => void;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
@@ -83,7 +84,11 @@ export function Stage({ rm, pessoas, onPessoa }: {
         <span className="strong">{rm.roomName ?? 'Escolha uma sala'}</span>
         {rm.error && (
           <span className="error inline">
-            {rm.error} <button className="link" onClick={() => rm.setError(null)}>fechar</button>
+            {rm.error}{' '}
+            {/* O atalho fica aqui porque é onde a pessoa está olhando quando algo quebra —
+                pedir para ela procurar nos ajustes é pedir demais no pior momento. */}
+            <button className="link" onClick={onRegistro}>ver registro</button>{' '}
+            <button className="link" onClick={() => rm.setError(null)}>fechar</button>
           </span>
         )}
       </header>
