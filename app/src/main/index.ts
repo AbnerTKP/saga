@@ -28,6 +28,9 @@ function createWindow() {
     minHeight: 560,
     backgroundColor: '#1e1f22',
     title: 'Cantinho do Vorcaro',
+    // Nasce escondida. Quem clica no ícone espera que o app já venha atualizado — ver a
+    // janela abrir e só depois anunciar que há atualização é a ordem errada.
+    show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: true,
     webPreferences: {
@@ -39,6 +42,15 @@ function createWindow() {
     },
   });
 
+  // Uma vez só: chamada de vários lugares, e mostrar de novo traria a janela para a
+  // frente no meio do que a pessoa estivesse fazendo.
+  let jaApareceu = false;
+  const mostrar = () => {
+    if (jaApareceu || win.isDestroyed()) return;
+    jaApareceu = true;
+    win.show();
+  };
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -47,10 +59,16 @@ function createWindow() {
   // Carregar a tela é o essencial; atualização é acessório. Se algo falhar aqui, a janela
   // tem de abrir do mesmo jeito — antes, uma exceção aqui deixava a janela em branco.
   try {
-    setupUpdates(win);
+    setupUpdates(win, mostrar);
   } catch (e) {
     registrar('erro', 'principal', `setupUpdates falhou: ${(e as Error).message}`);
+    mostrar();
   }
+
+  // Rede lenta ou GitHub fora não podem deixar ninguém olhando para o nada: passado esse
+  // tempo a janela aparece de qualquer jeito, mostrando em que pé está a consulta.
+  const naoDeixarPresa = setTimeout(mostrar, 2500);
+  win.on('closed', () => clearTimeout(naoDeixarPresa));
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);

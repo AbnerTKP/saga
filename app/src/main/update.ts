@@ -40,19 +40,33 @@ let ultimo: UpdateState = { fase: 'procurando' };
 // os avisos passam a ir.
 let janela: BrowserWindow | null = null;
 let jaIniciado = false;
+let mostrar: () => void = () => {};
 
-export function setupUpdates(win: BrowserWindow) {
+/**
+ * @param mostrarJanela chamado quando a consulta resolve — é o que faz a janela aparecer.
+ *        Enquanto ela não resolve, o app fica invisível: quem clica no ícone espera um app
+ *        já atualizado, não um que abre e depois avisa que há versão nova.
+ */
+export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () => {}) {
   janela = win;
+  mostrar = mostrarJanela;
 
   // Canais e temporizadores são do app, não da janela. Registrá-los de novo estoura com
   // "second handler", e como isso acontecia antes de a janela carregar, ela abria em
   // branco — bastava fechar e reabrir pelo Dock no Mac para cair nisso.
-  if (jaIniciado) return;
+  if (jaIniciado) {
+    // A consulta já aconteceu nesta sessão: a janela nova não tem o que esperar.
+    if (ultimo.fase !== 'procurando') mostrarJanela();
+    return;
+  }
   jaIniciado = true;
 
   const enviar = (s: UpdateState) => {
     ultimo = s;
     if (janela && !janela.isDestroyed()) janela.webContents.send('update:state', s);
+    // 'procurando' é o único estado em que ainda faz sentido esperar escondido. Baixando,
+    // a pessoa precisa ver o progresso; resolvido, o app abre.
+    if (s.fase !== 'procurando') mostrar();
   };
 
   ipcMain.handle('update:atual', () => ultimo);
@@ -61,7 +75,7 @@ export function setupUpdates(win: BrowserWindow) {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
   });
 
-  // Em desenvolvimento não há o que atualizar: libera a tela na hora.
+  // Em desenvolvimento não há o que atualizar: abre na hora.
   if (!app.isPackaged || REPO.startsWith('SEU_')) {
     enviar({ fase: 'nenhuma' });
     return;
