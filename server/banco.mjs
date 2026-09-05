@@ -54,6 +54,18 @@ const MIGRACOES = [
      PRIMARY KEY (servidor_id, usuario_id)
    )`,
 
+  // Sons do soundboard. O arquivo é content-addressed como as imagens; aqui fica só o
+  // nome que as pessoas veem e quem subiu.
+  `CREATE TABLE sons (
+     id          INTEGER PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     nome        TEXT    NOT NULL,
+     arquivo     TEXT    NOT NULL,
+     enviado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     criado_em   INTEGER NOT NULL
+   )`,
+  `CREATE INDEX sons_servidor ON sons(servidor_id)`,
+
   // Salas deixam de vir do .env: assim o dono pode renomear e reordenar sem redeploy.
   `CREATE TABLE salas (
      id          INTEGER PRIMARY KEY,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { tipoDaImagem, salvarImagem, nomeValido, LIMITES, ErroDeArquivo } from './arquivos.mjs';
+import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo } from './arquivos.mjs';
 
 const pasta = () => mkdtempSync(join(tmpdir(), 'img-'));
 const comCabecalho = (bytes, tamanho = 64) =>
@@ -103,4 +103,54 @@ test('só nomes que nós geramos são servidos', () => {
 test('o tipo servido vem da extensão que nós escrevemos', () => {
   assert.equal(nomeValido('b'.repeat(32) + '.gif').tipo, 'image/gif');
   assert.equal(nomeValido('b'.repeat(32) + '.webp').tipo, 'image/webp');
+});
+
+// --- som do soundboard ------------------------------------------------------
+
+const MP3_ID3 = comCabecalho([0x49, 0x44, 0x33, 0x03]);
+const MP3_CRU = comCabecalho([0xff, 0xfb, 0x90]);
+const OGG     = comCabecalho([0x4f, 0x67, 0x67, 0x53]);
+const FLAC    = comCabecalho([0x66, 0x4c, 0x61, 0x43]);
+const WAV     = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(52)]);
+const M4A     = Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.alloc(56)]);
+
+test('reconhece os formatos de áudio aceitos', () => {
+  assert.equal(tipoDoAudio(MP3_ID3), 'mp3');
+  assert.equal(tipoDoAudio(MP3_CRU), 'mp3', 'MP3 sem tag ID3 começa direto no quadro');
+  assert.equal(tipoDoAudio(OGG), 'ogg');
+  assert.equal(tipoDoAudio(FLAC), 'flac');
+  assert.equal(tipoDoAudio(WAV), 'wav');
+  assert.equal(tipoDoAudio(M4A), 'm4a');
+});
+
+test('imagem não passa por som, nem som por imagem', () => {
+  assert.equal(tipoDoAudio(PNG), null);
+  assert.equal(tipoDaImagem(MP3_ID3), null);
+  const p = pasta();
+  try {
+    assert.throws(() => salvarSom(p, PNG), /MP3, WAV, OGG/);
+    assert.throws(() => salvarImagem(p, MP3_ID3, 'foto'), /PNG, JPG, GIF/);
+  } finally { rmSync(p, { recursive: true }); }
+});
+
+test('som guardado vira hash com a extensão certa', () => {
+  const p = pasta();
+  try {
+    assert.match(salvarSom(p, OGG), /^[0-9a-f]{32}\.ogg$/);
+    assert.match(salvarSom(p, WAV), /^[0-9a-f]{32}\.wav$/);
+  } finally { rmSync(p, { recursive: true }); }
+});
+
+test('som grande demais é recusado', () => {
+  const p = pasta();
+  try {
+    const longo = Buffer.concat([MP3_ID3, Buffer.alloc(LIMITES.som + 1)]);
+    assert.throws(() => salvarSom(p, longo), (e) => e instanceof ErroDeArquivo && e.status === 413);
+  } finally { rmSync(p, { recursive: true }); }
+});
+
+test('o tipo servido cobre áudio também', () => {
+  assert.equal(nomeValido('c'.repeat(32) + '.mp3').tipo, 'audio/mpeg');
+  assert.equal(nomeValido('c'.repeat(32) + '.ogg').tipo, 'audio/ogg');
+  assert.equal(nomeValido('c'.repeat(32) + '.exe'), null, 'extensão desconhecida não pode ser servida');
 });

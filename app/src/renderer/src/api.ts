@@ -101,8 +101,8 @@ export const pedirTokenDaSala = (room: string) =>
 
 // --- imagens ----------------------------------------------------------------
 
-/** Endereço público da imagem. O nome é o hash do conteúdo, então pode ser cacheado. */
-export const urlDaImagem = (nome: string | null | undefined) =>
+/** Endereço público do arquivo (imagem ou som). O nome é o hash, então pode ser cacheado. */
+export const urlDoArquivo = (nome: string | null | undefined) =>
   nome ? `${BASE}/arquivos/${nome}` : null;
 
 /** Envia os bytes crus. Passar null remove a imagem. */
@@ -132,6 +132,31 @@ export const minhaFoto = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/f
 export const meuBanner = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/banner', a);
 export const fotoDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/foto', a);
 export const bannerDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/banner', a);
+
+// --- soundboard ---------------------------------------------------------------
+
+export type Som = { id: number; nome: string; arquivo: string; porQuem: string | null; criado_em: number };
+
+export const listarSons = async () => (await pedir<{ sons: Som[] }>('GET', '/sons')).sons;
+
+export const apagarSom = (id: number) => pedir<{ ok: true }>('POST', '/sons/apagar', { id });
+
+export async function subirSom(nome: string, arquivo: File): Promise<Som> {
+  const token = lerToken();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/sons?nome=${encodeURIComponent(nome)}`, {
+      method: 'POST',
+      headers: { 'content-type': arquivo.type || 'application/octet-stream', ...(token ? { 'x-sessao': token } : {}) },
+      body: await arquivo.arrayBuffer(),
+    });
+  } catch {
+    throw new ErroDoServidor('O som é grande demais ou a conexão caiu no meio.', 413);
+  }
+  const dados = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+  return (dados as { som: Som }).som;
+}
 
 export type Acao = 'mutar' | 'desconectar' | 'timeout' | 'tirarTimeout' | 'expulsar' | 'banir' | 'desbanir' | 'cargo';
 

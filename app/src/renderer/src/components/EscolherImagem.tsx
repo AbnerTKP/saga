@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { urlDaImagem } from '../api';
+import { urlDoArquivo } from '../api';
 
 /**
  * Escolhe um arquivo e envia. O <input type="file"> fica escondido porque o botão
@@ -13,7 +13,7 @@ export function EscolherImagem({ rotulo, atual, formato, onEnviar }: {
 }) {
   const campo = useRef<HTMLInputElement>(null);
   const [ocupado, setOcupado] = useState(false);
-  const url = urlDaImagem(atual);
+  const url = urlDoArquivo(atual);
 
   const enviar = async (arquivo: File | null) => {
     setOcupado(true);

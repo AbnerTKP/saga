@@ -208,3 +208,20 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .escolher-imagem button:hover:not(:disabled) { background: #4a4d55; }
 .escolher-imagem button:disabled { opacity: .5; cursor: default; }
 .escolher-imagem button.link { background: none; padding: 0; color: #949ba4; text-decoration: underline; }
+
+/* ---- soundboard ---- */
+
+.sons { display: flex; flex-wrap: wrap; gap: 8px; }
+.som { display: flex; align-items: stretch; border-radius: 6px; overflow: hidden; background: #383a40; }
+.som .tocar {
+  display: flex; align-items: center; gap: 7px; background: none; border: none;
+  color: #dbdee1; padding: 8px 12px; font-size: 13px; cursor: pointer; max-width: 15rem;
+}
+.som .tocar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.som .tocar:hover:not(:disabled) { background: #4a4d55; }
+.som .tocar:disabled { opacity: .5; cursor: default; }
+.som .apagar {
+  background: none; border: none; border-left: 1px solid #4a4d55;
+  color: #949ba4; padding: 0 8px; cursor: pointer;
+}
+.som .apagar:hover:not(:disabled) { background: #6a2b2b; color: #f5c4c4; }

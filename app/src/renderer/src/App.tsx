@@ -11,6 +11,7 @@ import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
 import { UpdateToast } from './components/UpdateToast';
 import { PainelDoServidor } from './components/PainelDoServidor';
+import { Soundboard } from './components/Soundboard';
 import { Versao } from './components/Versao';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -24,6 +25,7 @@ export function App() {
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
   const [painel, setPainel] = useState(false);
+  const [soundboard, setSoundboard] = useState(false);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const rm = useRoom();
 
@@ -128,6 +130,7 @@ export function App() {
         onSettings={() => setDevices(true)}
         fotos={fotos}
         onPainel={() => setPainel(true)}
+        onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
       />
       <Stage rm={rm} fotos={fotos} />
@@ -148,6 +151,14 @@ export function App() {
           onEu={atualizarEu}
           onServidor={atualizarServidor}
           onClose={() => setPainel(false)}
+        />
+      )}
+      {soundboard && (
+        <Soundboard
+          eu={sessao.eu}
+          naSala={rm.status === 'connected'}
+          onTocar={rm.tocarSom}
+          onClose={() => setSoundboard(false)}
         />
       )}
       <UpdateToast />

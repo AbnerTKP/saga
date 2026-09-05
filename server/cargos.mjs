@@ -25,6 +25,11 @@ export const EXIGE = {
 
 export const ACOES = Object.keys(EXIGE);
 
+// O soundboard não age sobre uma pessoa, então fica fora de EXIGE: subir e apagar som é
+// de moderador para cima; tocar é de todo mundo, e por isso nem é conferido.
+export const CARGO_PARA_GERIR_SONS = CARGO.MODERADOR;
+export const podeGerirSons = (membro) => !!membro && membro.cargo >= CARGO_PARA_GERIR_SONS;
+
 /**
  * Diz se `quem` pode fazer `acao` em `alvo`, ou por que não pode.
  * Recebe apenas { id, cargo } de cada lado — nada de objeto de banco inteiro.

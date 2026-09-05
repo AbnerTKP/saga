@@ -289,3 +289,87 @@ test('/rooms responde mesmo com o LiveKit fora do ar', async () => {
   assert.deepEqual(r.corpo.rooms.map((s) => s.name), ['Geral', 'Jogos']);
   assert.deepEqual(r.corpo.rooms[0].participants, []);
 });
+
+// --- soundboard -------------------------------------------------------------
+
+const MP3 = Buffer.concat([Buffer.from([0x49, 0x44, 0x33, 0x03, 0x00]), Buffer.alloc(59)]);
+
+const subirSom = async (sessao, nome, dados = MP3) => {
+  const r = await fetch(`${base}/sons?nome=${encodeURIComponent(nome)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', 'x-sessao': sessao },
+    body: dados,
+  });
+  return { status: r.status, corpo: await r.json().catch(() => ({})) };
+};
+
+test('membro não sobe som', async () => {
+  const bruno = await sessaoDe('bruno');
+  const r = await subirSom(bruno.token, 'proibido');
+  assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /moderadores e o dono/);
+});
+
+test('o dono sobe som e ele aparece na lista para todos', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await subirSom(dono.token, 'Risada');
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.som.nome, 'Risada');
+  assert.match(r.corpo.som.arquivo, /^[0-9a-f]{32}\.mp3$/);
+  assert.equal(r.corpo.som.porQuem, 'abner');
+
+  // Todo mundo pode ver e tocar, inclusive quem não pode subir.
+  const bruno = await sessaoDe('bruno');
+  const lista = await chamar('GET', '/sons', { sessao: bruno.token });
+  assert.ok(lista.corpo.sons.some((x) => x.nome === 'Risada'));
+});
+
+test('o som é servido com o tipo de áudio certo', async () => {
+  const dono = await sessaoDe('abner');
+  const { corpo } = await subirSom(dono.token, 'Palmas');
+  const r = await fetch(`${base}/arquivos/${corpo.som.arquivo}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'audio/mpeg');
+});
+
+test('nome repetido é recusado', async () => {
+  const dono = await sessaoDe('abner');
+  await subirSom(dono.token, 'Buzina');
+  const r = await subirSom(dono.token, 'buzina');
+  assert.equal(r.status, 409);
+});
+
+test('nome vazio é recusado', async () => {
+  const dono = await sessaoDe('abner');
+  assert.equal((await subirSom(dono.token, '   ')).status, 400);
+});
+
+test('arquivo que não é áudio é recusado', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await subirSom(dono.token, 'falso', Buffer.from('MZ\x90\x00'.padEnd(64)));
+  assert.equal(r.status, 400);
+  assert.match(r.corpo.error, /MP3, WAV, OGG/);
+});
+
+test('sem sessão não se lista nem se sobe som', async () => {
+  assert.equal((await chamar('GET', '/sons')).status, 401);
+  assert.equal((await fetch(`${base}/sons?nome=x`, { method: 'POST', body: MP3 })).status, 401);
+});
+
+test('membro não apaga som; o dono apaga', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const { corpo } = await subirSom(dono.token, 'Descartavel');
+
+  assert.equal((await chamar('POST', '/sons/apagar', { sessao: bruno.token, corpo: { id: corpo.som.id } })).status, 403);
+  assert.equal((await chamar('POST', '/sons/apagar', { sessao: dono.token, corpo: { id: corpo.som.id } })).status, 200);
+
+  const lista = await chamar('GET', '/sons', { sessao: dono.token });
+  assert.ok(!lista.corpo.sons.some((x) => x.nome === 'Descartavel'));
+});
+
+test('apagar som que não existe dá 404', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/sons/apagar', { sessao: dono.token, corpo: { id: 99999 } });
+  assert.equal(r.status, 404);
+});

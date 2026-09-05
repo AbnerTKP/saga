@@ -8,7 +8,8 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { createReadStream, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
-import { salvarImagem, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import { salvarImagem, salvarSom, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import * as sons from './sons.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
 import { CARGO, NOME_DO_CARGO } from './cargos.mjs';
@@ -236,6 +237,26 @@ const ROTAS = {
   'POST /eu/banner': (req) => trocarImagem(req, 'usuario', 'banner'),
   'POST /servidor/foto':   (req) => trocarImagem(req, 'servidor', 'foto'),
   'POST /servidor/banner': (req) => trocarImagem(req, 'servidor', 'banner'),
+
+  'GET /sons': async (req) => {
+    exigirSessao(req);
+    return { sons: sons.listarSons(db, SERVIDOR.id) };
+  },
+
+  // O nome vem na URL porque o corpo é o arquivo cru, sem espaço para campos.
+  'POST /sons': async (req) => {
+    const eu = exigirSessao(req);
+    const nome = new URL(req.url, 'http://x').searchParams.get('nome');
+    const bruto = await lerBinario(req, LIMITES.som + 1024);
+    const arquivo = salvarSom(ARQUIVOS, bruto);
+    return { som: sons.adicionarSom(db, SERVIDOR.id, eu, { nome, arquivo }) };
+  },
+
+  'POST /sons/apagar': async (req) => {
+    const eu = exigirSessao(req);
+    const { id } = await lerCorpo(req);
+    return sons.removerSom(db, SERVIDOR.id, eu, id);
+  },
 
   'POST /moderar': async (req) => {
     const eu = exigirSessao(req);

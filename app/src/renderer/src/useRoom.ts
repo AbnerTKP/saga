@@ -55,6 +55,14 @@ export function useRoom() {
   const deafenedRef = useRef(false);
   const micBeforeDeafen = useRef(true);
 
+  // Soundboard. O som vai para a sala numa faixa própria, e não misturado ao microfone:
+  // assim tocar não depende de estar com o microfone ligado, e mutar alguém não muta os
+  // sons dele. A faixa é publicada uma vez e reaproveitada.
+  const audio = useRef<AudioContext | null>(null);
+  const destinoDoSom = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const faixaDoSom = useRef<MediaStreamTrack | null>(null);
+  const buffers = useRef(new Map<string, AudioBuffer>());
+
   const room = useMemo(() => {
     const r = new Room({
       adaptiveStream: true,
@@ -90,6 +98,8 @@ export function useRoom() {
       } catch { /* ignora */ }
     };
     const onDisconnected = () => {
+      // A publicação morre junto com a sala; a próxima entrada publica de novo.
+      faixaDoSom.current = null;
       getAudioRoot().innerHTML = '';
       setStatus('idle');
       setRoomName(null);
@@ -215,6 +225,45 @@ export function useRoom() {
     bump();
   }, [room]);
 
+  /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
+  const tocarSom = useCallback(async (url: string) => {
+    if (room.state !== 'connected') {
+      setError('Entre numa sala antes de tocar um som.');
+      return;
+    }
+    try {
+      if (!audio.current) audio.current = new AudioContext();
+      // O navegador começa o contexto suspenso até haver um gesto do usuário.
+      if (audio.current.state === 'suspended') await audio.current.resume();
+      if (!destinoDoSom.current) destinoDoSom.current = audio.current.createMediaStreamDestination();
+
+      if (!faixaDoSom.current) {
+        const faixa = destinoDoSom.current.stream.getAudioTracks()[0];
+        // dtx cortaria o silêncio e, com ele, o comecinho de cada som.
+        await room.localParticipant.publishTrack(faixa, {
+          source: Track.Source.Unknown, name: 'soundboard', dtx: false,
+        });
+        faixaDoSom.current = faixa;
+      }
+
+      let buffer = buffers.current.get(url);
+      if (!buffer) {
+        const resposta = await fetch(url);
+        if (!resposta.ok) throw new Error(`não consegui baixar o som (${resposta.status})`);
+        buffer = await audio.current.decodeAudioData(await resposta.arrayBuffer());
+        buffers.current.set(url, buffer);   // o nome do arquivo é o hash: nunca desatualiza
+      }
+
+      const fonte = audio.current.createBufferSource();
+      fonte.buffer = buffer;
+      fonte.connect(destinoDoSom.current);       // para a sala
+      fonte.connect(audio.current.destination);  // e para quem tocou
+      fonte.start();
+    } catch (e) {
+      setError(`Som: ${(e as Error).message}`);
+    }
+  }, [room]);
+
   const sendMessage = useCallback(async (text: string) => {
     const t = text.trim();
     if (!t || room.state !== 'connected') return;
@@ -238,6 +287,6 @@ export function useRoom() {
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
-    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage,
+    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom,
   };
 }

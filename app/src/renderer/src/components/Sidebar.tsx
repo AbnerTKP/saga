@@ -5,11 +5,11 @@ import { Avatar } from './Avatar';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onShare, onSettings, onPainel, onLogout }: {
+export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   onJoin: (room: string) => void; onShare: () => void; onSettings: () => void;
   fotos: Map<string, string | null>;
-  onPainel: () => void; onLogout: () => void;
+  onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
 }) {
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
@@ -67,6 +67,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, fotos, onJoin, onS
           <div className="voice-actions">
             <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
             <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
+            <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
             <button className="danger" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { urlDaImagem } from '../api';
+import { urlDoArquivo } from '../api';
 
 export type TamanhoDoAvatar = 'normal' | 'big' | 'huge';
 
@@ -10,7 +10,7 @@ export function Avatar({ nome, foto, tamanho = 'normal', extra, titulo }: {
   extra?: string;
   titulo?: string;
 }) {
-  const url = urlDaImagem(foto);
+  const url = urlDoArquivo(foto);
   const classe = ['avatar', tamanho !== 'normal' ? tamanho : '', url ? 'com-foto' : '', extra ?? '']
     .filter(Boolean).join(' ');
   return (
