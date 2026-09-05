@@ -93,11 +93,11 @@ pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor n
 Ordenados por dependência, não por vontade. Cargos configuráveis mexem em toda regra de
 permissão; construir telas que exibem cargos antes disso significa refazê-las depois.
 
-### v0.12.0 — pronto, sem tag
+### v0.12.0 — no ar
 Giphy nas quatro imagens, Vorcaro Turbo, identificador antes do nome, cartão de perfil com
 banner ao clicar na pessoa, e o modal de configuração que transbordava.
 
-### v0.13.0 — Salas e chat em evidência
+### v0.13.0 — Salas e chat em evidência (no ar)
 - Criar, renomear e apagar salas (hoje vêm do banco mas não há tela)
 - Salas de **texto**, além das de voz; a de texto ocupa a área principal, como no Discord
 - Mensagens que não somem — hoje evaporam quando a sala esvazia, por não haver banco. Agora há
@@ -117,6 +117,12 @@ Manter a regra de ouro: ninguém age sobre alguém de cargo igual ou superior.
 ### v0.16.0 — Vários servidores
 Criar servidores, convidar, entrar. O banco já foi construído para isto desde a v0.2.0:
 cargo e banimento pertencem ao vínculo pessoa↔servidor, não à pessoa.
+
+### v0.17.0 — Design dos avisos
+Hoje todo aviso é a mesma tarja vermelha, inclusive os que não são erro: "isso é do
+Vorcaro Turbo" é convite, não falha. Separar por natureza — erro, aviso, sucesso,
+convite ao Turbo — cada um com sua cor e seu peso, e o do Turbo com o tratamento que a
+distinção merece.
 
 ### Sem data
 - Atualização automática no Mac (hoje só avisa, por falta de certificado da Apple)
