@@ -6,7 +6,14 @@ export type SourceInfo = {
   icon: string | null;
 };
 
-export type UpdateState = { version: string; url?: string; ready?: boolean; progress?: number };
+/** Espelha o UpdateState do processo principal (src/main/update.ts). */
+export type UpdateState = {
+  fase: 'procurando' | 'baixando' | 'pronto' | 'nenhuma' | 'aviso' | 'erro';
+  version?: string;
+  progress?: number;
+  url?: string;
+  mensagem?: string;
+};
 
 declare global {
   interface Window {

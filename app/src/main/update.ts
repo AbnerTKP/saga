@@ -5,11 +5,25 @@ import { autoUpdater } from 'electron-updater';
 // Formato: "usuario/repositorio". Precisa ser o mesmo de electron-builder.yml → publish.
 export const REPO = 'AbnerTKP/cantinho-do-vorcaro';
 
-export type UpdateState = { version: string; url?: string; ready?: boolean; progress?: number };
+/**
+ * Fases da atualização. O app mostra uma tela de partida enquanto está em 'procurando',
+ * 'baixando' ou 'pronto' — antes, isso acontecia calado e em segundo plano, e quem
+ * fechava o app no meio do download perdia o progresso e recomeçava do zero, sem nunca
+ * saber por quê. Era o "precisa reiniciar quatro vezes".
+ */
+export type UpdateState = {
+  fase: 'procurando' | 'baixando' | 'pronto' | 'nenhuma' | 'aviso' | 'erro';
+  version?: string;
+  progress?: number;
+  url?: string;        // no Mac, o endereço do DMG para baixar à mão
+  mensagem?: string;
+};
 
-const SIX_HOURS = 6 * 60 * 60 * 1000;
+const SEIS_HORAS = 6 * 60 * 60 * 1000;
+// Sem internet, o GitHub simplesmente não responde. Não dá para segurar o app por isso.
+const LIMITE_DA_CONSULTA = 15_000;
 
-function isNewer(a: string, b: string): boolean {
+function maisNova(a: string, b: string): boolean {
   const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
   for (let i = 0; i < 3; i++) {
     if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true;
@@ -19,49 +33,76 @@ function isNewer(a: string, b: string): boolean {
 }
 
 export function setupUpdates(win: BrowserWindow) {
-  // O aviso é disparado 5s depois de abrir. Se a janela ainda estiver na tela de entrada,
-  // o componente que escuta nem existe e a mensagem se perderia até a próxima checagem,
-  // seis horas depois. Por isso o último estado fica guardado e pode ser perguntado.
-  let ultimoAviso: UpdateState | null = null;
-  const send = (s: UpdateState) => {
-    ultimoAviso = s;
+  // O estado fica guardado porque a tela que o escuta pode montar depois do primeiro
+  // aviso; sem isso a mensagem se perde e a tela fica esperando para sempre.
+  let ultimo: UpdateState = { fase: 'procurando' };
+  const enviar = (s: UpdateState) => {
+    ultimo = s;
     if (!win.isDestroyed()) win.webContents.send('update:state', s);
   };
 
-  ipcMain.handle('update:atual', () => ultimoAviso);
+  ipcMain.handle('update:atual', () => ultimo);
   ipcMain.handle('update:install', () => autoUpdater.quitAndInstall());
   ipcMain.handle('open:external', (_e, url: string) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
   });
 
-  if (!app.isPackaged || REPO.startsWith('SEU_')) return;
-
-  if (process.platform === 'win32') {
-    // Windows: baixa em silêncio e instala quando o app fechar (ou no botão "reiniciar")
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.on('update-available', (i) => send({ version: i.version, progress: 0 }));
-    autoUpdater.on('download-progress', (p) => send({ version: '', progress: Math.round(p.percent) }));
-    autoUpdater.on('update-downloaded', (i) => send({ version: i.version, ready: true }));
-    autoUpdater.on('error', (e) => console.error('updater:', e.message));
-    const check = () => autoUpdater.checkForUpdates().catch(() => undefined);
-    setTimeout(check, 5000);
-    setInterval(check, SIX_HOURS);
+  // Em desenvolvimento não há o que atualizar: libera a tela na hora.
+  if (!app.isPackaged || REPO.startsWith('SEU_')) {
+    enviar({ fase: 'nenhuma' });
     return;
   }
 
-  // macOS sem assinatura: não dá para trocar o app sozinho. Avisa e abre o download.
-  const check = async () => {
+  // Rede lenta ou GitHub fora não podem prender ninguém na tela de partida.
+  const destravar = setTimeout(() => {
+    if (ultimo.fase === 'procurando') enviar({ fase: 'nenhuma' });
+  }, LIMITE_DA_CONSULTA);
+
+  if (process.platform === 'win32') {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('update-available', (i) => enviar({ fase: 'baixando', version: i.version, progress: 0 }));
+    autoUpdater.on('update-not-available', () => { clearTimeout(destravar); enviar({ fase: 'nenhuma' }); });
+    autoUpdater.on('download-progress', (p) => {
+      clearTimeout(destravar);   // está baixando: pode demorar o quanto precisar
+      enviar({ fase: 'baixando', version: ultimo.version ?? '', progress: Math.round(p.percent) });
+    });
+    autoUpdater.on('update-downloaded', (i) => enviar({ fase: 'pronto', version: i.version }));
+    autoUpdater.on('error', (e) => {
+      clearTimeout(destravar);
+      // Falha ao atualizar não pode impedir de usar o app: avisa e segue.
+      enviar({ fase: 'erro', mensagem: e.message });
+      setTimeout(() => { if (ultimo.fase === 'erro') enviar({ fase: 'nenhuma' }); }, 4000);
+    });
+
+    autoUpdater.checkForUpdates().catch(() => undefined);
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => undefined), SEIS_HORAS);
+    return;
+  }
+
+  // macOS: o app não é assinado pela Apple, então não pode se substituir sozinho.
+  // Avisa e abre o download; quem arrasta por cima é a pessoa.
+  const consultar = async (inicial: boolean) => {
     try {
-      const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { 'user-agent': 'cantinho-updater' } });
-      if (!r.ok) return;
+      const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        headers: { 'user-agent': 'cantinho-updater' },
+      });
+      if (!r.ok) throw new Error(`GitHub respondeu ${r.status}`);
       const j = (await r.json()) as { tag_name: string; html_url: string; assets?: { name: string; browser_download_url: string }[] };
       const v = String(j.tag_name).replace(/^v/, '');
-      if (!isNewer(v, app.getVersion())) return;
+      if (!maisNova(v, app.getVersion())) { enviar({ fase: 'nenhuma' }); return; }
       const dmg = (j.assets ?? []).find((a) => a.name.endsWith('.dmg'));
-      send({ version: v, url: dmg?.browser_download_url ?? j.html_url });
-    } catch { /* sem internet ou sem release ainda */ }
+      enviar({ fase: 'aviso', version: v, url: dmg?.browser_download_url ?? j.html_url });
+    } catch (e) {
+      // Sem internet na abertura não é motivo para segurar ninguém.
+      if (inicial) enviar({ fase: 'nenhuma' });
+      else console.error('updater:', (e as Error).message);
+    } finally {
+      clearTimeout(destravar);
+    }
   };
-  setTimeout(check, 5000);
-  setInterval(check, SIX_HOURS);
+
+  consultar(true);
+  setInterval(() => consultar(false), SEIS_HORAS);
 }

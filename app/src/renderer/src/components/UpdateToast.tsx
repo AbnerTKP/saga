@@ -1,36 +1,39 @@
 import { useEffect, useState } from 'react';
 import type { UpdateState } from '../desktop';
 
-export function UpdateToast() {
-  const [u, setU] = useState<UpdateState | null>(null);
-  const [hidden, setHidden] = useState(false);
+/**
+ * Aviso discreto para atualização que aparece com o app já aberto — a da abertura é
+ * tratada pela tela de partida. No Mac também é por aqui que se baixa à mão, já que o
+ * app não é assinado pela Apple e não pode se substituir sozinho.
+ */
+export function UpdateToast({ estado }: { estado: UpdateState }) {
+  const [escondido, setEscondido] = useState(false);
 
-  useEffect(() => {
-    const aplicar = (s: UpdateState) =>
-      setU((prev) => ({ ...(prev ?? { version: '' }), ...s, version: s.version || prev?.version || '' }));
-    // Pergunta o que já foi anunciado antes deste componente existir, e só então escuta.
-    window.desktop.updateAtual().then((s) => { if (s) aplicar(s); });
-    window.desktop.onUpdate(aplicar);
-  }, []);
+  // Uma versão nova reabre o aviso mesmo que a anterior tenha sido dispensada.
+  useEffect(() => { setEscondido(false); }, [estado.version]);
 
-  if (!u || hidden) return null;
+  if (escondido) return null;
+  if (estado.fase !== 'aviso' && estado.fase !== 'pronto' && estado.fase !== 'baixando') return null;
 
   return (
     <div className="toast">
-      {u.ready ? (
+      {estado.fase === 'baixando' && <span>Baixando versão {estado.version}… {estado.progress ?? 0}%</span>}
+
+      {estado.fase === 'pronto' && (
         <>
-          <span>Versão {u.version} pronta.</span>
+          <span>Versão {estado.version} pronta.</span>
           <button className="primary sm" onClick={() => window.desktop.installUpdate()}>Reiniciar e atualizar</button>
         </>
-      ) : u.url ? (
-        <>
-          <span>Versão {u.version} disponível.</span>
-          <button className="primary sm" onClick={() => window.desktop.openExternal(u.url!)}>Baixar</button>
-        </>
-      ) : (
-        <span>Baixando versão {u.version}… {u.progress ?? 0}%</span>
       )}
-      <button className="link" onClick={() => setHidden(true)}>depois</button>
+
+      {estado.fase === 'aviso' && (
+        <>
+          <span>Versão {estado.version} disponível.</span>
+          <button className="primary sm" onClick={() => estado.url && window.desktop.openExternal(estado.url)}>Baixar</button>
+        </>
+      )}
+
+      <button className="link" onClick={() => setEscondido(true)}>depois</button>
     </div>
   );
 }

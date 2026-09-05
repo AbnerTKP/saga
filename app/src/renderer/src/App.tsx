@@ -11,10 +11,12 @@ import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
 import { UpdateToast } from './components/UpdateToast';
+import { TelaDeAtualizacao } from './components/TelaDeAtualizacao';
 import { PainelDoServidor } from './components/PainelDoServidor';
 import { Soundboard } from './components/Soundboard';
 import { MenuDaPessoa, type PessoaNaCall } from './components/MenuDaPessoa';
 import { Versao } from './components/Versao';
+import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
 const ULTIMO_APELIDO = 'cantinho.apelido';
@@ -30,6 +32,19 @@ export function App() {
   const [soundboard, setSoundboard] = useState(false);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
+  const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
+  // A tela de partida só aparece na primeira consulta. Depois disso, versão nova chega
+  // pelo aviso no canto, sem interromper quem está no meio de uma conversa.
+  const [partidaResolvida, setPartidaResolvida] = useState(false);
+
+  useEffect(() => {
+    const aplicar = (s: UpdateState) => {
+      setAtualizacao(s);
+      if (s.fase === 'nenhuma' || s.fase === 'aviso') setPartidaResolvida(true);
+    };
+    window.desktop.updateAtual().then((s) => { if (s) aplicar(s); });
+    window.desktop.onUpdate(aplicar);
+  }, []);
   const rm = useRoom();
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
@@ -122,6 +137,9 @@ export function App() {
   const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
   const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
 
+  // Atualizar vem antes de tudo: não faz sentido entrar numa conta para reiniciar em seguida.
+  if (!partidaResolvida) return <TelaDeAtualizacao estado={atualizacao} onPular={() => setPartidaResolvida(true)} />;
+
   if (conferindo) return <div className="carregando">Entrando…</div>;
 
   if (!sessao) {
@@ -130,7 +148,7 @@ export function App() {
     return (
       <>
         <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} />
-        <UpdateToast />
+        <UpdateToast estado={atualizacao} />
         <Versao />
       </>
     );
@@ -201,7 +219,7 @@ export function App() {
           onClose={() => setMenu(null)}
         />
       )}
-      <UpdateToast />
+      <UpdateToast estado={atualizacao} />
       <Versao />
     </div>
   );
