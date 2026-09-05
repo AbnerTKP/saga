@@ -12,4 +12,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    # As contas moram aqui. Sem este volume elas sumiriam a cada atualização do servidor.
+    volumes:
+      - ./dados:/dados
+    environment:
+      BANCO: /dados/cantinho.db
     network_mode: host
