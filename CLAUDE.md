@@ -90,12 +90,36 @@ pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor n
 
 ## Próximos passos
 
-1. **Giphy** — nas quatro imagens de perfil e no chat. **Parado**: precisa da chave de
-   `developers.giphy.com` (Create an App → API, não SDK), que vai no `.env` do servidor,
-   nunca dentro do app.
-2. **Chat que persiste** — hoje as mensagens somem quando a sala esvazia, por não haver
-   banco. Agora há.
-3. **Vários servidores** — o banco já foi construído para isso. Ideia, não compromisso.
-4. **Atualização automática no Mac** — hoje só avisa e abre o download, porque o
-   mecanismo do macOS confere assinatura e recusa a nossa. Dá para o app baixar e se
-   substituir sozinho, contornando esse mecanismo.
+Ordenados por dependência, não por vontade. Cargos configuráveis mexem em toda regra de
+permissão; construir telas que exibem cargos antes disso significa refazê-las depois.
+
+### v0.12.0 — pronto, sem tag
+Giphy nas quatro imagens, Vorcaro Turbo, identificador antes do nome, cartão de perfil com
+banner ao clicar na pessoa, e o modal de configuração que transbordava.
+
+### v0.13.0 — Salas e chat em evidência
+- Criar, renomear e apagar salas (hoje vêm do banco mas não há tela)
+- Salas de **texto**, além das de voz; a de texto ocupa a área principal, como no Discord
+- Mensagens que não somem — hoje evaporam quando a sala esvazia, por não haver banco. Agora há
+- Opção de **não assistir transmissão nenhuma**, para quem só quer a voz
+
+### v0.14.0 — Cargos configuráveis
+Substitui os três níveis fixos (Dono, Moderador, Membro) por cargos criados pelo dono, com
+nome, cor, ordem e permissões marcáveis uma a uma. É a fundação: `cargos.mjs` deixa de ser
+uma escala numérica e passa a ser conjunto de permissões, e todo `cargo >=` do código muda.
+Manter a regra de ouro: ninguém age sobre alguém de cargo igual ou superior.
+
+### v0.15.0 — A cara do Cantinho
+- Barra do servidor **à direita** e **quadrada** — de propósito diferente do Discord
+- Lista de pessoas do servidor com seus cargos, também à direita
+- Com um servidor só, por enquanto
+
+### v0.16.0 — Vários servidores
+Criar servidores, convidar, entrar. O banco já foi construído para isto desde a v0.2.0:
+cargo e banimento pertencem ao vínculo pessoa↔servidor, não à pessoa.
+
+### Sem data
+- Atualização automática no Mac (hoje só avisa, por falta de certificado da Apple)
+- Ícone do Mac em retângulo arredondado, como manda o sistema
+- Atalhos de teclado no soundboard
+- "Modo música": desligar cancelamento de eco para quem toca instrumento
