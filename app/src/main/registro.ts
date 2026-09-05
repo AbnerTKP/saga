@@ -1,5 +1,5 @@
 import { app, ipcMain, shell, clipboard } from 'electron';
-import { accessSync, appendFileSync, constants, mkdirSync, readFileSync, renameSync, statSync, existsSync } from 'node:fs';
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, renameSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { EOL } from 'node:os';
 import { limparSegredos } from './segredos';
@@ -26,17 +26,24 @@ export function registrar(nivel: 'erro' | 'aviso' | 'info', origem: string, mens
 /**
  * Rodar como administrador é conhecido por quebrar a captura de tela e de áudio no
  * Windows — a mesma máquina funciona sem elevação e falha com ela. Como o app não precisa
- * de administrador para nada, isso costuma ser um "executar como administrador" acidental,
- * e sem estar no registro ninguém desconfia.
+ * de administrador para nada, isso costuma ser um "executar como administrador" acidental.
+ *
+ * Abrir o disco físico é o teste: só processo elevado consegue, e o sistema decide pela
+ * permissão de verdade. A tentação é usar accessSync com W_OK, mas no Windows ela não
+ * consulta permissão nenhuma — só olha o atributo somente-leitura do arquivo, e por isso
+ * responde "pode escrever" em quase tudo. Foi assim que esta função já acusou de
+ * administrador uma máquina que não era.
  */
-function comoAdministrador(): string {
-  if (process.platform !== 'win32') return '';
+function comoAdministrador(): boolean {
+  if (process.platform !== 'win32') return false;
+  let fd: number | undefined;
   try {
-    // Só um processo elevado consegue escrever aqui.
-    accessSync(`${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\drivers\\etc\\hosts`, constants.W_OK);
-    return ' | COMO ADMINISTRADOR (pode quebrar captura de tela e áudio)';
+    fd = openSync('\\\\.\\PHYSICALDRIVE0', 'r');
+    return true;
   } catch {
-    return '';
+    return false;
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* já foi */ } }
   }
 }
 
@@ -52,7 +59,7 @@ export function iniciarRegistro() {
   } catch { arquivo = ''; }
 
   // Cabeçalho: sem isto, um log compartilhado não diz de qual versão nem de qual sistema veio.
-  registrar('info', 'app', `--- abriu | versão ${app.getVersion()} | ${process.platform} ${process.getSystemVersion()} | electron ${process.versions.electron}${comoAdministrador()} ---`);
+  registrar('info', 'app', `--- abriu | versão ${app.getVersion()} | ${process.platform} ${process.getSystemVersion()} | electron ${process.versions.electron}${comoAdministrador() ? ' | COMO ADMINISTRADOR (pode quebrar captura de tela e áudio)' : ''} ---`);
 
   process.on('uncaughtException', (e) => registrar('erro', 'principal', `${e.message}\n${e.stack ?? ''}`));
   process.on('unhandledRejection', (e) => registrar('erro', 'principal', String(e instanceof Error ? `${e.message}\n${e.stack}` : e)));
