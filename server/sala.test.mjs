@@ -8,7 +8,7 @@
 //   TESTE_SERVIDOR=1.2.3.4:3001 TESTE_SENHA=asenha node --test sala.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Room, AudioSource, LocalAudioTrack, TrackPublishOptions, TrackSource } from '@livekit/rtc-node';
+import { Room, AudioSource, LocalAudioTrack, TrackPublishOptions, TrackSource, dispose } from '@livekit/rtc-node';
 
 const SERVIDOR = process.env.TESTE_SERVIDOR;
 const SENHA = process.env.TESTE_SENHA;
@@ -71,6 +71,7 @@ async function ateQue(oQue, verificar, tentativas = 20, espera = 500) {
 test('três pessoas na mesma sala, se enxergando e com os ícones certos', { skip: !SERVIDOR || !SENHA ? 'defina TESTE_SERVIDOR e TESTE_SENHA' : false, timeout: 180_000 }, async (t) => {
   const nomes = [`${PREFIXO}ana`, `${PREFIXO}bruno`, `${PREFIXO}caio`];
   const salas = [];
+  const faixas = [];
 
   try {
     await t.test('todas conseguem entrar na mesma sala', async () => {
@@ -89,7 +90,7 @@ test('três pessoas na mesma sala, se enxergando e com os ícones certos', { ski
     });
 
     await t.test('com microfone publicado, ninguém aparece mudo nem compartilhando tela', async () => {
-      for (const sala of salas) await publicarMicrofone(sala);
+      for (const sala of salas) faixas.push(await publicarMicrofone(sala));
       await ateQue('os três aparecerem falando', async () => {
         const nossos = await nossosNaSala();
         assert.equal(nossos.length, 3, `o /rooms mostra ${nossos.length} de 3`);
@@ -122,6 +123,10 @@ test('três pessoas na mesma sala, se enxergando e com os ícones certos', { ski
       });
     });
   } finally {
+    // O @livekit/rtc-node mantém threads nativas vivas. Sem fechar as faixas e chamar
+    // dispose(), o processo termina os testes e fica pendurado para sempre.
+    for (const faixa of faixas) await faixa.close(true).catch(() => {});
     for (const sala of salas) await sala.disconnect().catch(() => {});
+    await dispose();
   }
 });
