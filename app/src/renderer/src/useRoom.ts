@@ -262,6 +262,20 @@ export function useRoom() {
       // o que mandava a pessoa investigar o lugar errado.
       anotar('erro', 'tela', `falhou com áudio=${audio}: ${motivo}`);
 
+      // A captura do áudio do sistema depende do dispositivo de SAÍDA padrão. Listar o
+      // que existe na máquina distingue "não tem saída definida" de "tem, mas recusou" —
+      // e são conselhos opostos.
+      if (audio) {
+        navigator.mediaDevices.enumerateDevices()
+          .then((ds) => {
+            const saidas = ds.filter((d) => d.kind === 'audiooutput');
+            anotar('info', 'tela', saidas.length
+              ? `saídas de áudio: ${saidas.map((d) => `${d.deviceId === 'default' ? '[padrão] ' : ''}${d.label || '(sem nome)'}`).join(' | ')}`
+              : 'nenhuma saída de áudio encontrada nesta máquina');
+          })
+          .catch((e) => anotar('info', 'tela', `não consegui listar as saídas: ${(e as Error).message}`));
+      }
+
       if (!audio) {
         setError(`Não consegui compartilhar: ${motivo}`);
         throw e;
