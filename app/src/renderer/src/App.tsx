@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
+  guardarServidorAtual, lerServidorAtual, meusServidores,
   type Acao,
   verServidor,
   type Cargo, type RoomInfo, type Sessao, type Membro, type Servidor,
@@ -21,6 +22,7 @@ import { RegistroDeErros } from './components/RegistroDeErros';
 import { Versao } from './components/Versao';
 import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
+import { NovoServidor } from './components/NovoServidor';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -36,6 +38,7 @@ export function App() {
   const [painel, setPainel] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [registro, setRegistro] = useState(false);
+  const [novoServidor, setNovoServidor] = useState(false);
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
@@ -68,20 +71,38 @@ export function App() {
     if (!lerToken()) return;
     let vivo = true;
     quemSou()
-      .then((r) => { if (vivo) setSessao({ token: lerToken()!, ...r }); })
+      .then((r) => {
+        if (!vivo) return;
+        if (r.servidor) guardarServidorAtual(r.servidor.id);
+        setSessao({ token: lerToken()!, servidores: [], ...r });
+      })
       .catch(() => { guardarToken(null); })
       .finally(() => { if (vivo) setConferindo(false); });
     return () => { vivo = false; };
   }, []);
 
   const entrou = useCallback((s: Sessao) => {
-    try { localStorage.setItem(ULTIMO_APELIDO, s.eu.apelido); } catch { /* sem storage */ }
+    if (s.eu) { try { localStorage.setItem(ULTIMO_APELIDO, s.eu.apelido); } catch { /* sem storage */ } }
+    if (s.servidor) guardarServidorAtual(s.servidor.id);
     setSessao(s);
   }, []);
 
+  /** Trocar de servidor recarrega tudo: cargo, salas e pessoas são de lá, não daqui. */
+  const trocarDeServidor = useCallback(async (id: number) => {
+    guardarServidorAtual(id);
+    setSalaAbertaId(null);
+    await rm.leave().catch(() => undefined);
+    try {
+      const r = await quemSou();
+      setSessao((atual) => (atual ? { ...atual, eu: r.eu, servidor: r.servidor, salas: r.salas } : atual));
+    } catch (e) {
+      rm.setError((e as Error).message);
+    }
+  }, [rm]);
+
   // Quem está em cada sala
   useEffect(() => {
-    if (!sessao) return;
+    if (!sessao?.servidor) return;
     let vivo = true;
     const tick = async () => {
       try {
@@ -97,7 +118,7 @@ export function App() {
     tick();
     const id = setInterval(tick, 4000);
     return () => { vivo = false; clearInterval(id); };
-  }, [sessao]);
+  }, [sessao?.servidor?.id]);
 
   const abrirSala = useCallback(async (sala: RoomInfo) => {
     setSalaAbertaId(sala.id);
@@ -115,6 +136,7 @@ export function App() {
     await rm.leave();
     await sair().catch(() => undefined);
     guardarToken(null);
+    guardarServidorAtual(null);
     setSessao(null);
     setRooms([]);
   }, [rm]);
@@ -157,10 +179,15 @@ export function App() {
   // Quem faz parte do servidor muda devagar — cargo novo, alguém que entrou. De dez em
   // dez segundos basta, e não concorre com a busca de salas, que é de quatro.
   useEffect(() => {
-    if (!sessao) return;
+    if (!sessao?.servidor) return;
     let vivo = true;
     const buscar = () => verServidor()
-      .then((r) => { if (vivo) { setCargos(r.cargos); setMembrosDoServidor(r.membros); } })
+      .then((r) => {
+        if (!vivo) return;
+        setCargos(r.cargos);
+        setMembrosDoServidor(r.membros);
+        setSessao((atual) => (atual ? { ...atual, servidores: r.servidores } : atual));
+      })
       .catch(() => undefined);
     buscar();
     const id = setInterval(buscar, 10_000);
@@ -191,13 +218,36 @@ export function App() {
     );
   }
 
+  // Banido de todos os servidores em que estava: entra na conta, mas não há onde entrar.
+  if (!sessao.eu || !sessao.servidor) {
+    return (
+      <div className="connect">
+        <div className="connect-card">
+          <h1>Sem servidor</h1>
+          <p className="muted">
+            {sessao.impedimento ?? 'Você não faz parte de nenhum servidor agora.'}
+          </p>
+          <button className="primary" onClick={logout}>Sair da conta</button>
+          <div className="registro-link">
+            <button type="button" className="link" onClick={() => setRegistro(true)}>ver o registro</button>
+          </div>
+        </div>
+        {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
+        <Versao />
+      </div>
+    );
+  }
+
+  const eu = sessao.eu;
+  const servidor = sessao.servidor;
+
   return (
     <div className="app">
       <Sidebar
         rooms={rooms}
         pollError={pollError}
-        eu={sessao.eu}
-        servidor={sessao.servidor}
+        eu={eu}
+        servidor={servidor}
         rm={rm}
         onAbrir={abrirSala}
         salaAbertaId={salaAbertaId}
@@ -216,7 +266,7 @@ export function App() {
         onRegistro={() => setRegistro(true)}
         salaAberta={salaAberta}
         chat={chat}
-        meuId={sessao.eu.id}
+        meuId={eu.id}
       />
       {picker && (
         <ScreenPicker
@@ -236,8 +286,8 @@ export function App() {
       )}
       {painel && (
         <PainelDoServidor
-          eu={sessao.eu}
-          servidor={sessao.servidor}
+          eu={eu}
+          servidor={servidor}
           onEu={atualizarEu}
           onServidor={atualizarServidor}
           onClose={() => setPainel(false)}
@@ -245,7 +295,7 @@ export function App() {
       )}
       {soundboard && (
         <Soundboard
-          eu={sessao.eu}
+          eu={eu}
           naSala={rm.status === 'connected'}
           onTocar={rm.tocarSom}
           onClose={() => setSoundboard(false)}
@@ -255,7 +305,7 @@ export function App() {
         membros={membrosDoServidor}
         cargos={cargos}
         naVoz={naVoz}
-        eu={sessao.eu}
+        eu={eu}
         onPessoa={(m, em) => setMenu({
           pessoa: {
             identity: `u${m.id}`, nome: m.nome, usuarioId: m.id, cargo: m.cargo,
@@ -266,17 +316,17 @@ export function App() {
       />
 
       <TrilhaDeServidores
-        servidores={[sessao.servidor]}
-        atual={sessao.servidor.id}
-        onEscolher={() => undefined}
-        onConfigurar={() => setPainel(true)}
+        servidores={sessao.servidores.length ? sessao.servidores : [servidor]}
+        atual={servidor.id}
+        onEscolher={trocarDeServidor}
+        onConfigurar={() => setNovoServidor(true)}
       />
 
       {menu && (
         <MenuDaPessoa
           pessoa={menu.pessoa}
-          eu={sessao.eu}
-          cargos={cargos.filter((c) => !c.dono && c.nivel < (sessao.eu.cargo?.nivel ?? 0))}
+          eu={eu}
+          cargos={cargos.filter((c) => !c.dono && c.nivel < (eu.cargo?.nivel ?? 0))}
           em={menu.em}
           volume={rm.volumeDe(menu.pessoa.identity)}
           onVolume={(v) => rm.definirVolume(menu.pessoa.identity, v)}
@@ -284,6 +334,12 @@ export function App() {
             if (menu.pessoa.usuarioId !== undefined) await moderarPeloMenu(menu.pessoa.usuarioId, acao, extra);
           }}
           onClose={() => setMenu(null)}
+        />
+      )}
+      {novoServidor && (
+        <NovoServidor
+          onPronto={trocarDeServidor}
+          onClose={() => setNovoServidor(false)}
         />
       )}
       {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}

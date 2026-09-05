@@ -27,6 +27,9 @@ const IMPRESSOES = [
   '665cf2b3ada3',  // 14 cargos
   'b82ab7deb06c',  // 15 índice de cargos
   'c7478768ae58',  // 16 coluna cargo_id em membros
+  'def5e5aab371',  // 17 convites
+  '393600a0c9a2',  // 18 índice de convites
+  '7e000e21d81b',  // 19 coluna criado_por em servidores
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -46,7 +49,7 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['cargos', 'membros', 'mensagens', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+  assert.deepEqual(tabelas, ['cargos', 'convites', 'membros', 'mensagens', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
 });
 
 test('as colunas acrescentadas depois existem e têm padrão seguro', () => {

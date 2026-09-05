@@ -3,7 +3,7 @@ import {
   pode, podeSobre, verServidor, renomearServidor, mudarMeuNome, moderar,
   minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif,
   criarSala, renomearSala, apagarSala,
-  criarCargo, editarCargo, apagarCargo,
+  criarCargo, editarCargo, apagarCargo, criarConvite, type Convite,
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
   type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
@@ -32,6 +32,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [permissoes, setPermissoes] = useState<Record<string, string>>({});
   const [editando, setEditando] = useState<CargoNovo & { id?: number } | null>(null);
+  const [convite, setConvite] = useState<Convite | null>(null);
   const [novaSala, setNovaSala] = useState('');
   const [tipoNovo, setTipoNovo] = useState<TipoDeSala>('voz');
   const [nomeServidor, setNomeServidor] = useState(servidor.nome);
@@ -136,6 +137,28 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
             <div className="linha-campo">
               <input value={nomeServidor} onChange={(e) => setNomeServidor(e.target.value)} maxLength={40} />
               <button onClick={salvarNomeServidor} disabled={ocupado || nomeServidor === servidor.nome}>Salvar</button>
+            </div>
+
+            <p className="muted small" style={{ marginTop: 12 }}>
+              Convite para trazer gente. Vale por uma semana; quem entrar cai no cargo mais baixo.
+            </p>
+            <div className="linha-campo">
+              <input readOnly value={convite?.codigo ?? ''} placeholder="Gere um código" className="codigo-convite" />
+              <button
+                disabled={ocupado}
+                onClick={async () => {
+                  setErro(null); setOcupado(true);
+                  try { setConvite(await criarConvite()); setAviso('Convite gerado.'); }
+                  catch (e) { setErro((e as Error).message); } finally { setOcupado(false); }
+                }}
+              >
+                Gerar
+              </button>
+              {convite && (
+                <button onClick={() => { navigator.clipboard?.writeText(convite.codigo); setAviso('Código copiado.'); }}>
+                  Copiar
+                </button>
+              )}
             </div>
           </section>
         )}

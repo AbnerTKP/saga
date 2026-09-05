@@ -115,6 +115,21 @@ export const MIGRACOES = [
   // A coluna antiga `membros.cargo` fica: ela é a fonte da migração para cargo_id, e
   // apagar coluna em SQLite reescreve a tabela inteira sem ganho nenhum aqui.
   `ALTER TABLE membros ADD COLUMN cargo_id INTEGER REFERENCES cargos(id)`,
+
+  // Convites para entrar num servidor. Sem eles, um servidor novo nasceria fechado e
+  // sem jeito de chamar ninguém.
+  `CREATE TABLE convites (
+     codigo      TEXT    PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     criado_por  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     criado_em   INTEGER NOT NULL,
+     expira_em   INTEGER,
+     usos        INTEGER NOT NULL DEFAULT 0,
+     max_usos    INTEGER
+   )`,
+  `CREATE INDEX convites_servidor ON convites(servidor_id)`,
+  // Quem criou o servidor. Serve para não deixar o último dono sair e trancar todo mundo.
+  `ALTER TABLE servidores ADD COLUMN criado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`,
 ];
 
 export function abrirBanco(caminho) {

@@ -64,13 +64,30 @@ export type TipoDeSala = 'voz' | 'texto';
 export type RoomInfo = { id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[] };
 export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number };
 
-export type Sessao = { token: string; eu: Membro; servidor: Servidor; salas: Sala[]; impedimento?: string | null };
+export type Sessao = {
+  token: string;
+  eu: Membro | null;
+  servidor: Servidor | null;
+  servidores: Servidor[];
+  salas: Sala[];
+  impedimento?: string | null;
+};
 
 // --- guardar a sessão -------------------------------------------------------
 
 // Fica no computador para o app abrir já logado. É um crachá, não a senha: quem
 // for banido ou expulso perde o dele no servidor, e ele deixa de valer na hora.
 const CHAVE = 'cantinho.sessao';
+const CHAVE_SERVIDOR = 'cantinho.servidor';
+
+/** Em qual servidor o app está. Vai em cabeçalho, porque quase toda rota depende dele. */
+export const lerServidorAtual = (): number | null => {
+  try { const v = localStorage.getItem(CHAVE_SERVIDOR); return v ? Number(v) : null; } catch { return null; }
+};
+export const guardarServidorAtual = (id: number | null) => {
+  try { id ? localStorage.setItem(CHAVE_SERVIDOR, String(id)) : localStorage.removeItem(CHAVE_SERVIDOR); }
+  catch { /* sem storage */ }
+};
 
 export const lerToken = (): string | null => {
   try { return localStorage.getItem(CHAVE); } catch { return null; }
@@ -94,6 +111,7 @@ function anotarFalha(rota: string, e: ErroDoServidor) {
 
 async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<T> {
   const token = lerToken();
+  const servidor = lerServidorAtual();
   let res: Response;
   try {
     res = await fetch(BASE + rota, {
@@ -101,6 +119,7 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<
       headers: {
         ...(corpo ? { 'content-type': 'application/json' } : {}),
         ...(token ? { 'x-sessao': token } : {}),
+        ...(servidor ? { 'x-servidor': String(servidor) } : {}),
       },
       body: corpo ? JSON.stringify(corpo) : undefined,
     });
@@ -129,12 +148,30 @@ export const sair = () => pedir<{ ok: true }>('POST', '/sair');
 export const quemSou = () =>
   pedir<{ eu: Membro; servidor: Servidor; salas: Sala[]; impedimento: string | null }>('GET', '/eu');
 
+// --- servidores -------------------------------------------------------------
+
+export const meusServidores = async () =>
+  (await pedir<{ servidores: Servidor[] }>('GET', '/servidores')).servidores;
+
+export const criarServidor = (nome: string) =>
+  pedir<{ servidor: Servidor }>('POST', '/servidores/criar', { nome });
+
+export type Convite = { codigo: string; expiraEm: number | null; maxUsos: number | null };
+
+export const criarConvite = async (maxUsos?: number) =>
+  (await pedir<{ convite: Convite }>('POST', '/servidores/convite', { maxUsos })).convite;
+
+export const entrarComConvite = (codigo: string) =>
+  pedir<{ servidor: Servidor }>('POST', '/servidores/entrar', { codigo });
+
+export const sairDoServidor = () => pedir<{ ok: true }>('POST', '/servidores/sair');
+
 export const mudarMeuNome = (nome: string) => pedir<{ eu: Membro }>('PATCH', '/eu', { nome });
 
 export const verServidor = () =>
   pedir<{
     servidor: Servidor; salas: Sala[]; membros: Membro[];
-    cargos: Cargo[]; permissoes: Record<Permissao, string>;
+    cargos: Cargo[]; permissoes: Record<Permissao, string>; servidores: Servidor[];
   }>('GET', '/servidor');
 
 // --- cargos -----------------------------------------------------------------
@@ -205,6 +242,7 @@ async function enviarImagem<T>(rota: string, arquivo: File | null): Promise<T> {
       headers: {
         'content-type': arquivo?.type || 'application/octet-stream',
         ...(token ? { 'x-sessao': token } : {}),
+        ...(lerServidorAtual() ? { 'x-servidor': String(lerServidorAtual()) } : {}),
       },
       body: corpo,
     });
@@ -253,7 +291,11 @@ export async function subirSom(nome: string, arquivo: File): Promise<Som> {
   try {
     res = await fetch(`${BASE}/sons?nome=${encodeURIComponent(nome)}`, {
       method: 'POST',
-      headers: { 'content-type': arquivo.type || 'application/octet-stream', ...(token ? { 'x-sessao': token } : {}) },
+      headers: {
+        'content-type': arquivo.type || 'application/octet-stream',
+        ...(token ? { 'x-sessao': token } : {}),
+        ...(lerServidorAtual() ? { 'x-servidor': String(lerServidorAtual()) } : {}),
+      },
       body: await arquivo.arrayBuffer(),
     });
   } catch {

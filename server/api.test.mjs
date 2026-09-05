@@ -45,10 +45,14 @@ after(() => {
   rmSync(pasta, { recursive: true, force: true });
 });
 
-const chamar = async (metodo, rota, { corpo, sessao } = {}) => {
+const chamar = async (metodo, rota, { corpo, sessao, servidor } = {}) => {
   const r = await fetch(base + rota, {
     method: metodo,
-    headers: { 'content-type': 'application/json', ...(sessao ? { 'x-sessao': sessao } : {}) },
+    headers: {
+      'content-type': 'application/json',
+      ...(sessao ? { 'x-sessao': sessao } : {}),
+      ...(servidor ? { 'x-servidor': String(servidor) } : {}),
+    },
     body: corpo && metodo !== 'GET' ? JSON.stringify(corpo) : undefined,
   });
   return { status: r.status, corpo: await r.json().catch(() => ({})) };
@@ -581,4 +585,115 @@ test('apagar cargo devolve quem estava nele ao mais baixo', async () => {
   const lista = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.membros;
   const dele = lista.find((m) => m.id === bruno.eu.id);
   assert.equal(dele.cargoNome, 'Membro', 'ficou sem cargo em vez de descer');
+});
+
+// --- vários servidores --------------------------------------------------------
+
+test('cada um vê só os servidores de que faz parte', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('GET', '/servidores', { sessao: dono.token });
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.servidores.length, 1, 'começa com o servidor de casa');
+});
+
+test('criar servidor dá o cargo de dono e salas para começar', async () => {
+  const bruno = await sessaoDe('bruno');
+  const r = await chamar('POST', '/servidores/criar', { sessao: bruno.token, corpo: { nome: 'Sala do Bruno' } });
+  assert.equal(r.status, 200);
+  const novo = r.corpo.servidor;
+
+  // No servidor novo ele é dono, mesmo sendo membro comum no outro.
+  const eu = await chamar('GET', '/eu', { sessao: bruno.token, servidor: novo.id });
+  assert.equal(eu.corpo.eu.cargo.dono, true);
+
+  const salas = await chamar('GET', '/rooms', { sessao: bruno.token, servidor: novo.id });
+  assert.deepEqual(salas.corpo.rooms.map((s) => `${s.name}:${s.tipo}`), ['Geral:voz', 'Avisos:texto']);
+});
+
+test('o cargo vale por servidor, não pela pessoa', async () => {
+  // É o ponto de todo o desenho: dono num servidor, membro noutro.
+  const bruno = await sessaoDe('bruno');
+  const lista = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores;
+  const casa = lista[0], dele = lista.find((s) => s.nome === 'Sala do Bruno');
+
+  const naCasa = await chamar('GET', '/eu', { sessao: bruno.token, servidor: casa.id });
+  const noDele = await chamar('GET', '/eu', { sessao: bruno.token, servidor: dele.id });
+  assert.equal(naCasa.corpo.eu.cargo.dono, false);
+  assert.equal(noDele.corpo.eu.cargo.dono, true);
+});
+
+test('quem não é do servidor não o acessa, mesmo sabendo o número', async () => {
+  const bruno = await sessaoDe('bruno');
+  const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
+    .find((s) => s.nome === 'Sala do Bruno');
+
+  // O dono da casa não faz parte do servidor do Bruno: pedir por ele cai no dele mesmo.
+  // A comparação é por identidade, não por nome — o nome do servidor de casa muda noutro teste.
+  const dono = await sessaoDe('abner');
+  const r = await chamar('GET', '/eu', { sessao: dono.token, servidor: dele.id });
+  assert.notEqual(r.corpo.servidor.id, dele.id, 'entrou num servidor alheio');
+  const meus = (await chamar('GET', '/servidores', { sessao: dono.token })).corpo.servidores;
+  assert.ok(meus.some((s) => s.id === r.corpo.servidor.id), 'caiu num servidor que nem é dele');
+});
+
+test('convite leva alguém para dentro', async () => {
+  const bruno = await sessaoDe('bruno');
+  const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
+    .find((s) => s.nome === 'Sala do Bruno');
+
+  const convite = await chamar('POST', '/servidores/convite', { sessao: bruno.token, servidor: dele.id, corpo: {} });
+  assert.match(convite.corpo.convite.codigo, /^[A-Z2-9]{8}$/);
+
+  const caio = await sessaoDe('caio');
+  const entrou = await chamar('POST', '/servidores/entrar', { sessao: caio.token, corpo: { codigo: convite.corpo.convite.codigo } });
+  assert.equal(entrou.status, 200);
+  assert.equal(entrou.corpo.servidor.nome, 'Sala do Bruno');
+
+  const meus = (await chamar('GET', '/servidores', { sessao: caio.token })).corpo.servidores;
+  assert.ok(meus.some((s) => s.nome === 'Sala do Bruno'));
+});
+
+test('convite inventado é recusado sem dizer o que existe', async () => {
+  const caio = await sessaoDe('caio');
+  const r = await chamar('POST', '/servidores/entrar', { sessao: caio.token, corpo: { codigo: 'ABCD2345' } });
+  assert.equal(r.status, 404);
+  assert.match(r.corpo.error, /inválido ou vencido/);
+});
+
+test('membro comum não gera convite', async () => {
+  const bruno = await sessaoDe('bruno');
+  const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
+    .find((s) => s.nome === 'Sala do Bruno');
+  const caio = await sessaoDe('caio');
+  const r = await chamar('POST', '/servidores/convite', { sessao: caio.token, servidor: dele.id, corpo: {} });
+  assert.equal(r.status, 403);
+});
+
+test('dá para sair de um servidor, menos se você é o dono', async () => {
+  const bruno = await sessaoDe('bruno');
+  const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
+    .find((s) => s.nome === 'Sala do Bruno');
+
+  assert.equal((await chamar('POST', '/servidores/sair', { sessao: bruno.token, servidor: dele.id, corpo: {} })).status, 409);
+
+  const caio = await sessaoDe('caio');
+  assert.equal((await chamar('POST', '/servidores/sair', { sessao: caio.token, servidor: dele.id, corpo: {} })).status, 200);
+  const meus = (await chamar('GET', '/servidores', { sessao: caio.token })).corpo.servidores;
+  assert.ok(!meus.some((s) => s.nome === 'Sala do Bruno'), 'continuou dentro depois de sair');
+});
+
+test('salas de servidores diferentes não se misturam na voz', async () => {
+  // Duas salas chamadas "Geral" em servidores diferentes precisam ser conversas
+  // separadas: o LiveKit as identifica pelo id da sala, não pelo nome.
+  const bruno = await sessaoDe('bruno');
+  const lista = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores;
+  const casa = lista[0], dele = lista.find((s) => s.nome === 'Sala do Bruno');
+
+  const naCasa = await chamar('POST', '/token', { sessao: bruno.token, servidor: casa.id, corpo: { room: 'Geral' } });
+  const noDele = await chamar('POST', '/token', { sessao: bruno.token, servidor: dele.id, corpo: { room: 'Geral' } });
+  assert.equal(naCasa.status, 200);
+  assert.equal(noDele.status, 200);
+
+  const salaDe = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).video.room;
+  assert.notEqual(salaDe(naCasa.corpo.token), salaDe(noDele.corpo.token), 'as duas "Geral" caíram na mesma sala');
 });

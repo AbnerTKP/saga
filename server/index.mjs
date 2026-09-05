@@ -13,6 +13,7 @@ import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as salasM from './salas.mjs';
 import * as mensagens from './mensagens.mjs';
+import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
 import { temPermissao, PERMISSOES } from './permissoes.mjs';
@@ -39,16 +40,22 @@ if (!KEY || !SECRET || !SENHA_DO_GRUPO) {
 
 const svc = new RoomServiceClient(HOST, KEY, SECRET);
 const db = abrirBanco(BANCO);
+// O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
+// só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
 
 // A identidade no LiveKit é o id da conta, não o nome: é estável, e é por ela que a
 // moderação encontra a pessoa dentro da sala.
 const identidadeDe = (usuarioId) => `u${usuarioId}`;
+
+// A sala do LiveKit é identificada pelo id, não pelo nome: dois servidores com uma sala
+// "Geral" cairiam na mesma conversa se fosse pelo nome.
+const salaNoLiveKit = (sala) => `sala-${sala.id}`;
 const idDaIdentidade = (identity) => Number(String(identity).replace(/^u/, '')) || null;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, x-sessao',
+  'Access-Control-Allow-Headers': 'content-type, x-sessao, x-servidor',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
 };
 
@@ -109,40 +116,83 @@ const verMembro = (m) => m && ({
   castigoAte: m.silenciado_ate ?? null,
 });
 
-const verServidor = () => {
-  const s = db.prepare('SELECT * FROM servidores WHERE id = ?').get(SERVIDOR.id);
+const verServidor = (sid) => {
+  const s = db.prepare('SELECT * FROM servidores WHERE id = ?').get(sid);
   return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null };
 };
 
-const salasDoServidor = () => salasM.listarSalas(db, SERVIDOR.id);
-const nomesDasSalasDeVoz = () => salasDoServidor().filter((s) => s.tipo === 'voz').map((s) => s.nome);
+const salasDoServidor = (sid) => salasM.listarSalas(db, sid);
+const salasDeVoz = (sid) => salasDoServidor(sid).filter((s) => s.tipo === 'voz');
 
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
-  const membro = membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
-  return { token, eu: verMembro(membro), servidor: verServidor(), salas: salasDoServidor() };
+  // Quem chega sem vínculo nenhum entra no semeado pelo .env — é o Cantinho de casa.
+  const temVinculo = db.prepare('SELECT count(*) c FROM membros WHERE usuario_id = ?').get(usuario.id).c > 0;
+  if (!temVinculo) membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
+
+  const meus = servidoresM.meusServidores(db, usuario.id);
+  if (meus.length === 0) {
+    // Banido de todos os servidores em que estava. Ainda assim entra na conta: precisa
+    // ver o motivo, em vez de bater numa tela que não explica nada.
+    const qualquer = db.prepare('SELECT servidor_id FROM membros WHERE usuario_id = ? LIMIT 1').get(usuario.id);
+    const membro = qualquer ? membros.buscarMembro(db, qualquer.servidor_id, usuario.id) : null;
+    return {
+      token,
+      eu: membro ? verMembro(membro) : null,
+      servidor: null,
+      servidores: [],
+      salas: [],
+      impedimento: membros.impedimento(membro),
+    };
+  }
+
+  const sid = meus[0].id;
+  return {
+    token,
+    eu: verMembro(membros.buscarMembro(db, sid, usuario.id)),
+    servidor: verServidor(sid),
+    servidores: meus,
+    salas: salasDoServidor(sid),
+  };
 }
 
-function exigirSessao(req) {
-  const membro = quemE(req);
-  if (!membro) throw new ErroDeConta('Faça login novamente.', 401);
-  return membro;
-}
-
-function quemE(req) {
+/** Só a conta, sem servidor: serve para o que é global, como listar meus servidores. */
+function exigirConta(req) {
   const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
-  if (!usuario) return null;
-  return membros.buscarMembro(db, SERVIDOR.id, usuario.id);
+  if (!usuario) throw new ErroDeConta('Faça login novamente.', 401);
+  return usuario;
 }
 
-async function participantesDaSala(nome) {
+/**
+ * A conta e o servidor de que o pedido fala. Sem cabeçalho, usa o primeiro servidor da
+ * pessoa — é o que o app antigo, que não manda o cabeçalho, espera encontrar.
+ */
+function exigirMembro(req) {
+  const usuario = exigirConta(req);
+  const pedido = Number(req.headers['x-servidor']) || null;
+  const meus = servidoresM.meusServidores(db, usuario.id);
+  if (meus.length === 0) throw new ErroDeConta('Você não faz parte de nenhum servidor.', 404);
+
+  const sid = pedido && meus.some((s) => s.id === pedido) ? pedido : meus[0].id;
+  const membro = membros.buscarMembro(db, sid, usuario.id);
+  if (!membro) throw new ErroDeConta('Você não faz parte deste servidor.', 403);
+  return { usuario, sid, membro };
+}
+
+/** Compatível com o que já existia: devolve o membro, agora do servidor do pedido. */
+function exigirSessao(req) {
+  return exigirMembro(req).membro;
+}
+
+async function participantesDaSala(sid, sala) {
+  const nome = salaNoLiveKit(sala);
   const vivas = await svc.listRooms().catch(() => []);
   const r = vivas.find((x) => x.name === nome);
   if (!r || r.numParticipants === 0) return [];
   const ps = await svc.listParticipants(nome).catch(() => []);
   return ps.map((p) => {
     const base = verParticipante(p);
-    const membro = membros.buscarMembro(db, SERVIDOR.id, idDaIdentidade(p.identity));
+    const membro = membros.buscarMembro(db, sid, idDaIdentidade(p.identity));
     // Cargo e foto vêm do banco; microfone e tela, do LiveKit.
     // O LiveKit sabe microfone e tela; quem a pessoa é vem do banco.
     return {
@@ -161,15 +211,16 @@ async function participantesDaSala(nome) {
 }
 
 /** Tira da sala de voz, se estiver em alguma. Não estar em nenhuma não é erro. */
-async function tirarDaSala(usuarioId) {
-  const onde = await ondeEsta(usuarioId);
+async function tirarDaSala(sid, usuarioId) {
+  const onde = await ondeEsta(sid, usuarioId);
   if (onde) await svc.removeParticipant(onde.sala, identidadeDe(usuarioId)).catch(() => {});
 }
 
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
-async function ondeEsta(usuarioId) {
+async function ondeEsta(sid, usuarioId) {
   const alvo = identidadeDe(usuarioId);
-  for (const nome of nomesDasSalasDeVoz()) {
+  for (const sala of salasDeVoz(sid)) {
+    const nome = salaNoLiveKit(sala);
     const ps = await svc.listParticipants(nome).catch(() => []);
     const p = ps.find((x) => x.identity === alvo);
     if (p) return { sala: nome, participante: p };
@@ -193,7 +244,7 @@ function guardarComRegraDoTurbo(eu, bruto, papel, de) {
 
 /** Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor. */
 async function trocarImagem(req, de, papel) {
-  const eu = exigirSessao(req);
+  const { sid, membro: eu } = exigirMembro(req);
   if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
     throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
   }
@@ -202,11 +253,11 @@ async function trocarImagem(req, de, papel) {
   const nome = bruto.length ? guardarComRegraDoTurbo(eu, bruto, papel, de) : null;
 
   if (de === 'servidor') {
-    db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, SERVIDOR.id);
-    return { servidor: verServidor() };
+    db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
+    return { servidor: verServidor(sid) };
   }
   db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
-  return { eu: verMembro(membros.buscarMembro(db, SERVIDOR.id, eu.id)) };
+  return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
 }
 
 const ROTAS = {
@@ -222,117 +273,120 @@ const ROTAS = {
     const c = await lerCorpo(req);
     const { usuario, token } = entrar(db, c);
     const sessao = sessaoCompleta(usuario, token);
-    const barrado = membros.impedimento(membros.buscarMembro(db, SERVIDOR.id, usuario.id));
     // Banido entra na conta mas não na voz; o app mostra o motivo em vez de uma tela vazia.
+    const barrado = sessao.impedimento
+      ?? (sessao.servidor ? membros.impedimento(membros.buscarMembro(db, sessao.servidor.id, usuario.id)) : null);
     return { ...sessao, impedimento: barrado };
   },
 
   'POST /sair': async (req) => { sair(db, req.headers['x-sessao']); return { ok: true }; },
 
   'GET /eu': async (req) => {
-    const eu = exigirSessao(req);
-    return { eu: verMembro(eu), servidor: verServidor(), salas: salasDoServidor(), impedimento: membros.impedimento(eu) };
+    const { sid, membro: eu } = exigirMembro(req);
+    return { eu: verMembro(eu), servidor: verServidor(sid), salas: salasDoServidor(sid), impedimento: membros.impedimento(eu) };
   },
 
   'PATCH /eu': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { nome } = await lerCorpo(req);
-    return { eu: verMembro(membros.mudarNomeExibido(db, SERVIDOR.id, eu.id, nome)) };
+    return { eu: verMembro(membros.mudarNomeExibido(db, sid, eu.id, nome)) };
   },
 
   'GET /servidor': async (req) => {
-    exigirSessao(req);
+    const { sid } = exigirMembro(req);
     return {
-      servidor: verServidor(),
-      salas: salasDoServidor(),
-      membros: membros.listarMembros(db, SERVIDOR.id).map(verMembro),
-      cargos: cargosM.listarCargos(db, SERVIDOR.id),
+      servidor: verServidor(sid),
+      salas: salasDoServidor(sid),
+      membros: membros.listarMembros(db, sid).map(verMembro),
+      cargos: cargosM.listarCargos(db, sid),
+      servidores: servidoresM.meusServidores(db, exigirConta(req).id),
       // A tela precisa saber que permissões existem para desenhar as caixinhas.
       permissoes: PERMISSOES,
     };
   },
 
   'PATCH /servidor': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     if (!temPermissao(eu.cargo, 'gerirServidor')) {
       throw new ErroDeConta('Seu cargo não permite editar o servidor.', 403);
     }
     const { nome } = await lerCorpo(req);
     const limpo = String(nome ?? '').trim();
     if (limpo.length < 2 || limpo.length > 40) throw new ErroDeConta('O nome do servidor precisa ter de 2 a 40 caracteres.');
-    db.prepare('UPDATE servidores SET nome = ? WHERE id = ?').run(limpo, SERVIDOR.id);
-    return { servidor: verServidor() };
+    db.prepare('UPDATE servidores SET nome = ? WHERE id = ?').run(limpo, sid);
+    return { servidor: verServidor(sid) };
   },
 
   'GET /rooms': async (req) => {
-    exigirSessao(req);
+    const { sid } = exigirMembro(req);
     const salas = [];
-    for (const s of salasDoServidor()) {
+    for (const s of salasDoServidor(sid)) {
       salas.push({
         id: s.id,
         name: s.nome,
         tipo: s.tipo,
         // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
-        participants: s.tipo === 'voz' ? await participantesDaSala(s.nome) : [],
+        participants: s.tipo === 'voz' ? await participantesDaSala(sid, s) : [],
       });
     }
     return { rooms: salas };
   },
 
   'POST /salas/criar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { nome, tipo } = await lerCorpo(req);
-    return { sala: salasM.criarSala(db, SERVIDOR.id, eu, { nome, tipo }) };
+    return { sala: salasM.criarSala(db, sid, eu, { nome, tipo }) };
   },
 
   'POST /salas/renomear': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { id, nome } = await lerCorpo(req);
-    return { sala: salasM.renomearSala(db, SERVIDOR.id, eu, id, nome) };
+    return { sala: salasM.renomearSala(db, sid, eu, id, nome) };
   },
 
   'POST /salas/apagar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
-    return salasM.apagarSala(db, SERVIDOR.id, eu, id);
+    return salasM.apagarSala(db, sid, eu, id);
   },
 
   'POST /salas/ordem': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { ids } = await lerCorpo(req);
-    return { salas: salasM.reordenarSalas(db, SERVIDOR.id, eu, ids) };
+    return { salas: salasM.reordenarSalas(db, sid, eu, ids) };
   },
 
   'GET /mensagens': async (req) => {
-    exigirSessao(req);
+    const { sid } = exigirMembro(req);
     const q = new URL(req.url, 'http://x').searchParams;
     const depoisDe = q.get('depoisDe');
     return {
-      mensagens: mensagens.listarMensagens(db, SERVIDOR.id, q.get('sala'), {
+      mensagens: mensagens.listarMensagens(db, sid, q.get('sala'), {
         depoisDe: depoisDe ? Number(depoisDe) : undefined,
       }),
     };
   },
 
   'POST /mensagens': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
     const { sala, texto } = await lerCorpo(req);
-    return { mensagem: mensagens.enviarMensagem(db, SERVIDOR.id, eu, sala, texto) };
+    return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, texto) };
   },
 
   'POST /token': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
-    const { room } = await lerCorpo(req);
-    if (!nomesDasSalasDeVoz().includes(room)) {
-      throw new ErroDeConta('Essa sala não existe, ou é de texto.', 400);
-    }
+    const { room, sala: salaId } = await lerCorpo(req);
+    // Aceita o id (novo) ou o nome (como o app antigo pedia).
+    const sala = salasDeVoz(sid).find((s) => (salaId ? s.id === Number(salaId) : s.nome === room));
+    if (!sala) throw new ErroDeConta('Essa sala não existe, ou é de texto.', 400);
 
+    const nome = salaNoLiveKit(sala);
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '12h' });
-    at.addGrant({ room, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true });
+    at.addGrant({ room: nome, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true });
     return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
@@ -342,44 +396,78 @@ const ROTAS = {
   'POST /servidor/banner': (req) => trocarImagem(req, 'servidor', 'banner'),
 
   'GET /sons': async (req) => {
-    exigirSessao(req);
-    return { sons: sons.listarSons(db, SERVIDOR.id) };
+    const { sid } = exigirMembro(req);
+    return { sons: sons.listarSons(db, sid) };
   },
 
   // O nome vem na URL porque o corpo é o arquivo cru, sem espaço para campos.
   'POST /sons': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const nome = new URL(req.url, 'http://x').searchParams.get('nome');
     const bruto = await lerBinario(req, LIMITES.som + 1024);
     const arquivo = salvarSom(ARQUIVOS, bruto);
-    return { som: sons.adicionarSom(db, SERVIDOR.id, eu, { nome, arquivo }) };
+    return { som: sons.adicionarSom(db, sid, eu, { nome, arquivo }) };
   },
 
   'POST /sons/apagar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
-    return sons.removerSom(db, SERVIDOR.id, eu, id);
+    return sons.removerSom(db, sid, eu, id);
+  },
+
+  'GET /servidores': async (req) => {
+    const usuario = exigirConta(req);
+    return { servidores: servidoresM.meusServidores(db, usuario.id) };
+  },
+
+  'POST /servidores/criar': async (req) => {
+    const usuario = exigirConta(req);
+    return { servidor: servidoresM.criarServidor(db, usuario, await lerCorpo(req)) };
+  },
+
+  'POST /servidores/convite': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return { convite: servidoresM.criarConvite(db, sid, eu, await lerCorpo(req)) };
+  },
+
+  'GET /servidores/convites': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    if (!temPermissao(eu.cargo, 'gerirServidor')) {
+      throw new ErroDeConta('Seu cargo não permite ver os convites.', 403);
+    }
+    return { convites: servidoresM.listarConvites(db, sid) };
+  },
+
+  'POST /servidores/entrar': async (req) => {
+    const usuario = exigirConta(req);
+    const { codigo } = await lerCorpo(req);
+    return { servidor: servidoresM.usarConvite(db, usuario, codigo) };
+  },
+
+  'POST /servidores/sair': async (req) => {
+    const { sid, usuario } = exigirMembro(req);
+    return servidoresM.sairDoServidor(db, sid, usuario);
   },
 
   'POST /cargos/criar': async (req) => {
-    const eu = exigirSessao(req);
-    return { cargo: cargosM.criarCargo(db, SERVIDOR.id, eu, await lerCorpo(req)) };
+    const { sid, membro: eu } = exigirMembro(req);
+    return { cargo: cargosM.criarCargo(db, sid, eu, await lerCorpo(req)) };
   },
 
   'POST /cargos/editar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const c = await lerCorpo(req);
-    return { cargo: cargosM.editarCargo(db, SERVIDOR.id, eu, c.id, c) };
+    return { cargo: cargosM.editarCargo(db, sid, eu, c.id, c) };
   },
 
   'POST /cargos/apagar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
-    return cargosM.apagarCargo(db, SERVIDOR.id, eu, id);
+    return cargosM.apagarCargo(db, sid, eu, id);
   },
 
   'GET /giphy': async (req) => {
-    exigirSessao(req);
+    const { sid } = exigirMembro(req);
     const q = new URL(req.url, 'http://x').searchParams;
     return { gifs: await buscarGifs({ chave: GIPHY, termo: q.get('q'), limite: q.get('limite') }) };
   },
@@ -387,7 +475,7 @@ const ROTAS = {
   // O GIF escolhido é baixado e guardado aqui: assim continua funcionando se sumir do
   // Giphy, e passa pelas mesmas conferências de qualquer imagem enviada.
   'POST /giphy/usar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { onde, url } = await lerCorpo(req);
     const [de, papel] = String(onde ?? '').split('.');
     if (!['usuario', 'servidor'].includes(de) || !['foto', 'banner'].includes(papel)) {
@@ -400,17 +488,16 @@ const ROTAS = {
     const nome = guardarComRegraDoTurbo(eu, bruto, papel, de);
 
     if (de === 'servidor') {
-      db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, SERVIDOR.id);
-      return { servidor: verServidor() };
+      db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
+      return { servidor: verServidor(sid) };
     }
     db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
-    return { eu: verMembro(membros.buscarMembro(db, SERVIDOR.id, eu.id)) };
+    return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
   },
 
   'POST /moderar': async (req) => {
-    const eu = exigirSessao(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const { acao, alvo, minutos, cargo, turbo, idExibido } = await lerCorpo(req);
-    const sid = SERVIDOR.id;
 
     switch (acao) {
       // Banir e dar castigo também tiram da call. Sem isso a pessoa continua conversando
@@ -418,12 +505,12 @@ const ROTAS = {
       // com razão, que o botão não funcionou.
       case 'banir': {
         const r = membros.banir(db, sid, eu.id, alvo);
-        await tirarDaSala(alvo);
+        await tirarDaSala(sid, alvo);
         return { alvo: verMembro(r) };
       }
       case 'timeout': {
         const r = membros.darTimeout(db, sid, eu.id, alvo, minutos);
-        await tirarDaSala(alvo);
+        await tirarDaSala(sid, alvo);
         return { alvo: verMembro(r) };
       }
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
@@ -434,19 +521,19 @@ const ROTAS = {
 
       case 'expulsar': {
         membros.expulsar(db, sid, eu.id, alvo);
-        await tirarDaSala(alvo);
+        await tirarDaSala(sid, alvo);
         return { ok: true };
       }
       case 'desconectar': {
         membros.exigirPermissao(db, sid, eu.id, 'desconectar', alvo);
-        const onde = await ondeEsta(alvo);
+        const onde = await ondeEsta(sid, alvo);
         if (!onde) throw new ErroDeConta('Essa pessoa não está em nenhuma sala.', 409);
         await svc.removeParticipant(onde.sala, identidadeDe(alvo));
         return { ok: true };
       }
       case 'mutar': {
         membros.exigirPermissao(db, sid, eu.id, 'mutar', alvo);
-        const onde = await ondeEsta(alvo);
+        const onde = await ondeEsta(sid, alvo);
         if (!onde) throw new ErroDeConta('Essa pessoa não está em nenhuma sala.', 409);
         const microfones = onde.participante.tracks.filter((t) => t.source === 2 /* MICROPHONE */);
         for (const t of microfones) await svc.mutePublishedTrack(onde.sala, identidadeDe(alvo), t.sid, true);
@@ -505,5 +592,6 @@ const servidor = http.createServer(async (req, res) => {
 });
 
 servidor.listen(PORT, () => console.log(
-  `Cantinho em http://0.0.0.0:${PORT} — servidor "${verServidor().nome}", salas: ${salasDoServidor().map((s) => `${s.nome} (${s.tipo})`).join(', ')}`,
+  `Cantinho em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
+  + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
 ));
