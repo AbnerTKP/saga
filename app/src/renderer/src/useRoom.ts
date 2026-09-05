@@ -22,6 +22,19 @@ function getAudioRoot() {
   return audioRoot;
 }
 
+// Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
+// engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
+// desabilitadas e nada é dito, que por fora parece o clique não ter funcionado.
+const LIMITE_DE_CONEXAO = 20_000;
+
+function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<T> {
+  let id: ReturnType<typeof setTimeout>;
+  const limite = new Promise<never>((_, reject) => {
+    id = setTimeout(() => reject(new Error(aviso)), ms);
+  });
+  return Promise.race([promessa, limite]).finally(() => clearTimeout(id)) as Promise<T>;
+}
+
 export function useRoom() {
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
@@ -105,7 +118,12 @@ export function useRoom() {
     if (room.state !== 'disconnected') await room.disconnect();
     setStatus('connecting');
     try {
-      await room.connect(url, token);
+      await comLimite(
+        room.connect(url, token),
+        LIMITE_DE_CONEXAO,
+        `O servidor de voz (${url}) não respondeu em ${LIMITE_DE_CONEXAO / 1000}s. ` +
+          'A rede pode estar bloqueando essa porta — tente por outra rede, por exemplo o 4G do celular.',
+      );
       setRoomName(name);
       setStatus('connected');
       await room.startAudio().catch(() => undefined);
@@ -113,6 +131,9 @@ export function useRoom() {
         await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
       }
     } catch (e) {
+      // Se o tempo estourou, a tentativa pode continuar viva por baixo; derruba antes
+      // de voltar para 'idle', senão a próxima entrada encontra a sala num estado sujo.
+      await room.disconnect().catch(() => undefined);
       setStatus('idle');
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;

@@ -27,6 +27,30 @@ pnpm dev:app         # terminal 3: abre o app
 No app: servidor `localhost:3001`, senha `amigos`, seu nome. Salas: Geral, Jogos, Filmes
 (mude em `server/.env.dev`, variável `ROOMS`).
 
+## Testes
+
+```bash
+pnpm test        # unitários, rodam em segundos e sem depender de nada externo
+pnpm test:sala   # integração: sobe 3 participantes de verdade numa sala
+```
+
+Os unitários cobrem a tradução do estado do LiveKit para os ícones da barra lateral
+(`server/participantes.mjs`) — de onde já saiu um bug em que todo mundo aparecia mudo e
+compartilhando tela, porque `MICROPHONE` é 2 e `SCREEN_SHARE` é 3, não o contrário.
+
+O de integração conecta três clientes WebRTC reais no servidor, publica microfone e
+confere o que o `/rooms` devolve: que os três se enxergam, que ninguém aparece mudo ou
+compartilhando sem estar, que mutar um não muta os outros e que a sala esvazia ao sair.
+Ele ignora quem mais estiver na sala, então pode rodar com o pessoal usando. Precisa de um
+servidor no ar e da senha, que nunca fica no repositório:
+
+```bash
+TESTE_SERVIDOR=76.13.225.79:3001 TESTE_SENHA=asenha pnpm test:sala
+```
+
+No GitHub Actions os unitários e o typecheck rodam antes de gerar qualquer instalador: se
+falharem, nada é publicado.
+
 ## Hospedar para os amigos (uma vez só)
 
 O que fica ligado 24 h é o **servidor de voz** (pasta `server/`). Precisa de uma máquina Linux

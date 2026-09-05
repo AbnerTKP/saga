@@ -2,6 +2,7 @@
 // emite tokens do LiveKit e lista quem está em cada sala.
 import http from 'node:http';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { verParticipante } from './participantes.mjs';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const PASSWORD = process.env.APP_PASSWORD ?? '';
@@ -62,14 +63,7 @@ async function listRooms() {
     let participants = [];
     if (r && r.numParticipants > 0) {
       const ps = await svc.listParticipants(name).catch(() => []);
-      participants = ps.map(p => ({
-        identity: p.identity,
-        name: p.name || p.identity,
-        // publica câmera ou tela? (para os ícones da barra lateral)
-        camera: p.tracks.some(t => t.source === 1 /* CAMERA */),
-        screen: p.tracks.some(t => t.source === 2 /* SCREEN_SHARE */),
-        muted: p.tracks.filter(t => t.source === 3 /* MICROPHONE */).every(t => t.muted),
-      }));
+      participants = ps.map(verParticipante);
     }
     result.push({ name, participants });
   }
