@@ -13,10 +13,8 @@ const COMO_SE_LE: Record<Qualidade, string> = {
   '1080p60': '1080p · 60 quadros — a melhor, e a mais pesada',
 };
 
-export function DeviceSettings({ room, volumeDaTela, onVolumeDaTela, onRegistro, onClose }: {
+export function DeviceSettings({ room, onRegistro, onClose }: {
   room: Room;
-  volumeDaTela: number;
-  onVolumeDaTela: (v: number) => void;
   onRegistro: () => void;
   onClose: () => void;
 }) {
@@ -69,18 +67,6 @@ export function DeviceSettings({ room, volumeDaTela, onVolumeDaTela, onRegistro,
             <small className="muted">
               Vale a partir da próxima vez que você compartilhar. O servidor reenvia sua
               transmissão para cada pessoa na sala, então quanto mais gente, mais pesa.
-            </small>
-          </label>
-
-          <label>
-            Volume das transmissões · {Math.round(volumeDaTela * 100)}%
-            <input
-              type="range" min={0} max={150} value={Math.round(volumeDaTela * 100)}
-              onChange={(e) => onVolumeDaTela(Number(e.target.value) / 100)}
-            />
-            <small className="muted">
-              Só o som de quem está compartilhando tela, separado das vozes. Vale para a
-              transmissão em destaque — as outras ficam mudas.
             </small>
           </label>
 

@@ -187,8 +187,6 @@ export function App() {
       {devices && (
         <DeviceSettings
           room={rm.room}
-          volumeDaTela={rm.volumeDaTela}
-          onVolumeDaTela={rm.definirVolumeDaTela}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}
         />

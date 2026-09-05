@@ -88,10 +88,10 @@ export function useRoom() {
   // soundboard de fora, que anda numa faixa própria.
   const volumes = useRef(new Map<string, number>());
 
-  // O som da transmissão tem controle separado da voz: numa sessão de filme, dá para
-  // baixar o filme sem abaixar quem está comentando.
-  const volumeDaTela = useRef(1);
-  const [volumeDaTelaEstado, setVolumeDaTelaEstado] = useState(1);
+  // Volume de cada transmissão, separado da voz e separado entre si: dá para baixar o
+  // filme de um sem mexer no de outro, nem em quem está comentando.
+  const volumesDaTela = useRef(new Map<string, number>());
+  const [, redesenharVolumes] = useReducer((x: number) => x + 1, 0);
 
   // Só a transmissão em foco é ouvida. Com duas pessoas compartilhando, ouvir as duas ao
   // mesmo tempo seria uma sopa; quem manda é qual está em destaque no palco.
@@ -106,7 +106,7 @@ export function useRoom() {
       const identity = el.dataset.identity ?? '';
       const ehTela = el.dataset.source === Track.Source.ScreenShareAudio;
       if (ehTela) {
-        el.volume = volumeDaTela.current;
+        el.volume = volumesDaTela.current.get(identity) ?? 1;
         el.muted = deafenedRef.current || (!!focoDaTela.current && identity !== focoDaTela.current);
       } else {
         el.volume = volumes.current.get(identity) ?? 1;
@@ -331,11 +331,12 @@ export function useRoom() {
     bump();
   }, [aplicarAudio]);
 
-  const definirVolumeDaTela = useCallback((valor: number) => {
-    const v = Math.min(1.5, Math.max(0, valor));
-    volumeDaTela.current = v;
-    setVolumeDaTelaEstado(v);
+  const volumeDaTelaDe = useCallback((identity: string) => volumesDaTela.current.get(identity) ?? 1, []);
+
+  const definirVolumeDaTela = useCallback((identity: string, valor: number) => {
+    volumesDaTela.current.set(identity, Math.min(1.5, Math.max(0, valor)));
     aplicarAudio();
+    redesenharVolumes();
   }, [aplicarAudio]);
 
   /** Quem está em destaque no palco; só o áudio dessa transmissão é ouvido. */
@@ -369,6 +370,6 @@ export function useRoom() {
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom, volumeDe, definirVolume,
-    volumeDaTela: volumeDaTelaEstado, definirVolumeDaTela, definirFocoDaTela,
+    volumeDaTelaDe, definirVolumeDaTela, definirFocoDaTela,
   };
 }

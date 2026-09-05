@@ -3,11 +3,15 @@ import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
+import { MenuDaTela } from './MenuDaTela';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-function VideoTile({ tile, big, onClick }: { tile: Tile; big?: boolean; onClick?: () => void }) {
+function VideoTile({ tile, big, onClick, onMenu }: {
+  tile: Tile; big?: boolean; onClick?: () => void;
+  onMenu?: (e: React.MouseEvent) => void;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -18,7 +22,12 @@ function VideoTile({ tile, big, onClick }: { tile: Tile; big?: boolean; onClick?
   const name = tile.participant.name || tile.participant.identity;
   const isScreen = tile.source === Track.Source.ScreenShare;
   return (
-    <div className={`tile ${big ? 'big' : ''} ${tile.participant.isSpeaking && !isScreen ? 'speaking' : ''}`} onClick={onClick}>
+    <div
+      className={`tile ${big ? 'big' : ''} ${tile.participant.isSpeaking && !isScreen ? 'speaking' : ''}`}
+      onClick={onClick}
+      onContextMenu={onMenu}
+      title={isScreen ? 'Botão direito para o volume desta transmissão' : undefined}
+    >
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
       <div className="tile-label">
         {isScreen && <Icon name="screen" size={14} />}
@@ -34,6 +43,7 @@ export function Stage({ rm, pessoas, onPessoa }: {
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
+  const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
   const [text, setText] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +59,17 @@ export function Stage({ rm, pessoas, onPessoa }: {
     ? focusTile.participant.identity
     : null;
   useEffect(() => { rm.definirFocoDaTela(identidadeEmFoco); }, [identidadeEmFoco, rm]);
+
+  // Só transmissão tem volume próprio; câmera não carrega áudio separado.
+  const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
+    if (t.source !== Track.Source.ScreenShare) return;
+    e.preventDefault();
+    setMenuDaTela({
+      identity: t.participant.identity,
+      nome: t.participant.name || t.participant.identity,
+      em: { x: e.clientX, y: e.clientY },
+    });
+  };
 
   const send = (e: FormEvent) => { e.preventDefault(); rm.sendMessage(text); setText(''); };
 
@@ -89,10 +110,10 @@ export function Stage({ rm, pessoas, onPessoa }: {
           )}
           {!idle && focusTile && (
             <div className="focus-layout">
-              <VideoTile tile={focusTile} big onClick={() => setFocus(null)} />
+              <VideoTile tile={focusTile} big onClick={() => setFocus(null)} onMenu={menuDaTransmissao(focusTile)} />
               {(rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
-                  {rest.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} />)}
+                  {rest.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
@@ -106,7 +127,7 @@ export function Stage({ rm, pessoas, onPessoa }: {
           )}
           {!idle && !focusTile && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
-              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} />)}
+              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
                   <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} tamanho="huge" />
@@ -135,6 +156,15 @@ export function Stage({ rm, pessoas, onPessoa }: {
           </form>
         </aside>
       </div>
+      {menuDaTela && (
+        <MenuDaTela
+          nome={menuDaTela.nome}
+          em={menuDaTela.em}
+          volume={rm.volumeDaTelaDe(menuDaTela.identity)}
+          onVolume={(v) => rm.definirVolumeDaTela(menuDaTela.identity, v)}
+          onClose={() => setMenuDaTela(null)}
+        />
+      )}
     </main>
   );
 }
