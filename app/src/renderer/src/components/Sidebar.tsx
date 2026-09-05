@@ -2,6 +2,7 @@ import type { Membro, RoomInfo, Servidor } from '../api';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
+import { Sinal } from './Sinal';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
@@ -66,10 +67,11 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
         <div className="voice-panel">
           <div className="voice-status">
             <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
-            <div>
+            <div className="voice-texto">
               <div className="strong">{rm.status === 'connected' ? 'Voz conectada' : rm.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}</div>
               <div className="small muted">{rm.roomName}</div>
             </div>
+            {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
           </div>
           <div className="voice-actions">
             <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>

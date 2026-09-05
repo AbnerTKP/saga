@@ -288,3 +288,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   color: var(--text2); white-space: pre-wrap; word-break: break-word;
 }
 .registro-link { margin-top: 4px; text-align: center; }
+
+/* ---- sinal de conexão ---- */
+
+.voice-status .voice-texto { flex: 1; min-width: 0; }
+.sinal { display: flex; align-items: center; flex: none; cursor: default; }
+.sinal svg { fill: currentColor; display: block; }
+.sinal.bom { color: var(--ok); }
+.sinal.medio { color: var(--warn); }
+.sinal.ruim { color: var(--danger); }
+.sinal.sem { color: var(--text3); }

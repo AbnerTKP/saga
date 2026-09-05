@@ -146,6 +146,23 @@ export const meuBanner = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/b
 export const fotoDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/foto', a);
 export const bannerDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/banner', a);
 
+/**
+ * Tempo de ida e volta até o servidor, em milissegundos. Não é o ping da mídia — para
+ * esse o LiveKit não expõe nada público — mas o LiveKit roda na mesma máquina, então
+ * serve como medida honesta de "quão longe estou do servidor".
+ */
+export async function medirPing(): Promise<number | null> {
+  const inicio = performance.now();
+  try {
+    const r = await fetch(`${BASE}/health`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    await r.text();
+    return Math.round(performance.now() - inicio);
+  } catch {
+    return null;
+  }
+}
+
 // --- soundboard ---------------------------------------------------------------
 
 export type Som = { id: number; nome: string; arquivo: string; porQuem: string | null; criado_em: number };
