@@ -305,11 +305,17 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* ---- identificador, Turbo e cartão de perfil ---- */
 
-/* O identificador vem antes do nome e precisa ceder o lugar a ele: fica menor e apagado. */
+/* O identificador vem antes do nome e cede o lugar a ele: fica menor e apagado. */
 .id-do-membro {
   margin-right: 5px; padding: 0 4px; border-radius: 3px;
   background: rgba(255,255,255,.07); color: var(--text3);
   font-size: .82em; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+/* Em quem é Turbo ele acompanha a distinção, senão o roxo do nome deixava o
+   identificador parecendo apagado por engano, e não por escolha. */
+.turbo .id-do-membro,
+.id-do-membro.turbo {
+  background: rgba(192,132,252,.18); color: #d8b4fe;
 }
 
 /* Arco-íris do Vorcaro Turbo. O gradiente anda devagar de propósito: nome é para ler. */
@@ -338,12 +344,24 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 }
 
 /* O banner ocupa o topo do cartão, sangrando até as bordas. */
-.cartao-banner { margin: -10px -10px 0; height: 84px; overflow: hidden; border-radius: 8px 8px 0 0; }
+.cartao-banner { margin: -10px -10px 0; height: 76px; overflow: hidden; border-radius: 8px 8px 0 0; }
 .cartao-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.menu-topo.sob-banner { margin-top: -20px; }
-.menu-topo.sob-banner .avatar {
-  border: 3px solid var(--bg2); width: 44px; height: 44px; font-size: 16px;
+
+/* Com banner, a foto sobe e o nome desce para baixo dela — em linha, o nome comprido
+   escorregava por cima do banner e ficava ilegível contra a imagem. */
+.menu-topo.sob-banner {
+  flex-direction: column; align-items: flex-start; gap: 4px; margin-top: -22px;
 }
+.menu-topo.sob-banner .avatar {
+  border: 3px solid var(--bg2); width: 48px; height: 48px; font-size: 17px;
+}
+.menu-topo .quem { width: 100%; }
+/* O nome pode ter duas linhas antes de cortar: apelido comprido é comum. */
+.nome-do-cartao {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.25; word-break: break-word; white-space: normal;
+}
+.linha-do-cargo { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 
 /* ---- grade de GIFs ---- */
 

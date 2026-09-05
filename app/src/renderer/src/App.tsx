@@ -61,7 +61,7 @@ export function App() {
     window.desktop.updateAtual().then((s) => { if (s) aplicar(s); });
     window.desktop.onUpdate(aplicar);
   }, []);
-  const rm = useRoom();
+  const rm = useRoom(sessao?.eu?.turbo ?? false);
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 
@@ -280,6 +280,7 @@ export function App() {
       {devices && (
         <DeviceSettings
           room={rm.room}
+          souTurbo={eu.turbo}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}
         />

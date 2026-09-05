@@ -13,7 +13,7 @@ export function Nome({ membro, nome, id, turbo }: {
 
   return (
     <>
-      {identificador && <span className="id-do-membro">{identificador}</span>}
+      {identificador && <span className={`id-do-membro ${ehTurbo ? 'turbo' : ''}`}>{identificador}</span>}
       <span className={ehTurbo ? 'nome-turbo' : undefined}>{texto}</span>
     </>
   );

@@ -68,11 +68,13 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
       <div className={`menu-topo ${banner ? 'sob-banner' : ''}`}>
         <Avatar nome={pessoa.nome} foto={pessoa.foto} tamanho="big" />
         <div className="quem">
-          <div className="strong">
+          <div className="strong nome-do-cartao">
             <Nome nome={pessoa.nome} id={pessoa.idExibido} turbo={pessoa.turbo} />
           </div>
-          <div className="muted small">
-            {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
+          <div className="muted small linha-do-cargo">
+            <span style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}>
+              {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
+            </span>
             {pessoa.turbo && <span className="selo-turbo">TURBO</span>}
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { anotar } from './registro';
 import { explicarFalhaDeAudio, pareceMixagemDoSistema } from './erros';
 import { VOLUME } from './volume';
+import { qualidadeValida, type Qualidade } from './qualidades';
 
 type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
 import {
@@ -29,8 +30,8 @@ function getAudioRoot() {
   return audioRoot;
 }
 
-// Qualidades oferecidas para transmitir. O bitrate acompanha resolução e quadros: dobrar
-// os quadros sem subir o teto só trocaria travamento por borrão.
+// O bitrate acompanha resolução e quadros: dobrar os quadros sem subir o teto só trocaria
+// travamento por borrão. Quem alcança cada uma é decidido em qualidades.ts.
 export const QUALIDADES = {
   '720p30':  new VideoPreset(1280, 720, 2_500_000, 30, 'medium'),
   '1080p30': new VideoPreset(1920, 1080, 5_000_000, 30, 'medium'),
@@ -38,17 +39,11 @@ export const QUALIDADES = {
   '1080p60': new VideoPreset(1920, 1080, 8_000_000, 60, 'medium'),
 } as const;
 
-export type Qualidade = keyof typeof QUALIDADES;
-export const QUALIDADE_PADRAO: Qualidade = '1080p60';
-
 const CHAVE_QUALIDADE = 'cantinho.qualidade';
 
-export function lerQualidade(): Qualidade {
-  try {
-    const v = localStorage.getItem(CHAVE_QUALIDADE);
-    if (v && v in QUALIDADES) return v as Qualidade;
-  } catch { /* sem storage */ }
-  return QUALIDADE_PADRAO;
+/** O que está guardado, sem julgar: quem decide o que vale é qualidadeValida. */
+export function lerQualidadeGuardada(): unknown {
+  try { return localStorage.getItem(CHAVE_QUALIDADE); } catch { return null; }
 }
 
 export function guardarQualidade(q: Qualidade) {
@@ -68,7 +63,8 @@ function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<
   return Promise.race([promessa, limite]).finally(() => clearTimeout(id)) as Promise<T>;
 }
 
-export function useRoom() {
+/** Recebe se a pessoa é Turbo porque a qualidade de transmissão depende disso. */
+export function useRoom(souTurbo = false) {
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const [status, setStatus] = useState<Status>('idle');
@@ -272,7 +268,7 @@ export function useRoom() {
 
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
-    const preset = QUALIDADES[lerQualidade()];
+    const preset = QUALIDADES[qualidadeValida(lerQualidadeGuardada(), souTurbo)];
     const captura: ScreenShareCaptureOptions = {
       resolution: preset.resolution,
       // 'motion' avisa o codificador que ali corre vídeo. Sem isso ele assume texto e
@@ -336,7 +332,7 @@ export function useRoom() {
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room]);
+  }, [room, souTurbo]);
 
   const stopScreen = useCallback(async () => {
     // A faixa de mixagem é nossa, publicada à parte: o LiveKit não a recolhe sozinho.

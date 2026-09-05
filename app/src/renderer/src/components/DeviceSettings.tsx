@@ -1,24 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Room } from 'livekit-client';
 import { Icon } from './Icon';
-import { QUALIDADES, lerQualidade, guardarQualidade, type Qualidade } from '../useRoom';
+import { lerQualidadeGuardada, guardarQualidade } from '../useRoom';
+import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from '../qualidades';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const labels: Record<Kind, string> = { audioinput: 'Microfone', audiooutput: 'Saída de som', videoinput: 'Câmera' };
 
-const COMO_SE_LE: Record<Qualidade, string> = {
-  '720p30':  '720p · 30 quadros — a mais leve',
-  '1080p30': '1080p · 30 quadros — nítida, para slide e leitura',
-  '720p60':  '720p · 60 quadros — fluida, para jogo e vídeo',
-  '1080p60': '1080p · 60 quadros — a melhor, e a mais pesada',
-};
-
-export function DeviceSettings({ room, onRegistro, onClose }: {
+export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
   room: Room;
+  /** 1080p e 60 quadros são do Vorcaro Turbo; sem ele, só 720p a 30. */
+  souTurbo: boolean;
   onRegistro: () => void;
   onClose: () => void;
 }) {
-  const [qualidade, setQualidade] = useState<Qualidade>(lerQualidade);
+  const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souTurbo));
+  const permitidas = qualidadesDe(souTurbo);
   const [devices, setDevices] = useState<Record<Kind, MediaDeviceInfo[]>>({ audioinput: [], audiooutput: [], videoinput: [] });
   const [active, setActive] = useState<Record<Kind, string>>({
     audioinput: room.getActiveDevice('audioinput') ?? '',
@@ -55,18 +52,23 @@ export function DeviceSettings({ room, onRegistro, onClose }: {
             <select
               value={qualidade}
               onChange={(e) => {
-                const q = e.target.value as Qualidade;
+                // Passa pela mesma régua do momento de transmitir: a lista some, mas
+                // ninguém escolhe por engano o que não pode.
+                const q = qualidadeValida(e.target.value, souTurbo);
                 setQualidade(q);
                 guardarQualidade(q);
               }}
             >
-              {(Object.keys(QUALIDADES) as Qualidade[]).map((q) => (
-                <option key={q} value={q}>{COMO_SE_LE[q]}</option>
+              {TODAS.map((q) => (
+                <option key={q} value={q} disabled={!permitidas.includes(q)}>
+                  {COMO_SE_LE[q]}{!permitidas.includes(q) ? ' — Vorcaro Turbo' : ''}
+                </option>
               ))}
             </select>
             <small className="muted">
               Vale a partir da próxima vez que você compartilhar. O servidor reenvia sua
               transmissão para cada pessoa na sala, então quanto mais gente, mais pesa.
+              {!souTurbo && ' 1080p e 60 quadros são do Vorcaro Turbo.'}
             </small>
           </label>
 
