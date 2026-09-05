@@ -13,6 +13,10 @@ permissions:
 jobs:
   build:
     strategy:
+      # Em paralelo, os dois jobs criam um Release cada um no mesmo instante e os
+      # arquivos ficam divididos entre eles. Em sequência, o segundo encontra o
+      # Release que o primeiro criou e só anexa os seus arquivos.
+      max-parallel: 1
       matrix:
         include:
           - os: windows-latest

@@ -17,6 +17,9 @@ publish:
   provider: github
   owner: AbnerTKP
   repo: cantinho-do-vorcaro
+  # Sem isto o Release nasce como rascunho, visível só para o dono do repositório:
+  # o link /releases/latest daria 404 para quem fosse baixar.
+  releaseType: release
 
 # Sem assinatura: é só entre amigos. Ver README para abrir no Mac e no Windows.
 mac:
