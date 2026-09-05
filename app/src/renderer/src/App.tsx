@@ -5,6 +5,7 @@ import {
   type RoomInfo, type Sessao, type Membro, type Servidor,
 } from './api';
 import { useRoom } from './useRoom';
+import { useChat } from './useChat';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { Stage } from './components/Stage';
@@ -32,6 +33,9 @@ export function App() {
   const [painel, setPainel] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [registro, setRegistro] = useState(false);
+  // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
+  // é assim que se lê um aviso sem sair da conversa.
+  const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -88,11 +92,13 @@ export function App() {
     return () => { vivo = false; clearInterval(id); };
   }, [sessao]);
 
-  const joinRoom = useCallback(async (nome: string) => {
-    if (rm.roomName === nome) return;
+  const abrirSala = useCallback(async (sala: RoomInfo) => {
+    setSalaAbertaId(sala.id);
+    // Sala de texto não tem voz: abrir é só passar a ler e escrever nela.
+    if (sala.tipo !== 'voz' || rm.roomName === sala.name) return;
     try {
-      const { url, token } = await pedirTokenDaSala(nome);
-      await rm.join(url, token, nome);
+      const { url, token } = await pedirTokenDaSala(sala.name);
+      await rm.join(url, token, sala.name);
     } catch (e) {
       rm.setError((e as Error).message);
     }
@@ -137,6 +143,9 @@ export function App() {
     try { await rm.startScreen(null, true); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
   }, [rm, seletorDoSistema]);
 
+  const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
+  const chat = useChat(salaAberta?.id ?? null);
+
   const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
   const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
 
@@ -166,7 +175,8 @@ export function App() {
         eu={sessao.eu}
         servidor={sessao.servidor}
         rm={rm}
-        onJoin={joinRoom}
+        onAbrir={abrirSala}
+        salaAbertaId={salaAbertaId}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}
         pessoas={pessoas}
@@ -175,7 +185,15 @@ export function App() {
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
       />
-      <Stage rm={rm} pessoas={pessoas} onPessoa={abrirMenu} onRegistro={() => setRegistro(true)} />
+      <Stage
+        rm={rm}
+        pessoas={pessoas}
+        onPessoa={abrirMenu}
+        onRegistro={() => setRegistro(true)}
+        salaAberta={salaAberta}
+        chat={chat}
+        meuId={sessao.eu.id}
+      />
       {picker && (
         <ScreenPicker
           onClose={() => setPicker(false)}

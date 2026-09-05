@@ -36,9 +36,11 @@ export type RoomParticipant = {
   usuarioId?: number; cargo?: number; foto?: string | null;
   banner?: string | null; turbo?: boolean; idExibido?: string | null;
 };
-export type RoomInfo = { name: string; participants: RoomParticipant[] };
+export type TipoDeSala = 'voz' | 'texto';
+export type RoomInfo = { id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[] };
+export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number };
 
-export type Sessao = { token: string; eu: Membro; servidor: Servidor; salas: string[]; impedimento?: string | null };
+export type Sessao = { token: string; eu: Membro; servidor: Servidor; salas: Sala[]; impedimento?: string | null };
 
 // --- guardar a sessão -------------------------------------------------------
 
@@ -101,12 +103,47 @@ export const entrar = (c: { apelido: string; senha: string }) =>
 export const sair = () => pedir<{ ok: true }>('POST', '/sair');
 
 export const quemSou = () =>
-  pedir<{ eu: Membro; servidor: Servidor; salas: string[]; impedimento: string | null }>('GET', '/eu');
+  pedir<{ eu: Membro; servidor: Servidor; salas: Sala[]; impedimento: string | null }>('GET', '/eu');
 
 export const mudarMeuNome = (nome: string) => pedir<{ eu: Membro }>('PATCH', '/eu', { nome });
 
 export const verServidor = () =>
-  pedir<{ servidor: Servidor; salas: string[]; membros: Membro[] }>('GET', '/servidor');
+  pedir<{ servidor: Servidor; salas: Sala[]; membros: Membro[] }>('GET', '/servidor');
+
+// --- salas ------------------------------------------------------------------
+
+export const criarSala = (nome: string, tipo: TipoDeSala) =>
+  pedir<{ sala: Sala }>('POST', '/salas/criar', { nome, tipo });
+
+export const renomearSala = (id: number, nome: string) =>
+  pedir<{ sala: Sala }>('POST', '/salas/renomear', { id, nome });
+
+export const apagarSala = (id: number) => pedir<{ ok: true }>('POST', '/salas/apagar', { id });
+
+export const reordenarSalas = (ids: number[]) => pedir<{ salas: Sala[] }>('POST', '/salas/ordem', { ids });
+
+// --- chat -------------------------------------------------------------------
+
+export type Mensagem = {
+  id: number;
+  texto: string;
+  criadoEm: number;
+  autorId: number | null;
+  nome: string;
+  foto: string | null;
+  turbo: boolean;
+  idExibido: string | null;
+};
+
+/** Sem `depoisDe`, traz as últimas; com ele, só o que chegou desde então. */
+export const lerMensagens = async (sala: number, depoisDe?: number) =>
+  (await pedir<{ mensagens: Mensagem[] }>(
+    'GET',
+    `/mensagens?sala=${sala}${depoisDe ? `&depoisDe=${depoisDe}` : ''}`,
+  )).mensagens;
+
+export const enviarMensagem = async (sala: number, texto: string) =>
+  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
 
 export const renomearServidor = (nome: string) =>
   pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });

@@ -353,3 +353,41 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .gif img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gif:hover:not(:disabled) { outline: 2px solid var(--accent); }
 .gif.enviando { opacity: .4; }
+
+/* ---- chat ---- */
+
+/* Cada mensagem mostra quem escreveu, com foto: numa sala de texto que dura semanas,
+   "quem falou" importa tanto quanto o que foi dito. */
+.msg-topo { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.msg-topo .avatar { width: 18px; height: 18px; font-size: 9px; }
+.msg .text { padding-left: 24px; }
+
+/* Numa sala de texto o chat ocupa o palco inteiro, e o texto ganha respiro. */
+.chat-grande { border-left: none; flex: 1; min-height: 0; }
+.chat-grande .chat-log { padding: 16px 0; }
+.chat-grande .msg { padding: 5px 24px; font-size: 15px; }
+.chat-grande .msg-topo .avatar { width: 24px; height: 24px; font-size: 11px; }
+.chat-grande .msg .text { padding-left: 30px; }
+.chat-grande .chat-input { padding: 12px 24px 20px; }
+
+/* A sala aberta para leitura, que pode não ser a sala em que se está falando. */
+.room.aberta:not(.active) { background: var(--bg3); color: var(--white); }
+.stage-body.so-chat { grid-template-columns: 1fr; }
+.stage-head button.link.ligado { color: var(--warn); }
+
+/* ---- salas na configuração ---- */
+
+.lista-salas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lista-salas li { display: flex; align-items: center; gap: 8px; }
+.lista-salas input { flex: 1; min-width: 0; }
+.lista-salas button {
+  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  padding: 6px 10px; font-size: 12px; cursor: pointer;
+}
+.lista-salas button.danger { background: #6a2b2b; color: #f5c4c4; }
+.lista-salas button.danger:hover:not(:disabled) { background: #8a3535; }
+.lista-salas button:disabled { opacity: .4; cursor: default; }
+.tipo-da-sala {
+  flex: none; width: 42px; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text3); font-weight: 700;
+}

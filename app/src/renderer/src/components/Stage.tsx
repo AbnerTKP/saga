@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { MenuDaTela } from './MenuDaTela';
+import { Chat } from './Chat';
+import type { Mensagem, RoomInfo } from '../api';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
@@ -37,18 +39,22 @@ function VideoTile({ tile, big, onClick, onMenu }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
+export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meuId }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
   onRegistro: () => void;
+  /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra. */
+  salaAberta: RoomInfo | null;
+  chat: { mensagens: Mensagem[]; erro: string | null; enviar: (t: string) => Promise<void> };
+  meuId: number;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
-  const [text, setText] = useState('');
-  const logRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [rm.messages.length]);
+
+
+
 
   // Foca automaticamente a primeira tela compartilhada que aparecer
   const screens = rm.tiles.filter((t) => t.source === Track.Source.ScreenShare);
@@ -72,7 +78,7 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
     });
   };
 
-  const send = (e: FormEvent) => { e.preventDefault(); rm.sendMessage(text); setText(''); };
+
 
   const idle = rm.status === 'idle';
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
@@ -81,7 +87,18 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
     <main className="stage">
       <header className="stage-head">
         <Icon name="speaker" />
-        <span className="strong">{rm.roomName ?? 'Escolha uma sala'}</span>
+        <span className="strong">{salaAberta?.name ?? rm.roomName ?? 'Escolha uma sala'}</span>
+        {salaAberta?.tipo === 'voz' && rm.status !== 'idle' && (
+          <button
+            className={`link ${rm.semTransmissoes ? 'ligado' : ''}`}
+            title={rm.semTransmissoes
+              ? 'Voltar a receber as transmissões'
+              : 'Parar de receber transmissões — economiza banda, não só esconde'}
+            onClick={rm.alternarTransmissoes}
+          >
+            {rm.semTransmissoes ? 'assistir de novo' : 'não assistir'}
+          </button>
+        )}
         {rm.error && (
           <span className="error inline">
             {rm.error}{' '}
@@ -93,6 +110,18 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
         )}
       </header>
 
+      {salaAberta?.tipo === 'texto' ? (
+        <div className="stage-body so-chat">
+          <Chat
+            mensagens={chat.mensagens}
+            erro={chat.erro}
+            onEnviar={chat.enviar}
+            sala={salaAberta.name}
+            meuId={meuId}
+            grande
+          />
+        </div>
+      ) : (
       <div className="stage-body">
         <section className="videos">
           {idle && <div className="empty">Clique numa sala à esquerda para entrar na voz.</div>}
@@ -143,24 +172,15 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro }: {
           )}
         </section>
 
-        <aside className="chat">
-          <div className="chat-head">Chat da sala</div>
-          <div className="chat-log" ref={logRef}>
-            {rm.messages.length === 0 && <div className="muted small pad">Mensagens somem quando todo mundo sai da sala.</div>}
-            {rm.messages.map((m) => (
-              <div key={m.id} className={`msg ${m.mine ? 'mine' : ''}`}>
-                <span className="from">{m.from}</span>
-                <span className="time">{new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                <div className="text">{m.text}</div>
-              </div>
-            ))}
-          </div>
-          <form className="chat-input" onSubmit={send}>
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={idle ? 'Entre numa sala para conversar' : `Mensagem em ${rm.roomName}`} disabled={idle} maxLength={2000} />
-            <button disabled={idle || !text.trim()} title="Enviar"><Icon name="send" size={18} /></button>
-          </form>
-        </aside>
+        <Chat
+          mensagens={chat.mensagens}
+          erro={chat.erro}
+          onEnviar={chat.enviar}
+          sala={salaAberta?.name ?? null}
+          meuId={meuId}
+        />
       </div>
+      )}
       {menuDaTela && (
         <MenuDaTela
           nome={menuDaTela.nome}

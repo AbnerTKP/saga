@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   CARGO, verServidor, renomearServidor, mudarMeuNome, moderar,
   minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif,
-  type Acao, type AcaoDeModeracao, type Membro, type Servidor,
+  criarSala, renomearSala, apagarSala,
+  type Acao, type AcaoDeModeracao, type Membro, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
@@ -26,6 +27,9 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
   onEu: (m: Membro) => void; onServidor: (s: Servidor) => void; onClose: () => void;
 }) {
   const [membros, setMembros] = useState<Membro[]>([]);
+  const [salas, setSalas] = useState<Sala[]>([]);
+  const [novaSala, setNovaSala] = useState('');
+  const [tipoNovo, setTipoNovo] = useState<TipoDeSala>('voz');
   const [nomeServidor, setNomeServidor] = useState(servidor.nome);
   const [meuNome, setMeuNome] = useState(eu.nome);
   const [erro, setErro] = useState<string | null>(null);
@@ -36,6 +40,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
     try {
       const r = await verServidor();
       setMembros(r.membros);
+      setSalas(r.salas);
     } catch (e) { setErro((e as Error).message); }
   }, []);
 
@@ -125,6 +130,72 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
             <div className="linha-campo">
               <input value={nomeServidor} onChange={(e) => setNomeServidor(e.target.value)} maxLength={40} />
               <button onClick={salvarNomeServidor} disabled={ocupado || nomeServidor === servidor.nome}>Salvar</button>
+            </div>
+          </section>
+        )}
+
+        {eu.cargo >= CARGO.DONO && (
+          <section className="painel-bloco">
+            <h3>Salas <span className="count">{salas.length}</span></h3>
+            <p className="muted small">
+              Sala de voz é onde se conversa; sala de texto ocupa a tela e guarda o que
+              foi escrito. Não dá para apagar a última — sem sala, ninguém teria para onde ir.
+            </p>
+
+            <ul className="lista-salas">
+              {salas.map((s) => (
+                <li key={s.id}>
+                  <span className="tipo-da-sala">{s.tipo === 'texto' ? 'texto' : 'voz'}</span>
+                  <input
+                    defaultValue={s.nome}
+                    maxLength={32}
+                    title="ENTER renomeia"
+                    disabled={ocupado}
+                    onKeyDown={async (e) => {
+                      if (e.key !== 'Enter') return;
+                      const nome = (e.target as HTMLInputElement).value;
+                      setErro(null); setOcupado(true);
+                      try { await renomearSala(s.id, nome); setAviso('Sala renomeada.'); await recarregar(); }
+                      catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                    }}
+                  />
+                  <button
+                    className="danger"
+                    disabled={ocupado || salas.length <= 1}
+                    title={salas.length <= 1 ? 'É a única sala' : `Apagar ${s.nome} e tudo que foi escrito nela`}
+                    onClick={async () => {
+                      setErro(null); setOcupado(true);
+                      try { await apagarSala(s.id); setAviso('Sala apagada.'); await recarregar(); }
+                      catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                    }}
+                  >
+                    apagar
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="linha-campo" style={{ marginTop: 10 }}>
+              <input
+                placeholder="Nome da sala nova"
+                value={novaSala}
+                maxLength={32}
+                onChange={(e) => setNovaSala(e.target.value)}
+              />
+              <select value={tipoNovo} onChange={(e) => setTipoNovo(e.target.value as TipoDeSala)}>
+                <option value="voz">Voz</option>
+                <option value="texto">Texto</option>
+              </select>
+              <button
+                disabled={ocupado || !novaSala.trim()}
+                onClick={async () => {
+                  setErro(null); setOcupado(true);
+                  try { await criarSala(novaSala, tipoNovo); setNovaSala(''); setAviso('Sala criada.'); await recarregar(); }
+                  catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                }}
+              >
+                Criar
+              </button>
             </div>
           </section>
         )}

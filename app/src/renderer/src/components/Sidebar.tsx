@@ -8,9 +8,10 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa, onJoin, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
+export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
-  onJoin: (room: string) => void; onShare: () => void; onSettings: () => void;
+  onAbrir: (sala: RoomInfo) => void;
+  salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
   onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
@@ -42,8 +43,12 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
               }));
           return (
             <div key={r.name} className="room-block">
-              <button className={`room ${live ? 'active' : ''}`} onClick={() => onJoin(r.name)} disabled={rm.status === 'connecting'}>
-                <Icon name="speaker" /> <span>{r.name}</span>
+              <button
+                className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''}`}
+                onClick={() => onAbrir(r)}
+                disabled={rm.status === 'connecting'}
+              >
+                <Icon name={r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
                 {people.length > 0 && <span className="count">{people.length}</span>}
               </button>
               <ul className="people">

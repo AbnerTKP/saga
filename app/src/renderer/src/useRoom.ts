@@ -16,7 +16,6 @@ import {
   type TrackPublishOptions,
 } from 'livekit-client';
 
-export type ChatMessage = { id: string; from: string; text: string; ts: number; mine: boolean };
 export type Tile = { key: string; participant: Participant; track: Track; source: Track.Source; local: boolean };
 export type Status = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -74,7 +73,6 @@ export function useRoom() {
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const [status, setStatus] = useState<Status>('idle');
   const [roomName, setRoomName] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [deafened, setDeafenedState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deafenedRef = useRef(false);
@@ -92,6 +90,10 @@ export function useRoom() {
   // setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e deixaria o
   // soundboard de fora, que anda numa faixa própria.
   const volumes = useRef(new Map<string, number>());
+
+  // Quem não quer ver transmissão nenhuma. Não basta esconder: desinscrever para de
+  // receber o vídeo, que é onde está o peso — esconder gastaria a banda do mesmo jeito.
+  const [semTransmissoes, setSemTransmissoes] = useState(false);
 
   // Faixa do plano B do áudio da transmissão, publicada por fora do LiveKit.
   const faixaDeMixagem = useRef<MediaStreamTrack | null>(null);
@@ -154,23 +156,12 @@ export function useRoom() {
       track.detach().forEach((el) => el.remove());
       bump();
     };
-    const onData = (payload: Uint8Array, participant?: Participant, _k?: unknown, topic?: string) => {
-      if (topic !== 'chat') return;
-      try {
-        const msg = JSON.parse(new TextDecoder().decode(payload)) as { text: string; ts: number };
-        setMessages((m) => [
-          ...m.slice(-499),
-          { id: `${msg.ts}-${participant?.identity}`, from: participant?.name || participant?.identity || '?', text: msg.text, ts: msg.ts, mine: false },
-        ]);
-      } catch { /* ignora */ }
-    };
     const onDisconnected = () => {
       // A publicação morre junto com a sala; a próxima entrada publica de novo.
       faixaDoSom.current = null;
       getAudioRoot().innerHTML = '';
       setStatus('idle');
       setRoomName(null);
-      setMessages([]);
       bump();
     };
     const onError = (e: Error) => setError(e.message);
@@ -178,7 +169,6 @@ export function useRoom() {
     room
       .on(RoomEvent.TrackSubscribed, onSubscribed)
       .on(RoomEvent.TrackUnsubscribed, onUnsubscribed)
-      .on(RoomEvent.DataReceived, onData)
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.Reconnecting, () => setStatus('reconnecting'))
       .on(RoomEvent.Reconnected, () => setStatus('connected'))
@@ -413,6 +403,20 @@ export function useRoom() {
     }
   }, [room]);
 
+  /** Liga e desliga o recebimento das transmissões alheias. */
+  const alternarTransmissoes = useCallback(() => {
+    const novo = !semTransmissoes;
+    setSemTransmissoes(novo);
+    for (const p of room.remoteParticipants.values()) {
+      for (const pub of p.trackPublications.values()) {
+        if (pub.source === Track.Source.ScreenShare && 'setSubscribed' in pub) {
+          (pub as { setSubscribed(v: boolean): void }).setSubscribed(!novo);
+        }
+      }
+    }
+    bump();
+  }, [room, semTransmissoes]);
+
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
   const definirVolume = useCallback((identity: string, valor: number) => {
@@ -436,30 +440,24 @@ export function useRoom() {
     aplicarAudio();
   }, [aplicarAudio]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    const t = text.trim();
-    if (!t || room.state !== 'connected') return;
-    const ts = Date.now();
-    await room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ text: t, ts })), { reliable: true, topic: 'chat' });
-    setMessages((m) => [...m.slice(-499), { id: `${ts}-me`, from: room.localParticipant.name || 'você', text: t, ts, mine: true }]);
-  }, [room]);
-
   const participants: Participant[] = status === 'idle' ? [] : [room.localParticipant, ...room.remoteParticipants.values()];
 
   const tiles: Tile[] = [];
   for (const p of participants) {
     for (const pub of p.trackPublications.values()) {
       if (pub.kind !== Track.Kind.Video || !pub.track || pub.isMuted) continue;
+      if (semTransmissoes && pub.source === Track.Source.ScreenShare) continue;
       tiles.push({ key: pub.trackSid, participant: p, track: pub.track, source: pub.source, local: p === room.localParticipant });
     }
   }
 
   return {
-    room, status, roomName, error, setError, messages, participants, tiles, deafened,
+    room, status, roomName, error, setError, participants, tiles, deafened,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
-    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom, volumeDe, definirVolume,
+    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, tocarSom, volumeDe, definirVolume,
+    semTransmissoes, alternarTransmissoes,
     volumeDaTelaDe, definirVolumeDaTela, definirFocoDaTela,
   };
 }
