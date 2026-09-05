@@ -260,3 +260,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .clicavel { cursor: pointer; }
 .people li.clicavel:hover { background: var(--bg3); color: var(--text); }
 .tile.audio.clicavel { cursor: pointer; }
+
+/* Faixas de volume dentro dos ajustes */
+.form input[type="range"] { width: 100%; padding: 0; background: none; border: none; }
+.form small { display: block; margin-top: -2px; font-size: 11px; line-height: 1.35; text-transform: none; font-weight: 400; letter-spacing: 0; }

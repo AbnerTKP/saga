@@ -44,6 +44,12 @@ export function Stage({ rm, pessoas, onPessoa }: {
   const focusTile = rm.tiles.find((t) => t.key === focus) ?? (screens[0] ?? null);
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
+  // O áudio segue o destaque: só a transmissão em foco é ouvida.
+  const identidadeEmFoco = focusTile?.source === Track.Source.ScreenShare
+    ? focusTile.participant.identity
+    : null;
+  useEffect(() => { rm.definirFocoDaTela(identidadeEmFoco); }, [identidadeEmFoco, rm]);
+
   const send = (e: FormEvent) => { e.preventDefault(); rm.sendMessage(text); setText(''); };
 
   const idle = rm.status === 'idle';

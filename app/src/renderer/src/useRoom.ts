@@ -25,11 +25,31 @@ function getAudioRoot() {
   return audioRoot;
 }
 
-// Compartilhar vídeo é diferente de compartilhar planilha. O preset mais alto que o
-// LiveKit traz pronto é 1080p30, então este é montado à mão: 1080p a 60 fps, com
-// 8 Mb/s de teto — dobrar os quadros sem subir o bitrate só trocaria travamento por
-// borrão. Quem tiver internet ou máquina fraca cai sozinho pelos ajustes abaixo.
-const PRESET_DE_TELA = new VideoPreset(1920, 1080, 8_000_000, 60, 'medium');
+// Qualidades oferecidas para transmitir. O bitrate acompanha resolução e quadros: dobrar
+// os quadros sem subir o teto só trocaria travamento por borrão.
+export const QUALIDADES = {
+  '720p30':  new VideoPreset(1280, 720, 2_500_000, 30, 'medium'),
+  '1080p30': new VideoPreset(1920, 1080, 5_000_000, 30, 'medium'),
+  '720p60':  new VideoPreset(1280, 720, 4_000_000, 60, 'medium'),
+  '1080p60': new VideoPreset(1920, 1080, 8_000_000, 60, 'medium'),
+} as const;
+
+export type Qualidade = keyof typeof QUALIDADES;
+export const QUALIDADE_PADRAO: Qualidade = '1080p60';
+
+const CHAVE_QUALIDADE = 'cantinho.qualidade';
+
+export function lerQualidade(): Qualidade {
+  try {
+    const v = localStorage.getItem(CHAVE_QUALIDADE);
+    if (v && v in QUALIDADES) return v as Qualidade;
+  } catch { /* sem storage */ }
+  return QUALIDADE_PADRAO;
+}
+
+export function guardarQualidade(q: Qualidade) {
+  try { localStorage.setItem(CHAVE_QUALIDADE, q); } catch { /* sem storage */ }
+}
 
 // Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
 // engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
@@ -63,10 +83,37 @@ export function useRoom() {
   const faixaDoSom = useRef<MediaStreamTrack | null>(null);
   const buffers = useRef(new Map<string, AudioBuffer>());
 
-  // Volume por pessoa, de 0 a 1. Aplicado nos elementos de áudio que nós mesmos criamos,
-  // e não pelo setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e
-  // deixaria o soundboard de fora, que anda numa faixa própria.
+  // Volume por pessoa. Aplicado nos elementos de áudio que nós mesmos criamos, e não pelo
+  // setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e deixaria o
+  // soundboard de fora, que anda numa faixa própria.
   const volumes = useRef(new Map<string, number>());
+
+  // O som da transmissão tem controle separado da voz: numa sessão de filme, dá para
+  // baixar o filme sem abaixar quem está comentando.
+  const volumeDaTela = useRef(1);
+  const [volumeDaTelaEstado, setVolumeDaTelaEstado] = useState(1);
+
+  // Só a transmissão em foco é ouvida. Com duas pessoas compartilhando, ouvir as duas ao
+  // mesmo tempo seria uma sopa; quem manda é qual está em destaque no palco.
+  const focoDaTela = useRef<string | null>(null);
+
+  /**
+   * Decide volume e mudo de cada elemento de áudio. Um lugar só: antes, cada ajuste
+   * (surdez, volume da pessoa, foco) mexia num pedaço e eles se atropelavam.
+   */
+  const aplicarAudio = useCallback(() => {
+    getAudioRoot().querySelectorAll<HTMLMediaElement>('audio').forEach((el) => {
+      const identity = el.dataset.identity ?? '';
+      const ehTela = el.dataset.source === Track.Source.ScreenShareAudio;
+      if (ehTela) {
+        el.volume = volumeDaTela.current;
+        el.muted = deafenedRef.current || (!!focoDaTela.current && identity !== focoDaTela.current);
+      } else {
+        el.volume = volumes.current.get(identity) ?? 1;
+        el.muted = deafenedRef.current;
+      }
+    });
+  }, []);
 
   const room = useMemo(() => {
     const r = new Room({
@@ -84,9 +131,9 @@ export function useRoom() {
       if (track.kind === Track.Kind.Audio) {
         const el = track.attach() as HTMLMediaElement;
         el.dataset.identity = participante.identity;
-        el.muted = deafenedRef.current;
-        el.volume = volumes.current.get(participante.identity) ?? 1;
+        el.dataset.source = track.source;
         getAudioRoot().appendChild(el);
+        aplicarAudio();
       }
       bump();
     };
@@ -137,7 +184,7 @@ export function useRoom() {
     return () => {
       room.removeAllListeners();
     };
-  }, [room]);
+  }, [room, aplicarAudio]);
 
   const join = useCallback(async (url: string, token: string, name: string) => {
     setError(null);
@@ -186,17 +233,22 @@ export function useRoom() {
   // sourceId nulo = o macOS vai perguntar qual janela; não há fonte para reservar.
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
+    const preset = QUALIDADES[lerQualidade()];
     const captura: ScreenShareCaptureOptions = {
-      resolution: PRESET_DE_TELA.resolution,
+      resolution: preset.resolution,
       // 'motion' avisa o codificador que ali corre vídeo. Sem isso ele assume texto e
       // protege a nitidez sacrificando quadros — que é exatamente o travamento em filme.
       contentHint: 'motion',
       audio,
     };
     const publicacao: TrackPublishOptions = {
-      screenShareEncoding: PRESET_DE_TELA.encoding,
+      screenShareEncoding: preset.encoding,
       // Se a banda apertar, prefira borrar a imagem a perder fluidez.
       degradationPreference: 'maintain-framerate',
+      // Sem simulcast. Com ele, o LiveKit publica versões menores da tela, e o
+      // adaptiveStream de quem assiste escolhe a menor sempre que a janela do vídeo é
+      // menor que a tela transmitida — o que é quase sempre. Era essa a imagem borrada.
+      simulcast: false,
     };
     if (sourceId) await window.desktop.chooseSource(sourceId, audio);
     try {
@@ -220,7 +272,7 @@ export function useRoom() {
     const next = !deafenedRef.current;
     deafenedRef.current = next;
     setDeafenedState(next);
-    getAudioRoot().querySelectorAll('audio').forEach((el) => { el.muted = next; });
+    aplicarAudio();
     if (room.state === 'connected') {
       if (next) {
         micBeforeDeafen.current = lp().isMicrophoneEnabled;
@@ -230,7 +282,7 @@ export function useRoom() {
       }
     }
     bump();
-  }, [room]);
+  }, [room, aplicarAudio]);
 
   /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
   const tocarSom = useCallback(async (url: string) => {
@@ -274,14 +326,24 @@ export function useRoom() {
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
   const definirVolume = useCallback((identity: string, valor: number) => {
-    const v = Math.min(1, Math.max(0, valor));
-    volumes.current.set(identity, v);
-    // Vale para tudo que a pessoa publica: microfone, áudio de tela e soundboard.
-    getAudioRoot()
-      .querySelectorAll<HTMLMediaElement>(`audio[data-identity="${CSS.escape(identity)}"]`)
-      .forEach((el) => { el.volume = v; });
+    volumes.current.set(identity, Math.min(1.5, Math.max(0, valor)));
+    aplicarAudio();
     bump();
-  }, []);
+  }, [aplicarAudio]);
+
+  const definirVolumeDaTela = useCallback((valor: number) => {
+    const v = Math.min(1.5, Math.max(0, valor));
+    volumeDaTela.current = v;
+    setVolumeDaTelaEstado(v);
+    aplicarAudio();
+  }, [aplicarAudio]);
+
+  /** Quem está em destaque no palco; só o áudio dessa transmissão é ouvido. */
+  const definirFocoDaTela = useCallback((identity: string | null) => {
+    if (focoDaTela.current === identity) return;
+    focoDaTela.current = identity;
+    aplicarAudio();
+  }, [aplicarAudio]);
 
   const sendMessage = useCallback(async (text: string) => {
     const t = text.trim();
@@ -307,5 +369,6 @@ export function useRoom() {
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, sendMessage, tocarSom, volumeDe, definirVolume,
+    volumeDaTela: volumeDaTelaEstado, definirVolumeDaTela, definirFocoDaTela,
   };
 }

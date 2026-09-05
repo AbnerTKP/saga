@@ -163,7 +163,14 @@ export function App() {
           }}
         />
       )}
-      {devices && <DeviceSettings room={rm.room} onClose={() => setDevices(false)} />}
+      {devices && (
+        <DeviceSettings
+          room={rm.room}
+          volumeDaTela={rm.volumeDaTela}
+          onVolumeDaTela={rm.definirVolumeDaTela}
+          onClose={() => setDevices(false)}
+        />
+      )}
       {painel && (
         <PainelDoServidor
           eu={sessao.eu}
