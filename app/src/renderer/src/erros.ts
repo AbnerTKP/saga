@@ -17,3 +17,21 @@ export function explicarFalhaDeAudio(motivo: string): string {
   }
   return `Compartilhando sem o áudio do sistema (${motivo}).`;
 }
+
+/**
+ * O Windows costuma expor o áudio da saída como um dispositivo de *entrada* — "Mixagem
+ * estéreo" e parentes. Quando o caminho de loopback do Chromium é recusado pela máquina,
+ * capturar por essa entrada dá o mesmo resultado por outra porta.
+ *
+ * Os nomes variam por idioma e por fabricante, daí a lista.
+ */
+const NOMES_DE_MIXAGEM =
+  // Nativos da placa de som, por idioma e fabricante...
+  /mixagem est|stereo mix|st[ée]r[ée]o mix|what u hear|wave out|mezcla est|mix de sortie|loopback/i;
+
+// ...e os cabos virtuais, que é o que resta a quem não tem mixagem na placa. Ficam
+// separados porque instalar um deles é a saída que a gente recomenda nesse caso.
+const NOMES_DE_CABO_VIRTUAL = /cable output|vb-?audio|voicemeeter|virtual audio|\bvac\b/i;
+
+export const pareceMixagemDoSistema = (rotulo: string) =>
+  NOMES_DE_MIXAGEM.test(rotulo ?? '') || NOMES_DE_CABO_VIRTUAL.test(rotulo ?? '');

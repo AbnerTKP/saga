@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
-import { explicarFalhaDeAudio } from './erros';
+import { explicarFalhaDeAudio, pareceMixagemDoSistema } from './erros';
 import { VOLUME } from './volume';
 
 type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
@@ -92,6 +92,9 @@ export function useRoom() {
   // setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e deixaria o
   // soundboard de fora, que anda numa faixa própria.
   const volumes = useRef(new Map<string, number>());
+
+  // Faixa do plano B do áudio da transmissão, publicada por fora do LiveKit.
+  const faixaDeMixagem = useRef<MediaStreamTrack | null>(null);
 
   // Volume de cada transmissão, separado da voz e separado entre si: dá para baixar o
   // filme de um sem mexer no de outro, nem em quem está comentando.
@@ -241,6 +244,42 @@ export function useRoom() {
   }, [room]);
 
   // sourceId nulo = o macOS vai perguntar qual janela; não há fonte para reservar.
+  /**
+   * Plano B do áudio da transmissão. Publica como ScreenShareAudio, então do outro lado é
+   * indistinguível do caminho normal — inclusive no volume e no foco.
+   */
+  const tentarMixagemDoSistema = useCallback(async (): Promise<boolean> => {
+    try {
+      const ds = await navigator.mediaDevices.enumerateDevices();
+      const entradas = ds.filter((d) => d.kind === 'audioinput');
+      anotar('info', 'tela', `entradas de áudio: ${entradas.map((d) => d.label || '(sem nome)').join(' | ') || 'nenhuma'}`);
+
+      const mixagem = entradas.find((d) => pareceMixagemDoSistema(d.label));
+      if (!mixagem) {
+        anotar('info', 'tela', 'nenhuma entrada de mixagem do sistema nesta máquina');
+        return false;
+      }
+
+      const fluxo = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: mixagem.deviceId },
+          // Processamento de voz estragaria música e efeito: isto não é um microfone.
+          echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        },
+      });
+      const faixa = fluxo.getAudioTracks()[0];
+      if (!faixa) return false;
+
+      await lp().publishTrack(faixa, { source: Track.Source.ScreenShareAudio, dtx: false });
+      faixaDeMixagem.current = faixa;
+      anotar('info', 'tela', `áudio da transmissão indo pela entrada "${mixagem.label}"`);
+      return true;
+    } catch (e) {
+      anotar('erro', 'tela', `mixagem do sistema falhou: ${(e as Error).message}`);
+      return false;
+    }
+  }, [room]);
+
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
     const preset = QUALIDADES[lerQualidade()];
@@ -277,7 +316,12 @@ export function useRoom() {
           anotar('info', 'tela', 'áudio do sistema só passou no modo com silenciamento local');
           setError('Compartilhando com o áudio, mas o Windows exigiu silenciar o som aqui no seu PC — os outros ouvem, você não. Foi o único jeito que sua placa de som aceitou.');
         } else if (modo === 'nao' && audio) {
-          setError(explicarFalhaDeAudio(ultimoMotivo));
+          // O loopback do Chromium foi recusado. Tenta a porta dos fundos: capturar o
+          // áudio da saída pela entrada "Mixagem estéreo", quando a máquina tiver uma.
+          const pelaMixagem = await tentarMixagemDoSistema();
+          setError(pelaMixagem
+            ? 'Compartilhando com o áudio pela "Mixagem estéreo", já que o caminho normal foi recusado por este computador.'
+            : explicarFalhaDeAudio(ultimoMotivo));
         }
         bump();
         return;
@@ -305,6 +349,11 @@ export function useRoom() {
   }, [room]);
 
   const stopScreen = useCallback(async () => {
+    // A faixa de mixagem é nossa, publicada à parte: o LiveKit não a recolhe sozinho.
+    if (faixaDeMixagem.current) {
+      await lp().unpublishTrack(faixaDeMixagem.current, true).catch(() => undefined);
+      faixaDeMixagem.current = null;
+    }
     await lp().setScreenShareEnabled(false);
     bump();
   }, [room]);
