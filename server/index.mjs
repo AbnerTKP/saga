@@ -11,6 +11,8 @@ import { abrirBanco, garantirServidor } from './banco.mjs';
 import { salvarImagem, salvarSom, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
+import * as salasM from './salas.mjs';
+import * as mensagens from './mensagens.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
 import { CARGO, NOME_DO_CARGO } from './cargos.mjs';
@@ -109,8 +111,8 @@ const verServidor = () => {
   return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null };
 };
 
-const salasDoServidor = () =>
-  db.prepare('SELECT nome FROM salas WHERE servidor_id = ? ORDER BY ordem, id').all(SERVIDOR.id).map((r) => r.nome);
+const salasDoServidor = () => salasM.listarSalas(db, SERVIDOR.id);
+const nomesDasSalasDeVoz = () => salasDoServidor().filter((s) => s.tipo === 'voz').map((s) => s.nome);
 
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
@@ -164,7 +166,7 @@ async function tirarDaSala(usuarioId) {
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
 async function ondeEsta(usuarioId) {
   const alvo = identidadeDe(usuarioId);
-  for (const nome of salasDoServidor()) {
+  for (const nome of nomesDasSalasDeVoz()) {
     const ps = await svc.listParticipants(nome).catch(() => []);
     const p = ps.find((x) => x.identity === alvo);
     if (p) return { sala: nome, participante: p };
@@ -253,8 +255,59 @@ const ROTAS = {
   'GET /rooms': async (req) => {
     exigirSessao(req);
     const salas = [];
-    for (const nome of salasDoServidor()) salas.push({ name: nome, participants: await participantesDaSala(nome) });
+    for (const s of salasDoServidor()) {
+      salas.push({
+        id: s.id,
+        name: s.nome,
+        tipo: s.tipo,
+        // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
+        participants: s.tipo === 'voz' ? await participantesDaSala(s.nome) : [],
+      });
+    }
     return { rooms: salas };
+  },
+
+  'POST /salas/criar': async (req) => {
+    const eu = exigirSessao(req);
+    const { nome, tipo } = await lerCorpo(req);
+    return { sala: salasM.criarSala(db, SERVIDOR.id, eu, { nome, tipo }) };
+  },
+
+  'POST /salas/renomear': async (req) => {
+    const eu = exigirSessao(req);
+    const { id, nome } = await lerCorpo(req);
+    return { sala: salasM.renomearSala(db, SERVIDOR.id, eu, id, nome) };
+  },
+
+  'POST /salas/apagar': async (req) => {
+    const eu = exigirSessao(req);
+    const { id } = await lerCorpo(req);
+    return salasM.apagarSala(db, SERVIDOR.id, eu, id);
+  },
+
+  'POST /salas/ordem': async (req) => {
+    const eu = exigirSessao(req);
+    const { ids } = await lerCorpo(req);
+    return { salas: salasM.reordenarSalas(db, SERVIDOR.id, eu, ids) };
+  },
+
+  'GET /mensagens': async (req) => {
+    exigirSessao(req);
+    const q = new URL(req.url, 'http://x').searchParams;
+    const depoisDe = q.get('depoisDe');
+    return {
+      mensagens: mensagens.listarMensagens(db, SERVIDOR.id, q.get('sala'), {
+        depoisDe: depoisDe ? Number(depoisDe) : undefined,
+      }),
+    };
+  },
+
+  'POST /mensagens': async (req) => {
+    const eu = exigirSessao(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { sala, texto } = await lerCorpo(req);
+    return { mensagem: mensagens.enviarMensagem(db, SERVIDOR.id, eu, sala, texto) };
   },
 
   'POST /token': async (req) => {
@@ -262,7 +315,9 @@ const ROTAS = {
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
     const { room } = await lerCorpo(req);
-    if (!salasDoServidor().includes(room)) throw new ErroDeConta('Essa sala não existe.', 400);
+    if (!nomesDasSalasDeVoz().includes(room)) {
+      throw new ErroDeConta('Essa sala não existe, ou é de texto.', 400);
+    }
 
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '12h' });
     at.addGrant({ room, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true });
@@ -421,5 +476,5 @@ const servidor = http.createServer(async (req, res) => {
 });
 
 servidor.listen(PORT, () => console.log(
-  `Cantinho em http://0.0.0.0:${PORT} — servidor "${verServidor().nome}", salas: ${salasDoServidor().join(', ')}`,
+  `Cantinho em http://0.0.0.0:${PORT} — servidor "${verServidor().nome}", salas: ${salasDoServidor().map((s) => `${s.nome} (${s.tipo})`).join(', ')}`,
 ));

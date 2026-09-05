@@ -84,6 +84,20 @@ export const MIGRACOES = [
   // Identificador curto que aparece antes do nome, no gosto da casa. Texto, não número:
   // "007" precisa continuar "007", e o dono pode querer letra.
   `ALTER TABLE membros ADD COLUMN id_exibido TEXT`,
+
+  // Salas passam a ter tipo. As que existiam são de voz, que era o único tipo.
+  `ALTER TABLE salas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'voz'`,
+
+  // Mensagens deixam de morrer com a sala vazia. Antes viviam só na memória de quem
+  // estava dentro, porque não havia banco; agora há.
+  `CREATE TABLE mensagens (
+     id         INTEGER PRIMARY KEY,
+     sala_id    INTEGER NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+     usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     texto      TEXT    NOT NULL,
+     criado_em  INTEGER NOT NULL
+   )`,
+  `CREATE INDEX mensagens_sala ON mensagens(sala_id, id)`,
 ];
 
 export function abrirBanco(caminho) {
@@ -112,8 +126,11 @@ function migrar(db) {
 }
 
 /**
- * Garante que existe o servidor único de hoje, com as salas dadas. Idempotente:
- * não renomeia o servidor nem apaga salas, para não desfazer o que o dono ajustou.
+ * Garante que o servidor existe. As salas do .env servem só para semear o primeiro
+ * arranque: depois disso quem manda é o dono, pela tela.
+ *
+ * Semear a cada reinício faria uma sala apagada voltar sozinha — e ninguém entenderia
+ * por quê, porque a reinicialização acontece longe do clique que a apagou.
  */
 export function garantirServidor(db, { nome, salas }) {
   let servidor = db.prepare('SELECT * FROM servidores ORDER BY id LIMIT 1').get();
@@ -121,7 +138,11 @@ export function garantirServidor(db, { nome, salas }) {
     const info = db.prepare('INSERT INTO servidores (nome, criado_em) VALUES (?, ?)').run(nome, Date.now());
     servidor = db.prepare('SELECT * FROM servidores WHERE id = ?').get(Number(info.lastInsertRowid));
   }
-  const inserir = db.prepare('INSERT OR IGNORE INTO salas (servidor_id, nome, ordem) VALUES (?, ?, ?)');
-  salas.forEach((nomeDaSala, i) => inserir.run(servidor.id, nomeDaSala, i));
+
+  const jaTem = db.prepare('SELECT count(*) c FROM salas WHERE servidor_id = ?').get(servidor.id).c;
+  if (jaTem === 0) {
+    const inserir = db.prepare('INSERT INTO salas (servidor_id, nome, ordem, tipo) VALUES (?, ?, ?, ?)');
+    salas.forEach((nomeDaSala, i) => inserir.run(servidor.id, nomeDaSala, i, 'voz'));
+  }
   return servidor;
 }

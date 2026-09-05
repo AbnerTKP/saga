@@ -83,7 +83,8 @@ test('cadastro devolve sessão, servidor e salas de uma vez', async () => {
   assert.ok(r.corpo.token);
   assert.equal(r.corpo.eu.apelido, 'abner');
   assert.equal(r.corpo.eu.cargoNome, 'Dono', 'o apelido de DONO devia virar dono');
-  assert.deepEqual(r.corpo.salas, ['Geral', 'Jogos']);
+  assert.deepEqual(r.corpo.salas.map((s) => s.nome), ['Geral', 'Jogos']);
+  assert.deepEqual(r.corpo.salas.map((s) => s.tipo), ['voz', 'voz'], 'as semeadas são de voz');
   assert.equal(r.corpo.servidor.nome, 'Cantinho do Vorcaro');
 });
 
@@ -442,4 +443,73 @@ test('apagar som que não existe dá 404', async () => {
   const dono = await sessaoDe('abner');
   const r = await chamar('POST', '/sons/apagar', { sessao: dono.token, corpo: { id: 99999 } });
   assert.equal(r.status, 404);
+});
+
+// --- salas e chat -------------------------------------------------------------
+
+test('o dono cria sala de texto e ela aparece para todos', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Avisos', tipo: 'texto' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.sala.tipo, 'texto');
+
+  const bruno = await sessaoDe('bruno');
+  const lista = await chamar('GET', '/rooms', { sessao: bruno.token });
+  const avisos = lista.corpo.rooms.find((s) => s.name === 'Avisos');
+  assert.ok(avisos, 'a sala nova não apareceu');
+  assert.deepEqual(avisos.participants, [], 'sala de texto não tem gente dentro');
+});
+
+test('membro não cria nem apaga sala', async () => {
+  const bruno = await sessaoDe('bruno');
+  assert.equal((await chamar('POST', '/salas/criar', { sessao: bruno.token, corpo: { nome: 'X', tipo: 'voz' } })).status, 403);
+  assert.equal((await chamar('POST', '/salas/apagar', { sessao: bruno.token, corpo: { id: 1 } })).status, 403);
+});
+
+test('não se entra na voz de uma sala de texto', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/token', { sessao: dono.token, corpo: { room: 'Avisos' } });
+  assert.equal(r.status, 400);
+  assert.match(r.corpo.error, /texto/);
+});
+
+test('mensagem enviada fica guardada e volta com quem escreveu', async () => {
+  const dono = await sessaoDe('abner');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const avisos = salas.find((s) => s.name === 'Avisos');
+
+  const envio = await chamar('POST', '/mensagens', { sessao: dono.token, corpo: { sala: avisos.id, texto: 'olha esse link' } });
+  assert.equal(envio.status, 200);
+  assert.equal(envio.corpo.mensagem.nome, 'abner');
+
+  const lidas = await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: dono.token });
+  assert.equal(lidas.corpo.mensagens.at(-1).texto, 'olha esse link');
+});
+
+test('quem está de castigo não escreve', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const avisos = salas.find((s) => s.name === 'Avisos');
+
+  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'timeout', alvo: bruno.eu.id, minutos: 5 } });
+  const r = await chamar('POST', '/mensagens', { sessao: bruno.token, corpo: { sala: avisos.id, texto: 'oi' } });
+  assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /castigo/);
+  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'tirarTimeout', alvo: bruno.eu.id } });
+});
+
+test('sem sessão não se lê nem se escreve no chat', async () => {
+  assert.equal((await chamar('GET', '/mensagens?sala=1')).status, 401);
+  assert.equal((await chamar('POST', '/mensagens', { corpo: { sala: 1, texto: 'oi' } })).status, 401);
+});
+
+test('apagar sala leva as mensagens junto', async () => {
+  const dono = await sessaoDe('abner');
+  const nova = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Temporaria', tipo: 'texto' } })).corpo.sala;
+  await chamar('POST', '/mensagens', { sessao: dono.token, corpo: { sala: nova.id, texto: 'some comigo' } });
+
+  assert.equal((await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: nova.id } })).status, 200);
+  const r = await chamar('GET', `/mensagens?sala=${nova.id}`, { sessao: dono.token });
+  assert.equal(r.status, 404, 'a sala apagada ainda respondia');
 });

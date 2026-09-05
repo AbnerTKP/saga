@@ -21,6 +21,9 @@ const IMPRESSOES = [
   '8b0535660d75',  // 8  índice de sons
   '89541d4a2506',  // 9  coluna turbo
   'dc92e35733c9',  // 10 coluna id_exibido
+  '828329d3702c',  // 11 coluna tipo em salas
+  '86a198ad22f7',  // 12 mensagens
+  'b8d9e085c8e1',  // 13 índice de mensagens
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -40,7 +43,7 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['membros', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+  assert.deepEqual(tabelas, ['membros', 'mensagens', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
 });
 
 test('as colunas acrescentadas depois existem e têm padrão seguro', () => {
@@ -65,4 +68,34 @@ test('garantirServidor é idempotente e não desfaz o que o dono ajustou', () =>
   assert.equal(b.id, a.id);
   assert.equal(b.nome, 'Renomeado pelo dono', 'o nome escolhido pelo dono foi sobrescrito');
   assert.equal(db.prepare('SELECT count(*) c FROM salas').get().c, 2, 'uma sala foi apagada');
+});
+
+test('sala apagada pelo dono não ressuscita no reinício', () => {
+  // O .env semeia só o primeiro arranque. Semear sempre faria a sala voltar sozinha, e
+  // ninguém ligaria isso ao reinício, que acontece longe do clique que a apagou.
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral', 'Jogos', 'Filmes'] });
+  db.prepare("DELETE FROM salas WHERE nome = 'Filmes'").run();
+
+  garantirServidor(db, { nome: 'Cantinho', salas: ['Geral', 'Jogos', 'Filmes'] });
+  const nomes = db.prepare('SELECT nome FROM salas WHERE servidor_id = ? ORDER BY ordem').all(s.id).map((r) => r.nome);
+  assert.deepEqual(nomes, ['Geral', 'Jogos'], 'a sala apagada voltou');
+});
+
+test('sala criada antes do tipo continua sendo de voz', () => {
+  // A migração acrescentou a coluna com padrão 'voz': o que já existia não podia virar
+  // sala de texto de repente.
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  assert.equal(db.prepare('SELECT tipo FROM salas WHERE servidor_id = ?').get(s.id).tipo, 'voz');
+});
+
+test('apagar a sala leva as mensagens junto', () => {
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  const sala = db.prepare('SELECT id FROM salas LIMIT 1').get();
+  db.prepare('INSERT INTO mensagens (sala_id, texto, criado_em) VALUES (?, ?, ?)').run(sala.id, 'oi', Date.now());
+  db.prepare('DELETE FROM salas WHERE id = ?').run(sala.id);
+  assert.equal(db.prepare('SELECT count(*) c FROM mensagens').get().c, 0, 'mensagem órfã ficou para trás');
+  void s;
 });
