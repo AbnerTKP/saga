@@ -20,7 +20,8 @@ declare global {
     desktop: {
       platform: string;
       listSources: () => Promise<SourceInfo[]>;
-      chooseSource: (id: string, audio: boolean) => Promise<void>;
+      /** 'loopbackWithMute' captura o áudio do sistema silenciando a saída local. */
+      chooseSource: (id: string, audio: 'nao' | 'loopback' | 'loopbackWithMute') => Promise<void>;
       screenPermission: () => Promise<string>;
       /** No macOS o próprio sistema escolhe a janela; nosso seletor não deve aparecer. */
       usaSeletorDoSistema: () => Promise<boolean>;

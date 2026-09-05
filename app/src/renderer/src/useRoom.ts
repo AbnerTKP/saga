@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { anotar } from './registro';
 import { explicarFalhaDeAudio } from './erros';
 import { VOLUME } from './volume';
+
+type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
 import {
   Room,
   RoomEvent,
@@ -247,7 +249,6 @@ export function useRoom() {
       // 'motion' avisa o codificador que ali corre vídeo. Sem isso ele assume texto e
       // protege a nitidez sacrificando quadros — que é exatamente o travamento em filme.
       contentHint: 'motion',
-      audio,
     };
     const publicacao: TrackPublishOptions = {
       screenShareEncoding: preset.encoding,
@@ -258,49 +259,49 @@ export function useRoom() {
       // menor que a tela transmitida — o que é quase sempre. Era essa a imagem borrada.
       simulcast: false,
     };
-    if (sourceId) await window.desktop.chooseSource(sourceId, audio);
-    try {
-      await lp().setScreenShareEnabled(true, captura, publicacao);
-    } catch (e) {
-      const motivo = (e as Error).message || String(e);
-      // O erro real precisa ir para o registro. Antes ele era descartado aqui, e toda
-      // falha — fosse ela qual fosse — virava "áudio não disponível neste computador",
-      // o que mandava a pessoa investigar o lugar errado.
-      anotar('erro', 'tela', `falhou com áudio=${audio}: ${motivo}`);
 
-      // A captura do áudio do sistema depende do dispositivo de SAÍDA padrão. Listar o
-      // que existe na máquina distingue "não tem saída definida" de "tem, mas recusou" —
-      // e são conselhos opostos.
-      if (audio) {
-        navigator.mediaDevices.enumerateDevices()
-          .then((ds) => {
-            const saidas = ds.filter((d) => d.kind === 'audiooutput');
-            anotar('info', 'tela', saidas.length
-              ? `saídas de áudio: ${saidas.map((d) => `${d.deviceId === 'default' ? '[padrão] ' : ''}${d.label || '(sem nome)'}`).join(' | ')}`
-              : 'nenhuma saída de áudio encontrada nesta máquina');
-          })
-          .catch((e) => anotar('info', 'tela', `não consegui listar as saídas: ${(e as Error).message}`));
-      }
+    // Os dois modos falham por motivos diferentes: quando a placa de som recusa o
+    // 'loopback', o 'loopbackWithMute' às vezes passa. Só vale no Windows, onde nós
+    // escolhemos a fonte; no Mac quem resolve o áudio é o seletor do próprio sistema.
+    const modos: ModoDeAudio[] = !audio ? ['nao']
+      : sourceId ? ['loopback', 'loopbackWithMute', 'nao']
+      : ['loopback', 'nao'];
 
-      if (!audio) {
-        setError(`Não consegui compartilhar: ${motivo}`);
-        throw e;
-      }
-
-      // Segunda tentativa sem o áudio do sistema. Se esta passar, o problema era mesmo
-      // o áudio; se falhar também, o problema é outro e a mensagem diz qual.
+    let ultimoMotivo = '';
+    for (const modo of modos) {
       try {
-        if (sourceId) await window.desktop.chooseSource(sourceId, false);
-        await lp().setScreenShareEnabled(true, { ...captura, audio: false }, publicacao);
-        setError(explicarFalhaDeAudio(motivo));
-      } catch (e2) {
-        const motivo2 = (e2 as Error).message || String(e2);
-        anotar('erro', 'tela', `falhou também sem áudio: ${motivo2}`);
-        setError(`Não consegui compartilhar: ${motivo2}`);
-        throw e2;
+        if (sourceId) await window.desktop.chooseSource(sourceId, modo);
+        await lp().setScreenShareEnabled(true, { ...captura, audio: modo !== 'nao' }, publicacao);
+
+        if (modo === 'loopbackWithMute') {
+          anotar('info', 'tela', 'áudio do sistema só passou no modo com silenciamento local');
+          setError('Compartilhando com o áudio, mas o Windows exigiu silenciar o som aqui no seu PC — os outros ouvem, você não. Foi o único jeito que sua placa de som aceitou.');
+        } else if (modo === 'nao' && audio) {
+          setError(explicarFalhaDeAudio(ultimoMotivo));
+        }
+        bump();
+        return;
+      } catch (e) {
+        ultimoMotivo = (e as Error).message || String(e);
+        anotar('erro', 'tela', `modo "${modo}" falhou: ${ultimoMotivo}`);
+
+        // A lista de saídas explica a maioria das recusas de áudio; sem áudio, não ajuda.
+        if (modo === 'loopback') {
+          navigator.mediaDevices.enumerateDevices()
+            .then((ds) => {
+              const saidas = ds.filter((d) => d.kind === 'audiooutput');
+              anotar('info', 'tela', saidas.length
+                ? `saídas de áudio: ${saidas.map((d) => `${d.deviceId === 'default' ? '[padrão] ' : ''}${d.label || '(sem nome)'}`).join(' | ')}`
+                : 'nenhuma saída de áudio encontrada nesta máquina');
+            })
+            .catch(() => undefined);
+        }
       }
     }
-    bump();
+
+    // Nem sem áudio funcionou: aí o problema não era o áudio.
+    setError(`Não consegui compartilhar: ${ultimoMotivo}`);
+    throw new Error(ultimoMotivo);
   }, [room]);
 
   const stopScreen = useCallback(async () => {

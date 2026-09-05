@@ -3,7 +3,15 @@ import { join } from 'node:path';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 
-let pendingSource: { id: string; audio: boolean } | null = null;
+/**
+ * O Chromium tem dois modos de capturar o áudio do sistema, e eles falham por motivos
+ * diferentes: 'loopback' escuta a saída e deixa você ouvir também; 'loopbackWithMute'
+ * escuta e silencia a saída local. Quando o primeiro é recusado pela placa de som, o
+ * segundo às vezes passa — daí valer tentar os dois antes de desistir do áudio.
+ */
+type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
+
+let pendingSource: { id: string; audio: ModoDeAudio } | null = null;
 
 // No macOS 15+ a captura pelo desktopCapturer depende da permissão persistente de
 // Gravação de Tela, que o sistema volta a pedir sozinho de tempos em tempos — daí o
@@ -60,7 +68,7 @@ app.whenReady().then(async () => {
     async (_request, callback) => {
       const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
       const chosen = sources.find((s) => s.id === pendingSource?.id) ?? sources[0];
-      const audio = pendingSource?.audio ?? false;
+      const audio: ModoDeAudio = pendingSource?.audio ?? 'nao';
       pendingSource = null;
       if (!chosen) {
         registrar('erro', 'tela', 'nenhuma fonte de captura disponível');
@@ -70,9 +78,8 @@ app.whenReady().then(async () => {
       // Registrado porque "o áudio não sai só no PC dele" só se investiga sabendo o que
       // foi pedido: tela inteira ou janela, e com ou sem o áudio do sistema.
       registrar('info', 'tela',
-        `capturando ${chosen.id.startsWith('screen') ? 'tela inteira' : 'janela'} "${chosen.name}" | áudio do sistema: ${audio ? 'pedido' : 'não'}`);
-      // 'loopback' = áudio do sistema. Windows: nativo. macOS 14.2+: via Core Audio Taps (Electron ≥ 39).
-      callback(audio ? { video: chosen, audio: 'loopback' } : { video: chosen });
+        `capturando ${chosen.id.startsWith('screen') ? 'tela inteira' : 'janela'} "${chosen.name}" | áudio do sistema: ${audio}`);
+      callback(audio === 'nao' ? { video: chosen } : { video: chosen, audio });
     },
     { useSystemPicker: SELETOR_DO_SISTEMA },
   );
@@ -94,7 +101,7 @@ app.whenReady().then(async () => {
       }));
   });
 
-  ipcMain.handle('sources:choose', (_e, id: string, audio: boolean) => {
+  ipcMain.handle('sources:choose', (_e, id: string, audio: ModoDeAudio) => {
     pendingSource = { id, audio };
   });
 
