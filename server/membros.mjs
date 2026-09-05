@@ -1,7 +1,8 @@
 // Tudo que é da pessoa *dentro de um servidor*: nome exibido, cargo, banimento e castigo.
 // Separado da conta porque a mesma conta poderá estar em vários servidores com cargos
 // diferentes — hoje só existe um, mas o formato já é esse.
-import { CARGO, podeAgir, podeDefinirCargo, podeConfigurarMembro } from './cargos.mjs';
+import { podeAgir, podeDarCargo, temPermissao } from './permissoes.mjs';
+import { buscarCargo } from './cargos.mjs';
 import { ErroDeConta, derrubarSessoes } from './contas.mjs';
 
 /**
@@ -13,30 +14,54 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
   const jaEsta = buscarMembro(db, servidorId, usuario.id);
   if (jaEsta) return jaEsta;
 
-  const temDono = db.prepare('SELECT count(*) c FROM membros WHERE servidor_id = ? AND cargo = ?')
-    .get(servidorId, CARGO.DONO).c > 0;
-  const ehODono = dono
-    ? dono.trim().toLowerCase() === usuario.apelido_chave
-    : !temDono;
+  const cargos = db.prepare('SELECT id, nivel, dono FROM cargos WHERE servidor_id = ?').all(servidorId);
+  const oDoDono = cargos.find((c) => c.dono);
+  const oMaisBaixo = cargos.slice().sort((a, b) => a.nivel - b.nivel)[0];
 
-  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, entrou_em) VALUES (?, ?, ?, ?)')
-    .run(servidorId, usuario.id, ehODono ? CARGO.DONO : CARGO.MEMBRO, Date.now());
+  const jaTemDono = db.prepare(
+    'SELECT count(*) c FROM membros WHERE servidor_id = ? AND cargo_id = ?',
+  ).get(servidorId, oDoDono?.id ?? -1).c > 0;
+
+  const ehODono = dono ? dono.trim().toLowerCase() === usuario.apelido_chave : !jaTemDono;
+  const escolhido = ehODono ? oDoDono : oMaisBaixo;
+
+  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
+    .run(servidorId, usuario.id, escolhido?.nivel ?? 10, escolhido?.id ?? null, Date.now());
   return buscarMembro(db, servidorId, usuario.id);
 }
 
 // Junta conta e vínculo numa linha só, que é como o app quer ver a pessoa.
 const SELECT_MEMBRO = `
   SELECT u.id, u.apelido, u.foto, u.banner,
-         m.servidor_id, m.cargo, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
-         m.turbo, m.id_exibido,
+         m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
+         m.turbo, m.id_exibido, m.cargo_id,
+         c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,
+         c.dono AS cargo_dono, c.permissoes AS cargo_permissoes,
          COALESCE(NULLIF(m.nome_exibido, ''), u.apelido) AS nome
-    FROM membros m JOIN usuarios u ON u.id = m.usuario_id`;
+    FROM membros m
+    JOIN usuarios u ON u.id = m.usuario_id
+    LEFT JOIN cargos c ON c.id = m.cargo_id`;
+
+/** Junta o cargo à pessoa: as regras de permissão trabalham com o par, não com um número. */
+const comCargo = (m) => m && ({
+  ...m,
+  cargo: m.cargo_id ? {
+    id: m.cargo_id,
+    nome: m.cargo_nome,
+    cor: m.cargo_cor ?? null,
+    nivel: m.cargo_nivel,
+    dono: !!m.cargo_dono,
+    permissoes: JSON.parse(m.cargo_permissoes || '[]'),
+  } : null,
+});
 
 export const buscarMembro = (db, servidorId, usuarioId) =>
-  db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? AND m.usuario_id = ?`).get(servidorId, usuarioId) ?? null;
+  comCargo(db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? AND m.usuario_id = ?`)
+    .get(servidorId, usuarioId)) ?? null;
 
 export const listarMembros = (db, servidorId) =>
-  db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? ORDER BY m.cargo DESC, nome COLLATE NOCASE`).all(servidorId);
+  db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? ORDER BY c.nivel DESC, nome COLLATE NOCASE`)
+    .all(servidorId).map(comCargo);
 
 /** Motivo pelo qual esta pessoa não pode entrar numa sala agora, ou null se pode. */
 export function impedimento(membro, agora = Date.now()) {
@@ -66,8 +91,8 @@ const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, n�
 
 /** Turbo é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo. */
 export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
-  if (!podeConfigurarMembro(buscarMembro(db, servidorId, quemId))) {
-    throw new ErroDeConta('Só o dono concede Vorcaro Turbo.', 403);
+  if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'concederTurbo')) {
+    throw new ErroDeConta('Seu cargo não permite conceder o Vorcaro Turbo.', 403);
   }
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
   if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
@@ -78,8 +103,8 @@ export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
 
 /** Identificador curto que aparece antes do nome. Vazio remove. */
 export function definirIdExibido(db, servidorId, quemId, alvoId, id) {
-  if (!podeConfigurarMembro(buscarMembro(db, servidorId, quemId))) {
-    throw new ErroDeConta('Só o dono define o identificador.', 403);
+  if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'definirId')) {
+    throw new ErroDeConta('Seu cargo não permite definir o identificador.', 403);
   }
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
   if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
@@ -140,12 +165,15 @@ export function expulsar(db, servidorId, quemId, alvoId) {
   return alvo;
 }
 
-export function definirCargo(db, servidorId, quemId, alvoId, cargo) {
+export function definirCargo(db, servidorId, quemId, alvoId, cargoId) {
   const quem = buscarMembro(db, servidorId, quemId);
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
-  const r = podeDefinirCargo(quem, alvo, Number(cargo));
+  const novo = buscarCargo(db, servidorId, cargoId);
+  const r = podeDarCargo(quem, alvo, novo);
   if (!r.pode) throw new ErroDeConta(r.motivo, 403);
-  db.prepare('UPDATE membros SET cargo = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(Number(cargo), servidorId, alvo.id);
+
+  // A coluna antiga acompanha o nível: ela ainda é a fonte da migração de bancos velhos.
+  db.prepare('UPDATE membros SET cargo_id = ?, cargo = ? WHERE servidor_id = ? AND usuario_id = ?')
+    .run(novo.id, novo.nivel, servidorId, alvo.id);
   return buscarMembro(db, servidorId, alvo.id);
 }

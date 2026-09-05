@@ -15,7 +15,8 @@ import * as salasM from './salas.mjs';
 import * as mensagens from './mensagens.mjs';
 import { verParticipante } from './participantes.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
-import { CARGO, NOME_DO_CARGO } from './cargos.mjs';
+import { temPermissao, PERMISSOES } from './permissoes.mjs';
+import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -95,8 +96,10 @@ const verMembro = (m) => m && ({
   id: m.id,
   apelido: m.apelido,
   nome: m.nome,
-  cargo: m.cargo,
-  cargoNome: NOME_DO_CARGO[m.cargo] ?? 'Membro',
+  // O cargo vai inteiro: a tela precisa do nome e da cor para desenhar, e das
+  // permissões para não oferecer botão que o servidor vai recusar.
+  cargo: m.cargo ?? null,
+  cargoNome: m.cargo?.nome ?? 'Sem cargo',
   foto: m.foto ?? null,
   banner: m.banner ?? null,
   turbo: !!m.turbo,
@@ -191,8 +194,8 @@ function guardarComRegraDoTurbo(eu, bruto, papel, de) {
 /** Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor. */
 async function trocarImagem(req, de, papel) {
   const eu = exigirSessao(req);
-  if (de === 'servidor' && eu.cargo < CARGO.DONO) {
-    throw new ErroDeConta('Só o dono muda a imagem do servidor.', 403);
+  if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
+    throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
   }
   const bruto = await lerBinario(req, LIMITES[papel] + 1024);
   // Corpo vazio significa "tirar a imagem": é como o app pede a remoção.
@@ -239,12 +242,21 @@ const ROTAS = {
 
   'GET /servidor': async (req) => {
     exigirSessao(req);
-    return { servidor: verServidor(), salas: salasDoServidor(), membros: membros.listarMembros(db, SERVIDOR.id).map(verMembro) };
+    return {
+      servidor: verServidor(),
+      salas: salasDoServidor(),
+      membros: membros.listarMembros(db, SERVIDOR.id).map(verMembro),
+      cargos: cargosM.listarCargos(db, SERVIDOR.id),
+      // A tela precisa saber que permissões existem para desenhar as caixinhas.
+      permissoes: PERMISSOES,
+    };
   },
 
   'PATCH /servidor': async (req) => {
     const eu = exigirSessao(req);
-    if (eu.cargo < CARGO.DONO) throw new ErroDeConta('Só o dono edita o servidor.', 403);
+    if (!temPermissao(eu.cargo, 'gerirServidor')) {
+      throw new ErroDeConta('Seu cargo não permite editar o servidor.', 403);
+    }
     const { nome } = await lerCorpo(req);
     const limpo = String(nome ?? '').trim();
     if (limpo.length < 2 || limpo.length > 40) throw new ErroDeConta('O nome do servidor precisa ter de 2 a 40 caracteres.');
@@ -349,6 +361,23 @@ const ROTAS = {
     return sons.removerSom(db, SERVIDOR.id, eu, id);
   },
 
+  'POST /cargos/criar': async (req) => {
+    const eu = exigirSessao(req);
+    return { cargo: cargosM.criarCargo(db, SERVIDOR.id, eu, await lerCorpo(req)) };
+  },
+
+  'POST /cargos/editar': async (req) => {
+    const eu = exigirSessao(req);
+    const c = await lerCorpo(req);
+    return { cargo: cargosM.editarCargo(db, SERVIDOR.id, eu, c.id, c) };
+  },
+
+  'POST /cargos/apagar': async (req) => {
+    const eu = exigirSessao(req);
+    const { id } = await lerCorpo(req);
+    return cargosM.apagarCargo(db, SERVIDOR.id, eu, id);
+  },
+
   'GET /giphy': async (req) => {
     exigirSessao(req);
     const q = new URL(req.url, 'http://x').searchParams;
@@ -364,8 +393,8 @@ const ROTAS = {
     if (!['usuario', 'servidor'].includes(de) || !['foto', 'banner'].includes(papel)) {
       throw new ErroDeConta('Não sei onde pôr essa imagem.', 400);
     }
-    if (de === 'servidor' && eu.cargo < CARGO.DONO) {
-      throw new ErroDeConta('Só o dono muda a imagem do servidor.', 403);
+    if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
+      throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
     }
     const bruto = await baixarGif(url, LIMITES[papel]);
     const nome = guardarComRegraDoTurbo(eu, bruto, papel, de);

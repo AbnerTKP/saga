@@ -1,14 +1,16 @@
 // Salas do servidor: de voz ou de texto. Criar, renomear, reordenar e apagar é do dono —
 // quando os cargos configuráveis chegarem, isto vira uma permissão marcável.
 import { ErroDeConta } from './contas.mjs';
-import { podeConfigurarMembro } from './cargos.mjs';
+import { temPermissao } from './permissoes.mjs';
 
 export const TIPOS = ['voz', 'texto'];
 
 const NOME_VALIDO = /^[^\r\n]{1,32}$/;
 
-const exigirDono = (membro, oQue) => {
-  if (!podeConfigurarMembro(membro)) throw new ErroDeConta(`Só o dono ${oQue}.`, 403);
+const exigirGestaoDeSalas = (membro) => {
+  if (!temPermissao(membro?.cargo, 'gerirSalas')) {
+    throw new ErroDeConta('Seu cargo não permite mexer nas salas.', 403);
+  }
 };
 
 export const listarSalas = (db, servidorId) =>
@@ -32,7 +34,7 @@ function conferirNome(db, servidorId, nome, exceto = null) {
 }
 
 export function criarSala(db, servidorId, quem, { nome, tipo }) {
-  exigirDono(quem, 'cria salas');
+  exigirGestaoDeSalas(quem);
   if (!TIPOS.includes(tipo)) throw new ErroDeConta('A sala precisa ser de voz ou de texto.');
   const limpo = conferirNome(db, servidorId, nome);
 
@@ -43,7 +45,7 @@ export function criarSala(db, servidorId, quem, { nome, tipo }) {
 }
 
 export function renomearSala(db, servidorId, quem, id, nome) {
-  exigirDono(quem, 'renomeia salas');
+  exigirGestaoDeSalas(quem);
   const sala = buscarSala(db, servidorId, id);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
   const limpo = conferirNome(db, servidorId, nome, sala.id);
@@ -52,7 +54,7 @@ export function renomearSala(db, servidorId, quem, id, nome) {
 }
 
 export function apagarSala(db, servidorId, quem, id) {
-  exigirDono(quem, 'apaga salas');
+  exigirGestaoDeSalas(quem);
   const sala = buscarSala(db, servidorId, id);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
   // Um servidor sem sala nenhuma não teria para onde entrar, e o dono ficaria preso numa
@@ -66,7 +68,7 @@ export function apagarSala(db, servidorId, quem, id) {
 }
 
 export function reordenarSalas(db, servidorId, quem, idsNaOrdem) {
-  exigirDono(quem, 'reordena salas');
+  exigirGestaoDeSalas(quem);
   const atuais = new Set(listarSalas(db, servidorId).map((s) => s.id));
   const ids = (idsNaOrdem ?? []).map(Number);
   // Contar quantos vieram não basta: repetir a mesma sala daria o mesmo total e deixaria

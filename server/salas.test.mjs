@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { abrirBanco, garantirServidor } from './banco.mjs';
 import { criarConta } from './contas.mjs';
 import { garantirMembro, buscarMembro, definirCargo } from './membros.mjs';
-import { CARGO } from './cargos.mjs';
+import { listarCargos } from './cargos.mjs';
 import { listarSalas, criarSala, renomearSala, apagarSala, reordenarSalas } from './salas.mjs';
 import { listarMensagens, enviarMensagem, QUANTAS } from './mensagens.mjs';
 
@@ -15,7 +15,8 @@ function cenario() {
     garantirMembro(db, servidor.id, u);
     return buscarMembro(db, servidor.id, u.id);
   };
-  return { db, sid: servidor.id, cria };
+  const cargos = Object.fromEntries(listarCargos(db, servidor.id).map((c) => [c.nome, c]));
+  return { db, sid: servidor.id, cria, cargos };
 }
 
 // --- salas -------------------------------------------------------------------
@@ -41,14 +42,14 @@ test('sala nova entra no fim da lista', () => {
 });
 
 test('membro e moderador não mexem em salas', () => {
-  const { db, sid, cria } = cenario();
+  const { db, sid, cria, cargos } = cenario();
   const dono = cria('abner'), bruno = cria('bruno');
-  definirCargo(db, sid, dono.id, bruno.id, CARGO.MODERADOR);
+  definirCargo(db, sid, dono.id, bruno.id, cargos.Moderador.id);
   const mod = buscarMembro(db, sid, bruno.id);
   const caio = cria('caio');
   for (const quem of [mod, caio]) {
-    assert.throws(() => criarSala(db, sid, quem, { nome: 'X', tipo: 'voz' }), /Só o dono/);
-    assert.throws(() => apagarSala(db, sid, quem, listarSalas(db, sid)[0].id), /Só o dono/);
+    assert.throws(() => criarSala(db, sid, quem, { nome: 'X', tipo: 'voz' }), /permite/);
+    assert.throws(() => apagarSala(db, sid, quem, listarSalas(db, sid)[0].id), /permite/);
   }
 });
 

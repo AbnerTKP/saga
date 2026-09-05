@@ -1,72 +1,98 @@
-// Cargos e o que cada um pode fazer. Lógica pura, sem banco e sem rede, para poder
-// ser testada à exaustão: é aqui que um descuido vira "moderador consegue banir o dono".
+// Cargos do servidor. As regras de quem pode o quê vivem em permissoes.mjs, sem banco;
+// aqui é só guardar, ler e alterar.
+import { ErroDeConta } from './contas.mjs';
+import { limparPermissoes, podeMexerNoCargo, temPermissao } from './permissoes.mjs';
 
-export const CARGO = {
-  MEMBRO: 10,
-  MODERADOR: 50,
-  DONO: 100,
-};
+const NOME_VALIDO = /^[^\r\n]{1,24}$/;
+const COR_VALIDA = /^#[0-9a-f]{6}$/i;
 
-export const NOME_DO_CARGO = {
-  [CARGO.MEMBRO]: 'Membro',
-  [CARGO.MODERADOR]: 'Moderador',
-  [CARGO.DONO]: 'Dono',
-};
+const paraFora = (c) => c && ({
+  id: c.id,
+  nome: c.nome,
+  cor: c.cor ?? null,
+  nivel: c.nivel,
+  dono: !!c.dono,
+  permissoes: JSON.parse(c.permissoes || '[]'),
+});
 
-// Cargo mínimo para cada ação.
-export const EXIGE = {
-  mutar: CARGO.MODERADOR,        // força o microfone de alguém a desligar
-  desconectar: CARGO.MODERADOR,  // tira da call; a pessoa pode voltar
-  timeout: CARGO.MODERADOR,      // impede de entrar em sala por um tempo
-  expulsar: CARGO.MODERADOR,     // derruba a sessão; precisa entrar de novo
-  banir: CARGO.DONO,             // impede de entrar para sempre
-  definirCargo: CARGO.DONO,      // promove e rebaixa
-};
+export const listarCargos = (db, servidorId) =>
+  db.prepare('SELECT * FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC, id')
+    .all(servidorId).map(paraFora);
 
-export const ACOES = Object.keys(EXIGE);
+export const buscarCargo = (db, servidorId, id) =>
+  paraFora(db.prepare('SELECT * FROM cargos WHERE servidor_id = ? AND id = ?').get(servidorId, Number(id)));
 
-// O soundboard não age sobre uma pessoa, então fica fora de EXIGE: subir e apagar som é
-// de moderador para cima; tocar é de todo mundo, e por isso nem é conferido.
-export const CARGO_PARA_GERIR_SONS = CARGO.MODERADOR;
-export const podeGerirSons = (membro) => !!membro && membro.cargo >= CARGO_PARA_GERIR_SONS;
+export const cargoDoDono = (db, servidorId) =>
+  paraFora(db.prepare('SELECT * FROM cargos WHERE servidor_id = ? AND dono = 1').get(servidorId));
 
-// Turbo e identificador não são moderação: são distinção e enfeite, que o dono concede a
-// quem quiser — inclusive a si mesmo. Por isso ficam fora de EXIGE, cuja regra é
-// justamente impedir que alguém aja sobre si ou sobre um igual.
-export const podeConfigurarMembro = (membro) => !!membro && membro.cargo >= CARGO.DONO;
-
-/**
- * Diz se `quem` pode fazer `acao` em `alvo`, ou por que não pode.
- * Recebe apenas { id, cargo } de cada lado — nada de objeto de banco inteiro.
- * @returns {{ pode: true } | { pode: false, motivo: string }}
- */
-export function podeAgir(quem, acao, alvo) {
-  const minimo = EXIGE[acao];
-  if (minimo === undefined) return { pode: false, motivo: 'ação desconhecida' };
-  if (!quem || !alvo) return { pode: false, motivo: 'usuário não encontrado' };
-
-  if (quem.id === alvo.id) return { pode: false, motivo: 'não dá para fazer isso consigo mesmo' };
-  if (quem.cargo < minimo) {
-    return { pode: false, motivo: `precisa ser ${NOME_DO_CARGO[minimo]} ou acima` };
+function conferir(db, servidorId, { nome, cor, nivel }, exceto = null) {
+  const limpo = String(nome ?? '').trim();
+  if (!NOME_VALIDO.test(limpo)) {
+    throw new ErroDeConta('O nome do cargo precisa ter de 1 a 24 caracteres, numa linha só.');
   }
-  // Ninguém mexe com igual ou superior. É o que impede um moderador de derrubar
-  // outro moderador, e principalmente de encostar no dono.
-  if (alvo.cargo >= quem.cargo) {
-    return { pode: false, motivo: `${NOME_DO_CARGO[alvo.cargo] ?? 'esse usuário'} está no mesmo nível ou acima do seu` };
+  if (cor != null && cor !== '' && !COR_VALIDA.test(cor)) {
+    throw new ErroDeConta('A cor precisa ser um código como #a855f7.');
   }
-  return { pode: true };
+  const n = Number(nivel);
+  if (!Number.isInteger(n) || n < 1 || n > 99) {
+    throw new ErroDeConta('O nível precisa ser um número de 1 a 99. O 100 é do dono.');
+  }
+  const igual = db.prepare('SELECT id FROM cargos WHERE servidor_id = ? AND nome = ? COLLATE NOCASE')
+    .get(servidorId, limpo);
+  if (igual && igual.id !== exceto) throw new ErroDeConta('Já existe um cargo com esse nome.', 409);
+  return { nome: limpo, cor: cor || null, nivel: n };
 }
 
-/** O dono não pode se rebaixar sozinho: o servidor ficaria sem ninguém no topo. */
-export function podeDefinirCargo(quem, alvo, novoCargo) {
-  if (!Object.values(CARGO).includes(novoCargo)) {
-    return { pode: false, motivo: 'cargo inválido' };
+export function criarCargo(db, servidorId, quem, dados) {
+  if (!temPermissao(quem?.cargo, 'gerirCargos')) {
+    throw new ErroDeConta('Seu cargo não permite criar cargos.', 403);
   }
-  const base = podeAgir(quem, 'definirCargo', alvo);
-  if (!base.pode) return base;
-  // Nem promover alguém ao seu próprio nível ou acima.
-  if (novoCargo >= quem.cargo) {
-    return { pode: false, motivo: 'não dá para promover alguém ao seu nível ou acima' };
+  const { nome, cor, nivel } = conferir(db, servidorId, dados);
+  // Ninguém cria um cargo do próprio nível ou acima: seria dar a si mesmo um par capaz
+  // de agir sobre quem o criou.
+  if (!quem.cargo.dono && nivel >= quem.cargo.nivel) {
+    throw new ErroDeConta('Não dá para criar um cargo do seu nível ou acima.', 403);
   }
-  return { pode: true };
+  const permissoes = limparPermissoes(dados.permissoes);
+  const info = db.prepare(
+    'INSERT INTO cargos (servidor_id, nome, cor, nivel, dono, permissoes, criado_em) VALUES (?, ?, ?, ?, 0, ?, ?)',
+  ).run(servidorId, nome, cor, nivel, JSON.stringify(permissoes), Date.now());
+  return buscarCargo(db, servidorId, Number(info.lastInsertRowid));
+}
+
+export function editarCargo(db, servidorId, quem, id, dados) {
+  const cargo = buscarCargo(db, servidorId, id);
+  const r = podeMexerNoCargo(quem, cargo);
+  if (!r.pode) throw new ErroDeConta(r.motivo, 403);
+
+  const { nome, cor, nivel } = conferir(db, servidorId, dados, cargo.id);
+  if (!quem.cargo.dono && nivel >= quem.cargo.nivel) {
+    throw new ErroDeConta('Não dá para pôr um cargo no seu nível ou acima.', 403);
+  }
+  // Ninguém dá a um cargo uma permissão que não tem: seria contornar o próprio limite
+  // criando um cargo mais forte e vestindo-o depois.
+  const pedidas = limparPermissoes(dados.permissoes);
+  const permitidas = quem.cargo.dono ? pedidas : pedidas.filter((p) => temPermissao(quem.cargo, p));
+
+  db.prepare('UPDATE cargos SET nome = ?, cor = ?, nivel = ?, permissoes = ? WHERE id = ?')
+    .run(nome, cor, nivel, JSON.stringify(permitidas), cargo.id);
+  return buscarCargo(db, servidorId, cargo.id);
+}
+
+export function apagarCargo(db, servidorId, quem, id) {
+  const cargo = buscarCargo(db, servidorId, id);
+  const r = podeMexerNoCargo(quem, cargo);
+  if (!r.pode) throw new ErroDeConta(r.motivo, 403);
+
+  // Quem estava nele desce para o cargo mais baixo, senão ficaria sem cargo nenhum e
+  // sem poder entrar em lugar algum.
+  const maisBaixo = db.prepare(
+    'SELECT id FROM cargos WHERE servidor_id = ? AND id != ? ORDER BY nivel LIMIT 1',
+  ).get(servidorId, cargo.id);
+  if (!maisBaixo) throw new ErroDeConta('É o único cargo que sobrou.', 409);
+
+  db.prepare('UPDATE membros SET cargo_id = ? WHERE servidor_id = ? AND cargo_id = ?')
+    .run(maisBaixo.id, servidorId, cargo.id);
+  db.prepare('DELETE FROM cargos WHERE id = ?').run(cargo.id);
+  return { ok: true, movidosPara: maisBaixo.id };
 }

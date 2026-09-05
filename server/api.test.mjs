@@ -374,11 +374,11 @@ const subirSom = async (sessao, nome, dados = MP3) => {
   return { status: r.status, corpo: await r.json().catch(() => ({})) };
 };
 
-test('membro não sobe som', async () => {
+test('quem não tem a permissão não sobe som', async () => {
   const bruno = await sessaoDe('bruno');
   const r = await subirSom(bruno.token, 'proibido');
   assert.equal(r.status, 403);
-  assert.match(r.corpo.error, /moderadores e o dono/);
+  assert.match(r.corpo.error, /não permite/);
 });
 
 test('o dono sobe som e ele aparece na lista para todos', async () => {
@@ -512,4 +512,73 @@ test('apagar sala leva as mensagens junto', async () => {
   assert.equal((await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: nova.id } })).status, 200);
   const r = await chamar('GET', `/mensagens?sala=${nova.id}`, { sessao: dono.token });
   assert.equal(r.status, 404, 'a sala apagada ainda respondia');
+});
+
+// --- cargos configuráveis -----------------------------------------------------
+
+test('o servidor traz os cargos e a lista de permissões que existem', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('GET', '/servidor', { sessao: dono.token });
+  assert.deepEqual(r.corpo.cargos.map((c) => c.nome), ['Dono', 'Moderador', 'Membro']);
+  assert.equal(r.corpo.cargos[0].dono, true);
+  assert.ok(r.corpo.permissoes.banir, 'a tela precisa saber que permissões desenhar');
+});
+
+test('o dono cria um cargo com as permissões que escolher', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/cargos/criar', {
+    sessao: dono.token,
+    corpo: { nome: 'Faxineiro', cor: '#22c55e', nivel: 20, permissoes: ['gerirSons', 'inventada'] },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.cargo.nome, 'Faxineiro');
+  assert.deepEqual(r.corpo.cargo.permissoes, ['gerirSons'], 'permissão inventada foi descartada');
+});
+
+test('membro não cria nem apaga cargo', async () => {
+  const bruno = await sessaoDe('bruno');
+  assert.equal((await chamar('POST', '/cargos/criar', { sessao: bruno.token, corpo: { nome: 'X', nivel: 5 } })).status, 403);
+  assert.equal((await chamar('POST', '/cargos/apagar', { sessao: bruno.token, corpo: { id: 1 } })).status, 403);
+});
+
+test('o cargo de dono não se edita nem se apaga', async () => {
+  const dono = await sessaoDe('abner');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const oDono = cargos.find((c) => c.dono);
+  assert.equal((await chamar('POST', '/cargos/editar', { sessao: dono.token, corpo: { id: oDono.id, nome: 'Rei', nivel: 100 } })).status, 403);
+  assert.equal((await chamar('POST', '/cargos/apagar', { sessao: dono.token, corpo: { id: oDono.id } })).status, 403);
+});
+
+test('nível fora de 1 a 99 é recusado', async () => {
+  const dono = await sessaoDe('abner');
+  for (const nivel of [0, 100, 101, -1]) {
+    const r = await chamar('POST', '/cargos/criar', { sessao: dono.token, corpo: { nome: `N${nivel}`, nivel } });
+    assert.equal(r.status, 400, `nível ${nivel} passou`);
+  }
+});
+
+test('dar um cargo muda o que a pessoa pode fazer', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const faxineiro = cargos.find((c) => c.nome === 'Faxineiro');
+
+  // Antes: sem permissão de som.
+  assert.equal((await subirSom(bruno.token, 'antes')).status, 403);
+
+  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'cargo', alvo: bruno.eu.id, cargo: faxineiro.id } });
+  assert.equal((await subirSom(bruno.token, 'depois')).status, 200, 'o cargo novo não valeu');
+});
+
+test('apagar cargo devolve quem estava nele ao mais baixo', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const faxineiro = cargos.find((c) => c.nome === 'Faxineiro');
+
+  assert.equal((await chamar('POST', '/cargos/apagar', { sessao: dono.token, corpo: { id: faxineiro.id } })).status, 200);
+
+  const lista = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.membros;
+  const dele = lista.find((m) => m.id === bruno.eu.id);
+  assert.equal(dele.cargoNome, 'Membro', 'ficou sem cargo em vez de descer');
 });

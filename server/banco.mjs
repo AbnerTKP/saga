@@ -7,7 +7,6 @@
 // cargo, banimento, castigo — vive na tabela de membros, que liga pessoa e servidor.
 // Fazer isso depois significaria migrar dados de gente já cadastrada.
 import { DatabaseSync } from 'node:sqlite';
-import { CARGO } from './cargos.mjs';
 
 // Cada migração roda uma vez, em ordem, e fica registrada pela POSIÇÃO na lista. Por isso
 // nunca se edita, remove ou insere no meio: acrescenta-se no fim, sempre. Inserir no meio
@@ -49,7 +48,7 @@ export const MIGRACOES = [
      servidor_id    INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
      usuario_id     INTEGER NOT NULL REFERENCES usuarios(id)   ON DELETE CASCADE,
      nome_exibido   TEXT,
-     cargo          INTEGER NOT NULL DEFAULT ${CARGO.MEMBRO},
+     cargo          INTEGER NOT NULL DEFAULT 10,
      entrou_em      INTEGER NOT NULL,
      banido_em      INTEGER,
      banido_por     TEXT,
@@ -98,6 +97,24 @@ export const MIGRACOES = [
      criado_em  INTEGER NOT NULL
    )`,
   `CREATE INDEX mensagens_sala ON mensagens(sala_id, id)`,
+
+  // Cargos de verdade, no lugar dos três níveis fixos. `nivel` mantém a hierarquia
+  // (ninguém alcança um igual ou superior) e `permissoes` diz o que cada um faz.
+  // O cargo de dono é marcado: ele tem tudo sempre, e não se edita nem se apaga.
+  `CREATE TABLE cargos (
+     id          INTEGER PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     nome        TEXT    NOT NULL,
+     cor         TEXT,
+     nivel       INTEGER NOT NULL,
+     dono        INTEGER NOT NULL DEFAULT 0,
+     permissoes  TEXT    NOT NULL DEFAULT '[]',
+     criado_em   INTEGER NOT NULL
+   )`,
+  `CREATE INDEX cargos_servidor ON cargos(servidor_id, nivel DESC)`,
+  // A coluna antiga `membros.cargo` fica: ela é a fonte da migração para cargo_id, e
+  // apagar coluna em SQLite reescreve a tabela inteira sem ganho nenhum aqui.
+  `ALTER TABLE membros ADD COLUMN cargo_id INTEGER REFERENCES cargos(id)`,
 ];
 
 export function abrirBanco(caminho) {
@@ -139,10 +156,53 @@ export function garantirServidor(db, { nome, salas }) {
     servidor = db.prepare('SELECT * FROM servidores WHERE id = ?').get(Number(info.lastInsertRowid));
   }
 
+  garantirCargos(db, servidor.id);
+
   const jaTem = db.prepare('SELECT count(*) c FROM salas WHERE servidor_id = ?').get(servidor.id).c;
   if (jaTem === 0) {
     const inserir = db.prepare('INSERT INTO salas (servidor_id, nome, ordem, tipo) VALUES (?, ?, ?, ?)');
     salas.forEach((nomeDaSala, i) => inserir.run(servidor.id, nomeDaSala, i, 'voz'));
   }
   return servidor;
+}
+
+/** Permissões que cada um dos três cargos originais ganha ao virar cargo de verdade. */
+const CARGOS_INICIAIS = [
+  { nome: 'Dono', nivel: 100, dono: 1, cor: '#f0b232', permissoes: [] },
+  {
+    nome: 'Moderador', nivel: 50, dono: 0, cor: '#5865f2',
+    permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons'],
+  },
+  { nome: 'Membro', nivel: 10, dono: 0, cor: null, permissoes: [] },
+];
+
+/**
+ * Cria os cargos do servidor na primeira vez e liga cada membro ao seu, a partir do
+ * nível numérico antigo. Idempotente: rodar de novo não mexe no que o dono ajustou.
+ *
+ * Fica aqui, e não numa migração, porque migração roda uma vez por banco — e um servidor
+ * criado depois precisaria dos cargos do mesmo jeito.
+ */
+export function garantirCargos(db, servidorId) {
+  const quantos = db.prepare('SELECT count(*) c FROM cargos WHERE servidor_id = ?').get(servidorId).c;
+  if (quantos === 0) {
+    const inserir = db.prepare(
+      'INSERT INTO cargos (servidor_id, nome, cor, nivel, dono, permissoes, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    for (const c of CARGOS_INICIAIS) {
+      inserir.run(servidorId, c.nome, c.cor, c.nivel, c.dono, JSON.stringify(c.permissoes), Date.now());
+    }
+  }
+
+  // Liga quem ainda não tem cargo, casando pelo nível antigo. Quem já tem fica como está.
+  const porNivel = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ?').all(servidorId);
+  const maisAlto = (nivel) =>
+    porNivel.filter((c) => c.nivel <= nivel).sort((a, b) => b.nivel - a.nivel)[0]
+    ?? porNivel.sort((a, b) => a.nivel - b.nivel)[0];
+
+  const semCargo = db.prepare(
+    'SELECT usuario_id, cargo FROM membros WHERE servidor_id = ? AND cargo_id IS NULL',
+  ).all(servidorId);
+  const ligar = db.prepare('UPDATE membros SET cargo_id = ? WHERE servidor_id = ? AND usuario_id = ?');
+  for (const m of semCargo) ligar.run(maisAlto(m.cargo).id, servidorId, m.usuario_id);
 }

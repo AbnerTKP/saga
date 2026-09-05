@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { abrirBanco, garantirServidor, MIGRACOES } from './banco.mjs';
+import { abrirBanco, garantirServidor, garantirCargos, MIGRACOES } from './banco.mjs';
 
 // As migrações são registradas pela POSIÇÃO na lista. Se alguém inserir uma no meio,
 // a produção passa a considerar aplicada uma migração que nunca rodou, e a seguinte
@@ -24,6 +24,9 @@ const IMPRESSOES = [
   '828329d3702c',  // 11 coluna tipo em salas
   '86a198ad22f7',  // 12 mensagens
   'b8d9e085c8e1',  // 13 índice de mensagens
+  '665cf2b3ada3',  // 14 cargos
+  'b82ab7deb06c',  // 15 índice de cargos
+  'c7478768ae58',  // 16 coluna cargo_id em membros
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -43,7 +46,7 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['membros', 'mensagens', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+  assert.deepEqual(tabelas, ['cargos', 'membros', 'mensagens', 'migracoes', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
 });
 
 test('as colunas acrescentadas depois existem e têm padrão seguro', () => {
@@ -98,4 +101,44 @@ test('apagar a sala leva as mensagens junto', () => {
   db.prepare('DELETE FROM salas WHERE id = ?').run(sala.id);
   assert.equal(db.prepare('SELECT count(*) c FROM mensagens').get().c, 0, 'mensagem órfã ficou para trás');
   void s;
+});
+
+test('o servidor nasce com os três cargos, e o de dono marcado', () => {
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  const cargos = db.prepare('SELECT nome, nivel, dono FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC').all(s.id);
+  assert.deepEqual(cargos.map((c) => c.nome), ['Dono', 'Moderador', 'Membro']);
+  assert.equal(cargos[0].dono, 1);
+  assert.equal(cargos[1].dono, 0);
+});
+
+test('rodar de novo não duplica cargos nem desfaz o que o dono mudou', () => {
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  db.prepare("UPDATE cargos SET nome = 'Xerife' WHERE servidor_id = ? AND nivel = 50").run(s.id);
+
+  garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  const cargos = db.prepare('SELECT nome FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC').all(s.id);
+  assert.deepEqual(cargos.map((c) => c.nome), ['Dono', 'Xerife', 'Membro']);
+});
+
+test('quem já era membro é ligado ao cargo certo pelo nível antigo', () => {
+  // A conversão precisa acontecer sem ninguém perder poder nem ganhar: quem era
+  // moderador continua moderador, e o dono continua dono.
+  const db = abrirBanco(':memory:');
+  const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
+  db.prepare('INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES (?,?,?,?)').run('a', 'a', 'x', 1);
+  db.prepare('INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES (?,?,?,?)').run('b', 'b', 'x', 1);
+  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, entrou_em) VALUES (?,?,?,?)').run(s.id, 1, 100, 1);
+  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, entrou_em) VALUES (?,?,?,?)').run(s.id, 2, 50, 1);
+
+  garantirCargos(db, s.id);
+  const quem = db.prepare(`
+    SELECT u.apelido, c.nome FROM membros m
+      JOIN usuarios u ON u.id = m.usuario_id
+      JOIN cargos c   ON c.id = m.cargo_id
+     WHERE m.servidor_id = ? ORDER BY u.apelido`).all(s.id)
+    // O SQLite devolve objetos sem protótipo; a comparação estrita repara nisso.
+    .map((r) => ({ ...r }));
+  assert.deepEqual(quem, [{ apelido: 'a', nome: 'Dono' }, { apelido: 'b', nome: 'Moderador' }]);
 });
