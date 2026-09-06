@@ -194,9 +194,14 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
    Turbo" tinham a mesma cara de coisa quebrada. Agora cada um se anuncia pela cor, e a
    barra da esquerda é o que se lê de relance, antes de qualquer palavra.
    Empilham acima do aviso de atualização, que mora no mesmo canto. */
+/* O contêiner não recebe clique, só os cartões. Ele é largo (até 420px) e alto quando há
+   vários, e fica por cima do quadro flutuante da live — sem isto, o vão entre um aviso e
+   outro, e toda a área vazia à esquerda deles, comem o clique do que está por baixo.
+   Foi assim que o botão de expandir da live ficava inclicável enquanto houvesse aviso. */
 .avisos { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: 72px;
-  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 21; max-width: min(420px, calc(100vw - 32px)); }
-.aviso { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 21; max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none; }
+.aviso { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
   background: var(--bg1); border: 1px solid var(--line); border-left: 3px solid var(--text3);
   border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.45); font-size: 13px; line-height: 1.45;
   animation: aviso-entra .18s ease-out; }

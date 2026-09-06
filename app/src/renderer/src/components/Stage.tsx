@@ -8,6 +8,7 @@ import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import type { Mensagem, RoomInfo } from '../api';
 import type { PessoaNaCall } from './MenuDaPessoa';
+import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
 
@@ -30,9 +31,19 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
   const isScreen = tile.source === Track.Source.ScreenShare;
 
   // Tela cheia de verdade, na tela inteira do computador — não só maior dentro da janela.
+  //
+  // A pergunta é "EU estou em tela cheia?", não "alguém está?". O mesmo track pode estar
+  // desenhado em dois quadros ao mesmo tempo — o do palco e o flutuante —, e perguntar ao
+  // documento fazia clicar no segundo FECHAR o primeiro em vez de trocar.
   const telaCheia = () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
-    else caixa.current?.requestFullscreen().catch(() => undefined);
+    const alvo = caixa.current;
+    if (!alvo) return;
+    if (document.fullscreenElement === alvo) {
+      document.exitFullscreen().catch((e) => anotar('erro', 'tela', e));
+    } else {
+      anotar('info', 'tela', 'pedindo tela cheia');
+      alvo.requestFullscreen().catch((e) => anotar('erro', 'tela', e));
+    }
   };
 
   return (
@@ -54,6 +65,9 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
           className="tile-expandir"
           title="Tela cheia (dois cliques também)"
           onClick={(e) => { e.stopPropagation(); telaCheia(); }}
+          // 'dblclick' é outro evento: sem isto, dois cliques no botão disparam três vezes
+          // (click, click e o dblclick subindo até o quadro) e a tela cheia entra e sai.
+          onDoubleClick={(e) => e.stopPropagation()}
         >
           <Icon name="expandir" size={16} />
         </button>

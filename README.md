@@ -91,10 +91,60 @@ pnpm dist:win   # gera "app/dist/Cantinho do Vorcaro Setup 0.1.0.exe" (dá para 
 
 Os instaladores **não são assinados por uma autoridade** (o certificado custa US$ 99/ano na
 Apple e ~US$ 10/mês na Microsoft), então o aviso de "app não verificado" aparece nos dois
-sistemas. No Mac, ainda assim, o `afterPack` de `app/build/afterPack.js` assina o pacote em
-**ad-hoc**: isso não vem da Apple e não tira o aviso, mas dá ao app um CDHash estável, sem o
-qual o macOS não consegue guardar as permissões de microfone, câmera e gravação de tela e
-volta a pedi-las a cada abertura. Não remova esse hook.
+sistemas. No Mac, o `afterPack` de `app/build/afterPack.js` assina o pacote de qualquer
+jeito, porque sem assinatura nenhuma o macOS não tem a que associar as permissões de
+microfone, câmera e tela. Não remova esse hook.
+
+### Por que o Mac pede a permissão de tela de novo a cada versão
+
+Porque assinar em ad-hoc não basta. O que o macOS guarda junto da permissão é o *requisito
+designado* do app, e no ad-hoc ele é o hash do build — que muda em toda versão. Resultado:
+cada atualização é "outro app" para o sistema, e a chave que você ligou nos Ajustes continua
+aparecendo ligada sem valer nada.
+
+```
+ad-hoc        designated => cdhash H"a644c9ee…"                    ← muda a cada build
+certificado   designated => identifier "br.com.vorcaro.cantinho"
+                            and certificate leaf = H"…"            ← igual entre builds
+```
+
+O conserto é assinar sempre com o **mesmo** certificado. Ele não precisa ser da Apple: um
+auto-assinado resolve, custa nada, e não muda o Gatekeeper (o aviso de "não verificado"
+continua igual). Gere uma vez:
+
+```bash
+cat > cert.cnf <<'EOF'
+[req]
+distinguished_name=dn
+x509_extensions=v3
+prompt=no
+[dn]
+CN=Cantinho do Vorcaro
+[v3]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature
+extendedKeyUsage=critical,codeSigning
+EOF
+
+openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+  -keyout chave.pem -out cert.pem -config cert.cnf
+openssl pkcs12 -legacy -export -out cantinho.p12 -inkey chave.pem -in cert.pem
+base64 -i cantinho.p12 | pbcopy      # cola isto no secret MAC_CERT_P12
+```
+
+No GitHub, em **Settings › Secrets and variables › Actions**, crie `MAC_CERT_P12` (o texto
+colado) e `MAC_CERT_SENHA` (a senha que você digitou no `pkcs12`). O `CN` precisa bater com
+`MAC_CERT_NOME` em `.github/workflows/release.yml`. **Guarde o `cantinho.p12`**: perder a
+chave privada é voltar à estaca zero, porque o requisito muda junto com o certificado.
+
+Sem os secrets, o build sai em ad-hoc como antes — o CI não quebra, só não conserta.
+
+Na **primeira** versão assinada, cada pessoa ainda precisa reconceder uma vez, porque o
+requisito muda de hash para certificado justamente nesse build: em **Ajustes do Sistema ›
+Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela**, remover o Cantinho pelo
+botão **−** (só desligar e ligar a chave costuma não bastar), compartilhar a tela de novo
+para o macOS pedir, e sair do app por completo (⌘Q) antes de reabrir. Da versão seguinte em
+diante, para de pedir.
 
 Para amigos, basta explicar:
 
@@ -114,9 +164,11 @@ O app olha o GitHub Releases do repositório a cada 6 horas (e 5 s depois de abr
 
 - **Windows**: baixa a versão nova em silêncio e mostra "Reiniciar e atualizar". Se a pessoa
   ignorar, instala sozinho na próxima vez que fechar o app.
-- **Mac**: como o app não é assinado pela Apple, ele não pode se substituir sozinho. Aparece o
-  aviso "Versão X disponível" com o botão **Baixar**, que abre o DMG novo; a pessoa arrasta por
-  cima do antigo. (Assinar e notarizar, US$ 99/ano, destrava a atualização automática no Mac.)
+- **Mac**: aparece o aviso "Versão X disponível" com o botão **Baixar**, que abre o DMG novo;
+  a pessoa arrasta por cima do antigo. São três travas para isso virar automático, não uma:
+  `update.ts` nem chama o atualizador no Mac; o `electron-builder.yml` só gera `dmg`, e o
+  mecanismo do Mac exige o alvo `zip`; e a assinatura. O certificado próprio resolve só a
+  terceira — sozinho, não liga nada.
 
 Para isso funcionar, uma configuração única:
 

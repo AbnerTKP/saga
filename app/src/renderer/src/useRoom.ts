@@ -7,7 +7,7 @@ import { criarAvisos } from './avisos';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 
-type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
+type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
 /** Captura sem o processamento de microfone, e em estéreo. Ver o comentário em startScreen. */
 const SOM_DE_VERDADE: AudioCaptureOptions = {
@@ -343,12 +343,21 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       simulcast: false,
     };
 
-    // Os dois modos falham por motivos diferentes: quando a placa de som recusa o
-    // 'loopback', o 'loopbackWithMute' às vezes passa. Só vale no Windows, onde nós
-    // escolhemos a fonte; no Mac quem resolve o áudio é o seletor do próprio sistema.
+    // A ordem é a do melhor para o que ainda serve.
+    //
+    // 'loopbackWithoutChrome' vem primeiro porque é o único que não devolve a nossa
+    // própria voz: ele captura a saída do sistema menos o que este app está tocando. Sem
+    // ele, quem transmite manda de volta as vozes da call — e não é eco de microfone, é
+    // cópia digital do mix, então fone de ouvido não muda nada. Ele exige Windows 11 ou
+    // macOS 14.2; onde não houver, ou falha (e caímos no seguinte) ou vem sem faixa
+    // nenhuma — e faixa que não veio é justamente o que a conferência abaixo pega.
+    //
+    // Depois dele, o caminho de sempre: 'loopback', e no Windows o 'loopbackWithMute' para
+    // quando a placa de som recusa o primeiro. Ver o comentário de ModoDeAudio no main.
     const modos: ModoDeAudio[] = !audio ? ['nao']
-      : sourceId && window.desktop.platform === 'win32' ? ['loopback', 'loopbackWithMute', 'nao']
-      : ['loopback', 'nao'];
+      : sourceId && window.desktop.platform === 'win32'
+        ? ['loopbackWithoutChrome', 'loopback', 'loopbackWithMute', 'nao']
+        : ['loopbackWithoutChrome', 'loopback', 'nao'];
 
     let ultimoMotivo = '';
     for (const modo of modos) {
@@ -363,6 +372,21 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
         // Áudio recusado não lança erro: vira uma faixa morta, calada. É o que deixou o Mac
         // transmitindo mudo sem nada no registro. Quem sabe se veio ou não é a publicação.
         const veioAudio = !!lp().getTrackPublication(Track.Source.ScreenShareAudio);
+
+        // Aceito e mudo é a cara da falha do 'loopbackWithoutChrome' em máquina velha
+        // demais para captura por processo: nada lança, e vem faixa nenhuma. Aí não dá
+        // para parar aqui — sem cair para o modo seguinte, trocaríamos "todo mundo se
+        // ouve" por "ninguém ouve nada", que é pior. Só desfaz e tenta o próximo.
+        //
+        // Só este modo cai. Faixa muda no 'loopback' continua como sempre foi: avisa e
+        // fica assim. Cair dali para o 'loopbackWithMute' silenciaria a máquina inteira de
+        // quem transmite, que é remédio pior que a doença.
+        if (audio && !veioAudio && modo === 'loopbackWithoutChrome') {
+          anotar('aviso', 'tela', `modo "${modo}" foi aceito mas veio mudo; tentando o próximo`);
+          await lp().setScreenShareEnabled(false).catch(() => undefined);
+          continue;
+        }
+
         if (audio && modo !== 'nao' && !veioAudio) {
           anotar('aviso', 'tela', `modo "${modo}" foi aceito, mas nenhuma faixa de áudio foi publicada`);
           avisar('aviso', explicarTelaMuda(window.desktop.platform));
@@ -385,7 +409,11 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
         return;
       } catch (e) {
         ultimoMotivo = (e as Error).message || String(e);
-        anotar('erro', 'tela', `modo "${modo}" falhou: ${ultimoMotivo}`);
+        // O modo que exclui o próprio app não existe em Windows 10 nem em macOS antigo, e
+        // falhar ali é o esperado, não defeito: fica como informação para não encher o
+        // registro de vermelho em máquina que nunca teve como aceitar.
+        anotar(modo === 'loopbackWithoutChrome' ? 'info' : 'erro', 'tela',
+          `modo "${modo}" falhou: ${ultimoMotivo}`);
 
         // A lista de saídas explica a maioria das recusas de áudio; sem áudio, não ajuda.
         if (modo === 'loopback') {

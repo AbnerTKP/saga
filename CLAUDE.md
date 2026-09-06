@@ -95,9 +95,14 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   respondeu "negado" com as duas chaves ligadas nos Ajustes — a permissão guardada é a da
   versão anterior, porque cada build nossa é assinada em ad-hoc e tem assinatura própria.
   Chegamos a escolher o seletor por essa resposta, e o app ficou preso no caminho sem som
-  sem jeito de sair. A prova que não mente é o sistema devolver, ou não, a lista de telas:
-  lista vazia é permissão faltando, e é aí que a instrução aparece — incluindo "desligue e
-  ligue de novo a chave", que é o que reregistra a versão nova.
+  sem jeito de sair. A prova que não mente é o sistema entregar, ou não, as telas.
+- **Sem permissão, `getSources` LANÇA — não devolve lista vazia.** Estava escrito aqui o
+  contrário, e custou caro: o registro do dono tem dez `Failed to get sources` e zero
+  passagens pelo ramo da lista vazia. Como o ipc rejeitava e o `ScreenPicker` não tinha
+  `catch`, a janela "Compartilhar tela" ficava presa em "Carregando…" para sempre — a
+  instrução de como conceder a permissão ficava inalcançável justo para quem precisava
+  dela. Hoje a falha vira lista vazia no processo principal, e as duas formas caem na
+  mesma explicação. Medir vale mais que deduzir: este parágrafo já esteve errado.
 - **O áudio da tela é som, não voz.** Pedindo `audio: true` cru, o Chromium entrega a
   captura com o processamento de microfone ligado — ganho automático, cancelamento de eco e
   supressão de ruído — e em mono. Medido: `{autoGainControl: true, echoCancellation: true,
@@ -108,10 +113,62 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Áudio de tela recusado não lança erro** — vira faixa muda, e a própria Electron
   documenta isso. Depois de publicar, conferimos se a faixa existe; sem essa conferência
   o Mac transmitiu mudo por versões seguidas sem nada aparecer no registro.
-- **O app é assinado em ad-hoc pelo `afterPack`.** Sem identidade de código estável o
-  macOS não guarda permissão de microfone, câmera e tela. Não remover.
+- **`loopback` devolve a nossa própria voz, e fone não resolve.** Ele captura a mistura da
+  saída padrão inteira, o que inclui as vozes que o próprio app está tocando: quem
+  transmite manda todo mundo de volta para a call. Não é eco de microfone — é cópia
+  digital do mix, antes de virar som no ar, então fone de ouvido não muda nada, e o
+  `echoCancellation` do microfone não alcança. `loopbackWithMute` também não resolve: ele
+  silencia o *endereço de saída da máquina*, não o app — quem transmite perde o filme e as
+  vozes, e a captura continua a mesma.
+- **`loopbackWithoutChrome` é o modo que exclui o próprio app**, e é o primeiro da fila. A
+  tipagem da Electron só conhece dois valores, mas ela repassa a string crua como id de
+  dispositivo e o Chromium a reconhece — é o mesmo id que o Chrome usa para atender
+  `restrictOwnAudio`. Medido aqui com o Electron do projeto: `loopback` →
+  `deviceId: "loopback"`, `loopbackWithoutChrome` → `deviceId: "loopbackWithoutChrome"`, e
+  uma string inventada → `NotReadableError`. Ou seja, é dispositivo de verdade, não string
+  ignorada. Por dentro é captura por processo, então pede Windows 11 ou macOS 14.2: onde
+  não houver, ou lança (e a fila cai para `loopback`) ou vem muda — e é só por isso que
+  faixa muda **neste modo** cai para o próximo, em vez de só avisar como nos outros. Cair
+  de `loopback` para `loopbackWithMute` seria pior que o problema.
+- **Ad-hoc não é identidade estável — é o contrário disso.** O `afterPack` assina, e
+  assinar é obrigatório: sem assinatura nenhuma o macOS não tem a que associar permissão de
+  microfone, câmera e tela. Mas ad-hoc não resolve, e por anos estava escrito aqui e no
+  código que resolvia. O que o macOS guarda junto da permissão é o *requisito designado*, e
+  no ad-hoc ele é o hash do build:
+
+  | | ad-hoc | certificado próprio |
+  |---|---|---|
+  | requisito | `cdhash H"a644c9ee…"` | `identifier "br.com.vorcaro.cantinho" and certificate leaf = H"…"` |
+  | build seguinte satisfaz o anterior | não | sim |
+
+  Medido com o `afterPack` de verdade: três builds de conteúdo diferente assinados com o
+  mesmo certificado deram CDHash diferente e requisito idêntico (`explicit requirement
+  satisfied`). Por isso cada versão nova vira "outro app" e a chave ligada nos Ajustes
+  deixa de valer. Daí `MAC_SIGN_IDENTITY`: com a variável, assina com o certificado
+  guardado em secret; sem ela, cai no ad-hoc, e o build local de quem não tem o
+  certificado continua saindo.
+- **O certificado é auto-assinado e não muda o Gatekeeper.** `spctl` rejeita ad-hoc e
+  auto-assinado exatamente igual — a dança de "Abrir Mesmo Assim" continua. Ele serve para
+  uma coisa só: a permissão parar de cair a cada versão.
+- **O som do sistema no Mac é uma permissão separada da tela.** Desde o macOS 14.4 a
+  captura é por *audio tap* do CoreAudio, com TCC próprio. A chave
+  `NSAudioCaptureUsageDescription` já vem do Electron — chegamos a "consertar" a ausência
+  dela antes de conferir, e ela estava lá o tempo todo, inclusive no app instalado. O que
+  mudamos foi só a frase, para o macOS pedir em português. **O Mac transmitir mudo continua
+  sem explicação medida:** num teste aqui, a faixa capturada veio existente e silenciosa
+  tanto em `loopback` quanto em `loopbackWithoutChrome`.
+- **`fullscreen` é uma permissão do Electron.** O `setPermissionRequestHandler` liberava só
+  `media`, `display-capture` e `notifications`, então todo `requestFullscreen()` era negado
+  no processo principal. Negado, ele não vira erro: a promessa fica pendurada para sempre —
+  nem resolve, nem rejeita —, então `catch` nenhum vê nada e o registro fica limpo. Medido
+  com o Electron do projeto: sem `'fullscreen'` na lista, `NADA — promessa nunca respondeu`;
+  com ela, `promessa resolveu`. A tela cheia da v0.18.0 nunca funcionou em versão nenhuma.
 - **Região de arraste engole clique de tudo que é desenhado por cima.** Qualquer coisa
   flutuante precisa de `-webkit-app-region: no-drag`.
+- **Contêiner de canto não recebe clique — só os cartões dentro dele.** A pilha de avisos
+  é larga e quase toda vazia, e fica por cima do quadro flutuante da live: sem
+  `pointer-events: none` no contêiner e `auto` nos cartões, o vão entre um aviso e outro
+  come o clique do que está por baixo. Vale para qualquer coisa que se ancore num canto.
 - **O CSP precisa de `http:`/`https:` em `img-src` e `media-src`**: a página vem de
   `file://`, então `'self'` não cobre o servidor.
 - **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
@@ -162,7 +219,7 @@ hipótese de regressão, e descartado sem teste.
 ## Testes
 
 ```bash
-pnpm test        # servidor (184) + app (58), segundos, sem nada externo
+pnpm test        # servidor (184) + app (57), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -173,8 +230,11 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 
 ## Depois disso
 
-1. **Atualização automática no Mac** — hoje só avisa, porque o mecanismo do macOS confere
-   assinatura e recusa a nossa, que é ad-hoc.
+1. **Atualização automática no Mac** — hoje só avisa, e são **três** travas, não uma:
+   (a) `update.ts` nem chama o atualizador no Mac — o caminho de lá é escrito à mão e só
+   avisa; (b) o `electron-builder.yml` só gera `dmg`, e o mecanismo do Mac exige o alvo
+   `zip`; (c) a assinatura, que o certificado próprio resolve. Certificado sozinho não liga
+   nada — esta linha já atribuiu tudo à assinatura, e estava errada.
 2. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
 3. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
 4. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
@@ -184,3 +244,16 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 - A atualização abrindo já atualizada no Windows (v0.16.2) — exige uma atualização real
   acontecendo com alguém do outro lado.
 - Som, câmera, microfone e compartilhamento de tela em máquinas que não são este Mac.
+- **Se o certificado próprio realmente segura a permissão no macOS 26.** O que está medido
+  é o requisito ficar idêntico entre builds; que o TCC case a permissão por ele é
+  comportamento documentado da Apple, não coisa medida aqui — o `TCC.db` não abre sem
+  Acesso Total ao Disco. O teste é: assinar, conceder a tela, subir a versão, reassinar com
+  o mesmo certificado, reinstalar e ver se o `Failed to match existing code requirement`
+  some do `log show`.
+- **Se o DMG assinado com certificado próprio abre nos outros Macs** sem virar "está
+  danificado". Ninguém testou, e é o risco que atinge os quatro de uma vez.
+- **Se o `loopbackWithoutChrome` de fato corta o retorno de voz.** O que está medido é o
+  dispositivo abrir e ser um dispositivo distinto. Que ele remova as nossas vozes da
+  captura exige duas pessoas numa call de verdade — e no Windows nada disso foi exercido.
+- **Por que a faixa de áudio da tela vem silenciosa neste Mac** nos dois modos, com a
+  chave de permissão presente no Info.plist. Não foi explicado.

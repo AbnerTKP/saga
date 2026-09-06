@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 const desktop = {
   platform: process.platform,
   listSources: () => ipcRenderer.invoke('sources:list'),
-  chooseSource: (id: string, audio: 'nao' | 'loopback' | 'loopbackWithMute') => ipcRenderer.invoke('sources:choose', id, audio),
+  chooseSource: (id: string, audio: 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute') => ipcRenderer.invoke('sources:choose', id, audio),
   screenPermission: (): Promise<string> => ipcRenderer.invoke('screen:permission'),
   usaSeletorDoSistema: (): Promise<boolean> => ipcRenderer.invoke('screen:seletorDoSistema'),
   openScreenSettings: () => ipcRenderer.invoke('screen:openSettings'),

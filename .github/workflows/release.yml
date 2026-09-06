@@ -59,6 +59,13 @@ jobs:
           - os: macos-latest
             cmd: dist:mac
     runs-on: ${{ matrix.os }}
+    env:
+      MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+      MAC_CERT_SENHA: ${{ secrets.MAC_CERT_SENHA }}
+      # Nome comum do certificado, igual ao usado para gerá-lo. Não é segredo, e é o erro
+      # mais fácil de cometer: se não bater com o do chaveiro, o codesign não acha a
+      # identidade. Ver README para gerar o certificado e guardar o .p12 nos secrets.
+      MAC_CERT_NOME: "Cantinho do Vorcaro"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -66,7 +73,42 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+
+      # Identidade de código estável para o Mac.
+      #
+      # Sem isto o afterPack assina em ad-hoc, e aí o "requisito designado" do app é o
+      # hash do build — muda a cada versão, e o macOS passa a ver um aplicativo diferente:
+      # a permissão de Gravação de Tela que o amigo concedeu deixa de valer, com a chave
+      # continuando ligada nos Ajustes. Medido: em ad-hoc o build seguinte não satisfaz o
+      # requisito do anterior; com um certificado fixo, satisfaz.
+      #
+      # O certificado é auto-assinado, gerado uma vez e guardado em secret. Não é da Apple
+      # e não tira o aviso do Gatekeeper — isso continua igual. O que ele resolve é a
+      # permissão cair a cada versão. Se os secrets não existirem, o passo é pulado e o
+      # build sai em ad-hoc como antes, em vez de quebrar.
+      - name: Certificado do Mac
+        # O segredo precisa estar no `env` do JOB (mais acima) e não só aqui: o `env` de um
+        # passo não é visível na condição desse mesmo passo.
+        if: matrix.os == 'macos-latest' && env.MAC_CERT_P12 != ''
+        run: |
+          KC="$RUNNER_TEMP/assinatura.keychain-db"
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/id.p12"
+          security create-keychain -p "$MAC_CERT_SENHA" "$KC"
+          security unlock-keychain -p "$MAC_CERT_SENHA" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security import "$RUNNER_TEMP/id.p12" -k "$KC" -P "$MAC_CERT_SENHA" -T /usr/bin/codesign -f pkcs12
+          # Sem isto o codesign trava pedindo a senha do chaveiro, e no CI não há quem digite.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MAC_CERT_SENHA" "$KC"
+          # A flag --keychain do codesign não basta: o chaveiro precisa estar na lista de busca.
+          security list-keychains -d user -s $(security list-keychains -d user | tr -d ' "') "$KC"
+          rm -f "$RUNNER_TEMP/id.p12"
+          # É daqui que o afterPack lê a identidade. Sem estas duas linhas ele cai no ad-hoc.
+          echo "MAC_SIGN_IDENTITY=$MAC_CERT_NOME" >> "$GITHUB_ENV"
+          echo "MAC_SIGN_KEYCHAIN=$KC" >> "$GITHUB_ENV"
+
       - run: pnpm --filter app ${{ matrix.cmd }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # sem assinatura no Mac
+          # Continua sem certificado da Apple: quem assina é o afterPack, com o certificado
+          # próprio acima quando ele existe, e em ad-hoc quando não existe.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"

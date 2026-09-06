@@ -31,6 +31,12 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: "Para falar nas salas de voz."
     NSCameraUsageDescription: "Para ligar a webcam."
+    # Desde o macOS 14.4 o som do sistema é uma permissão à parte da tela — o Chromium
+    # captura por "audio tap" do CoreAudio, com TCC próprio. A chave em si NÃO estava
+    # faltando: o Electron já a traz, e o app instalado já a tinha. O que estava faltando
+    # era ela estar em português: é esta frase que o macOS mostra na hora de pedir, e o
+    # padrão do Electron é "This app needs access to audio capture".
+    NSAudioCaptureUsageDescription: "Para levar o som do que você compartilha junto com a imagem."
 dmg:
   contents:
     - { x: 130, y: 220 }

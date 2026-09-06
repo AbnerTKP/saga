@@ -10,16 +10,18 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
 
   useEffect(() => {
     (async () => {
-      const list = await window.desktop.listSources();
+      // Sem permissão, o pedido pode voltar vazio OU rejeitar — o macOS 26 rejeita. Sem
+      // este catch, `sources` ficava nulo para sempre e a janela travava em "Carregando…".
+      const list = await window.desktop.listSources().catch(() => [] as SourceInfo[]);
       setSources(list);
       setSel(list.find((s) => s.kind === 'screen')?.id ?? list[0]?.id ?? null);
     })();
   }, []);
 
-  // Quem diz se a permissão existe é o sistema devolver, ou não, a lista de telas. O
+  // Quem diz se a permissão existe é o sistema entregar, ou não, as telas. O
   // `getMediaAccessStatus` já respondeu "negado" com as chaves ligadas nos Ajustes: a
   // entrada na lista guarda a assinatura da versão anterior, e cada build nossa tem a
-  // sua. A lista vazia é o sintoma real, e é nele que se confia.
+  // sua. Nenhuma tela na mão é o sintoma real — tenha ela vindo vazia ou nem vindo.
   const semAcesso = sources !== null && sources.length === 0;
   const shown = (sources ?? []).filter((s) => s.kind === tab);
 
@@ -37,11 +39,17 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
             <ol>
               <li>Abra <b>Ajustes do Sistema › Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela</b>.</li>
               <li>
-                Ligue a chave do <b>Cantinho do Vorcaro</b>. <b>Se ela já estiver ligada,
-                desligue e ligue de novo</b> — depois de atualizar, a permissão guardada é
-                a da versão anterior, e o macOS continua mostrando a chave ligada.
+                Ache o <b>Cantinho do Vorcaro</b> na lista e <b>remova pelo botão −</b>. Só
+                desligar e ligar a chave costuma não bastar: a linha antiga guarda a
+                assinatura da versão anterior e continua negando, mesmo aparecendo ligada.
               </li>
-              <li>Feche e abra o app.</li>
+              <li>
+                Feche esta janela e peça <b>compartilhar tela</b> de novo — sem a linha
+                antiga atrapalhando, aí sim o macOS pergunta.
+              </li>
+              <li>
+                <b>Saia do app por completo</b> (⌘Q — fechar a janela não basta) e abra de novo.
+              </li>
             </ol>
             <button className="primary" onClick={() => window.desktop.openScreenSettings()}>Abrir Ajustes</button>
           </div>

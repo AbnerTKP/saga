@@ -4,12 +4,25 @@ import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 
 /**
- * O Chromium tem dois modos de capturar o áudio do sistema, e eles falham por motivos
- * diferentes: 'loopback' escuta a saída e deixa você ouvir também; 'loopbackWithMute'
- * escuta e silencia a saída local. Quando o primeiro é recusado pela placa de som, o
- * segundo às vezes passa — daí valer tentar os dois antes de desistir do áudio.
+ * Como o áudio do sistema é capturado. Os modos falham por motivos diferentes, e por isso
+ * são tentados em ordem:
+ *
+ * - 'loopbackWithoutChrome' captura a saída do sistema MENOS o que o próprio app está
+ *   tocando. É o que resolve o retorno: sem ele, as vozes da call saem pelos alto-falantes
+ *   de quem transmite, entram na captura e voltam para todo mundo — e fone não adianta,
+ *   porque a tomada é digital, no mix do motor de áudio, não no ar. Por dentro é captura
+ *   por processo (WASAPI com PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE no Windows,
+ *   CoreAudio Tap com lista de exclusão no Mac), e por isso pede Windows 11 ou macOS 14.2.
+ *   Onde não houver, falha ou vem muda, e a ordem abaixo cai para o modo de sempre.
+ * - 'loopback' escuta a saída inteira e deixa você ouvir também. É o caminho de sempre, e
+ *   é ele que devolve a nossa própria voz.
+ * - 'loopbackWithMute' escuta e silencia a saída — não a do app, a da MÁQUINA: quem
+ *   transmite fica sem ouvir nada. Só serve quando a placa de som recusa o 'loopback'.
+ *
+ * A tipagem da Electron só conhece dois valores, mas ela repassa a string crua como id de
+ * dispositivo, e o serviço de áudio do Chromium reconhece as outras. Daí o cast lá embaixo.
  */
-type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
+type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
 let pendingSource: { id: string; audio: ModoDeAudio } | null = null;
 
@@ -89,9 +102,17 @@ app.whenReady().then(async () => {
   // Antes de qualquer coisa: se algo falhar na preparação, tem de ficar registrado.
   iniciarRegistro();
 
-  // Permissões de mídia do Chromium: só o que o app usa
+  // O que o Chromium pode pedir. A lista parece ser só de mídia, mas 'fullscreen' precisa
+  // estar aqui: no Electron, `requestFullscreen()` do renderer não entra em tela cheia
+  // sozinho — passa por este handler. Negado, ele não vira erro: a promessa fica pendurada
+  // para sempre, então nem o `catch` do renderer nem o registro veem alguma coisa. Foi o
+  // que fez a tela cheia da transmissão nunca ter funcionado, em nenhuma versão.
+  const PERMITIDAS = ['media', 'display-capture', 'notifications', 'fullscreen'];
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    callback(['media', 'display-capture', 'notifications'].includes(permission));
+    const pode = PERMITIDAS.includes(permission);
+    // Negar em silêncio é o que custou caro: fica registrado para o próximo caso aparecer.
+    if (!pode) registrar('aviso', 'permissao', `negada ao Chromium: ${permission}`);
+    callback(pode);
   });
 
   // Com o seletor nativo ligado, este handler não é chamado — o macOS resolve sozinho.
@@ -111,19 +132,33 @@ app.whenReady().then(async () => {
       // foi pedido: tela inteira ou janela, e com ou sem o áudio do sistema.
       registrar('info', 'tela',
         `capturando ${chosen.id.startsWith('screen') ? 'tela inteira' : 'janela'} "${chosen.name}" | áudio do sistema: ${audio}`);
-      callback(audio === 'nao' ? { video: chosen } : { video: chosen, audio });
+      // O cast é por causa da tipagem estreita da Electron; ver o comentário de ModoDeAudio.
+      callback(audio === 'nao'
+        ? { video: chosen }
+        : { video: chosen, audio: audio as 'loopback' | 'loopbackWithMute' });
     },
     { useSystemPicker: SELETOR_DO_SISTEMA },
   );
 
   ipcMain.handle('sources:list', async () => {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen', 'window'],
-      thumbnailSize: { width: 320, height: 180 },
-      fetchWindowIcons: true,
-    });
-    // Lista vazia é o sintoma de permissão faltando — e a única prova que não mente,
-    // já que `getMediaAccessStatus` respondeu "negado" com as chaves ligadas nos Ajustes.
+    // Sem permissão de Gravação de Tela, o macOS 26 com Electron 39 não devolve lista
+    // vazia: o `getSources` LANÇA ("Failed to get sources"). Medido no registro do dono,
+    // 10 vezes, contra zero vezes do caminho da lista vazia. Deixar a exceção subir pelo
+    // ipc rejeitava a promessa no renderer, e a janela "Compartilhar tela" ficava presa
+    // em "Carregando…" para sempre — a instrução de como conceder a permissão ficava
+    // inalcançável justamente para quem precisava dela. Aqui a falha vira lista vazia,
+    // que é o sintoma que o resto do app já sabe explicar.
+    let sources: Electron.DesktopCapturerSource[];
+    try {
+      sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 320, height: 180 },
+        fetchWindowIcons: true,
+      });
+    } catch (e) {
+      registrar('aviso', 'tela', `o sistema recusou listar as telas: ${(e as Error).message}`);
+      return [];
+    }
     if (sources.length === 0) {
       registrar('aviso', 'tela', 'o sistema não devolveu nenhuma tela: permissão de Gravação de Tela');
     }
