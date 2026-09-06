@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cantinho do Vorcaro — voz, vídeo e tela entre amigos</title>
+<meta name="description" content="App de desktop para Windows e Mac: salas de voz, câmera e compartilhamento de tela com o som indo junto. Feito para um grupo de amigos, não para uma comunidade.">
+<link rel="icon" href="favicon.png" type="image/png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://abnertkp.github.io/cantinho-do-vorcaro/">
+<meta property="og:title" content="Cantinho do Vorcaro">
+<meta property="og:description" content="Voz, vídeo e tela entre amigos — com o som do que está na sua tela indo junto.">
+<meta property="og:image" content="https://abnertkp.github.io/cantinho-do-vorcaro/janela.webp">
+<meta name="theme-color" content="#141517">
+<style>
+  :root {
+    --fundo: #141517; --carta: #1e1f22; --carta2: #26272b; --linha: #2b2d31;
+    --texto: #dbdee1; --suave: #949ba4; --fraco: #6d6f78; --claro: #f2f3f5;
+    --acento: #5865f2; --acento-h: #4752c4; --turbo: #c084fc; --ok: #23a559;
+    --raio: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--texto);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  a { color: #7d90ff; }
+  .largura { width: min(1120px, 100% - 48px); margin-inline: auto; }
+  @media (max-width: 640px) { .largura { width: calc(100% - 32px); } }
+
+  /* ---------- topo ---------- */
+  .capa { position: relative; overflow: hidden; padding: 88px 0 0; }
+  /* O brilho vem do azul do próprio ícone: a página e o app têm de parecer a mesma coisa. */
+  .capa::before {
+    content: ''; position: absolute; left: 50%; top: -340px; width: 1100px; height: 700px;
+    transform: translateX(-50%); pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%, #1b4f9633 0%, #5865f21a 45%, transparent 72%);
+  }
+  .capa > * { position: relative; }
+  .marca { display: flex; align-items: center; gap: 16px; margin-bottom: 30px; }
+  .marca img { width: 60px; height: 60px; border-radius: 14px; box-shadow: 0 6px 22px #0009; }
+  .marca b { font-size: 17px; color: var(--claro); font-weight: 650; letter-spacing: -.01em; }
+  .marca span { display: block; font-size: 13px; color: var(--fraco); font-weight: 400; }
+
+  h1 {
+    margin: 0 0 18px; max-width: 15ch; font-weight: 700; letter-spacing: -.028em;
+    font-size: clamp(38px, 6.4vw, 66px); line-height: 1.06; color: var(--claro);
+  }
+  .chamada { margin: 0 0 8px; max-width: 40ch; font-size: clamp(17px, 2.1vw, 21px); color: var(--suave); }
+  .chamada b { color: var(--texto); font-weight: 600; }
+  .miudo { margin: 0 0 34px; max-width: 46ch; font-size: 15px; color: var(--fraco); }
+
+  /* ---------- baixar ---------- */
+  .baixar { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+  .botao {
+    display: flex; align-items: center; gap: 13px; text-decoration: none;
+    padding: 14px 22px 14px 18px; border-radius: 12px; border: 1px solid var(--linha);
+    background: var(--carta); color: var(--texto); transition: background .15s, border-color .15s, transform .15s;
+  }
+  .botao:hover { background: var(--carta2); border-color: #3a3d44; transform: translateY(-1px); }
+  .botao.principal { background: var(--acento); border-color: var(--acento); color: #fff; }
+  .botao.principal:hover { background: var(--acento-h); border-color: var(--acento-h); }
+  .botao svg { flex: none; opacity: .95; }
+  .botao .rotulo { display: block; font-weight: 620; font-size: 15px; line-height: 1.25; letter-spacing: -.01em; }
+  .botao .peso { display: block; font-size: 12.5px; opacity: .72; }
+  .versao { margin: 20px 0 0; font-size: 13.5px; color: var(--fraco); }
+  .versao a { color: var(--suave); }
+
+  /* ---------- retrato ---------- */
+  .retrato { margin-top: 68px; padding-bottom: 92px; }
+  .moldura {
+    border-radius: var(--raio); overflow: hidden; border: 1px solid var(--linha);
+    background: var(--carta); box-shadow: 0 30px 70px -20px #000c, 0 0 0 1px #ffffff08 inset;
+  }
+  .moldura img { display: block; width: 100%; height: auto; }
+  .legenda { margin: 14px 2px 0; font-size: 12.5px; color: var(--fraco); }
+  /* Em tela estreita a janela inteira vira um borrão de 300px. Melhor deixar arrastar de
+     lado, no tamanho em que dá para ler, do que mostrar tudo e não mostrar nada. */
+  @media (max-width: 720px) {
+    .moldura { overflow-x: auto; }
+    .moldura img { min-width: 780px; }
+    .legenda::after { content: ' Arraste para o lado para ver inteira.'; }
+  }
+
+  /* ---------- seções ---------- */
+  section { padding: 84px 0; border-top: 1px solid var(--linha); }
+  h2 { margin: 0 0 12px; font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -.022em; color: var(--claro); }
+  .sub { margin: 0 0 44px; max-width: 56ch; color: var(--suave); }
+
+  .cartas { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(292px, 1fr)); }
+  .carta { padding: 26px; border-radius: var(--raio); background: var(--carta); border: 1px solid var(--linha); }
+  .carta h3 { margin: 0 0 9px; font-size: 16.5px; color: var(--claro); letter-spacing: -.012em; }
+  .carta p { margin: 0; font-size: 14.5px; color: var(--suave); }
+  .selo {
+    display: inline-flex; align-items: center; gap: 5px; margin-bottom: 15px;
+    padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--turbo); background: #c084fc1a;
+  }
+
+  .passos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .passo { padding: 26px; border-radius: var(--raio); background: var(--carta); border: 1px solid var(--linha); }
+  .passo h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 16.5px; color: var(--claro); }
+  .passo ol { margin: 0; padding-left: 20px; font-size: 14.5px; color: var(--suave); }
+  .passo li + li { margin-top: 8px; }
+  .passo kbd {
+    font: inherit; font-size: 13.5px; padding: 1px 7px; border-radius: 5px;
+    background: var(--carta2); border: 1px solid var(--linha); color: var(--texto); white-space: nowrap;
+  }
+  .nota { margin: 22px 0 0; font-size: 13.5px; color: var(--fraco); max-width: 68ch; }
+
+  footer { padding: 44px 0 64px; border-top: 1px solid var(--linha); font-size: 13.5px; color: var(--fraco); }
+  footer .linhas { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
+  footer .cresce { flex: 1; }
+</style>
+</head>
+<body>
+
+<header class="capa">
+  <div class="largura">
+    <div class="marca">
+      <img src="icone.webp" alt="" width="60" height="60">
+      <div>
+        <b>Cantinho do Vorcaro</b>
+        <span>para Windows e Mac</span>
+      </div>
+    </div>
+
+    <h1>Voz, vídeo e tela entre amigos.</h1>
+    <p class="chamada">
+      Um app de desktop para o <b>seu</b> grupo — com o som do que está na sua tela
+      indo junto com a imagem.
+    </p>
+    <p class="miudo">
+      Sem comunidade, sem gente que você não conhece, sem anúncio. Só as pessoas que
+      você chamou.
+    </p>
+
+    <div class="baixar">
+      <a class="botao" id="win" href="https://github.com/AbnerTKP/cantinho-do-vorcaro/releases/latest" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3V5.6zm8.4-1.2L21 3v8.5h-9.6V4.4zM3 12.5h7.2v6.9L3 18.4v-5.9zm8.4 0H21V21l-9.6-1.4v-7.1z"/></svg>
+        <span>
+          <span class="rotulo">Baixar para Windows</span>
+          <span class="peso" id="win-peso">instalador .exe</span>
+        </span>
+      </a>
+      <a class="botao" id="mac" href="https://github.com/AbnerTKP/cantinho-do-vorcaro/releases/latest" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .8 1.1 1.7 2.3 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.3-2.5 1.3-2.6 0 0-2.5-1-2.5-3.6zM14.1 5.9c.6-.8 1-1.9.9-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-.9 2.9 1 0 2-.5 2.7-1.3z"/></svg>
+        <span>
+          <span class="rotulo">Baixar para Mac</span>
+          <span class="peso" id="mac-peso">imagem .dmg</span>
+        </span>
+      </a>
+    </div>
+
+    <p class="versao" id="versao">
+      <a href="https://github.com/AbnerTKP/cantinho-do-vorcaro/releases" rel="noopener">Ver todas as versões</a>
+    </p>
+  </div>
+
+  <div class="largura retrato">
+    <div class="moldura">
+      <img src="janela.webp" width="2048" height="1280"
+           alt="Janela do Cantinho do Vorcaro: salas à esquerda, uma transmissão de tela no centro e a lista de pessoas por cargo à direita." loading="lazy">
+    </div>
+    <p class="legenda">A janela do app, com uma transmissão no palco e a faixa de quem está transmitindo logo acima.</p>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="largura">
+    <h2>O que ele faz</h2>
+    <p class="sub">Nada que você não vá usar — e as poucas coisas que faz, feitas até funcionarem.</p>
+    <div class="cartas">
+      <article class="carta">
+        <h3>Salas de voz que estão sempre lá</h3>
+        <p>Entra e sai com um clique. A barra lateral mostra quem está em cada sala, quem
+        está falando, quem está com a câmera ligada e quem está transmitindo.</p>
+      </article>
+      <article class="carta">
+        <h3>Tela com o som junto</h3>
+        <p>O áudio do que você está assistindo vai para a call em estéreo, sem o
+        processamento de microfone que estoura filme — e sem devolver a voz de quem está
+        na call de volta para dentro dela.</p>
+      </article>
+      <article class="carta">
+        <span class="selo">Vorcaro Turbo</span>
+        <h3>Nitidez ou fluidez, e você escolhe</h3>
+        <p>Até 1080p e 60 quadros. Numa cena pesada não cabem os dois: a 30 quadros a
+        imagem fica nítida e os quadros é que cedem; a 60, o contrário.</p>
+      </article>
+      <article class="carta">
+        <h3>Cargos desenhados por você</h3>
+        <p>Quem pode criar sala, mutar, expulsar ou banir é decisão do dono. E ninguém age
+        sobre alguém de cargo igual ou superior ao seu.</p>
+      </article>
+      <article class="carta">
+        <h3>Soundboard</h3>
+        <p>Os sons vão numa faixa própria: tocar não depende de estar com o microfone
+        ligado, e mutar alguém não muta os sons dele.</p>
+      </article>
+      <article class="carta">
+        <h3>Perfil, GIF e mais de um cantinho</h3>
+        <p>Foto e banner com enquadramento que você ajusta, GIF no chat, e vários
+        servidores na mesma conta — cada um com o seu cargo e o seu nome.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="primeira-vez">
+  <div class="largura">
+    <h2>Na primeira vez que abrir</h2>
+    <p class="sub">
+      O app não tem certificado pago, então o sistema avisa. Não há nada de errado com ele —
+      é só o preço de um app feito para cinco pessoas.
+    </p>
+    <div class="passos">
+      <article class="passo">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.2 4.6v6.9H3V5.6zm8.4-1.2L21 3v8.5h-9.6V4.4zM3 12.5h7.2v6.9L3 18.4v-5.9zm8.4 0H21V21l-9.6-1.4v-7.1z"/></svg>
+          Windows
+        </h3>
+        <ol>
+          <li>Abra o arquivo <kbd>.exe</kbd> que você baixou.</li>
+          <li>Vai aparecer <em>“O Windows protegeu o seu PC”</em>. Clique em
+              <kbd>Mais informações</kbd> e depois em <kbd>Executar mesmo assim</kbd>.</li>
+          <li>Pronto. Das próximas vezes o app se atualiza sozinho.</li>
+        </ol>
+      </article>
+      <article class="passo">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .8 1.1 1.7 2.3 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.3-2.5 1.3-2.6 0 0-2.5-1-2.5-3.6zM14.1 5.9c.6-.8 1-1.9.9-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-.9 2.9 1 0 2-.5 2.7-1.3z"/></svg>
+          Mac
+        </h3>
+        <ol>
+          <li>Abra o <kbd>.dmg</kbd> e arraste o app para <kbd>Aplicativos</kbd>.</li>
+          <li>Na primeira abertura o macOS recusa. Vá em
+              <kbd>Ajustes do Sistema › Privacidade e Segurança</kbd> e clique em
+              <kbd>Abrir Mesmo Assim</kbd>.</li>
+          <li>Ele vai pedir microfone, câmera e gravação de tela conforme você usar cada um.</li>
+        </ol>
+      </article>
+    </div>
+    <p class="nota">
+      Ao abrir, o endereço do servidor já vem preenchido. Falta só o seu apelido e a senha —
+      peça ao dono do cantinho.
+    </p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="largura linhas">
+    <span class="cresce">Feito para o cardume. Código aberto, sem rastreamento e sem anúncio.</span>
+    <a href="https://github.com/AbnerTKP/cantinho-do-vorcaro" rel="noopener">Código no GitHub</a>
+    <a href="https://github.com/AbnerTKP/cantinho-do-vorcaro/releases" rel="noopener">Versões</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var REPO = 'AbnerTKP/cantinho-do-vorcaro';
+  var ua = navigator.userAgent;
+  var ehMac = /Mac|iPhone|iPad|iPod/.test(ua);
+  var ehWin = /Windows|Win32|Win64/.test(ua);
+
+  // O sistema de quem está lendo vem primeiro, e em destaque. Quem não é nenhum dos dois
+  // (Linux, celular) vê os dois iguais, em vez de um palpite errado em azul.
+  var win = document.getElementById('win');
+  var mac = document.getElementById('mac');
+  if (ehWin) { win.classList.add('principal'); win.parentNode.insertBefore(win, mac); }
+  else if (ehMac) { mac.classList.add('principal'); mac.parentNode.insertBefore(mac, win); }
+
+  var mb = function (b) { return (b / 1048576).toFixed(0).replace('.', ',') + ' MB'; };
+  var dia = function (iso) {
+    try {
+      return new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) { return ''; }
+  };
+
+  // Os links já apontam para /releases/latest, que sempre funciona. Isto aqui só melhora:
+  // troca pelo arquivo direto, com versão, peso e data. Se a API não responder — ela tem
+  // limite por IP —, fica o que já estava, em vez de a página virar um botão quebrado.
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (rel) {
+      var achar = function (fim) {
+        for (var i = 0; i < (rel.assets || []).length; i++) {
+          var a = rel.assets[i];
+          if (a.name.slice(-fim.length).toLowerCase() === fim) return a;
+        }
+        return null;
+      };
+      var exe = achar('.exe');
+      var dmg = achar('.dmg');
+      if (exe) {
+        win.href = exe.browser_download_url;
+        document.getElementById('win-peso').textContent = 'instalador .exe · ' + mb(exe.size);
+      }
+      if (dmg) {
+        mac.href = dmg.browser_download_url;
+        document.getElementById('mac-peso').textContent = 'imagem .dmg · ' + mb(dmg.size);
+      }
+      var quando = dia(rel.published_at);
+      document.getElementById('versao').innerHTML =
+        '<strong style="color:var(--suave);font-weight:600">' + (rel.tag_name || '') + '</strong>'
+        + (quando ? ' · ' + quando : '')
+        + ' · <a href="https://github.com/' + REPO + '/releases" rel="noopener">ver todas as versões</a>';
+    })
+    .catch(function () { /* fica o link para a página de versões */ });
+})();
+</script>
+</body>
+</html>
