@@ -94,12 +94,12 @@ function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<
   return Promise.race([promessa, limite]).finally(() => clearTimeout(id)) as Promise<T>;
 }
 
-/** Recebe se a pessoa é Turbo porque a qualidade de transmissão depende disso. */
+/** Recebe se a pessoa é Berserk porque a qualidade de transmissão depende disso. */
 /**
  * `aoChegarAlguem` é chamado quando alguém entra na sala em que você está — é dali que
  * sai o aviso na tela. Vem de fora porque quem desenha aviso é o App, não este gancho.
  */
-export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => void) {
+export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => void) {
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const [status, setStatus] = useState<Status>('idle');
@@ -401,7 +401,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
    */
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
-    const qualidade = qualidadeValida(lerQualidadeGuardada(), souTurbo);
+    const qualidade = qualidadeValida(lerQualidadeGuardada(), souBerserk);
     const preset = QUALIDADES[qualidade];
 
     // Quando a cena aperta, alguma coisa cede — e quem diz o quê é a escolha da pessoa.
@@ -523,7 +523,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room, souTurbo, avisar, anotarComoEstaSaindo, pararMedicoes]);
+  }, [room, souBerserk, avisar, anotarComoEstaSaindo, pararMedicoes]);
 
   const stopScreen = useCallback(async () => {
     pararMedicoes();

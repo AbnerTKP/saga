@@ -345,7 +345,7 @@ export function App() {
       {devices && (
         <DeviceSettings
           room={rm.room}
-          souTurbo={eu.turbo}
+          souBerserk={eu.turbo}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}
         />

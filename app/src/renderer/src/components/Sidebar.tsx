@@ -69,7 +69,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
                     <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto} />
                     <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                     <span className="pico">
-                      {p.turbo && <span className="raio-turbo" title="Berserk"><Icon name="raio" size={13} /></span>}
+                      {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
                       {p.screen && <Icon name="screen" />}
                       {p.camera && <Icon name="camera" />}
                       {p.muted && <Icon name="micOff" />}

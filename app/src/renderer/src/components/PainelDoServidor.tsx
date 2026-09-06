@@ -358,7 +358,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                 <div className="quem">
                   <div className="strong">
                     <Nome membro={m} />
-                    {m.turbo && <span className="selo-turbo" title="Berserk">TURBO</span>}
+                    {m.turbo && <span className="selo-berserk">BERSERK</span>}
                     {m.id === eu.id && <span className="muted small"> (você)</span>}
                   </div>
                   <div className="muted small">
@@ -392,7 +392,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                   )}
                   {pode(eu.cargo, 'concederTurbo') && (
                     <button
-                      className={m.turbo ? 'turbo-on' : ''}
+                      className={m.turbo ? 'berserk-on' : ''}
                       title={m.turbo ? 'Tirar o Berserk' : 'Dar Berserk'}
                       disabled={ocupado}
                       onClick={() => agir('turbo', m, { turbo: !m.turbo })}

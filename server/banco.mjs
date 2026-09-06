@@ -138,6 +138,14 @@ export const MIGRACOES = [
   // Enquadramento da foto e do banner: onde a imagem foi arrastada e o quanto foi
   // aproximada. O arquivo enviado não é tocado — recortar mataria a animação do GIF.
   `ALTER TABLE usuarios ADD COLUMN enquadramento TEXT`,
+
+  // O Berserk é da CONTA, não do vínculo com um servidor. Ele nasceu em `membros`, e
+  // isso fazia a mesma pessoa ser Berserk num servidor e não ser no vizinho — o que não
+  // é o que ele significa: quem tem, tem na Saga. A coluna antiga fica onde está, morta:
+  // migração publicada não se edita nem se remove, só se acrescenta.
+  `ALTER TABLE usuarios ADD COLUMN turbo INTEGER NOT NULL DEFAULT 0`,
+  // Ninguém perde o que já tinha: quem era Berserk em qualquer servidor passa a ser na conta.
+  `UPDATE usuarios SET turbo = 1 WHERE id IN (SELECT usuario_id FROM membros WHERE turbo = 1)`,
 ];
 
 export function abrirBanco(caminho) {

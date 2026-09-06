@@ -32,6 +32,8 @@ const IMPRESSOES = [
   '7e000e21d81b',  // 19 coluna criado_por em servidores
   'e47efb98833d',  // 20 coluna imagem em mensagens
   'bf5bffec61bd',  // 21 coluna enquadramento em usuarios
+  '90125bd0e30a',  // 22 coluna turbo em usuarios (o Berserk virou da conta)
+  'a9415f3e8440',  // 23 quem já era Berserk num servidor passa a ser na conta
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

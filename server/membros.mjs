@@ -34,7 +34,7 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
 const SELECT_MEMBRO = `
   SELECT u.id, u.apelido, u.foto, u.banner, u.enquadramento,
          m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
-         m.turbo, m.id_exibido, m.cargo_id,
+         u.turbo, m.id_exibido, m.cargo_id,
          c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,
          c.dono AS cargo_dono, c.permissoes AS cargo_permissoes,
          COALESCE(NULLIF(m.nome_exibido, ''), u.apelido) AS nome
@@ -89,15 +89,20 @@ export function mudarNomeExibido(db, servidorId, usuarioId, nome) {
 
 const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, não pode roubar a linha
 
-/** Turbo é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo. */
+/**
+ * Berserk é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo.
+ *
+ * Quem concede é o dono DE UM SERVIDOR, mas o que ele concede é da CONTA: a pessoa passa
+ * a ser Berserk em toda a Saga, não só ali. É por isso que a permissão é conferida no
+ * servidor de quem dá, e a escrita é em `usuarios`.
+ */
 export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
   if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'concederTurbo')) {
     throw new ErroDeConta('Seu cargo não permite conceder o Berserk.', 403);
   }
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
   if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
-  db.prepare('UPDATE membros SET turbo = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(ligado ? 1 : 0, servidorId, alvo.id);
+  db.prepare('UPDATE usuarios SET turbo = ? WHERE id = ?').run(ligado ? 1 : 0, alvo.id);
   return buscarMembro(db, servidorId, alvo.id);
 }
 

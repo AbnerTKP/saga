@@ -9,12 +9,12 @@ export function Nome({ membro, nome, id, turbo }: {
 }) {
   const texto = membro?.nome ?? nome ?? '';
   const identificador = membro?.idExibido ?? id ?? null;
-  const ehTurbo = membro?.turbo ?? turbo ?? false;
+  const ehBerserk = membro?.turbo ?? turbo ?? false;
 
   return (
     <>
-      {identificador && <span className={`id-do-membro ${ehTurbo ? 'turbo' : ''}`}>{identificador}</span>}
-      <span className={ehTurbo ? 'nome-turbo' : undefined}>{texto}</span>
+      {identificador && <span className={`id-do-membro ${ehBerserk ? 'berserk' : ''}`}>{identificador}</span>}
+      <span className={ehBerserk ? 'nome-berserk' : undefined}>{texto}</span>
     </>
   );
 }

@@ -636,6 +636,75 @@ test('quem não é do servidor não o acessa, mesmo sabendo o número', async ()
   assert.ok(meus.some((s) => s.id === r.corpo.servidor.id), 'caiu num servidor que nem é dele');
 });
 
+test('servidor novo é usável de ponta a ponta: salas, voz e chat', async () => {
+  // O caminho inteiro de quem cria um servidor e passa a viver nele. Cada pedaço já era
+  // testado à parte; o que faltava era a costura, que é onde o x-servidor se perde.
+  await cadastrar('duda');
+  const duda = await sessaoDe('duda');
+  const novo = (await chamar('POST', '/servidores/criar', {
+    sessao: duda.token, corpo: { nome: 'Salão de Duda' },
+  })).corpo.servidor;
+
+  // 1. cria uma sala de voz e uma de texto no servidor novo
+  const voz = await chamar('POST', '/salas/criar', {
+    sessao: duda.token, servidor: novo.id, corpo: { nome: 'Bancada', tipo: 'voz' },
+  });
+  assert.equal(voz.status, 200, JSON.stringify(voz.corpo));
+  const texto = await chamar('POST', '/salas/criar', {
+    sessao: duda.token, servidor: novo.id, corpo: { nome: 'recados', tipo: 'texto' },
+  });
+  assert.equal(texto.status, 200);
+
+  // 2. as salas aparecem no servidor certo, e SÓ nele
+  const daqui = (await chamar('GET', '/rooms', { sessao: duda.token, servidor: novo.id })).corpo.rooms;
+  assert.ok(daqui.some((s) => s.name === 'Bancada'), 'a sala criada não apareceu');
+  const deCasa = (await chamar('GET', '/rooms', { sessao: duda.token })).corpo.rooms;
+  assert.ok(!deCasa.some((s) => s.name === 'Bancada'), 'a sala vazou para o servidor de casa');
+
+  // 3. o passe de voz sai, e é de uma sala diferente da homônima do outro servidor
+  const passe = await chamar('POST', '/token', {
+    sessao: duda.token, servidor: novo.id, corpo: { sala: voz.corpo.sala.id },
+  });
+  assert.equal(passe.status, 200, JSON.stringify(passe.corpo));
+  assert.ok(passe.corpo.token, 'não veio passe do LiveKit');
+
+  const geralDaqui = daqui.find((s) => s.name === 'Geral');
+  const geralDeCasa = deCasa.find((s) => s.name === 'Geral');
+  assert.notEqual(geralDaqui.id, geralDeCasa.id,
+    'dois "Geral" com o mesmo id cairiam na mesma conversa');
+
+  // 4. o chat da sala nova funciona e fica onde foi escrito
+  const msg = await chamar('POST', '/mensagens', {
+    sessao: duda.token, servidor: novo.id,
+    corpo: { sala: texto.corpo.sala.id, texto: 'primeira daqui' },
+  });
+  assert.equal(msg.status, 200, JSON.stringify(msg.corpo));
+  const lidas = await chamar('GET', `/mensagens?sala=${texto.corpo.sala.id}`, {
+    sessao: duda.token, servidor: novo.id,
+  });
+  assert.ok(lidas.corpo.mensagens.some((m) => m.texto === 'primeira daqui'));
+});
+
+test('o Berserk atravessa os servidores; o cargo, não', async () => {
+  // O que distingue os dois: cargo é do vínculo, Berserk é da conta — da Saga inteira.
+  const bruno = await sessaoDe('bruno');
+  const meus = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores;
+  const dele = meus.find((s) => s.nome === 'Sala do Bruno');
+  const casa = meus.find((s) => s.id !== dele.id);
+
+  const eu = (await chamar('GET', '/eu', { sessao: bruno.token, servidor: dele.id })).corpo.eu;
+  const deu = await chamar('POST', '/moderar', {
+    sessao: bruno.token, servidor: dele.id,
+    corpo: { acao: 'turbo', alvo: eu.id, turbo: true },
+  });
+  assert.equal(deu.status, 200, JSON.stringify(deu.corpo));
+  assert.equal(deu.corpo.alvo.turbo, true);
+
+  const naCasa = (await chamar('GET', '/eu', { sessao: bruno.token, servidor: casa.id })).corpo.eu;
+  assert.equal(naCasa.turbo, true, 'o Berserk tem de valer em todos os servidores');
+  assert.equal(naCasa.cargo.dono, false, 'o cargo, esse, continua sendo de cada servidor');
+});
+
 test('convite leva alguém para dentro', async () => {
   const bruno = await sessaoDe('bruno');
   const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores

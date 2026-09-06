@@ -14,7 +14,7 @@ export const QUANTAS = 100;
 const SELECT = `
   SELECT m.id, m.texto, m.imagem, m.criado_em, m.usuario_id,
          COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
-         u.foto, u.enquadramento, mem.turbo, mem.id_exibido
+         u.foto, u.enquadramento, u.turbo, mem.id_exibido
     FROM mensagens m
     LEFT JOIN usuarios u   ON u.id = m.usuario_id
     LEFT JOIN membros  mem ON mem.usuario_id = m.usuario_id AND mem.servidor_id = ?`;

@@ -93,7 +93,7 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
             <span style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}>
               {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
             </span>
-            {pessoa.turbo && <span className="selo-turbo">TURBO</span>}
+            {pessoa.turbo && <span className="selo-berserk">BERSERK</span>}
           </div>
         </div>
       </div>

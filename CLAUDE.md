@@ -50,8 +50,8 @@ que dá para testar sem tela fica em módulos puros: `permissoes` do lado do ser
 paralelo em `api.ts` (`pode`, `podeSobre`), e `qualidades.ts`, `volume.ts`, `sinal.ts`,
 `erros.ts` e `audivel.ts` são pequenos e testados.
 
-**Identidade** — a conta (apelido + senha) é global; cargo, banimento, castigo, nome
-exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
+**Identidade** — a conta (apelido + senha) e o **Berserk** são globais; cargo, banimento,
+castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
 
 ## Decisões que não são óbvias no código
 
@@ -62,6 +62,21 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   derrubou o servidor duas vezes.
 - **Cargo, banimento e nome exibido pertencem ao vínculo pessoa↔servidor**, não à pessoa.
   A conta é global. É o que permitirá vários servidores sem migrar dados.
+- **O Berserk é da conta, e não do vínculo** — é a exceção da linha acima, e a diferença
+  importa: cargo é de cada servidor, Berserk é da Saga inteira. Ele nasceu em `membros`, o
+  que fazia a mesma pessoa ser Berserk num servidor e não ser no vizinho. Hoje a coluna que
+  vale é `usuarios.turbo`; quem concede continua sendo o dono de um servidor (é lá que a
+  permissão é conferida), mas o que ele concede vale em todo canto. A coluna `membros.turbo`
+  ficou onde estava, morta: migração publicada não se edita nem se remove.
+- **Três nomes ficaram "turbo" de propósito**: a coluna do banco, o campo `turbo` que anda
+  entre app e servidor, e o `tipo: 'turbo'` do aviso. São protocolo e dado, não texto de
+  tela — e app e servidor sobem separados, então renomear o que viaja entre eles faria a
+  versão velha de um não entender a nova do outro. Um aviso de tipo desconhecido cairia em
+  vermelho, que é justamente o que "isso é do Berserk" não pode parecer.
+- **A marca do Berserk é o Mjölnir, cheio e sem detalhe.** Ele vive a 13 px ao lado do
+  nome, e ali só sobrevive silhueta densa — o raio antigo funcionava por isso. Um valknut
+  e uma runa Thurisaz foram desenhados e olhados nos três tamanhos antes de escolher:
+  viraram triângulo e seta.
 - **Ninguém age sobre alguém de cargo igual ou superior** — é o que sustenta toda a
   moderação. A regra vive em `permissoes.mjs`, puro e testado à exaustão, e só vale para
   ações que recaem sobre alguém: criar sala não pergunta "acima de quem?".

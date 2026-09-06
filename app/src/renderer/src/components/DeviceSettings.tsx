@@ -7,15 +7,15 @@ import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const labels: Record<Kind, string> = { audioinput: 'Microfone', audiooutput: 'Saída de som', videoinput: 'Câmera' };
 
-export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
+export function DeviceSettings({ room, souBerserk, onRegistro, onClose }: {
   room: Room;
   /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
-  souTurbo: boolean;
+  souBerserk: boolean;
   onRegistro: () => void;
   onClose: () => void;
 }) {
-  const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souTurbo));
-  const permitidas = qualidadesDe(souTurbo);
+  const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souBerserk));
+  const permitidas = qualidadesDe(souBerserk);
   const [devices, setDevices] = useState<Record<Kind, MediaDeviceInfo[]>>({ audioinput: [], audiooutput: [], videoinput: [] });
   const [active, setActive] = useState<Record<Kind, string>>({
     audioinput: room.getActiveDevice('audioinput') ?? '',
@@ -54,7 +54,7 @@ export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
               onChange={(e) => {
                 // Passa pela mesma régua do momento de transmitir: a lista some, mas
                 // ninguém escolhe por engano o que não pode.
-                const q = qualidadeValida(e.target.value, souTurbo);
+                const q = qualidadeValida(e.target.value, souBerserk);
                 setQualidade(q);
                 guardarQualidade(q);
               }}
@@ -71,7 +71,7 @@ export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
               quadros é que caem; a 60, os quadros seguem e a imagem é que perde nitidez.
               O servidor reenvia sua transmissão para cada pessoa na sala, então quanto mais
               gente, mais pesa.
-              {!souTurbo && ' 1080p e 60 quadros são do Berserk.'}
+              {!souBerserk && ' 1080p e 60 quadros são do Berserk.'}
             </small>
           </label>
 

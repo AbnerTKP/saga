@@ -50,7 +50,7 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
             <Icon name="close" />
           </button>
 
-          <div className={`perfil-banner ${pessoa.turbo ? 'turbo' : ''} ${banner ? '' : 'vazio'}`}>
+          <div className={`perfil-banner ${pessoa.turbo ? 'berserk' : ''} ${banner ? '' : 'vazio'}`}>
             {banner && (
               <img
                 src={banner}
@@ -66,7 +66,7 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
 
           <div className="perfil-corpo">
             <div
-              className={`perfil-foto ${foto ? 'com-foto' : ''} ${pessoa.turbo ? 'turbo' : ''}`}
+              className={`perfil-foto ${foto ? 'com-foto' : ''} ${pessoa.turbo ? 'berserk' : ''}`}
               onClick={() => foto && setImagemAberta(foto)}
               title={foto ? 'Ver a foto maior' : undefined}
             >
@@ -88,7 +88,7 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
               </span>
               {souEu && <span className="perfil-selo">você</span>}
               {pessoa.turbo && (
-                <span className="perfil-selo turbo"><Icon name="raio" size={12} /> Berserk</span>
+                <span className="perfil-selo berserk"><Icon name="mjolnir" size={12} /> Berserk</span>
               )}
               {naVoz && <span className="perfil-selo ok"><Icon name="speaker" size={12} /> na call</span>}
             </div>

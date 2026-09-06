@@ -5,7 +5,7 @@ const ICONE: Record<Aviso['tipo'], string> = {
   erro: 'close',
   aviso: 'texto',
   sucesso: 'send',
-  turbo: 'raio',
+  turbo: 'mjolnir',
   info: 'pessoas',
 };
 

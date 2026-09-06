@@ -214,7 +214,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* Aviso de atualização */
 /* Avisos. Antes tudo era a mesma tarja vermelha: falha de rede e "isso é do Vorcaro
-   Turbo" tinham a mesma cara de coisa quebrada. Agora cada um se anuncia pela cor, e a
+   Berserk" tinham a mesma cara de coisa quebrada. Agora cada um se anuncia pela cor, e a
    barra da esquerda é o que se lê de relance, antes de qualquer palavra.
    Empilham acima do aviso de atualização, que mora no mesmo canto. */
 /* O contêiner não recebe clique, só os cartões. Ele é largo (até 420px) e alto quando há
@@ -244,7 +244,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .aviso.aviso   .aviso-icone { color: var(--warn); }
 .aviso.sucesso { border-left-color: var(--ok); }
 .aviso.sucesso .aviso-icone { color: var(--ok); }
-/* Turbo é convite, não recusa: roxo, o mesmo do raio na lista de pessoas. */
+/* Berserk é convite, não recusa: roxo, o mesmo do Mjölnir na lista de pessoas. */
 /* Alguém entrou numa sala: informação, não acontecimento. Fica em azul, discreto. */
 .aviso.info    { border-left-color: var(--accent); }
 .aviso.info    .aviso-icone { color: var(--accent); }
@@ -424,7 +424,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .sinal.ruim { color: var(--danger); }
 .sinal.sem { color: var(--text3); }
 
-/* ---- identificador, Turbo e cartão de perfil ---- */
+/* ---- identificador, Berserk e cartão de perfil ---- */
 
 /* O identificador vem antes do nome e cede o lugar a ele: fica menor e apagado. */
 .id-do-membro {
@@ -432,15 +432,15 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   background: rgba(255,255,255,.07); color: var(--text3);
   font-size: .82em; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-/* Em quem é Turbo ele acompanha a distinção, senão o roxo do nome deixava o
+/* Em quem é Berserk ele acompanha a distinção, senão o roxo do nome deixava o
    identificador parecendo apagado por engano, e não por escolha. */
-.turbo .id-do-membro,
-.id-do-membro.turbo {
+.berserk .id-do-membro,
+.id-do-membro.berserk {
   background: rgba(192,132,252,.18); color: #d8b4fe;
 }
 
 /* Arco-íris do Berserk. O gradiente anda devagar de propósito: nome é para ler. */
-.nome-turbo {
+.nome-berserk {
   background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
   background-size: 300% 100%;
   -webkit-background-clip: text; background-clip: text;
@@ -449,16 +449,16 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 }
 @keyframes arco-iris { to { background-position: 300% 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .nome-turbo { animation: none; background-position: 30% 0; }
+  .nome-berserk { animation: none; background-position: 30% 0; }
 }
 
-.selo-turbo {
+.selo-berserk {
   margin-left: 6px; padding: 1px 5px; border-radius: 3px;
   background: linear-gradient(90deg, #a855f7, #ec4899);
   color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .06em; vertical-align: middle;
 }
 
-.membros .acoes button.turbo-on { background: linear-gradient(90deg, #a855f7, #ec4899); color: #fff; }
+.membros .acoes button.berserk-on { background: linear-gradient(90deg, #a855f7, #ec4899); color: #fff; }
 .membros .acoes .campo-id {
   width: 56px; padding: 3px 6px; font-size: 12px; text-align: center;
   font-variant-numeric: tabular-nums;
@@ -549,8 +549,8 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .permissoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }
 .permissoes .check { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 
-/* O raio do Turbo, roxo, junto dos outros ícones da pessoa. */
-.raio-turbo { color: #c084fc; display: flex; }
+/* O Mjölnir do Berserk, roxo, junto dos outros ícones da pessoa. */
+.marca-berserk { color: #c084fc; display: flex; }
 
 /* ---- lista de pessoas e trilha, à direita ---- */
 
@@ -617,11 +617,11 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 .perfil-banner { height: 130px; overflow: hidden; background: var(--bg4); flex: none; }
 .perfil-banner.vazio { background: linear-gradient(135deg, var(--bg4), var(--bg3)); }
-/* Sem banner próprio, o Turbo ganha a faixa colorida — é a distinção que ele compra. */
-.perfil-banner.turbo.vazio { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
+/* Sem banner próprio, o Berserk ganha a faixa colorida — é a distinção que ele compra. */
+.perfil-banner.berserk.vazio { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
   background-size: 300% 100%; animation: arco-iris 8s linear infinite; }
 .perfil-banner img { width: 100%; height: 100%; display: block; cursor: zoom-in; }
-@media (prefers-reduced-motion: reduce) { .perfil-banner.turbo.vazio { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .perfil-banner.berserk.vazio { animation: none; } }
 
 .perfil-corpo { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
 
@@ -632,7 +632,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   overflow: hidden; flex: none;
 }
 .perfil-foto.com-foto { background: none; cursor: zoom-in; }
-.perfil-foto.turbo { border-color: #c084fc; }
+.perfil-foto.berserk { border-color: #c084fc; }
 .perfil-foto img { width: 100%; height: 100%; display: block; }
 
 .perfil-nome { font-size: 22px; font-weight: 700; color: var(--white); line-height: 1.2;
@@ -643,7 +643,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .perfil-selo { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
   border-radius: 10px; background: var(--bg4); color: var(--text2);
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-.perfil-selo.turbo { background: rgba(192,132,252,.16); color: #d8b4fe; }
+.perfil-selo.berserk { background: rgba(192,132,252,.16); color: #d8b4fe; }
 .perfil-selo.ok { background: rgba(35,165,89,.16); color: #57d98a; }
 
 .perfil-dados { margin: 4px 0 0; padding: 12px 14px; display: grid; gap: 10px;
