@@ -205,6 +205,10 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   come o clique do que está por baixo. Vale para qualquer coisa que se ancore num canto.
 - **O CSP precisa de `http:`/`https:` em `img-src` e `media-src`**: a página vem de
   `file://`, então `'self'` não cobre o servidor.
+- **Quem está transmitindo fica sempre à vista, mesmo o que você não está vendo.** É a
+  diferença entre esconder e sumir: uma live que você cortou sem deixar rastro obriga a
+  procurar o caminho de volta, e não havia um. Vale para qualquer coisa que a pessoa
+  desliga — o desligado precisa continuar visível, senão não tem como religar.
 - **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
@@ -215,6 +219,14 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   Quem corta a live tem de cortar as duas: "não assistir" desinscrevia só o vídeo, e o som
   de todas as lives continuava entrando e tocando com a tela apagada. Medido: cortando só
   o vídeo, `screen_share=cortado` e `screen_share_audio=RECEBENDO`.
+- **Parar de ver é por pessoa, e quem foi cortado continua listado.** Era um link geral no
+  topo do palco: cortava todas de uma vez, não dizia de quem eram, e a live sumia da tela
+  — o caminho de volta era achar de novo aquele link. Hoje há a faixa de lives (`.lives`),
+  que sai da **publicação**, não da faixa: quem você cortou não tem faixa nenhuma e mesmo
+  assim continua ali, marcado "parada", a um clique de voltar. E o corte é por pessoa,
+  guardado por identidade, então sobrevive à pessoa parar e recomeçar a transmitir —
+  medido: cortado → parou → voltou a transmitir → continua cortado, e cortar um não mexe
+  no outro.
 - **Só a live que está no palco é ouvida, e "nenhuma no palco" quer dizer silêncio.** A
   regra antiga só calava uma live quando havia OUTRA em destaque — sem destaque, não calava
   nada, que é o mesmo que tocar todas. Bastava clicar numa câmera, ou pedir "não assistir",

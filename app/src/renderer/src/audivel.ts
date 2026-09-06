@@ -7,8 +7,8 @@
  *
  * O que estava errado era o "nenhuma no palco". A regra antiga só calava uma live quando
  * havia OUTRA em destaque; sem destaque nenhum, ela não calava nada — e "nada calado"
- * quer dizer *todas tocando*. Era o que acontecia ao clicar em "não assistir": os vídeos
- * sumiam da tela, o destaque virava nenhum, e o som das lives todas continuava. Aqui,
+ * quer dizer *todas tocando*. Era o que acontecia ao parar de assistir: os vídeos sumiam
+ * da tela, o palco ficava vazio, e o som das lives todas continuava. Aqui,
  * `liveNoPalco: null` significa silêncio, não festa.
  */
 export type Faixa = {
@@ -19,8 +19,8 @@ export type Faixa = {
 
 export type Estado = {
   surdo: boolean;
-  /** Quem escolheu não receber transmissão nenhuma. */
-  semTransmissoes: boolean;
+  /** De quem a pessoa escolheu não receber a live. */
+  cortadas: ReadonlySet<string>;
   /** A live em destaque — ou, se o destaque for uma câmera, a primeira que estiver no ar. */
   liveNoPalco: string | null;
 };
@@ -28,6 +28,6 @@ export type Estado = {
 export const mudo = (faixa: Faixa, estado: Estado): boolean => {
   if (estado.surdo) return true;
   if (!faixa.ehLive) return false;
-  if (estado.semTransmissoes) return true;
+  if (estado.cortadas.has(faixa.identity)) return true;
   return faixa.identity !== estado.liveNoPalco;
 };

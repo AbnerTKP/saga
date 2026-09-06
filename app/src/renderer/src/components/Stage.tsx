@@ -121,6 +121,22 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
   const identidadeNoPalco = liveNoPalco?.participant.identity ?? null;
   useEffect(() => { rm.definirLiveNoPalco(identidadeNoPalco); }, [identidadeNoPalco, rm]);
 
+  // Quem estava cortado não tem faixa, então não tem em que focar ainda. Guarda-se o
+  // pedido e ele é cumprido quando o vídeo chega — senão, voltar a ver uma live com outra
+  // no palco não levava a nada visível, e parecia que o clique não tinha funcionado.
+  const [aguardandoPalco, setAguardandoPalco] = useState<string | null>(null);
+  useEffect(() => {
+    if (!aguardandoPalco) return;
+    const chegou = screens.find((t) => t.participant.identity === aguardandoPalco);
+    if (chegou) { setFocus(chegou.key); setAguardandoPalco(null); }
+  }, [aguardandoPalco, screens]);
+
+  const porNoPalco = (identity: string, cortada: boolean) => {
+    const tela = screens.find((t) => t.participant.identity === identity);
+    if (tela) { setFocus(tela.key); return; }
+    if (cortada) { rm.alternarLive(identity); setAguardandoPalco(identity); }
+  };
+
   // Só transmissão tem volume próprio; câmera não carrega áudio separado.
   const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
     if (t.source !== Track.Source.ScreenShare) return;
@@ -149,19 +165,47 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
             <Icon name="speaker" size={13} /> voz em {rm.roomName}
           </span>
         )}
-        {!idle && (
-          <button
-            className={`link ${rm.semTransmissoes ? 'ligado' : ''}`}
-            title={rm.semTransmissoes
-              ? 'Voltar a receber as transmissões'
-              : 'Parar de receber transmissões — economiza banda, não só esconde'}
-            onClick={rm.alternarTransmissoes}
-          >
-            {rm.semTransmissoes ? 'assistir de novo' : 'não assistir'}
-          </button>
-        )}
-
       </header>
+
+      {/* O hub das lives. Ele é a resposta a "parei de ver e não achei como voltar": quem
+          está transmitindo continua listado aqui mesmo depois de você cortar, e voltar é
+          um clique no nome. O controle antigo era um link no topo, geral e sem estado
+          visível — cortava todas de uma vez e não dizia de quem eram. */}
+      {!idle && rm.lives.length > 0 && (
+        <div className="lives">
+          <span className="lives-titulo"><Icon name="screen" size={14} /> transmitindo</span>
+          {rm.lives.map((l) => {
+            const noPalco = !l.cortada && l.identity === identidadeNoPalco;
+            return (
+              <div key={l.identity} className={`live-chip ${noPalco ? 'no-palco' : ''} ${l.cortada ? 'cortada' : ''}`}>
+                <button
+                  className="live-ver"
+                  title={l.cortada ? `Voltar a ver a live de ${l.nome}`
+                    : noPalco ? `A live de ${l.nome} já está no palco` : `Pôr a live de ${l.nome} no palco`}
+                  onClick={() => porNoPalco(l.identity, l.cortada)}
+                >
+                  <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
+                    enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} />
+                  <span className="live-nome">{l.nome}</span>
+                  {noPalco && <span className="live-estado">no palco</span>}
+                  {l.cortada && <span className="live-estado">parada</span>}
+                </button>
+                {/* A sua própria live não se corta: para parar, é parar de compartilhar. */}
+                {!l.local && (
+                  <button
+                    className="link live-acao"
+                    title={l.cortada ? 'Voltar a receber esta live'
+                      : 'Parar de receber esta live — economiza banda, não só esconde'}
+                    onClick={() => rm.alternarLive(l.identity)}
+                  >
+                    {l.cortada ? 'ver' : 'parar'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
@@ -198,7 +242,11 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
                   </span>
                 ))}
               </div>
-              <div className="muted">Só voz por enquanto. Ligue a câmera ou compartilhe a tela.</div>
+              <div className="muted">
+                {rm.lives.length > 0
+                  ? 'Você parou de ver as lives. Clique num nome ali em cima para voltar.'
+                  : 'Só voz por enquanto. Ligue a câmera ou compartilhe a tela.'}
+              </div>
             </div>
           )}
           {!idle && focusTile && (

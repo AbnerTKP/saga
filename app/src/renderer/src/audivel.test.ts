@@ -4,7 +4,8 @@ import { mudo } from './audivel.ts';
 
 const live = (identity: string) => ({ ehLive: true, identity });
 const voz = (identity: string) => ({ ehLive: false, identity });
-const palco = (liveNoPalco: string | null) => ({ surdo: false, semTransmissoes: false, liveNoPalco });
+const palco = (liveNoPalco: string | null, cortadas: string[] = []) =>
+  ({ surdo: false, cortadas: new Set(cortadas), liveNoPalco });
 
 test('a live no palco é a única que se ouve', () => {
   assert.equal(mudo(live('ana'), palco('ana')), false);
@@ -16,21 +17,23 @@ test('sem live no palco, silêncio — não todas tocando de uma vez', () => {
   assert.equal(mudo(live('bia'), palco(null)), true);
 });
 
-test('quem não quer receber transmissão não ouve nenhuma', () => {
-  const semNada = { surdo: false, semTransmissoes: true, liveNoPalco: 'ana' };
-  assert.equal(mudo(live('ana'), semNada), true, 'nem a que estava no palco');
-  assert.equal(mudo(live('bia'), semNada), true);
+test('live cortada cala mesmo estando no palco', () => {
+  assert.equal(mudo(live('ana'), palco('ana', ['ana'])), true);
+});
+
+test('cortar uma não cala a outra', () => {
+  assert.equal(mudo(live('bia'), palco('bia', ['ana'])), false);
 });
 
 test('a surdez cala tudo, live e voz', () => {
-  const surdo = { surdo: true, semTransmissoes: false, liveNoPalco: 'ana' };
+  const surdo = { surdo: true, cortadas: new Set<string>(), liveNoPalco: 'ana' };
   assert.equal(mudo(live('ana'), surdo), true);
   assert.equal(mudo(voz('ana'), surdo), true);
 });
 
-test('voz e soundboard não dependem do palco', () => {
+test('voz e soundboard não dependem do palco nem do que foi cortado', () => {
   assert.equal(mudo(voz('ana'), palco(null)), false);
   assert.equal(mudo(voz('bia'), palco('ana')), false, 'quem fala não cala por não estar transmitindo');
-  assert.equal(mudo(voz('bia'), { surdo: false, semTransmissoes: true, liveNoPalco: null }), false,
-    'não assistir é sobre transmissão, não sobre quem está falando');
+  assert.equal(mudo(voz('ana'), palco(null, ['ana'])), false,
+    'parar de ver a live de alguém não é deixar de ouvir a pessoa');
 });

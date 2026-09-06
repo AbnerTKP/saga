@@ -33,6 +33,13 @@ import {
 } from 'livekit-client';
 
 export type Tile = { key: string; participant: Participant; track: Track; source: Track.Source; local: boolean };
+
+/** Quem está transmitindo agora — esteja você recebendo ou não. É a lista do hub de lives. */
+export type Live = { identity: string; nome: string; local: boolean; cortada: boolean };
+
+/** Vídeo e som da live são publicações separadas; cortar uma sem a outra deixa som órfão. */
+const ehDaLive = (fonte: Track.Source) =>
+  fonte === Track.Source.ScreenShare || fonte === Track.Source.ScreenShareAudio;
 export type Status = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
 let audioRoot: HTMLDivElement | null = null;
@@ -117,12 +124,12 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   // soundboard de fora, que anda numa faixa própria.
   const volumes = useRef(new Map<string, number>());
 
-  // Quem não quer ver transmissão nenhuma. Não basta esconder: desinscrever para de
-  // receber o vídeo, que é onde está o peso — esconder gastaria a banda do mesmo jeito.
-  const [semTransmissoes, setSemTransmissoes] = useState(false);
+  // De quem a pessoa parou de receber a live, um a um. Não basta esconder: desinscrever
+  // para de receber, que é onde está o peso — esconder gastaria a banda do mesmo jeito.
+  const [cortadas, setCortadas] = useState<ReadonlySet<string>>(new Set());
   // Espelho em ref: aplicarAudio roda fora do ciclo do React — uma faixa que chega logo
-  // depois do clique em "não assistir" seria julgada pelo valor velho e entraria tocando.
-  const semTransmissoesRef = useRef(false);
+  // depois do clique seria julgada pelo valor velho e entraria tocando.
+  const cortadasRef = useRef<ReadonlySet<string>>(new Set());
 
   // Faixa do plano B do áudio da transmissão, publicada por fora do LiveKit.
   const faixaDeMixagem = useRef<MediaStreamTrack | null>(null);
@@ -156,7 +163,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
         el.volume = VOLUME(guardado);
         el.muted = mudo({ ehLive, identity }, {
           surdo: deafenedRef.current,
-          semTransmissoes: semTransmissoesRef.current,
+          cortadas: cortadasRef.current,
           liveNoPalco: liveNoPalco.current,
         });
       } catch (e) {
@@ -232,8 +239,12 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       .on(RoomEvent.ActiveSpeakersChanged, bump)
       .on(RoomEvent.TrackMuted, bump)
       .on(RoomEvent.TrackUnmuted, bump)
-      .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication) => {
+      .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
+        // Quem você cortou continua cortado ao voltar a transmitir. Sem isto, parar de
+        // assistir alguém se desfazia sozinho na próxima vez que a pessoa compartilhasse,
+        // e a banda voltava sem ninguém ter pedido.
+        if (ehDaLive(pub.source) && cortadasRef.current.has(quem.identity)) pub.setSubscribed(false);
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
@@ -572,27 +583,31 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   }, [room, avisar]);
 
   /**
-   * Liga e desliga o recebimento das transmissões alheias.
+   * Para, ou volta a receber, a live de uma pessoa.
    *
-   * O som da live anda numa publicação PRÓPRIA (`ScreenShareAudio`), separada do vídeo.
-   * Desinscrever só o vídeo deixava o som de todas as lives entrando e tocando com a tela
-   * apagada — e o botão promete parar de receber, não esconder.
+   * É por pessoa, não tudo de uma vez: parar de ver a live de alguém é o pedido normal, e
+   * antes só existia o "não assistir" geral — que apagava todas e ainda deixava o som
+   * entrando, porque o som da live anda numa publicação PRÓPRIA (`ScreenShareAudio`),
+   * separada do vídeo. Cortar é cortar as duas.
    */
-  const alternarTransmissoes = useCallback(() => {
-    const novo = !semTransmissoes;
-    setSemTransmissoes(novo);
-    semTransmissoesRef.current = novo;
-    const daLive = (f: Track.Source) => f === Track.Source.ScreenShare || f === Track.Source.ScreenShareAudio;
-    for (const p of room.remoteParticipants.values()) {
-      for (const pub of p.trackPublications.values()) {
-        if (daLive(pub.source) && 'setSubscribed' in pub) {
-          (pub as { setSubscribed(v: boolean): void }).setSubscribed(!novo);
+  const alternarLive = useCallback((identity: string) => {
+    const cortar = !cortadasRef.current.has(identity);
+    const nova = new Set(cortadasRef.current);
+    if (cortar) nova.add(identity); else nova.delete(identity);
+    cortadasRef.current = nova;
+    setCortadas(nova);
+
+    const quem = room.remoteParticipants.get(identity);
+    if (quem) {
+      for (const pub of quem.trackPublications.values()) {
+        if (ehDaLive(pub.source) && 'setSubscribed' in pub) {
+          (pub as { setSubscribed(v: boolean): void }).setSubscribed(!cortar);
         }
       }
     }
     aplicarAudio();
     bump();
-  }, [room, semTransmissoes, aplicarAudio]);
+  }, [room, aplicarAudio]);
 
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
@@ -623,9 +638,21 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   for (const p of participants) {
     for (const pub of p.trackPublications.values()) {
       if (pub.kind !== Track.Kind.Video || !pub.track || pub.isMuted) continue;
-      if (semTransmissoes && pub.source === Track.Source.ScreenShare) continue;
       tiles.push({ key: pub.trackSid, participant: p, track: pub.track, source: pub.source, local: p === room.localParticipant });
     }
+  }
+
+  // O hub de lives sai da PUBLICAÇÃO, não da faixa: quem você cortou não tem faixa
+  // nenhuma, e mesmo assim precisa continuar aparecendo — é por ali que se volta a ver.
+  const lives: Live[] = [];
+  for (const p of participants) {
+    if (!p.getTrackPublication(Track.Source.ScreenShare)) continue;
+    lives.push({
+      identity: p.identity,
+      nome: p.name || p.identity,
+      local: p === room.localParticipant,
+      cortada: cortadas.has(p.identity),
+    });
   }
 
   return {
@@ -634,7 +661,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, tocarSom, volumeDe, definirVolume,
-    semTransmissoes, alternarTransmissoes,
+    lives, alternarLive,
     volumeDaTelaDe, definirVolumeDaTela, definirLiveNoPalco,
   };
 }
