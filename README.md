@@ -136,8 +136,8 @@ Depois, os dois secrets (dá para fazer pelo site, em **Settings › Secrets and
 Actions**, ou pela linha de comando):
 
 ```bash
-base64 -i cantinho.p12 | gh secret set MAC_CERT_P12 --repo AbnerTKP/cantinho-do-vorcaro
-gh secret set MAC_CERT_SENHA --repo AbnerTKP/cantinho-do-vorcaro   # a senha do pkcs12
+base64 -i cantinho.p12 | gh secret set MAC_CERT_P12 --repo AbnerTKP/saga
+gh secret set MAC_CERT_SENHA --repo AbnerTKP/saga   # a senha do pkcs12
 ```
 
 O `CN` precisa bater com `MAC_CERT_NOME` em `.github/workflows/release.yml`. **Guarde o
@@ -186,7 +186,7 @@ O app olha o GitHub Releases do repositório a cada 6 horas (e 5 s depois de abr
 
 Para isso funcionar, uma configuração única:
 
-1. Já feito: o repositório público é `AbnerTKP/cantinho-do-vorcaro`.
+1. Já feito: o repositório público é `AbnerTKP/saga`.
 2. Já feito: `REPO` em `app/src/main/update.ts` e `owner`/`repo` em `app/electron-builder.yml`
    apontam para ele. (Se um dia mudar de repositório, são esses dois lugares.)
 3. Para lançar uma versão: mude `version` em `app/package.json` (ex.: `0.2.0`), faça commit e

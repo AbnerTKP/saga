@@ -29,7 +29,7 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 |---|---|
 | Servidor | `76.13.225.79:3001` (VPS Hostinger, Ubuntu 24.04, root por chave SSH) |
 | Arquivos | `/root/server`, compose `docker-compose.ip.yml`, banco em `/dados` |
-| Repositório | `AbnerTKP/cantinho-do-vorcaro`, link fixo `/releases/latest` |
+| Repositório | `AbnerTKP/saga`, link fixo `/releases/latest` |
 | Dono | apelido `TKP` |
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
 

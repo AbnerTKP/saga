@@ -3,7 +3,7 @@ import { autoUpdater } from 'electron-updater';
 
 // Repositório público no GitHub onde os instaladores são publicados (Releases).
 // Formato: "usuario/repositorio". Precisa ser o mesmo de electron-builder.yml → publish.
-export const REPO = 'AbnerTKP/cantinho-do-vorcaro';
+export const REPO = 'AbnerTKP/saga';
 
 /**
  * Fases da atualização. O app mostra uma tela de partida enquanto está em 'procurando',
@@ -114,7 +114,7 @@ export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () 
   const consultar = async (inicial: boolean) => {
     try {
       const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-        headers: { 'user-agent': 'cantinho-updater' },
+        headers: { 'user-agent': 'saga-updater' },
       });
       if (!r.ok) throw new Error(`GitHub respondeu ${r.status}`);
       const j = (await r.json()) as { tag_name: string; html_url: string; assets?: { name: string; browser_download_url: string }[] };

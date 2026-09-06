@@ -16,7 +16,7 @@ afterPack: ./build/afterPack.js
 publish:
   provider: github
   owner: AbnerTKP
-  repo: cantinho-do-vorcaro
+  repo: saga
   # Sem isto o Release nasce como rascunho, visível só para o dono do repositório:
   # o link /releases/latest daria 404 para quem fosse baixar.
   releaseType: release
