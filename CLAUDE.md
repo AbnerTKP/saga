@@ -88,8 +88,16 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Imagem e som são validados pela assinatura dos bytes**, nunca pelo `content-type`.
 - **A tela vai sem simulcast.** Com ele, o `adaptiveStream` de quem assiste escolhia a
   versão menor sempre que a janela era menor que a tela transmitida — era a imagem borrada.
-- **No macOS a captura usa `useSystemPicker`.** O caminho antigo depende da permissão
-  persistente de Gravação de Tela, que o macOS 15+ revoga sozinho de tempos em tempos.
+- **No Mac o seletor do sistema é plano B, não o padrão.** Ele não chama o nosso handler,
+  e é só dentro dele que se concede `audio: 'loopback'` — sem isso a transmissão vai muda.
+  Medido nesta máquina: pelo seletor do sistema vêm 0 faixas de áudio; pelo nosso, 1,
+  rotulada "System audio". Ele só volta a entrar quando a Gravação de Tela foi **negada**,
+  porque aí o nosso seletor não lista nada; com a permissão pendente usamos o nosso, que
+  faz o macOS perguntar. O motivo de um dia ele ter sido o padrão continua valendo: escolher
+  no seletor do sistema é a própria autorização, e não há permissão a revogar.
+- **Áudio de tela recusado não lança erro** — vira faixa muda, e a própria Electron
+  documenta isso. Depois de publicar, conferimos se a faixa existe; sem essa conferência
+  o Mac transmitiu mudo por versões seguidas sem nada aparecer no registro.
 - **O app é assinado em ad-hoc pelo `afterPack`.** Sem identidade de código estável o
   macOS não guarda permissão de microfone, câmera e tela. Não remover.
 - **Região de arraste engole clique de tudo que é desenhado por cima.** Qualquer coisa

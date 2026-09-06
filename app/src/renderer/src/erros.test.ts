@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { explicarFalhaDeAudio, pareceMixagemDoSistema } from './erros.ts';
+import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros.ts';
 
 test('o erro que o amigo teve vira instrução, não enigma', () => {
   // Foi este, palavra por palavra, o que apareceu no registro dele.
@@ -62,4 +62,21 @@ test('não confunde microfone comum com mixagem', () => {
   ]) {
     assert.equal(pareceMixagemDoSistema(nome), false, nome);
   }
+});
+
+test('tela muda no Mac sem permissão manda ligar a Gravação de Tela', () => {
+  const m = explicarTelaMuda('darwin', 'denied');
+  assert.match(m, /Gravação de Tela/);
+  assert.match(m, /abra o app de novo/);
+});
+
+test('tela muda no Mac com permissão não manda mexer em permissão', () => {
+  const m = explicarTelaMuda('darwin', 'granted');
+  assert.doesNotMatch(m, /Gravação de Tela/);
+  assert.match(m, /não entregou o som/);
+});
+
+test('tela muda fora do Mac não fala do macOS', () => {
+  const m = explicarTelaMuda('win32', 'granted');
+  assert.doesNotMatch(m, /macOS|Mac\b/);
 });

@@ -13,12 +13,27 @@ type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
 
 let pendingSource: { id: string; audio: ModoDeAudio } | null = null;
 
-// No macOS 15+ a captura pelo desktopCapturer depende da permissão persistente de
-// Gravação de Tela, que o sistema volta a pedir sozinho de tempos em tempos — daí o
-// "já autorizei e ele pede de novo". Com o seletor nativo, escolher a janela é a própria
-// autorização: não há permissão para guardar, nem para o sistema revogar.
-// No Windows não existe seletor nativo, então lá seguimos com o nosso.
-const SELETOR_DO_SISTEMA = process.platform === 'darwin';
+// Qual seletor de tela usar. No Windows não existe o nativo, então é sempre o nosso.
+//
+// No Mac já foi o contrário: o seletor do sistema era o primeiro, porque escolher a janela
+// nele é a própria autorização — não há permissão de Gravação de Tela para o sistema
+// guardar nem para revogar sozinho, que é a origem do "já autorizei e ele pede de novo".
+// Só que o seletor do sistema não chama o nosso handler — e é só dentro dele que se concede o
+// áudio do sistema (`audio: 'loopback'`). Medido neste Mac: pelo seletor do sistema vêm 0
+// faixas de áudio; pelo nosso, 1, rotulada "System audio". Por isso, no Mac, o seletor do
+// sistema virou plano B: só entra quando falta a permissão de Gravação de Tela, sem a qual
+// o nosso seletor não consegue nem listar as telas.
+let SELETOR_DO_SISTEMA = false;
+function decidirSeletor() {
+  if (process.platform !== 'darwin') return false;
+  // Existe em tempo de execução desde a Electron 30, mas ainda não está nas tipagens.
+  const capturador = desktopCapturer as { isDisplayMediaSystemPickerAvailable?: () => boolean };
+  if (!capturador.isDisplayMediaSystemPickerAvailable?.()) return false;
+  // 'not-determined' é a primeira vez: aí vale usar o nosso, que faz o macOS perguntar.
+  // Só quem já disse não fica com o seletor do sistema — mudo, mas ao menos transmitindo.
+  const permissao = systemPreferences.getMediaAccessStatus('screen');
+  return permissao === 'denied' || permissao === 'restricted';
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -85,6 +100,11 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(['media', 'display-capture', 'notifications'].includes(permission));
   });
+
+  SELETOR_DO_SISTEMA = decidirSeletor();
+  registrar('info', 'tela', SELETOR_DO_SISTEMA
+    ? 'seletor do sistema (o áudio da tela não vem por aqui: falta a permissão de Gravação de Tela)'
+    : 'seletor do app (o áudio da tela pode vir junto)');
 
   // Com o seletor nativo ligado, este handler não é chamado — o macOS resolve sozinho.
   // Ele continua aqui para o Windows e para macOS antigo, onde o seletor não existe.

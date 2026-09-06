@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
-import { explicarFalhaDeAudio, pareceMixagemDoSistema } from './erros';
+import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros';
 import { VOLUME } from './volume';
 import { qualidadeValida, type Qualidade } from './qualidades';
 
@@ -289,7 +289,7 @@ export function useRoom(souTurbo = false) {
     // 'loopback', o 'loopbackWithMute' às vezes passa. Só vale no Windows, onde nós
     // escolhemos a fonte; no Mac quem resolve o áudio é o seletor do próprio sistema.
     const modos: ModoDeAudio[] = !audio ? ['nao']
-      : sourceId ? ['loopback', 'loopbackWithMute', 'nao']
+      : sourceId && window.desktop.platform === 'win32' ? ['loopback', 'loopbackWithMute', 'nao']
       : ['loopback', 'nao'];
 
     let ultimoMotivo = '';
@@ -297,6 +297,17 @@ export function useRoom(souTurbo = false) {
       try {
         if (sourceId) await window.desktop.chooseSource(sourceId, modo);
         await lp().setScreenShareEnabled(true, { ...captura, audio: modo !== 'nao' }, publicacao);
+
+        // Áudio recusado não lança erro: vira uma faixa morta, calada. É o que deixou o Mac
+        // transmitindo mudo sem nada no registro. Quem sabe se veio ou não é a publicação.
+        const veioAudio = !!lp().getTrackPublication(Track.Source.ScreenShareAudio);
+        if (audio && modo !== 'nao' && !veioAudio) {
+          anotar('aviso', 'tela', `modo "${modo}" foi aceito, mas nenhuma faixa de áudio foi publicada`);
+          const permissao = await window.desktop.screenPermission().catch(() => 'unknown');
+          setError(explicarTelaMuda(window.desktop.platform, permissao));
+        } else if (audio && veioAudio) {
+          anotar('info', 'tela', `áudio da tela publicado no modo "${modo}"`);
+        }
 
         if (modo === 'loopbackWithMute') {
           anotar('info', 'tela', 'áudio do sistema só passou no modo com silenciamento local');

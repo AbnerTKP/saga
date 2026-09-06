@@ -35,3 +35,22 @@ const NOMES_DE_CABO_VIRTUAL = /cable output|vb-?audio|voicemeeter|virtual audio|
 
 export const pareceMixagemDoSistema = (rotulo: string) =>
   NOMES_DE_MIXAGEM.test(rotulo ?? '') || NOMES_DE_CABO_VIRTUAL.test(rotulo ?? '');
+
+/**
+ * A Electron avisa, na documentação do `desktopCapturer`, que uma captura de áudio
+ * recusada no macOS vira uma faixa morta — sem erro, sem aviso. Foi assim que o Mac
+ * passou a transmitir mudo sem ninguém descobrir por quê. Quando a faixa não vem,
+ * é esta função que diz o que houve.
+ */
+export function explicarTelaMuda(plataforma: string, permissaoDeTela: string): string {
+  if (plataforma === 'darwin' && permissaoDeTela !== 'granted') {
+    return 'Transmitindo sem o áudio: no Mac ele só vem pelo seletor do próprio app, e esse '
+      + 'seletor depende da permissão de Gravação de Tela. Ligue o Cantinho do Vorcaro em '
+      + 'Ajustes do Sistema › Privacidade e Segurança › Gravação de Tela e abra o app de novo.';
+  }
+  if (plataforma === 'darwin') {
+    return 'Transmitindo sem o áudio: o macOS aceitou compartilhar a tela, mas não entregou o '
+      + 'som do sistema junto.';
+  }
+  return 'Transmitindo sem o áudio do sistema: ele foi pedido, mas não veio junto com a tela.';
+}

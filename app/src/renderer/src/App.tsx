@@ -168,8 +168,8 @@ export function App() {
     try { await moderar(acao, alvo, extra); } catch (e) { rm.setError((e as Error).message); }
   }, [rm]);
 
-  // No Mac quem escolhe a janela é o próprio sistema, então abrir o nosso seletor
-  // significaria escolher duas vezes. No Windows ele continua sendo o caminho.
+  // O seletor do sistema, quando entra, escolhe a janela sozinho — abrir o nosso ali
+  // significaria escolher duas vezes. Quem decide qual é qual é o processo principal.
   const compartilhar = useCallback(async () => {
     if (rm.screenOn) return rm.stopScreen();
     if (!seletorDoSistema) return setPicker(true);
