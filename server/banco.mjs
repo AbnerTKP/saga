@@ -77,7 +77,7 @@ export const MIGRACOES = [
    )`,
   `CREATE INDEX sons_servidor ON sons(servidor_id)`,
 
-  // Vorcaro Turbo: distinção que o dono concede. Destrava nome em arco-íris e imagem
+  // Berserk: distinção que o dono concede. Destrava nome em arco-íris e imagem
   // animada no perfil.
   `ALTER TABLE membros ADD COLUMN turbo INTEGER NOT NULL DEFAULT 0`,
   // Identificador curto que aparece antes do nome, no gosto da casa. Texto, não número:

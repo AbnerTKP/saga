@@ -51,10 +51,10 @@ export function iniciarRegistro() {
   const pasta = join(app.getPath('userData'), 'registro');
   try {
     mkdirSync(pasta, { recursive: true });
-    arquivo = join(pasta, 'cantinho.log');
+    arquivo = join(pasta, 'saga.log');
     // Uma rotação só: o arquivo atual e o anterior. Mais que isso não ajuda ninguém.
     if (existsSync(arquivo) && statSync(arquivo).size > LIMITE) {
-      renameSync(arquivo, join(pasta, 'cantinho.anterior.log'));
+      renameSync(arquivo, join(pasta, 'saga.anterior.log'));
     }
   } catch { arquivo = ''; }
 

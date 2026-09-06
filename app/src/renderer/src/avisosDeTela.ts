@@ -1,5 +1,5 @@
 // Os avisos que a tela mostra. Antes era uma tarja vermelha para tudo: falha de rede,
-// alguém entrando, e "isso é do Vorcaro Turbo" tinham a mesma cara de coisa quebrada.
+// alguém entrando, e "isso é do Berserk" tinham a mesma cara de coisa quebrada.
 
 export type TipoDeAviso = 'erro' | 'aviso' | 'sucesso' | 'turbo' | 'info';
 

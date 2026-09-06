@@ -49,7 +49,7 @@ export function explicarTelaMuda(plataforma: string): string {
   if (plataforma === 'darwin') {
     return 'Transmitindo sem o áudio: o macOS aceitou compartilhar a tela, mas não entregou o '
       + 'som do sistema. Em Ajustes do Sistema › Privacidade e Segurança › Gravação do Áudio '
-      + 'do Sistema e da Tela, ligue o Cantinho do Vorcaro — e se a chave já estiver ligada, '
+      + 'do Sistema e da Tela, ligue a Saga — e se a chave já estiver ligada, '
       + 'desligue e ligue de novo, porque depois de atualizar o macOS guarda a permissão da '
       + 'versão anterior. Depois feche e abra o app.';
   }

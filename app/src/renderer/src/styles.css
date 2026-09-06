@@ -439,7 +439,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   background: rgba(192,132,252,.18); color: #d8b4fe;
 }
 
-/* Arco-íris do Vorcaro Turbo. O gradiente anda devagar de propósito: nome é para ler. */
+/* Arco-íris do Berserk. O gradiente anda devagar de propósito: nome é para ler. */
 .nome-turbo {
   background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
   background-size: 300% 100%;
@@ -554,7 +554,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* ---- lista de pessoas e trilha, à direita ---- */
 
-/* A trilha fica na ponta direita e é quadrada: a cara do Cantinho, não a do Discord. */
+/* A trilha fica na ponta direita e é quadrada: a cara da Saga, não a do Discord. */
 .app { grid-template-columns: 240px 1fr 220px 60px; }
 
 .lista-membros { background: var(--bg1); display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); }

@@ -47,7 +47,7 @@ export function NovoServidor({ onPronto, onClose }: {
               autoFocus
               value={texto}
               maxLength={criando ? 40 : 8}
-              placeholder={criando ? 'Cantinho dos Jogos' : 'ABCD2345'}
+              placeholder={criando ? 'Cardume dos Jogos' : 'ABCD2345'}
               onChange={(e) => setTexto(criando ? e.target.value : e.target.value.toUpperCase())}
               onKeyDown={(e) => { if (e.key === 'Enter' && texto.trim()) enviar(); }}
             />

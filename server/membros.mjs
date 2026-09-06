@@ -92,7 +92,7 @@ const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, n�
 /** Turbo é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo. */
 export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
   if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'concederTurbo')) {
-    throw new ErroDeConta('Seu cargo não permite conceder o Vorcaro Turbo.', 403);
+    throw new ErroDeConta('Seu cargo não permite conceder o Berserk.', 403);
   }
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
   if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);

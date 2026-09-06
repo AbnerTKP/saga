@@ -141,7 +141,7 @@ test('quem não é membro do servidor não entra', () => {
   assert.match(impedimento(buscarMembro(db, sid, 999)), /não faz parte/);
 });
 
-// --- Vorcaro Turbo e identificador ---------------------------------------------
+// --- Berserk e identificador ---------------------------------------------
 
 test('ninguém nasce Turbo', () => {
   const { db, sid, cria } = cenario();

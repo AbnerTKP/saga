@@ -17,7 +17,7 @@ export const PERMISSOES = {
   gerirSalas: 'Criar, renomear e apagar salas',
   gerirSons: 'Subir e apagar sons do soundboard',
   gerirServidor: 'Mudar nome e imagens do servidor',
-  concederTurbo: 'Dar e tirar o Vorcaro Turbo',
+  concederTurbo: 'Dar e tirar o Berserk',
   definirId: 'Definir o identificador de alguém',
 };
 

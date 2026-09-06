@@ -1,7 +1,7 @@
 // Onde a foto e o banner ficam dentro do espaço em que aparecem.
 //
 // O app não recorta: recortar é redesenhar a imagem, e um GIF redesenhado perde a
-// animação — justamente o que o Vorcaro Turbo destrava. Guardamos onde a imagem foi
+// animação — justamente o que o Berserk destrava. Guardamos onde a imagem foi
 // arrastada e o quanto foi aproximada, e aplicamos isso na hora de mostrar.
 //
 // As mesmas regras existem em `server/enquadramento.mjs`, porque o que vem daqui nunca é

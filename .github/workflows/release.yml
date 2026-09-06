@@ -65,6 +65,11 @@ jobs:
       # Nome comum do certificado, igual ao usado para gerá-lo. Não é segredo, e é o erro
       # mais fácil de cometer: se não bater com o do chaveiro, o codesign não acha a
       # identidade. Ver README para gerar o certificado e guardar o .p12 nos secrets.
+      #
+      # Continua "Cantinho do Vorcaro" DE PROPÓSITO, mesmo o app se chamando Saga: este é
+      # o nome dentro do .p12 que está no secret, não o nome do app. Trocar aqui sem gerar
+      # um certificado novo faz o codesign não achar a identidade e cair no ad-hoc — e o
+      # ad-hoc é justamente o que fazia a permissão de tela cair a cada versão.
       MAC_CERT_NOME: "Cantinho do Vorcaro"
     steps:
       - uses: actions/checkout@v4

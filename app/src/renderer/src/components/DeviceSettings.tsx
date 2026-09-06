@@ -9,7 +9,7 @@ const labels: Record<Kind, string> = { audioinput: 'Microfone', audiooutput: 'Sa
 
 export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
   room: Room;
-  /** 1080p e 60 quadros são do Vorcaro Turbo; sem ele, só 720p a 30. */
+  /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
   souTurbo: boolean;
   onRegistro: () => void;
   onClose: () => void;
@@ -61,7 +61,7 @@ export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
             >
               {TODAS.map((q) => (
                 <option key={q} value={q} disabled={!permitidas.includes(q)}>
-                  {COMO_SE_LE[q]}{!permitidas.includes(q) ? ' — Vorcaro Turbo' : ''}
+                  {COMO_SE_LE[q]}{!permitidas.includes(q) ? ' — Berserk' : ''}
                 </option>
               ))}
             </select>
@@ -71,7 +71,7 @@ export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
               quadros é que caem; a 60, os quadros seguem e a imagem é que perde nitidez.
               O servidor reenvia sua transmissão para cada pessoa na sala, então quanto mais
               gente, mais pesa.
-              {!souTurbo && ' 1080p e 60 quadros são do Vorcaro Turbo.'}
+              {!souTurbo && ' 1080p e 60 quadros são do Berserk.'}
             </small>
           </label>
 

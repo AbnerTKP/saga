@@ -7,7 +7,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypt
 export class ErroDeConta extends Error {
   /**
    * `tipo` diz ao app com que cara mostrar isto. Nem toda recusa é falha: "isso é do
-   * Vorcaro Turbo" é convite, e pintá-lo de vermelho como um erro faz a pessoa achar que
+   * Berserk" é convite, e pintá-lo de vermelho como um erro faz a pessoa achar que
    * quebrou alguma coisa. Quem decide é aqui, não o app adivinhando pelo texto.
    */
   constructor(mensagem, status = 400, tipo = 'erro') {

@@ -88,6 +88,12 @@ export type Sessao = {
 
 // Fica no computador para o app abrir já logado. É um crachá, não a senha: quem
 // for banido ou expulso perde o dele no servidor, e ele deixa de valer na hora.
+/**
+ * As chaves guardam o prefixo `cantinho.` de propósito, com o app já se chamando Saga.
+ * Elas não aparecem para ninguém, e renomear teria um preço só: deslogar todo mundo e
+ * zerar qualidade, marcador de lidas e último apelido, tudo de uma vez, sem ninguém
+ * entender por quê. Prefixo antigo é dívida barata; conta perdida, não.
+ */
 const CHAVE = 'cantinho.sessao';
 const CHAVE_SERVIDOR = 'cantinho.servidor';
 

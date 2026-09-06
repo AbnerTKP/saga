@@ -115,7 +115,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           </div>
           <p className="muted small">
             Seu nome aqui é o que os outros veem. O apelido de entrada continua <b>{eu.apelido}</b> e não muda.
-            {!eu.turbo && ' Imagem animada é do Vorcaro Turbo; parada, todo mundo pode.'}
+            {!eu.turbo && ' Imagem animada é do Berserk; parada, todo mundo pode.'}
           </p>
           <div className="linha-campo">
             <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
@@ -358,7 +358,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                 <div className="quem">
                   <div className="strong">
                     <Nome membro={m} />
-                    {m.turbo && <span className="selo-turbo" title="Vorcaro Turbo">TURBO</span>}
+                    {m.turbo && <span className="selo-turbo" title="Berserk">TURBO</span>}
                     {m.id === eu.id && <span className="muted small"> (você)</span>}
                   </div>
                   <div className="muted small">
@@ -393,7 +393,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                   {pode(eu.cargo, 'concederTurbo') && (
                     <button
                       className={m.turbo ? 'turbo-on' : ''}
-                      title={m.turbo ? 'Tirar o Vorcaro Turbo' : 'Dar Vorcaro Turbo'}
+                      title={m.turbo ? 'Tirar o Berserk' : 'Dar Berserk'}
                       disabled={ocupado}
                       onClick={() => agir('turbo', m, { turbo: !m.turbo })}
                     >

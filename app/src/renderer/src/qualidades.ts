@@ -1,7 +1,7 @@
 /**
  * Qualidades de transmissão e quem alcança cada uma.
  *
- * 1080p em qualquer taxa, e 60 quadros em qualquer resolução, são do Vorcaro Turbo.
+ * 1080p em qualquer taxa, e 60 quadros em qualquer resolução, são do Berserk.
  * Quem não tem fica em 720p a 30 — que é o suficiente para mostrar uma tela, e o que
  * menos pesa no servidor, já que ele reenvia a transmissão para cada pessoa da sala.
  */

@@ -35,11 +35,11 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
 
         {semAcesso ? (
           <div className="pad">
-            <p>O macOS não está deixando o Cantinho do Vorcaro ver as telas.</p>
+            <p>O macOS não está deixando a Saga ver as telas.</p>
             <ol>
               <li>Abra <b>Ajustes do Sistema › Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela</b>.</li>
               <li>
-                Ache o <b>Cantinho do Vorcaro</b> na lista e <b>remova pelo botão −</b>. Só
+                Ache a <b>Saga</b> na lista e <b>remova pelo botão −</b>. Só
                 desligar e ligar a chave costuma não bastar: a linha antiga guarda a
                 assinatura da versão anterior e continua negando, mesmo aparecendo ligada.
               </li>

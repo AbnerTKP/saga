@@ -1,4 +1,4 @@
-# Cantinho do Vorcaro — voz, vídeo e tela entre amigos
+# Saga — voz, vídeo e tela entre amigos
 
 App de desktop (Windows e Mac) no estilo Discord, sem cadastro e sem servidores de comunidade:
 uma senha compartilhada, algumas salas de voz fixas, câmera, compartilhamento de tela com áudio
@@ -85,8 +85,8 @@ teimoso (firewall que só deixa 443), troque no `livekit.yaml` `tls_port: 5349` 
 ## Gerar os instaladores
 
 ```bash
-pnpm dist:mac   # gera "app/dist/Cantinho do Vorcaro-0.1.0-universal.dmg" (Intel + Apple Silicon)
-pnpm dist:win   # gera "app/dist/Cantinho do Vorcaro Setup 0.1.0.exe" (dá para gerar no Mac mesmo)
+pnpm dist:mac   # gera "app/dist/Saga-0.1.0-universal.dmg" (Intel + Apple Silicon)
+pnpm dist:win   # gera "app/dist/Saga Setup 0.1.0.exe" (dá para gerar no Mac mesmo)
 ```
 
 Os instaladores **não são assinados por uma autoridade** (o certificado custa US$ 99/ano na
@@ -119,7 +119,7 @@ distinguished_name=dn
 x509_extensions=v3
 prompt=no
 [dn]
-CN=Cantinho do Vorcaro
+CN=Cantinho do Vorcaro   # nome do certificado, NÃO do app: é o que está no secret
 [v3]
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature
@@ -149,13 +149,13 @@ Sem os secrets, o build sai em ad-hoc como antes — o CI não quebra, só não 
 conferir qual dos dois aconteceu, o registro do build imprime o requisito:
 
 ```
-• assinado com "Cantinho do Vorcaro"  …/Cantinho do Vorcaro.app
+• assinado com "Cantinho do Vorcaro"  …/Saga.app
 • designated => identifier "br.com.vorcaro.cantinho" and certificate leaf = H"…"
 ```
 
 Na **primeira** versão assinada, cada pessoa ainda precisa reconceder uma vez, porque o
 requisito muda de hash para certificado justamente nesse build: em **Ajustes do Sistema ›
-Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela**, remover o Cantinho pelo
+Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela**, remover a Saga pelo
 botão **−** (só desligar e ligar a chave costuma não bastar), compartilhar a tela de novo
 para o macOS pedir, e sair do app por completo (⌘Q) antes de reabrir. Da versão seguinte em
 diante, para de pedir.
@@ -164,7 +164,7 @@ Para amigos, basta explicar:
 
 - **Mac**: arraste para Aplicativos. Na primeira vez, o macOS diz que "não pôde verificar".
   Abra **Ajustes do Sistema › Privacidade e Segurança**, role até o aviso e clique em
-  **Abrir Mesmo Assim**. Alternativa no Terminal: `xattr -d com.apple.quarantine "/Applications/Cantinho do Vorcaro.app"`.
+  **Abrir Mesmo Assim**. Alternativa no Terminal: `xattr -d com.apple.quarantine "/Applications/Saga.app"`.
   Ao compartilhar tela pela primeira vez, o macOS pede permissão de **Gravação de Tela**; o app
   mostra o caminho e o botão que abre o painel certo. Depois de ligar, feche e abra o app.
 - **Windows**: o SmartScreen mostra "Windows protegeu o seu PC". Clique em **Mais informações ›

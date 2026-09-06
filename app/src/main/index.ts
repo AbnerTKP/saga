@@ -1,7 +1,46 @@
 import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell } from 'electron';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { cpSync, existsSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
+
+/**
+ * O app se chamava "Cantinho do Vorcaro" e passou a se chamar "Saga".
+ *
+ * O Electron guarda os dados numa pasta com o NOME do app. Trocar o nome, sozinho, faria
+ * a pasta nova nascer vazia: todo mundo deslogado, qualidade de transmissão no padrão,
+ * marcador de mensagem lida zerado e o último apelido esquecido — tudo mora no
+ * localStorage, que mora ali dentro. Ninguém ia ligar uma coisa à outra; ia parecer que a
+ * versão nova apagou as contas.
+ *
+ * Então, na primeira vez que a pasta nova estiver vazia, a antiga é copiada por cima. Só
+ * o que interessa: o cache tem 68 MB e se refaz sozinho. É de mão única e roda uma vez —
+ * quando a pasta nova já tiver vida própria, a antiga vira lixo que a pessoa pode apagar.
+ *
+ * Tem de acontecer ANTES de o Electron abrir esses arquivos, por isso está aqui em cima e
+ * não dentro do whenReady.
+ */
+const NOME_ANTIGO = 'Cantinho do Vorcaro';
+const HERANCA = ['Local Storage', 'Session Storage', 'Preferences', 'registro'];
+
+function herdarDoNomeAntigo() {
+  try {
+    const nova = app.getPath('userData');
+    if (existsSync(join(nova, 'Local Storage'))) return;      // já tem vida própria
+    const velha = join(dirname(nova), NOME_ANTIGO);
+    if (!existsSync(join(velha, 'Local Storage'))) return;    // instalação nova, nada a herdar
+    for (const parte of HERANCA) {
+      const de = join(velha, parte);
+      if (existsSync(de)) cpSync(de, join(nova, parte), { recursive: true });
+    }
+    console.log(`dados herdados de "${NOME_ANTIGO}"`);
+  } catch (e) {
+    // Herdar é conforto, não requisito: falhando, a pessoa faz login de novo.
+    console.error('não deu para herdar os dados do nome antigo:', e);
+  }
+}
+
+herdarDoNomeAntigo();
 
 /**
  * Como o áudio do sistema é capturado. Os modos falham por motivos diferentes, e por isso
@@ -48,7 +87,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 560,
     backgroundColor: '#1e1f22',
-    title: 'Cantinho do Vorcaro',
+    title: 'Saga',
     // Nasce escondida. Quem clica no ícone espera que o app já venha atualizado — ver a
     // janela abrir e só depois anunciar que há atualização é a ordem errada.
     show: false,
@@ -163,7 +202,7 @@ app.whenReady().then(async () => {
       registrar('aviso', 'tela', 'o sistema não devolveu nenhuma tela: permissão de Gravação de Tela');
     }
     return sources
-      .filter((s) => !s.name.startsWith('Cantinho do Vorcaro'))
+      .filter((s) => !s.name.startsWith('Saga'))
       .map((s) => ({
         id: s.id,
         name: s.name,

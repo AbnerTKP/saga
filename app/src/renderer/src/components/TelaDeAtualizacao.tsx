@@ -29,7 +29,7 @@ export function TelaDeAtualizacao({ estado, onPular }: { estado: UpdateState; on
   return (
     <div className="partida">
       <div className="partida-caixa">
-        <h1>Cantinho do Vorcaro</h1>
+        <h1>Saga</h1>
 
         {estado.fase === 'procurando' && <p className="muted">Procurando atualizações…</p>}
 

@@ -1,4 +1,4 @@
-# Cantinho do Vorcaro
+# Saga
 
 App de desktop (Windows e Mac) estilo Discord para um grupo de amigos: contas com cargos
 que o dono desenha, salas de voz e de texto, câmera, compartilhamento de tela, soundboard,
@@ -76,7 +76,26 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.
 - **As salas do `.env` semeiam só o primeiro arranque.** Semeando sempre, uma sala apagada
   voltaria no reinício seguinte e ninguém ligaria uma coisa à outra.
-- **1080p e 60 quadros são do Vorcaro Turbo**, e a régua (`qualidades.ts`) vale tanto na
+- **O app se chamava "Cantinho do Vorcaro" e o Turbo, "Vorcaro Turbo".** Hoje são **Saga**
+  (o sentido nórdico da palavra: a narrativa, e a deusa Sága) e **Berserk**. Em português
+  "saga" é feminino, e é assim que a interface fala: *a* Saga. Três coisas **não** foram
+  renomeadas junto, e cada uma por um motivo:
+  - **As chaves do `localStorage` (`cantinho.sessao`, `cantinho.qualidade`, …)** — renomear
+    desloga todo mundo e zera qualidade, marcador de lidas e último apelido de uma vez, sem
+    ninguém entender por quê. Prefixo antigo é dívida barata; conta perdida, não.
+  - **O `appId` `br.com.vorcaro.cantinho`** — é o identificador de pacote no macOS, e é
+    por ele que o TCC guarda a permissão de tela. Trocar faria todo mundo conceder de novo,
+    justamente o que o certificado próprio existe para evitar. Ninguém vê esse texto.
+  - **O `MAC_CERT_NOME` no CI** — é o nome dentro do `.p12` que está no secret, não o nome
+    do app. Trocar sem gerar certificado novo faz o `codesign` não achar a identidade e cair
+    no ad-hoc.
+- **Trocar o nome do app muda a pasta de dados do Electron**, que leva o nome dele. Sem
+  fazer nada, a versão nova nasceria sem sessão, sem ajustes e sem marcador de lidas — e
+  pareceria que ela apagou as contas. Por isso `herdarDoNomeAntigo` copia
+  `Local Storage`, `Session Storage`, `Preferences` e `registro` da pasta antiga na
+  primeira abertura, e só nela. O cache fica para trás de propósito: são 68 MB que se
+  refazem sozinhos.
+- **1080p e 60 quadros são do Berserk**, e a régua (`qualidades.ts`) vale tanto na
   escolha quanto na hora de transmitir. É trava do app, não do servidor: o LiveKit não
   limita bitrate por participante, então é regra de conduta, não cerca.
 - **Numa cena pesada não cabem nitidez e fluidez — e quem escolhe é a pessoa, no menu.**
@@ -259,7 +278,7 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   e cada "não assistir / assistir de novo" deixava mais um para trás. Por isso o elemento
   carrega o `sid` da faixa: é por ele que se acha o dono na hora de tirar.
 - **Enquadrar não é recortar.** Recortar significa redesenhar a imagem, e um GIF
-  redesenhado perde a animação — o que o Vorcaro Turbo destrava. Guardamos posição e
+  redesenhado perde a animação — o que o Berserk destrava. Guardamos posição e
   aproximação, e aplicamos ao mostrar; o arquivo enviado nunca é tocado. A imagem também
   não é reduzida: vai como veio, e o que torna isso aceitável é o nome ser o hash do
   conteúdo, então cada pessoa baixa uma vez. A conta é uma só (`enquadramento.ts`), usada
@@ -267,7 +286,7 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   que a pessoa viu ao ajustar. O servidor tem a mesma régua, porque o que vem do app
   nunca é palavra final.
 - **Quem diz o tipo do aviso é o servidor**, não o app adivinhando pelo texto. "Isso é do
-  Vorcaro Turbo" é convite, não falha, e pintá-lo de vermelho faz a pessoa achar que
+  Berserk" é convite, não falha, e pintá-lo de vermelho faz a pessoa achar que
   quebrou alguma coisa. Erro fica na tela até fecharem; o resto some sozinho.
 - **O marcador de mensagem lida fica no computador de quem lê**, e viaja na busca de
   salas que já acontecia. Guardar no banco pediria tabela nova para um problema que

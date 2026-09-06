@@ -1,7 +1,7 @@
 // Como a foto e o banner ficam posicionados no espaço em que aparecem.
 //
 // O app NÃO recorta a imagem: guardar um recorte significaria redesenhá-la, e um GIF
-// redesenhado perde a animação — esvaziaria justamente o que o Vorcaro Turbo destrava.
+// redesenhado perde a animação — esvaziaria justamente o que o Berserk destrava.
 // Em vez disso guardamos onde a imagem foi arrastada e o quanto foi aproximada, e isso é
 // aplicado na hora de mostrar. O arquivo enviado nunca é tocado.
 //

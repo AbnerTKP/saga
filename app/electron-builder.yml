@@ -1,5 +1,5 @@
 appId: br.com.vorcaro.cantinho
-productName: Cantinho do Vorcaro
+productName: Saga
 directories:
   output: dist
   buildResources: build

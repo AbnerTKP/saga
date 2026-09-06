@@ -88,7 +88,7 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
               </span>
               {souEu && <span className="perfil-selo">você</span>}
               {pessoa.turbo && (
-                <span className="perfil-selo turbo"><Icon name="raio" size={12} /> Vorcaro Turbo</span>
+                <span className="perfil-selo turbo"><Icon name="raio" size={12} /> Berserk</span>
               )}
               {naVoz && <span className="perfil-selo ok"><Icon name="speaker" size={12} /> na call</span>}
             </div>

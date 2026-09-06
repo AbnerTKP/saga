@@ -1,4 +1,4 @@
-// Servidor do Cantinho: contas, cargos e emissão de tokens do LiveKit.
+// Servidor da Saga: contas, cargos e emissão de tokens do LiveKit.
 //
 // A autenticação é por sessão, não mais pela senha do grupo em cada pedido: a senha do
 // grupo virou só o convite, exigida uma vez, no cadastro. Sem isso não haveria como saber
@@ -24,7 +24,7 @@ import * as membros from './membros.mjs';
 const PORT = Number(process.env.PORT ?? 3001);
 const SENHA_DO_GRUPO = process.env.APP_PASSWORD ?? '';
 const SALAS_INICIAIS = (process.env.ROOMS ?? 'Geral').split(',').map((s) => s.trim()).filter(Boolean);
-const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Cantinho do Vorcaro';
+const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Saga';
 const DONO = process.env.DONO ?? '';            // apelido que vira dono; vazio = o primeiro a entrar
 const BANCO = process.env.BANCO ?? './dados/cantinho.db';
 /**
@@ -144,7 +144,7 @@ const salasDeVoz = (sid) => salasDoServidor(sid).filter((s) => s.tipo === 'voz')
 
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
-  // Quem chega sem vínculo nenhum entra no semeado pelo .env — é o Cantinho de casa.
+  // Quem chega sem vínculo nenhum entra no semeado pelo .env — é o servidor de casa.
   const temVinculo = db.prepare('SELECT count(*) c FROM membros WHERE usuario_id = ?').get(usuario.id).c > 0;
   if (!temVinculo) membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
 
@@ -249,7 +249,7 @@ async function ondeEsta(sid, usuarioId) {
 }
 
 /**
- * Imagem animada é privilégio do Vorcaro Turbo. O servidor confere, e não a tela: do
+ * Imagem animada é privilégio do Berserk. O servidor confere, e não a tela: do
  * contrário bastaria alterar o app para contornar.
  */
 function guardarComRegraDoTurbo(eu, bruto, papel, de) {
@@ -258,7 +258,7 @@ function guardarComRegraDoTurbo(eu, bruto, papel, de) {
   // O servidor é do dono, então a imagem dele não passa por essa régua.
   if (animada && de === 'usuario' && !eu.turbo) {
     throw new ErroDeConta(
-      'Imagem animada é do Vorcaro Turbo. Peça ao dono, ou use PNG, JPG ou WEBP.', 403, 'turbo');
+      'Imagem animada é do Berserk. Peça ao dono, ou use PNG, JPG ou WEBP.', 403, 'turbo');
   }
   return nome;
 }
@@ -648,7 +648,7 @@ const servidor = http.createServer(async (req, res) => {
 
 servidor.listen(PORT, () => {
   console.log(
-    `Cantinho em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
+    `Saga em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
     + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
   );
   // Dito em voz alta de propósito: as fotos já sumiram uma vez indo parar dentro do

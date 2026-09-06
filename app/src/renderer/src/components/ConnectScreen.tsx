@@ -45,7 +45,7 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   return (
     <div className="connect">
       <form className="connect-card" onSubmit={enviar}>
-        <h1>Cantinho do Vorcaro</h1>
+        <h1>Saga</h1>
         <p className="muted">Voz, vídeo e tela entre amigos.</p>
 
         <div className="tabs" role="tablist">

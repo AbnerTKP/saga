@@ -89,7 +89,7 @@ test('cadastro devolve sessão, servidor e salas de uma vez', async () => {
   assert.equal(r.corpo.eu.cargoNome, 'Dono', 'o apelido de DONO devia virar dono');
   assert.deepEqual(r.corpo.salas.map((s) => s.nome), ['Geral', 'Jogos']);
   assert.deepEqual(r.corpo.salas.map((s) => s.tipo), ['voz', 'voz'], 'as semeadas são de voz');
-  assert.equal(r.corpo.servidor.nome, 'Cantinho do Vorcaro');
+  assert.equal(r.corpo.servidor.nome, 'Saga');
 });
 
 test('a senha nunca volta na resposta', async () => {
@@ -247,7 +247,7 @@ test('imagem animada é recusada a quem não é Turbo', async () => {
   const { token } = await sessaoDe('abner');
   const r = await subir('/eu/banner', token, GIF);
   assert.equal(r.status, 403);
-  assert.match(r.corpo.error, /Turbo/);
+  assert.match(r.corpo.error, /Berserk/);
 });
 
 test('imagem parada continua livre para todos', async () => {
