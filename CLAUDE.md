@@ -294,14 +294,15 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
   diferença entre esconder e sumir: uma live que você cortou sem deixar rastro obriga a
   procurar o caminho de volta, e não havia um. Vale para qualquer coisa que a pessoa
   desliga — o desligado precisa continuar visível, senão não tem como religar.
-- **A transmissão que você não escolheu não é escondida: ela não chega.** Só a escolhida
-  fica inscrita — vídeo e som, que andam em publicações separadas e por isso são cortados
-  os dois. Medido no servidor de verdade, com dois transmitindo: em 7 s, 229.809 bytes da
-  escolhida e **0 bytes** da outra. Trocar de escolha inverte na hora, e não escolher
-  nenhuma não recebe nenhuma. Cada pessoa escolhe a sua; é decisão deste app, e ninguém
-  precisa combinar com ninguém.
-- **Transmissão que começa não entra sozinha.** O `TrackPublished` desinscreve quem não é
-  o escolhido; sem isso, alguém compartilhando encheria a banda de todo mundo sem pedir.
+- **A imagem de todas chega; o som, só o da escolhida.** Cheguei a cortar o vídeo das
+  outras também — medido e funcionando, 0 bytes — e estava errado: economizava banda ao
+  preço de deixar a escolha às cegas, com o nome da pessoa e mais nada. Não dá para
+  escolher o que não se vê. O som continua sendo de uma só, porque duas transmissões
+  falando juntas é uma sopa em que não se entende nenhuma.
+- **A escolha é um clique na própria imagem, não numa lista à parte.** Chegou a ser uma
+  faixa de fichas no alto da tela, e escolher longe do que se escolhe foi rejeitado na
+  hora. O palco tem dois campos: em cima a escolhida, embaixo todas. Sem escolha, o campo
+  de cima não some — ele diz o que fazer.
 - **O palco não escolhe a transmissão; quem assiste escolhe.** Ele focava a primeira que
   aparecesse, e "a primeira" é a ordem em que os participantes calharam de vir — que muda
   quando alguém liga a câmera ou troca de faixa. Com duas pessoas transmitindo, o quadro

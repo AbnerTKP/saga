@@ -108,7 +108,9 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .live-chip { display: flex; align-items: center; gap: 2px; flex: none; background: var(--bg1);
   border: 1px solid transparent; border-radius: 999px; padding: 2px 8px 2px 3px; }
 .live-chip.no-palco { border-color: var(--accent); background: var(--bg3); }
-.lives-nota { flex: none; margin-left: 4px; }
+/* O campo de cima sem escolha: em vez de sumir, ele diz o que fazer. */
+.grande-vazio { flex: 1; cursor: default; border: 2px dashed var(--linha-tracejada, #3a3d44); background: transparent; }
+.grande-vazio .muted { display: grid; place-items: center; gap: 8px; text-align: center; }
 .live-ver { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 999px; color: var(--text); }
 .live-ver:hover { color: var(--white); }
 .live-nome { font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

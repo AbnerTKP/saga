@@ -263,9 +263,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       .on(RoomEvent.TrackUnmuted, bump)
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
-        // Transmissão que começa não entra sozinha: só chega a de quem você escolheu. Sem
-        // isto, alguém compartilhando encheria a sua banda sem você ter pedido nada.
-        if (ehDaLive(pub.source) && quem.identity !== assistindoRef.current) pub.setSubscribed(false);
+        // A imagem entra (é a miniatura por onde se escolhe); o som, só o da escolhida.
+        if (pub.source === Track.Source.ScreenShareAudio && quem.identity !== assistindoRef.current) {
+          pub.setSubscribed(false);
+        }
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
@@ -644,22 +645,24 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   }, [room, avisar, souBerserk]);
 
   /**
-   * Escolhe a transmissão que esta pessoa vai assistir. `null` é não assistir nenhuma.
+   * Escolhe a transmissão que vai para o palco. `null` é nenhuma.
    *
-   * Inscreve a escolhida e DESinscreve todas as outras — vídeo e som, que andam em
-   * publicações separadas (`ScreenShare` e `ScreenShareAudio`) e por isso precisam ser
-   * cortados os dois. É o que faz "não estou vendo" também querer dizer "não estou
-   * baixando".
+   * O VÍDEO de todas continua chegando: é a miniatura lá embaixo que deixa escolher, e
+   * não dá para escolher o que não se vê. O SOM é que é só o da escolhida — som de duas
+   * transmissões ao mesmo tempo é uma sopa em que não se entende nenhuma.
+   *
+   * Cheguei a cortar o vídeo das outras também, e estava errado: economizava banda ao
+   * preço de deixar a escolha às cegas, com o nome da pessoa e mais nada.
    */
   const assistir = useCallback((identity: string | null) => {
     assistindoRef.current = identity;
     setAssistindoState(identity);
     for (const p of room.remoteParticipants.values()) {
-      const querVer = p.identity === identity;
       for (const pub of p.trackPublications.values()) {
-        if (ehDaLive(pub.source) && 'setSubscribed' in pub) {
-          (pub as { setSubscribed(v: boolean): void }).setSubscribed(querVer);
-        }
+        if (!('setSubscribed' in pub)) continue;
+        const mexer = pub as { setSubscribed(v: boolean): void };
+        if (pub.source === Track.Source.ScreenShare) mexer.setSubscribed(true);
+        if (pub.source === Track.Source.ScreenShareAudio) mexer.setSubscribed(p.identity === identity);
       }
     }
     aplicarAudio();

@@ -58,7 +58,7 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
       <div className="tile-label">
         {isScreen && <Icon name="screen" size={14} />}
-        {name}{tile.local ? ' (você)' : ''}{isScreen ? (big ? ' · tela' : ' · clique para assistir') : ''}
+        {name}{tile.local ? ' (você)' : ''}{isScreen ? (big ? ' · tela' : ' · assistir') : ''}
       </div>
       {isScreen && (
         <button
@@ -137,6 +137,19 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   const focusTile = liveNoPalco ?? rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
+  /**
+   * O que o clique num quadro faz. Numa transmissão, escolher é assistir — e é o som que
+   * muda de dono, não só o tamanho. Numa câmera, é só ampliar.
+   */
+  const escolher = (t: Tile) => {
+    if (t.source === Track.Source.ScreenShare) {
+      rm.assistir(t.participant.identity === rm.assistindo ? null : t.participant.identity);
+      setFocus(null);
+      return;
+    }
+    setFocus(focus === t.key ? null : t.key);
+  };
+
   // Só transmissão tem volume próprio; câmera não carrega áudio separado.
   const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
     if (t.source !== Track.Source.ScreenShare) return;
@@ -173,31 +186,6 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           está transmitindo continua listado aqui mesmo depois de você cortar, e voltar é
           um clique no nome. O controle antigo era um link no topo, geral e sem estado
           visível — cortava todas de uma vez e não dizia de quem eram. */}
-      {!idle && rm.lives.length > 0 && (
-        <div className="lives">
-          <span className="lives-titulo"><Icon name="screen" size={14} /> transmitindo</span>
-          {rm.lives.map((l) => (
-            <div key={l.identity} className={`live-chip ${l.assistindo ? 'no-palco' : ''}`}>
-              <button
-                className="live-ver"
-                title={l.assistindo ? `Parar de assistir ${l.nome}` : `Assistir a transmissão de ${l.nome}`}
-                onClick={() => rm.assistir(l.assistindo ? null : l.identity)}
-              >
-                <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
-                  enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} />
-                <span className="live-nome">{l.nome}</span>
-                <span className="live-estado">{l.assistindo ? 'assistindo' : 'assistir'}</span>
-              </button>
-            </div>
-          ))}
-          {/* Dito uma vez, no lugar onde se escolhe: as outras não estão chegando, e é
-              por isso que não aparecem no palco. */}
-          <span className="lives-nota muted small">
-            {rm.assistindo ? 'só esta está sendo recebida' : 'escolha uma para assistir'}
-          </span>
-        </div>
-      )}
-
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
           Quem está na voz e abre o chat não perde a live: ela vira o quadro flutuante. */}
@@ -240,12 +228,24 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               </div>
             </div>
           )}
-          {!idle && focusTile && (
+          {/* Dois campos: em cima a que você escolheu, embaixo todas, para escolher.
+              A escolha é um clique na própria imagem — era em fichas no alto da tela, e
+              escolher longe do que se escolhe é o que estava ruim. */}
+          {!idle && (focusTile || screens.length > 0) && (
             <div className="focus-layout">
-              <VideoTile tile={focusTile} big preencher={preencher} onClick={() => setFocus(null)} onMenu={menuDaTransmissao(focusTile)} />
+              {focusTile
+                ? <VideoTile tile={focusTile} big preencher={preencher} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)} />
+                : (
+                  <div className="tile grande-vazio">
+                    <div className="muted">
+                      <Icon name="screen" size={22} />
+                      <div>Clique numa transmissão aqui embaixo para assistir</div>
+                    </div>
+                  </div>
+                )}
               {(rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
-                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
+                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
@@ -257,9 +257,9 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               )}
             </div>
           )}
-          {!idle && !focusTile && rm.tiles.length > 0 && (
+          {!idle && !focusTile && screens.length === 0 && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
-              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
+              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
                   <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="huge" />
