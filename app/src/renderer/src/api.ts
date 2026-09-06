@@ -5,6 +5,8 @@
 // versão nova para todo mundo receber.
 // Em desenvolvimento aponta para a máquina local, senão testar qualquer mudança
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
+import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
+
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
 const BASE = /^https?:\/\//i.test(SERVIDOR)
@@ -45,6 +47,8 @@ export type Membro = {
   cargoNome: string;
   foto: string | null;
   banner: string | null;
+  /** Como esta pessoa enquadrou a própria foto e o próprio banner. */
+  enquadramento: Enquadramentos;
   turbo: boolean;
   /** Identificador curto que aparece antes do nome. */
   idExibido: string | null;
@@ -58,7 +62,7 @@ export type Servidor = { id: number; nome: string; foto: string | null; banner: 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
   usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
-  banner?: string | null; turbo?: boolean; idExibido?: string | null;
+  banner?: string | null; enquadramento?: Enquadramentos; turbo?: boolean; idExibido?: string | null;
 };
 export type TipoDeSala = 'voz' | 'texto';
 export type RoomInfo = {
@@ -216,6 +220,7 @@ export type Mensagem = {
   autorId: number | null;
   nome: string;
   foto: string | null;
+  enquadramento?: Enquadramentos;
   turbo: boolean;
   idExibido: string | null;
 };
@@ -353,6 +358,10 @@ export const buscarGifs = async (termo: string) =>
   (await pedir<{ gifs: Gif[] }>('GET', `/giphy?q=${encodeURIComponent(termo)}`)).gifs;
 
 export type OndeAImagemVai = 'usuario.foto' | 'usuario.banner' | 'servidor.foto' | 'servidor.banner';
+
+/** Grava só a posição e a aproximação: o arquivo enviado não é tocado. */
+export const salvarEnquadramento = async (papel: Papel, valor: Enquadramento | null) =>
+  (await pedir<{ eu: Membro }>('PATCH', '/eu/enquadramento', { papel, valor })).eu;
 
 export const usarGif = (onde: OndeAImagemVai, url: string) =>
   pedir<{ eu?: Membro; servidor?: Servidor }>('POST', '/giphy/usar', { onde, url });

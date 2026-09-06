@@ -32,7 +32,7 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
 
 // Junta conta e vínculo numa linha só, que é como o app quer ver a pessoa.
 const SELECT_MEMBRO = `
-  SELECT u.id, u.apelido, u.foto, u.banner,
+  SELECT u.id, u.apelido, u.foto, u.banner, u.enquadramento,
          m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
          m.turbo, m.id_exibido, m.cargo_id,
          c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,

@@ -135,6 +135,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
                     onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}
                   >
                     <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto}
+                      enquadramento={pessoas.get(p.identity)?.enquadramento?.foto}
                       tamanho="huge" extra={p.isSpeaking ? 'speaking' : ''} titulo={`${p.name} — clique para opções`} />
                   </span>
                 ))}
@@ -151,7 +152,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
-                      <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} tamanho="big" />
+                      <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>
                   ))}
@@ -164,7 +165,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
               {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
-                  <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} tamanho="huge" />
+                  <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="huge" />
                   <div className="tile-label">{p.name || p.identity}</div>
                 </div>
               ))}

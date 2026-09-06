@@ -134,6 +134,10 @@ export const MIGRACOES = [
   // GIF no chat. A imagem é guardada como qualquer outra (nome = hash do conteúdo), e a
   // mensagem aponta para ela. Mensagem com imagem pode vir sem texto nenhum.
   `ALTER TABLE mensagens ADD COLUMN imagem TEXT`,
+
+  // Enquadramento da foto e do banner: onde a imagem foi arrastada e o quanto foi
+  // aproximada. O arquivo enviado não é tocado — recortar mataria a animação do GIF.
+  `ALTER TABLE usuarios ADD COLUMN enquadramento TEXT`,
 ];
 
 export function abrirBanco(caminho) {

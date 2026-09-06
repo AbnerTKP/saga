@@ -3,6 +3,7 @@ import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } f
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { urlDoArquivo } from '../api';
+import { estilo, type Enquadramentos } from '../enquadramento';
 
 export type PessoaNaCall = {
   identity: string;
@@ -11,11 +12,13 @@ export type PessoaNaCall = {
   cargo?: Cargo | null;
   foto?: string | null;
   banner?: string | null;
+  /** Como a pessoa enquadrou a própria foto e o próprio banner. */
+  enquadramento?: Enquadramentos;
   turbo?: boolean;
   idExibido?: string | null;
 };
 
-export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onClose }: {
+export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerFoto, onClose }: {
   pessoa: PessoaNaCall;
   eu: Membro;
   /** Os cargos que podem ser dados: os abaixo do meu, e nunca o de dono. */
@@ -24,6 +27,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   volume: number;
   onVolume: (v: number) => void;
   onAcao: (acao: Acao, extra?: { minutos?: number; cargo?: number }) => Promise<void>;
+  /** Clicar na foto abre ela maior: no cartão ela é pequena demais para se ver. */
+  onVerFoto: (url: string) => void;
   onClose: () => void;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
@@ -63,10 +68,21 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   return (
     <div ref={caixa} className="menu-pessoa" style={{ left: x, top: Math.max(8, y), width: largura }}>
       {/* O banner vira o topo do cartão, como num perfil — é onde ele faz sentido. */}
-      {banner && <div className="cartao-banner"><img src={banner} alt="" draggable={false} /></div>}
+      {banner && (
+        <div className="cartao-banner">
+          <img src={banner} alt="" draggable={false} style={estilo(pessoa.enquadramento?.banner)} />
+        </div>
+      )}
 
       <div className={`menu-topo ${banner ? 'sob-banner' : ''}`}>
-        <Avatar nome={pessoa.nome} foto={pessoa.foto} tamanho="big" />
+        <Avatar
+          nome={pessoa.nome}
+          foto={pessoa.foto}
+          enquadramento={pessoa.enquadramento?.foto}
+          tamanho="big"
+          titulo={pessoa.foto ? 'Ver a foto maior' : undefined}
+          onClick={() => { const u = urlDoArquivo(pessoa.foto); if (u) { onVerFoto(u); onClose(); } }}
+        />
         <div className="quem">
           <div className="strong nome-do-cartao">
             <Nome nome={pessoa.nome} id={pessoa.idExibido} turbo={pessoa.turbo} />

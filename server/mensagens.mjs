@@ -3,6 +3,7 @@
 // virava pó quando a sala esvaziava.
 import { ErroDeConta } from './contas.mjs';
 import { buscarSala } from './salas.mjs';
+import { ler as lerEnquadramento } from './enquadramento.mjs';
 
 const TAMANHO_MAXIMO = 2000;
 
@@ -13,7 +14,7 @@ export const QUANTAS = 100;
 const SELECT = `
   SELECT m.id, m.texto, m.imagem, m.criado_em, m.usuario_id,
          COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
-         u.foto, mem.turbo, mem.id_exibido
+         u.foto, u.enquadramento, mem.turbo, mem.id_exibido
     FROM mensagens m
     LEFT JOIN usuarios u   ON u.id = m.usuario_id
     LEFT JOIN membros  mem ON mem.usuario_id = m.usuario_id AND mem.servidor_id = ?`;
@@ -39,6 +40,7 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
     // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não.
     nome: m.nome ?? 'alguém',
     foto: m.foto ?? null,
+    enquadramento: lerEnquadramento(m.enquadramento),
     turbo: !!m.turbo,
     idExibido: m.id_exibido ?? null,
   }));

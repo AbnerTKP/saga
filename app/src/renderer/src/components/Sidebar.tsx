@@ -33,12 +33,13 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
             ? rm.participants.map((p) => ({
                 identity: p.identity, name: p.name || p.identity,
                 foto: pessoas.get(p.identity)?.foto ?? null,
+                enquadramento: pessoas.get(p.identity)?.enquadramento,
                 turbo: pessoas.get(p.identity)?.turbo ?? false,
                 idExibido: pessoas.get(p.identity)?.idExibido ?? null,
                 speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
               }))
             : r.participants.map((p) => ({
-                ...p, foto: p.foto ?? null, turbo: p.turbo ?? false,
+                ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
                 idExibido: p.idExibido ?? null, speaking: false,
               }));
           return (
@@ -65,7 +66,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
                     title={`${p.name} — clique para opções`}
                     onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
                   >
-                    <Avatar nome={p.name} foto={p.foto} />
+                    <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto} />
                     <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                     <span className="pico">
                       {p.turbo && <span className="raio-turbo" title="Vorcaro Turbo"><Icon name="raio" size={13} /></span>}
@@ -102,7 +103,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
       )}
 
       <div className="user-panel">
-        <Avatar nome={eu.nome} foto={eu.foto} tamanho="big" />
+        <Avatar nome={eu.nome} foto={eu.foto} enquadramento={eu.enquadramento?.foto} tamanho="big" />
         <div className="uname">
           <div className="strong" title={`${eu.cargoNome} · entra como ${eu.apelido}`}>
             <Nome membro={eu} />

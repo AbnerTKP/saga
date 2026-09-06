@@ -52,7 +52,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
         {mensagens.map((m) => (
           <div key={m.id} className={`msg ${m.autorId === meuId ? 'mine' : ''}`}>
             <div className="msg-topo">
-              <Avatar nome={m.nome} foto={m.foto} />
+              <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
               <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
               <span className="time">{hora(m.criadoEm)}</span>
             </div>

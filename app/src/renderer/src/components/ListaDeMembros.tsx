@@ -45,7 +45,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
                   title={`${m.nome} — ${m.cargoNome}${online ? ' · na voz agora' : ''}`}
                   onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY })}
                 >
-                  <Avatar nome={m.nome} foto={m.foto} />
+                  <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
                   <span className="membro-nome" style={g.cargo?.cor && !m.turbo ? { color: g.cargo.cor } : undefined}>
                     <Nome membro={m} />
                   </span>

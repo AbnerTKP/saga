@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   pode, podeSobre, verServidor, renomearServidor, mudarMeuNome, moderar,
-  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif,
+  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif, salvarEnquadramento,
   criarSala, renomearSala, apagarSala,
   criarCargo, editarCargo, apagarCargo, criarConvite, type Convite,
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
@@ -100,11 +100,15 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           <div className="imagens">
             <EscolherImagem
               rotulo="Sua foto" formato="redondo" atual={eu.foto}
+              papel="foto" enquadramento={eu.enquadramento?.foto}
+              onEnquadrar={async (v) => { setErro(null); onEu(await salvarEnquadramento('foto', v)); await recarregar(); }}
               onEnviar={async (a) => { setErro(null); try { onEu((await minhaFoto(a)).eu); await recarregar(); } catch (e) { setErro((e as Error).message); } }}
               onGif={async (url) => { setErro(null); const r = await usarGif('usuario.foto', url); if (r.eu) { onEu(r.eu); await recarregar(); } }}
             />
             <EscolherImagem
               rotulo="Seu banner" formato="faixa" atual={eu.banner}
+              papel="banner" enquadramento={eu.enquadramento?.banner}
+              onEnquadrar={async (v) => { setErro(null); onEu(await salvarEnquadramento('banner', v)); }}
               onEnviar={async (a) => { setErro(null); try { onEu((await meuBanner(a)).eu); } catch (e) { setErro((e as Error).message); } }}
               onGif={async (url) => { setErro(null); const r = await usarGif('usuario.banner', url); if (r.eu) onEu(r.eu); }}
             />
@@ -350,7 +354,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
           <ul className="membros">
             {membros.map((m) => (
               <li key={m.id} className={m.banido ? 'banido' : ''}>
-                <Avatar nome={m.nome} foto={m.foto} />
+                <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
                 <div className="quem">
                   <div className="strong">
                     <Nome membro={m} />

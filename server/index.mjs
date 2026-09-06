@@ -11,6 +11,7 @@ import { abrirBanco, garantirServidor } from './banco.mjs';
 import { salvarImagem, salvarSom, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
+import * as enquadramento from './enquadramento.mjs';
 import * as salasM from './salas.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as servidoresM from './servidores.mjs';
@@ -109,6 +110,9 @@ const verMembro = (m) => m && ({
   cargoNome: m.cargo?.nome ?? 'Sem cargo',
   foto: m.foto ?? null,
   banner: m.banner ?? null,
+  // O enquadramento viaja junto da imagem: sem ele, a mesma foto apareceria enquadrada
+  // num lugar e torta no outro.
+  enquadramento: enquadramento.ler(m.enquadramento),
   turbo: !!m.turbo,
   idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
@@ -203,6 +207,7 @@ async function participantesDaSala(sid, sala) {
         cargo: membro.cargo,
         foto: membro.foto ?? null,
         banner: membro.banner ?? null,
+        enquadramento: enquadramento.ler(membro.enquadramento),
         turbo: !!membro.turbo,
         idExibido: membro.id_exibido ?? null,
       } : {}),
@@ -385,6 +390,19 @@ const ROTAS = {
   // O GIF do chat também é baixado e guardado aqui, pelo mesmo motivo do GIF de perfil:
   // continua funcionando se sumir do Giphy, e passa pela conferência de bytes de sempre.
   // Não é do Turbo: o que o Turbo destrava é a imagem animada NO PERFIL.
+  // Enquadrar não muda o arquivo: grava só onde a imagem ficou e o quanto foi aproximada.
+  'PATCH /eu/enquadramento': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { papel, valor } = await lerCorpo(req);
+    if (!['foto', 'banner'].includes(papel)) {
+      throw new ErroDeConta('Só dá para enquadrar a foto ou o banner.', 400);
+    }
+    const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(eu.id);
+    const novo = enquadramento.guardar(atual?.enquadramento, papel, valor);
+    db.prepare('UPDATE usuarios SET enquadramento = ? WHERE id = ?').run(novo, eu.id);
+    return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
+  },
+
   'POST /mensagens/gif': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
