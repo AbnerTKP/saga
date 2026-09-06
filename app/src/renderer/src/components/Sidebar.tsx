@@ -1,4 +1,6 @@
-import type { Membro, RoomInfo, Servidor } from '../api';
+import { useState } from 'react';
+import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
+import { moverSala, type Alvo } from '../ordenacao';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
@@ -8,8 +10,13 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
+export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
+  categorias: Categoria[];
+  /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
+  podeGerirSalas: boolean;
+  onReordenar: (salas: { id: number; categoriaId: number | null }[]) => void;
+  onMenuDeSalas: (em: { x: number; y: number }, categoria: Categoria | null) => void;
   onAbrir: (sala: RoomInfo) => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
@@ -19,6 +26,46 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
 
+  // Arrastar: qual sala está na mão, e onde ela cairia se soltasse agora. O alvo é
+  // desenhado como um risco entre duas linhas — sem ele, a pessoa solta no escuro.
+  const [naMao, setNaMao] = useState<number | null>(null);
+  const [alvo, setAlvo] = useState<Alvo | null>(null);
+  const [fechadas, setFechadas] = useState<Set<number>>(new Set());
+
+  const ordemDosGrupos: (number | null)[] = [null, ...categorias.map((c) => c.id)];
+  const grupos = ordemDosGrupos.map((g) => ({
+    categoria: g === null ? null : categorias.find((c) => c.id === g)!,
+    salas: rooms.filter((r) => (r.categoriaId ?? null) === g),
+  }));
+
+  const soltar = () => {
+    if (naMao !== null && alvo) {
+      const nova = moverSala(
+        rooms.map((r) => ({ id: r.id, categoriaId: r.categoriaId ?? null })),
+        ordemDosGrupos, naMao, alvo,
+      );
+      // Só avisa se de fato mudou: soltar no mesmo lugar não é uma edição.
+      const antes = rooms.map((r) => `${r.id}:${r.categoriaId ?? ''}`).join();
+      if (nova.map((s) => `${s.id}:${s.categoriaId ?? ''}`).join() !== antes) onReordenar(nova);
+    }
+    setNaMao(null); setAlvo(null);
+  };
+
+  // Metade de cima cai antes da sala; metade de baixo, depois. É o gesto que todo mundo
+  // já tem na mão de outros programas.
+  const mirar = (e: React.DragEvent, categoriaId: number | null, indice: number) => {
+    if (naMao === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const caixa = e.currentTarget.getBoundingClientRect();
+    const embaixo = e.clientY - caixa.top > caixa.height / 2;
+    setAlvo({ categoriaId, indice: indice + (embaixo ? 1 : 0) });
+  };
+
+  const risco = (categoriaId: number | null, indice: number) =>
+    alvo && alvo.categoriaId === categoriaId && alvo.indice === indice
+      ? <li className="risco-de-solta" aria-hidden /> : null;
+
   return (
     <aside className="sidebar">
       <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
@@ -26,61 +73,110 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
         {pollError && <span className="dot-warn" title={pollError} />}
       </div>
 
-      <div className="rooms">
-        {rooms.map((r) => {
-          const live = rm.salaDaVoz?.id === r.id;
-          const people = live
-            ? rm.participants.map((p) => ({
-                identity: p.identity, name: p.name || p.identity,
-                foto: pessoas.get(p.identity)?.foto ?? null,
-                enquadramento: pessoas.get(p.identity)?.enquadramento,
-                turbo: pessoas.get(p.identity)?.turbo ?? false,
-                idExibido: pessoas.get(p.identity)?.idExibido ?? null,
-                speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
-              }))
-            : r.participants.map((p) => ({
-                ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
-                idExibido: p.idExibido ?? null, speaking: false,
-              }));
-          return (
-            <div key={r.name} className="room-block">
+      <div
+        className="rooms"
+        onContextMenu={(e) => { if (podeGerirSalas) { e.preventDefault(); onMenuDeSalas({ x: e.clientX, y: e.clientY }, null); } }}
+        onDragOver={(e) => { if (naMao !== null) { e.preventDefault(); } }}
+        onDrop={soltar}
+      >
+        {grupos.map((g) => (
+          <div key={g.categoria?.id ?? 'soltas'} className="grupo-de-salas">
+            {g.categoria && (
               <button
-                className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
-                onClick={() => onAbrir(r)}
-                disabled={rm.status === 'connecting'}
+                className="cabecalho-de-categoria"
+                title={`${g.categoria.nome} — botão direito para renomear ou apagar`}
+                onClick={() => setFechadas((f) => {
+                  const n = new Set(f);
+                  n.has(g.categoria!.id) ? n.delete(g.categoria!.id) : n.add(g.categoria!.id);
+                  return n;
+                })}
+                onContextMenu={(e) => {
+                  if (!podeGerirSalas) return;
+                  e.preventDefault(); e.stopPropagation();
+                  onMenuDeSalas({ x: e.clientX, y: e.clientY }, g.categoria);
+                }}
+                /* Soltar em cima do título joga a sala para o começo da gaveta — é o
+                   único jeito de encher uma gaveta que ainda está vazia. */
+                onDragOver={(e) => { if (naMao !== null) { e.preventDefault(); e.stopPropagation(); setAlvo({ categoriaId: g.categoria!.id, indice: 0 }); } }}
               >
-                <Icon name={r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
-                {/* Sem isto a sala de texto só era vista por quem lembrava de abrir. */}
-                {r.naoLidas > 0 && (
-                  <span className="nao-lidas" title={`${r.naoLidas} ${r.naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}>
-                    {r.naoLidas > 99 ? '99+' : r.naoLidas}
-                  </span>
-                )}
-                {people.length > 0 && <span className="count">{people.length}</span>}
+                <span className={`seta ${fechadas.has(g.categoria.id) ? 'fechada' : ''}`}>▾</span>
+                <span>{g.categoria.nome}</span>
               </button>
-              <ul className="people">
-                {people.map((p) => (
-                  <li
-                    key={p.identity}
-                    className={`clicavel ${p.speaking ? 'speaking' : ''}`}
-                    title={`${p.name} — clique para opções`}
-                    onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
+            )}
+
+            {!(g.categoria && fechadas.has(g.categoria.id)) && (
+              <ul className="lista-de-salas">
+                {g.salas.map((r, i) => {
+                      const live = rm.salaDaVoz?.id === r.id;
+              const people = live
+                ? rm.participants.map((p) => ({
+                    identity: p.identity, name: p.name || p.identity,
+                    foto: pessoas.get(p.identity)?.foto ?? null,
+                    enquadramento: pessoas.get(p.identity)?.enquadramento,
+                    turbo: pessoas.get(p.identity)?.turbo ?? false,
+                    idExibido: pessoas.get(p.identity)?.idExibido ?? null,
+                    speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
+                  }))
+                : r.participants.map((p) => ({
+                    ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
+                    idExibido: p.idExibido ?? null, speaking: false,
+                  }));
+              return (
+                <div key={r.name} className="room-block">
+                  <button
+                    className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
+                    onClick={() => onAbrir(r)}
+                    disabled={rm.status === 'connecting'}
                   >
-                    <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto} />
-                    <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
-                    <span className="pico">
-                      {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
-                      {p.screen && <Icon name="screen" />}
-                      {p.camera && <Icon name="camera" />}
-                      {p.muted && <Icon name="micOff" />}
-                    </span>
-                  </li>
-                ))}
+                    <Icon name={r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
+                    {/* Sem isto a sala de texto só era vista por quem lembrava de abrir. */}
+                    {r.naoLidas > 0 && (
+                      <span className="nao-lidas" title={`${r.naoLidas} ${r.naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}>
+                        {r.naoLidas > 99 ? '99+' : r.naoLidas}
+                      </span>
+                    )}
+                    {people.length > 0 && <span className="count">{people.length}</span>}
+                  </button>
+                  <ul className="people">
+                    {people.map((p) => (
+                      <li
+                        key={p.identity}
+                        className={`clicavel ${p.speaking ? 'speaking' : ''}`}
+                        title={`${p.name} — clique para opções`}
+                        onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
+                      >
+                        <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto} />
+                        <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
+                        <span className="pico">
+                          {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
+                          {p.screen && <Icon name="screen" />}
+                          {p.camera && <Icon name="camera" />}
+                          {p.muted && <Icon name="micOff" />}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+                })}
+                {/* O fim do grupo também é um lugar de soltar, senão não dá para pôr uma
+                    sala depois da última. */}
+                <li
+                  className="fim-do-grupo"
+                  onDragOver={(e) => { if (naMao !== null) { e.preventDefault(); e.stopPropagation(); setAlvo({ categoriaId: g.categoria?.id ?? null, indice: g.salas.length }); } }}
+                >
+                  {risco(g.categoria?.id ?? null, g.salas.length)}
+                </li>
               </ul>
-            </div>
-          );
-        })}
-        {rooms.length === 0 && <div className="muted small pad">Nenhuma sala configurada no servidor.</div>}
+            )}
+          </div>
+        ))}
+        {rooms.length === 0 && categorias.length === 0 && (
+          <div className="muted small pad">
+            Nenhuma sala configurada no servidor.
+            {podeGerirSalas && ' Clique com o botão direito aqui para criar uma.'}
+          </div>
+        )}
       </div>
 
       {connected && (

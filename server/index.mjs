@@ -13,6 +13,7 @@ import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
 import * as salasM from './salas.mjs';
+import * as categoriasM from './categorias.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
@@ -171,6 +172,7 @@ function sessaoCompleta(usuario, token) {
     servidor: verServidor(sid),
     servidores: meus,
     salas: salasDoServidor(sid),
+    categorias: categoriasM.listarCategorias(db, sid),
   };
 }
 
@@ -356,7 +358,9 @@ const ROTAS = {
           : 0,
       });
     }
-    return { rooms: salas };
+    // As gavetas vão junto: a barra lateral desenha as duas coisas na mesma passada, e
+    // uma segunda busca só para elas piscaria a lista a cada atualização.
+    return { rooms: salas, categorias: categoriasM.listarCategorias(db, sid) };
   },
 
   'POST /salas/criar': async (req) => {
@@ -379,8 +383,33 @@ const ROTAS = {
 
   'POST /salas/ordem': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
+    // `salas` é a forma nova ({id, categoriaId}); `ids`, a que o app antigo manda.
+    const { ids, salas } = await lerCorpo(req);
+    return { salas: salasM.reordenarSalas(db, sid, eu, salas ?? ids) };
+  },
+
+  'POST /categorias/criar': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { nome } = await lerCorpo(req);
+    return { categoria: categoriasM.criarCategoria(db, sid, eu, nome) };
+  },
+
+  'POST /categorias/renomear': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { id, nome } = await lerCorpo(req);
+    return { categoria: categoriasM.renomearCategoria(db, sid, eu, id, nome) };
+  },
+
+  'POST /categorias/apagar': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { id } = await lerCorpo(req);
+    return categoriasM.apagarCategoria(db, sid, eu, id);
+  },
+
+  'POST /categorias/ordem': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
     const { ids } = await lerCorpo(req);
-    return { salas: salasM.reordenarSalas(db, sid, eu, ids) };
+    return { categorias: categoriasM.reordenarCategorias(db, sid, eu, ids) };
   },
 
   'GET /mensagens': async (req) => {

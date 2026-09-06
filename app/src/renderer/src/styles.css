@@ -668,3 +668,41 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 /* O som que está no ar: o botão vira "parar", então precisa parecer outra coisa. */
 .som.tocando .tocar { background: var(--accent); color: #fff; }
 .som.tocando .tocar:hover:not(:disabled) { background: var(--accent-h); }
+
+/* ---- salas em gavetas, e o arrastar ---- */
+.grupo-de-salas { margin-bottom: 2px; }
+.lista-de-salas { list-style: none; margin: 0; padding: 0; }
+.linha-de-sala { position: relative; }
+/* Quem está na mão fica apagado: o que interessa durante o arraste é o risco de onde vai
+   cair, não a linha que saiu do lugar. */
+.linha-de-sala.na-mao > .room-block { opacity: .35; }
+.fim-do-grupo { list-style: none; min-height: 10px; position: relative; }
+
+.cabecalho-de-categoria {
+  width: 100%; display: flex; align-items: center; gap: 4px;
+  padding: 8px 8px 3px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text3); text-align: left;
+}
+.cabecalho-de-categoria:hover { color: var(--text); }
+.cabecalho-de-categoria .seta { display: inline-block; transition: transform .12s; font-size: 10px; }
+.cabecalho-de-categoria .seta.fechada { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .cabecalho-de-categoria .seta { transition: none; } }
+
+/* O risco de onde a sala vai cair. Sem ele, solta-se no escuro. */
+.risco-de-solta {
+  list-style: none; height: 2px; margin: 1px 6px; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 0 1px rgba(88,101,242,.35);
+}
+
+.menu-salas button {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; font-size: 13.5px; color: var(--text); text-align: left;
+}
+.menu-salas button:hover { background: var(--bg3); color: var(--white); }
+.menu-salas button.perigo:hover { background: var(--danger); color: #fff; }
+.menu-titulo {
+  padding: 9px 10px 5px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.menu-risco { height: 1px; background: var(--line); margin: 4px 0; }
+.linha-botoes { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }

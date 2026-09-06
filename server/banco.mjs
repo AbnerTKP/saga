@@ -146,6 +146,19 @@ export const MIGRACOES = [
   `ALTER TABLE usuarios ADD COLUMN turbo INTEGER NOT NULL DEFAULT 0`,
   // Ninguém perde o que já tinha: quem era Berserk em qualquer servidor passa a ser na conta.
   `UPDATE usuarios SET turbo = 1 WHERE id IN (SELECT usuario_id FROM membros WHERE turbo = 1)`,
+
+  // Gavetas para as salas. A ordem é dentro da gaveta; as sem gaveta ficam no topo, que
+  // é onde a pessoa espera achar o que não guardou em lugar nenhum.
+  `CREATE TABLE categorias (
+     id          INTEGER PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     nome        TEXT    NOT NULL,
+     ordem       INTEGER NOT NULL DEFAULT 0,
+     criado_em   INTEGER NOT NULL
+   )`,
+  `CREATE INDEX categorias_servidor ON categorias(servidor_id)`,
+  // Apagar a gaveta não leva as salas junto: some a categoria, a conversa fica.
+  `ALTER TABLE salas ADD COLUMN categoria_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL`,
 ];
 
 export function abrirBanco(caminho) {

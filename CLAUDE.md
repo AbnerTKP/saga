@@ -100,6 +100,21 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
 - **Pedir por um servidor de que não se faz parte cai no seu próprio**, sem erro e sem
   entrada: saber o número de um servidor alheio não abre porta.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.
+- **Reordenar sala é só dado, e por isso não derruba ninguém da call.** A sala do LiveKit
+  é o id; arrastar mexe em `ordem` e `categoria_id`, e em id nenhum. A lista muda na hora
+  e a busca seguinte confirma — dando errado, é ela que devolve a ordem de verdade.
+- **A conta de arrastar mora em `ordenacao.ts`, longe da tela.** É onde esse tipo de código
+  erra: tirar da posição velha desloca a nova, e aparar o índice antes de descontar a
+  própria sala fazia "soltar no fim" parar em penúltimo — o teste pegou.
+- **Categoria é gaveta, não dono da conversa.** Apagá-la devolve as salas para o topo em
+  vez de levá-las junto; perder conversa é outra decisão, com outra pergunta. As salas sem
+  gaveta vêm primeiro na lista, porque são as que ninguém guardou ainda.
+- **A ordem das salas é dentro da gaveta**, não uma numeração corrida pelo servidor
+  inteiro: assim mover uma sala de gaveta não obriga a renumerar a lista toda, e duas
+  gavetas podem ter uma sala 0 cada.
+- **`POST /salas/ordem` aceita as duas formas** — uma lista de ids (o app antes das
+  categorias) e uma de `{id, categoriaId}`. App e servidor sobem separados; a forma antiga
+  reordena sem tirar sala nenhuma da gaveta.
 - **As salas do `.env` semeiam só o primeiro arranque.** Semeando sempre, uma sala apagada
   voltaria no reinício seguinte e ninguém ligaria uma coisa à outra.
 - **O app se chamava "Cantinho do Vorcaro" e o Turbo, "Vorcaro Turbo".** Hoje são **Saga**

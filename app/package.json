@@ -12,7 +12,7 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts src/renderer/src/erros.test.ts src/renderer/src/avisos.test.ts src/renderer/src/leituras.test.ts src/renderer/src/avisosDeTela.test.ts src/renderer/src/enquadramento.test.ts src/renderer/src/volume.test.ts src/renderer/src/qualidades.test.ts src/renderer/src/audivel.test.ts src/renderer/src/links.test.ts"
+    "test": "node --experimental-strip-types --test src/main/segredos.test.ts src/renderer/src/sinal.test.ts src/renderer/src/erros.test.ts src/renderer/src/avisos.test.ts src/renderer/src/leituras.test.ts src/renderer/src/avisosDeTela.test.ts src/renderer/src/enquadramento.test.ts src/renderer/src/volume.test.ts src/renderer/src/qualidades.test.ts src/renderer/src/audivel.test.ts src/renderer/src/links.test.ts src/renderer/src/ordenacao.test.ts"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

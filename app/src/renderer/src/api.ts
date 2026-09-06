@@ -72,8 +72,12 @@ export type RoomInfo = {
   id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[];
   /** Quantas mensagens chegaram depois da última que eu li. Sala de voz é sempre 0. */
   naoLidas: number;
+  /** A gaveta em que a sala está, ou null quando está solta no topo. */
+  categoriaId: number | null;
 };
-export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number };
+export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null };
+/** A gaveta onde as salas ficam guardadas. Não guarda conversa: só agrupa. */
+export type Categoria = { id: number; nome: string; ordem: number };
 
 export type Sessao = {
   token: string;
@@ -216,7 +220,21 @@ export const renomearSala = (id: number, nome: string) =>
 
 export const apagarSala = (id: number) => pedir<{ ok: true }>('POST', '/salas/apagar', { id });
 
-export const reordenarSalas = (ids: number[]) => pedir<{ salas: Sala[] }>('POST', '/salas/ordem', { ids });
+/** A ordem manda a gaveta junto: arrastar entre categorias é o mesmo gesto de reordenar. */
+export const reordenarSalas = (salas: { id: number; categoriaId: number | null }[]) =>
+  pedir<{ salas: Sala[] }>('POST', '/salas/ordem', { salas });
+
+export const criarCategoria = (nome: string) =>
+  pedir<{ categoria: Categoria }>('POST', '/categorias/criar', { nome });
+
+export const renomearCategoria = (id: number, nome: string) =>
+  pedir<{ categoria: Categoria }>('POST', '/categorias/renomear', { id, nome });
+
+export const apagarCategoria = (id: number) =>
+  pedir<{ ok: true }>('POST', '/categorias/apagar', { id });
+
+export const reordenarCategorias = (ids: number[]) =>
+  pedir<{ categorias: Categoria[] }>('POST', '/categorias/ordem', { ids });
 
 // --- chat -------------------------------------------------------------------
 
@@ -253,7 +271,8 @@ export const renomearServidor = (nome: string) =>
 
 /** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
 export const buscarSalas = async (lidas = '') =>
-  (await pedir<{ rooms: RoomInfo[] }>('GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`)).rooms;
+  pedir<{ rooms: RoomInfo[]; categorias: Categoria[] }>(
+    'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`);
 
 export const pedirTokenDaSala = (room: string) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });

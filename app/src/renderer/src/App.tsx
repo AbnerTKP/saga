@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
+  pode, criarSala, reordenarSalas, criarCategoria, renomearCategoria, apagarCategoria,
   guardarServidorAtual, lerServidorAtual, meusServidores,
   type Acao,
   verServidor,
-  type Cargo, type RoomInfo, type Sessao, type Membro, type Servidor,
+  type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor,
 } from './api';
 import { useRoom } from './useRoom';
 import { useChat } from './useChat';
@@ -14,6 +15,8 @@ import { CartaoDoPerfil } from './components/CartaoDoPerfil';
 import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
+import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
+import { PedirNome } from './components/PedirNome';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
@@ -36,6 +39,9 @@ export function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [conferindo, setConferindo] = useState(!!lerToken());
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
+  const [pedido, setPedido] = useState<AcaoDeSala | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
@@ -143,7 +149,8 @@ export function App() {
       try {
         const lista = await buscarSalas(paraParametro(lidasRef.current));
         if (!vivo) return;
-        setRooms(lista);
+        setRooms(lista.rooms);
+        setCategorias(lista.categorias);
         setPollError(null);
       } catch (e) {
         if (!vivo) return;
@@ -242,6 +249,36 @@ export function App() {
     return () => { vivo = false; clearInterval(id); };
   }, [sessao]);
 
+  /**
+   * Reordenar é só dado: a sala do LiveKit é o id, e arrastar não toca em id nenhum —
+   * ninguém cai da call por causa disso. A lista muda na hora e a busca seguinte confirma;
+   * dando errado, é ela que devolve a ordem de verdade.
+   */
+  const reordenar = useCallback(async (novaOrdem: { id: number; categoriaId: number | null }[]) => {
+    setRooms((antes) => novaOrdem
+      .map((n) => { const r = antes.find((x) => x.id === n.id); return r && { ...r, categoriaId: n.categoriaId }; })
+      .filter((r): r is RoomInfo => !!r));
+    try { await reordenarSalas(novaOrdem); }
+    catch (e) { notas.mostrar('erro', (e as Error).message); }
+  }, [notas]);
+
+  const fazerNoMenu = useCallback(async (a: AcaoDeSala) => {
+    try {
+      if (a.tipo === 'apagarCategoria') { await apagarCategoria(a.id); return; }
+      setPedido(a);   // criar e renomear pedem um nome antes
+    } catch (e) { notas.mostrar('erro', (e as Error).message); }
+  }, [notas]);
+
+  const comONome = useCallback(async (nome: string) => {
+    if (!pedido) return;
+    try {
+      if (pedido.tipo === 'criar') await criarSala(nome, pedido.sala);
+      else if (pedido.tipo === 'categoria') await criarCategoria(nome);
+      else if (pedido.tipo === 'renomearCategoria') await renomearCategoria(pedido.id, nome);
+    } catch (e) { notas.mostrar('erro', (e as Error).message); }
+    finally { setPedido(null); }
+  }, [pedido, notas]);
+
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   const chat = useChat(salaAberta?.id ?? null);
 
@@ -303,6 +340,10 @@ export function App() {
     <div className="app">
       <Sidebar
         rooms={rooms}
+        categorias={categorias}
+        podeGerirSalas={pode(eu.cargo, 'gerirSalas')}
+        onReordenar={reordenar}
+        onMenuDeSalas={(em, categoria) => setMenuDeSalas({ em, categoria })}
         pollError={pollError}
         eu={eu}
         servidor={servidor}
@@ -412,6 +453,28 @@ export function App() {
           naVoz={perfilAberto.usuarioId !== undefined && naVoz.has(perfilAberto.usuarioId)}
           souEu={perfilAberto.usuarioId === eu.id}
           onClose={() => setPerfilAberto(null)}
+        />
+      )}
+      {menuDeSalas && (
+        <MenuDeSalas
+          em={menuDeSalas.em}
+          categoria={menuDeSalas.categoria}
+          onAcao={fazerNoMenu}
+          onClose={() => setMenuDeSalas(null)}
+        />
+      )}
+      {pedido && (
+        <PedirNome
+          titulo={
+            pedido.tipo === 'criar' ? (pedido.sala === 'voz' ? 'Nova sala de voz' : 'Nova sala de chat')
+            : pedido.tipo === 'categoria' ? 'Nova categoria' : 'Renomear categoria'
+          }
+          rotulo={pedido.tipo === 'categoria' || pedido.tipo === 'renomearCategoria' ? 'Nome da categoria' : 'Nome da sala'}
+          exemplo={pedido.tipo === 'criar' ? (pedido.sala === 'voz' ? 'Bancada' : 'recados') : 'Jogos'}
+          inicial={pedido.tipo === 'renomearCategoria' ? pedido.nome : ''}
+          confirmar={pedido.tipo === 'renomearCategoria' ? 'Renomear' : 'Criar'}
+          onPronto={comONome}
+          onClose={() => setPedido(null)}
         />
       )}
       {novoServidor && (
