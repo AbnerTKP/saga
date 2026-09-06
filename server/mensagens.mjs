@@ -63,3 +63,32 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
   const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: Number(info.lastInsertRowid) - 1 });
   return nova;
 }
+
+/**
+ * Quantas mensagens chegaram numa sala depois da última que a pessoa leu.
+ *
+ * O marcador de leitura fica no app, não no banco: cada pessoa lê no computador dela, e
+ * guardar isso no servidor pediria uma tabela nova para resolver um problema que ninguém
+ * tem — cinco amigos, um computador cada.
+ *
+ * As mensagens da própria pessoa não contam: ver "1 nova" por causa do que você mesmo
+ * escreveu é ruído, não aviso.
+ */
+export function contarNaoLidas(db, salaId, desdeId, exceto) {
+  return db.prepare(
+    'SELECT count(*) c FROM mensagens WHERE sala_id = ? AND id > ? AND usuario_id IS NOT ?',
+  ).get(Number(salaId), Number(desdeId) || 0, exceto ?? null).c;
+}
+
+/**
+ * Lê "12:340,15:9" — sala:última lida — como o app manda na busca de salas. Entrada
+ * estranha vira marcador nenhum, e nunca exceção: isso aqui vem da URL.
+ */
+export function lerMarcadores(texto) {
+  const marcadores = new Map();
+  for (const parte of String(texto ?? '').split(',')) {
+    const [sala, lida] = parte.split(':');
+    if (Number(sala) > 0 && Number(lida) >= 0) marcadores.set(Number(sala), Number(lida));
+  }
+  return marcadores;
+}

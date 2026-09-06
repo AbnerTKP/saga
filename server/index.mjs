@@ -318,7 +318,10 @@ const ROTAS = {
   },
 
   'GET /rooms': async (req) => {
-    const { sid } = exigirMembro(req);
+    const { sid, membro: eu } = exigirMembro(req);
+    // O app manda até onde já leu cada sala, e recebe de volta quanto falta. Assim o
+    // aviso de mensagem nova sai na mesma busca que já acontece, sem uma segunda.
+    const lidas = mensagens.lerMarcadores(new URL(req.url, 'http://x').searchParams.get('lidas'));
     const salas = [];
     for (const s of salasDoServidor(sid)) {
       salas.push({
@@ -327,6 +330,9 @@ const ROTAS = {
         tipo: s.tipo,
         // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
         participants: s.tipo === 'voz' ? await participantesDaSala(sid, s) : [],
+        naoLidas: s.tipo === 'texto'
+          ? mensagens.contarNaoLidas(db, s.id, lidas.get(s.id) ?? 0, eu.id)
+          : 0,
       });
     }
     return { rooms: salas };

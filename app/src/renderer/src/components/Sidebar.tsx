@@ -44,11 +44,17 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
           return (
             <div key={r.name} className="room-block">
               <button
-                className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''}`}
+                className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
                 onClick={() => onAbrir(r)}
                 disabled={rm.status === 'connecting'}
               >
                 <Icon name={r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
+                {/* Sem isto a sala de texto só era vista por quem lembrava de abrir. */}
+                {r.naoLidas > 0 && (
+                  <span className="nao-lidas" title={`${r.naoLidas} ${r.naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}>
+                    {r.naoLidas > 99 ? '99+' : r.naoLidas}
+                  </span>
+                )}
                 {people.length > 0 && <span className="count">{people.length}</span>}
               </button>
               <ul className="people">

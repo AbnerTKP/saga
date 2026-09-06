@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
   guardarServidorAtual, lerServidorAtual, meusServidores,
@@ -8,6 +8,7 @@ import {
 } from './api';
 import { useRoom } from './useRoom';
 import { useChat } from './useChat';
+import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { Stage } from './components/Stage';
@@ -42,6 +43,7 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
+  const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
   // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
   // porque mudam quando alguém os edita.
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -100,13 +102,18 @@ export function App() {
     }
   }, [rm]);
 
+  // A busca de salas vive dentro de um intervalo. Lendo o marcador por referência, marcar
+  // uma sala como lida não derruba e recria esse intervalo a cada mensagem.
+  const lidasRef = useRef(lidas);
+  useEffect(() => { lidasRef.current = lidas; guardar(lidas); }, [lidas]);
+
   // Quem está em cada sala
   useEffect(() => {
     if (!sessao?.servidor) return;
     let vivo = true;
     const tick = async () => {
       try {
-        const lista = await buscarSalas();
+        const lista = await buscarSalas(paraParametro(lidasRef.current));
         if (vivo) { setRooms(lista); setPollError(null); }
       } catch (e) {
         if (!vivo) return;
@@ -196,6 +203,15 @@ export function App() {
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   const chat = useChat(salaAberta?.id ?? null);
+
+  // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
+  // abrir quanto quando chega mensagem com ela já aberta.
+  const ultimaNaTela = chat.mensagens.at(-1)?.id ?? 0;
+  useEffect(() => {
+    if (salaAberta?.tipo === 'texto' && ultimaNaTela) {
+      setLidas((m) => marcarLido(m, salaAberta.id, ultimaNaTela));
+    }
+  }, [salaAberta?.id, salaAberta?.tipo, ultimaNaTela]);
 
   const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
   const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);

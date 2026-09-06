@@ -38,6 +38,14 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .room:hover:not(:disabled) { background: var(--bg3); color: var(--text); }
 .room.active { background: var(--bg4); color: var(--white); }
 .room .count { margin-left: auto; font-size: 12px; color: var(--text3); }
+
+/* Aviso de mensagem nova. O nome em branco e forte é o que se vê de canto de olho; o
+   número é para quem já olhou. Fica antes da contagem de gente, que é outra informação. */
+.room.nova { color: var(--white); font-weight: 600; }
+.room .nao-lidas { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center; border-radius: 9px; background: var(--danger);
+  color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.room .nao-lidas + .count { margin-left: 6px; }
 .people { list-style: none; margin: 0; padding: 0 0 4px 26px; }
 .people li { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 4px; color: var(--text2); font-size: 14px; }
 .people li.speaking .avatar { box-shadow: 0 0 0 2px var(--ok); }

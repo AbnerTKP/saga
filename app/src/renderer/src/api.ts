@@ -61,7 +61,11 @@ export type RoomParticipant = {
   banner?: string | null; turbo?: boolean; idExibido?: string | null;
 };
 export type TipoDeSala = 'voz' | 'texto';
-export type RoomInfo = { id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[] };
+export type RoomInfo = {
+  id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[];
+  /** Quantas mensagens chegaram depois da última que eu li. Sala de voz é sempre 0. */
+  naoLidas: number;
+};
 export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number };
 
 export type Sessao = {
@@ -226,7 +230,9 @@ export const enviarGifNoChat = async (sala: number, url: string) =>
 export const renomearServidor = (nome: string) =>
   pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });
 
-export const buscarSalas = async () => (await pedir<{ rooms: RoomInfo[] }>('GET', '/rooms')).rooms;
+/** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
+export const buscarSalas = async (lidas = '') =>
+  (await pedir<{ rooms: RoomInfo[] }>('GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`)).rooms;
 
 export const pedirTokenDaSala = (room: string) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });

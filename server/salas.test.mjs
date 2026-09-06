@@ -5,7 +5,7 @@ import { criarConta } from './contas.mjs';
 import { garantirMembro, buscarMembro, definirCargo } from './membros.mjs';
 import { listarCargos } from './cargos.mjs';
 import { listarSalas, criarSala, renomearSala, apagarSala, reordenarSalas } from './salas.mjs';
-import { listarMensagens, enviarMensagem, QUANTAS } from './mensagens.mjs';
+import { listarMensagens, enviarMensagem, contarNaoLidas, lerMarcadores, QUANTAS } from './mensagens.mjs';
 
 function cenario() {
   const db = abrirBanco(':memory:');
@@ -194,4 +194,34 @@ test('mensagem de texto não ganha imagem por acidente', () => {
   const dono = cria('TKP');
   const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
   assert.equal(enviarMensagem(db, sid, dono, sala.id, 'oi').imagem, null);
+});
+
+test('não lidas conta o que chegou depois do marcador', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('TKP');
+  const outro = cria('Amigo');
+  const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
+
+  const primeira = enviarMensagem(db, sid, outro, sala.id, 'oi');
+  enviarMensagem(db, sid, outro, sala.id, 'tudo bem?');
+
+  assert.equal(contarNaoLidas(db, sala.id, 0, dono.id), 2);
+  assert.equal(contarNaoLidas(db, sala.id, primeira.id, dono.id), 1);
+  assert.equal(contarNaoLidas(db, sala.id, 999, dono.id), 0);
+});
+
+test('o que eu mesmo escrevi não me aparece como não lido', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('TKP');
+  const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
+  enviarMensagem(db, sid, dono, sala.id, 'falando sozinho');
+  assert.equal(contarNaoLidas(db, sala.id, 0, dono.id), 0);
+});
+
+test('marcadores vindos da URL: o que não presta é descartado, sem estourar', () => {
+  assert.deepEqual([...lerMarcadores('3:40,7:0')], [[3, 40], [7, 0]]);
+  assert.deepEqual([...lerMarcadores('')], []);
+  assert.deepEqual([...lerMarcadores(null)], []);
+  assert.deepEqual([...lerMarcadores('bobagem,x:y,0:5,-2:9')], []);
+  assert.deepEqual([...lerMarcadores('4:12,lixo')], [[4, 12]]);
 });
