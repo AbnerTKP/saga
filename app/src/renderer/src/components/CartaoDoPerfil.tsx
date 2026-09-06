@@ -29,7 +29,10 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
   onClose: () => void;
 }) {
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
-  const banner = urlDoArquivo(pessoa.banner);
+  const bannerNoBanco = urlDoArquivo(pessoa.banner);
+  // Mesma história da foto: banner que não carrega vira o banner vazio, não um rasgo.
+  const [bannerQuebrado, setBannerQuebrado] = useState<string | null>(null);
+  const banner = bannerNoBanco && bannerQuebrado !== bannerNoBanco ? bannerNoBanco : null;
   const foto = urlDoArquivo(pessoa.foto);
   const entrou = desde(pessoa.entrouEm);
 
@@ -56,6 +59,7 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
                 style={estilo(pessoa.enquadramento?.banner)}
                 onClick={() => setImagemAberta(banner)}
                 title="Ver o banner maior"
+                onError={() => setBannerQuebrado(bannerNoBanco)}
               />
             )}
           </div>

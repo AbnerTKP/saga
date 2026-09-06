@@ -5,10 +5,10 @@
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
-import { salvarImagem, salvarSom, nomeValido, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import { salvarImagem, salvarSom, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
@@ -27,7 +27,20 @@ const SALAS_INICIAIS = (process.env.ROOMS ?? 'Geral').split(',').map((s) => s.tr
 const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Cantinho do Vorcaro';
 const DONO = process.env.DONO ?? '';            // apelido que vira dono; vazio = o primeiro a entrar
 const BANCO = process.env.BANCO ?? './dados/cantinho.db';
-const ARQUIVOS = process.env.ARQUIVOS ?? './dados/arquivos';
+/**
+ * As fotos moram AO LADO DO BANCO, e isso não é estilo — é o que impede de perdê-las.
+ *
+ * Era um caminho solto (`./dados/arquivos`), relativo à pasta de trabalho. Em produção o
+ * banco é apontado para o volume (`/dados/cantinho.db`) e ninguém lembrou de apontar as
+ * fotos também: elas iam para `/srv/dados/arquivos`, DENTRO do contêiner. Cada
+ * `up -d --build` levava tudo embora, com o banco intacto apontando para arquivos que já
+ * não existiam. Ninguém percebeu porque o nome do arquivo é o hash e a resposta vem com
+ * `immutable, max-age=31536000`: quem já tinha visto continuava vendo do cache por um ano,
+ * e só quem chegava depois via a inicial no lugar da foto. Foram 6 imagens de 12.
+ *
+ * Amarrando ao banco, apontar um sem o outro deixa de ser possível.
+ */
+const ARQUIVOS = process.env.ARQUIVOS ?? pastaDosArquivos(BANCO);
 const GIPHY = process.env.GIPHY_KEY ?? '';   // vazio = busca de GIF desligada
 const KEY = process.env.LIVEKIT_API_KEY;
 const SECRET = process.env.LIVEKIT_API_SECRET;
@@ -633,7 +646,15 @@ const servidor = http.createServer(async (req, res) => {
   }
 });
 
-servidor.listen(PORT, () => console.log(
-  `Cantinho em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
-  + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
-));
+servidor.listen(PORT, () => {
+  console.log(
+    `Cantinho em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
+    + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
+  );
+  // Dito em voz alta de propósito: as fotos já sumiram uma vez indo parar dentro do
+  // contêiner, e o silêncio foi metade do problema. "0 arquivos" depois de um deploy é
+  // para saltar aos olhos de quem publicou.
+  let quantos = 0;
+  try { quantos = readdirSync(ARQUIVOS).length; } catch { quantos = 0; }
+  console.log(`banco em ${BANCO} — arquivos em ${ARQUIVOS} (${quantos})`);
+});

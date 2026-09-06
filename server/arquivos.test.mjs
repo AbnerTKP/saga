@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo } from './arquivos.mjs';
+import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos } from './arquivos.mjs';
 
 const pasta = () => mkdtempSync(join(tmpdir(), 'img-'));
 const comCabecalho = (bytes, tamanho = 64) =>
@@ -153,4 +153,14 @@ test('o tipo servido cobre áudio também', () => {
   assert.equal(nomeValido('c'.repeat(32) + '.mp3').tipo, 'audio/mpeg');
   assert.equal(nomeValido('c'.repeat(32) + '.ogg').tipo, 'audio/ogg');
   assert.equal(nomeValido('c'.repeat(32) + '.exe'), null, 'extensão desconhecida não pode ser servida');
+});
+
+test('as imagens moram ao lado do banco — apontar um sem o outro não é possível', () => {
+  assert.equal(pastaDosArquivos('/dados/cantinho.db'), '/dados/arquivos');
+  assert.equal(pastaDosArquivos('./dados/cantinho.db'), 'dados/arquivos');
+  assert.equal(pastaDosArquivos('/var/lib/cantinho/banco.sqlite'), '/var/lib/cantinho/arquivos');
+});
+
+test('o banco na pasta atual não joga as imagens para fora dela', () => {
+  assert.equal(pastaDosArquivos('cantinho.db'), 'arquivos');
 });

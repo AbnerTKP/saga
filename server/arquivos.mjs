@@ -6,7 +6,17 @@
 // o que elimina de saída qualquer travessia de diretório.
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+
+/**
+ * Onde as imagens moram: ao lado do banco, sempre.
+ *
+ * Vem daqui, e não de uma variável própria, porque uma variável própria já foi esquecida:
+ * em produção o banco foi apontado para o volume e as fotos ficaram dentro do contêiner,
+ * morrendo a cada `up --build` com o banco intacto apontando para elas. Amarradas ao
+ * banco, não dá para persistir um e perder o outro.
+ */
+export const pastaDosArquivos = (banco) => join(dirname(banco), 'arquivos');
 
 export const LIMITES = {
   foto: 3 * 1024 * 1024,     // 3 MB — cabe GIF curto de avatar

@@ -34,7 +34,9 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
 
 Publicar servidor: `scp *.mjs Dockerfile root@…:/root/server/` e
-`docker compose -f docker-compose.ip.yml up -d --build token`.
+`docker compose -f docker-compose.ip.yml up -d --build token`. Depois, confira a linha
+`arquivos em /dados/arquivos (N)` no `docker logs`: se o N zerar, alguma coisa saiu do
+volume outra vez.
 
 ## Como está montado
 
@@ -115,6 +117,25 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   A remoção é consequência: se o LiveKit estiver fora, o registro vale do mesmo jeito.
 - **Nome de arquivo é o hash do conteúdo.** Dá cache eterno, deduplicação, e ninguém
   escolhe o nome — o que elimina escrita fora da pasta.
+- **As imagens moram AO LADO DO BANCO** (`pastaDosArquivos`, derivada de `BANCO`), e isso
+  não é arrumação: é o que impede de perdê-las. Era uma variável própria, e uma variável
+  própria foi esquecida — em produção o banco foi apontado para o volume
+  (`/dados/cantinho.db`) e as fotos continuaram no padrão relativo, indo parar em
+  `/srv/dados/arquivos`, **dentro do contêiner**. Cada `up -d --build` levava tudo embora,
+  com o banco intacto apontando para arquivos que já não existiam. Foram 6 imagens de 12.
+- **Cache eterno esconde o sumiço dos arquivos, e foi metade do estrago.** Como a resposta
+  vai com `immutable, max-age=31536000`, quem já tinha visto a foto continuou vendo do
+  cache por um ano; só quem chegou depois viu o buraco. O sintoma chega como "os novatos
+  não veem nossas fotos", que não parece perda de dados — e o dono só desconfiou porque
+  dois amigos entraram. Quando o sintoma for "só os novos veem diferente", desconfie de
+  arquivo que sumiu, não de permissão.
+- **O arranque diz onde estão o banco e os arquivos, com a contagem.** `arquivos em
+  /dados/arquivos (7)`. É barato e é o que teria gritado no primeiro deploy em vez de
+  ficar seis meses calado.
+- **Foto que não carrega volta a ser a inicial** (`Avatar`, `CartaoDoPerfil`). Sem isso
+  sobra um buraco transparente, porque `.avatar.com-foto` tira o fundo: quem chegou depois
+  do sumiço não via nem foto nem letra. Guarda-se a URL que falhou, não um sim/não, para
+  que trocar de foto tente de novo sozinho.
 - **Imagem e som são validados pela assinatura dos bytes**, nunca pelo `content-type`.
 - **A tela vai sem simulcast.** Com ele, o `adaptiveStream` de quem assiste escolhia a
   versão menor sempre que a janela era menor que a tela transmitida — era a imagem borrada.
