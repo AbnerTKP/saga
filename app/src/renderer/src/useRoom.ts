@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { anotar } from './registro';
 import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros';
 import { VOLUME } from './volume';
-import { qualidadeValida, type Qualidade } from './qualidades';
+import { qualidadeValida, prioridadeDe, type Qualidade } from './qualidades';
 import { criarAvisos } from './avisos';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
@@ -123,6 +123,10 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   // Faixa do plano B do áudio da transmissão, publicada por fora do LiveKit.
   const faixaDeMixagem = useRef<MediaStreamTrack | null>(null);
 
+  // Medições agendadas do que está saindo. Guardadas para poder cancelar: sem isso, uma
+  // transmissão que acabou ainda anotaria no registro depois de encerrada.
+  const medicoes = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   // Volume de cada transmissão, separado da voz e separado entre si: dá para baixar o
   // filme de um sem mexer no de outro, nem em quem está comentando.
   const volumesDaTela = useRef(new Map<string, number>());
@@ -186,6 +190,8 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     };
     const onDisconnected = () => {
       // A publicação morre junto com a sala; a próxima entrada publica de novo.
+      medicoes.current.forEach(clearTimeout);
+      medicoes.current = [];
       faixaDoSom.current = null;
       getAudioRoot().innerHTML = '';
       setStatus('idle');
@@ -309,6 +315,45 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   }, [room]);
 
   /**
+   * Anota o que o codificador está mandando DE VERDADE, alguns segundos depois de começar.
+   *
+   * A resolução que sai não é a que se pediu: quando a cena pesa, o codificador entrega
+   * menos do que o menu prometeu, e em silêncio. Sem esta linha no registro, "a imagem
+   * está ruim" não tem como ser respondido — foi preciso montar uma sala de teste no
+   * servidor de verdade para descobrir que saíam 960x540. Agora o registro de quem
+   * transmite diz sozinho.
+   *
+   * Duas amostras: uma cedo, quando a banda ainda está subindo, e outra em regime.
+   */
+  const anotarComoEstaSaindo = useCallback((segundos: number) => {
+    medicoes.current.push(setTimeout(() => {
+      const faixa = lp().getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+      const sender = (faixa as { sender?: RTCRtpSender } | undefined)?.sender;
+      if (!sender) return;
+      sender.getStats().then((stats) => {
+        stats.forEach((s) => {
+          const o = s as RTCStats & {
+            kind?: string; frameWidth?: number; frameHeight?: number;
+            framesPerSecond?: number; targetBitrate?: number; qualityLimitationReason?: string;
+          };
+          if (o.type !== 'outbound-rtp' || o.kind !== 'video') return;
+          const cedendo = o.qualityLimitationReason && o.qualityLimitationReason !== 'none'
+            ? `, cedendo por ${o.qualityLimitationReason}` : '';
+          anotar('info', 'tela',
+            `aos ${segundos}s saindo ${o.frameWidth ?? '?'}x${o.frameHeight ?? '?'} a `
+            + `${Math.round(o.framesPerSecond ?? 0)} quadros, `
+            + `${Math.round((o.targetBitrate ?? 0) / 1000)} kbps${cedendo}`);
+        });
+      }).catch(() => undefined);
+    }, segundos * 1000));
+  }, [room]);
+
+  const pararMedicoes = useCallback(() => {
+    medicoes.current.forEach(clearTimeout);
+    medicoes.current = [];
+  }, []);
+
+  /**
    * O áudio da tela é SOM, não voz.
    *
    * Sem dizer isso, o Chromium entrega a captura com o processamento de microfone ligado:
@@ -319,12 +364,19 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
    */
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
-    const preset = QUALIDADES[qualidadeValida(lerQualidadeGuardada(), souTurbo)];
+    const qualidade = qualidadeValida(lerQualidadeGuardada(), souTurbo);
+    const preset = QUALIDADES[qualidade];
+
+    // Quando a cena aperta, alguma coisa cede — e quem diz o quê é a escolha da pessoa.
+    // Ver prioridadeDe, em qualidades.ts, para o que foi medido. Em resumo: 'motion'
+    // deixa o codificador jogar fora resolução para segurar os quadros (era a imagem de
+    // 360p), e 'detail' põe o codificador em modo de tela, onde a resolução é intocável
+    // e os quadros é que cedem. A degradationPreference diz o mesmo pela porta da frente:
+    // no modo de tela ela é ignorada, mas em 'motion' é ela que manda.
+    const prioridade = prioridadeDe(qualidade);
     const captura: ScreenShareCaptureOptions = {
       resolution: preset.resolution,
-      // 'motion' avisa o codificador que ali corre vídeo. Sem isso ele assume texto e
-      // protege a nitidez sacrificando quadros — que é exatamente o travamento em filme.
-      contentHint: 'motion',
+      contentHint: prioridade === 'fluidez' ? 'motion' : 'detail',
     };
     const publicacao: TrackPublishOptions = {
       // 128 kbps em estéreo, em vez dos 48 kbps mono do preset de voz que vem por padrão.
@@ -335,8 +387,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       dtx: false,
       red: false,
       screenShareEncoding: preset.encoding,
-      // Se a banda apertar, prefira borrar a imagem a perder fluidez.
-      degradationPreference: 'maintain-framerate',
+      degradationPreference: prioridade === 'fluidez' ? 'maintain-framerate' : 'maintain-resolution',
       // Sem simulcast. Com ele, o LiveKit publica versões menores da tela, e o
       // adaptiveStream de quem assiste escolhe a menor sempre que a janela do vídeo é
       // menor que a tela transmitida — o que é quase sempre. Era essa a imagem borrada.
@@ -405,6 +456,9 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
             ? 'Compartilhando com o áudio pela "Mixagem estéreo", já que o caminho normal foi recusado por este computador.'
             : explicarFalhaDeAudio(ultimoMotivo));
         }
+        pararMedicoes();
+        anotarComoEstaSaindo(10);
+        anotarComoEstaSaindo(45);
         bump();
         return;
       } catch (e) {
@@ -432,9 +486,10 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room, souTurbo, avisar]);
+  }, [room, souTurbo, avisar, anotarComoEstaSaindo, pararMedicoes]);
 
   const stopScreen = useCallback(async () => {
+    pararMedicoes();
     // A faixa de mixagem é nossa, publicada à parte: o LiveKit não a recolhe sozinho.
     if (faixaDeMixagem.current) {
       await lp().unpublishTrack(faixaDeMixagem.current, true).catch(() => undefined);
@@ -442,7 +497,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     }
     await lp().setScreenShareEnabled(false);
     bump();
-  }, [room]);
+  }, [room, pararMedicoes]);
 
   const toggleDeafen = useCallback(async () => {
     const next = !deafenedRef.current;

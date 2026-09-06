@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TODAS, QUALIDADE_LIVRE, ehDoTurbo, qualidadesDe, qualidadeValida } from './qualidades.ts';
+import { TODAS, QUALIDADE_LIVRE, ehDoTurbo, qualidadesDe, qualidadeValida, prioridadeDe } from './qualidades.ts';
 
 test('sem Turbo só existe 720p a 30 quadros', () => {
   assert.deepEqual(qualidadesDe(false), ['720p30']);
@@ -32,4 +32,17 @@ test('escolha guardada que não existe mais vira a livre, sem quebrar', () => {
 test('a qualidade livre passa para todo mundo', () => {
   assert.equal(qualidadeValida('720p30', false), '720p30');
   assert.equal(qualidadeValida('720p30', true), '720p30');
+});
+
+test('quem escolheu 60 quadros quer fluidez; quem escolheu 30 quer nitidez', () => {
+  assert.equal(prioridadeDe('720p30'), 'nitidez');
+  assert.equal(prioridadeDe('1080p30'), 'nitidez');
+  assert.equal(prioridadeDe('720p60'), 'fluidez');
+  assert.equal(prioridadeDe('1080p60'), 'fluidez');
+});
+
+test('toda qualidade tem uma prioridade — nenhuma fica sem regra', () => {
+  for (const q of TODAS) {
+    assert.ok(['nitidez', 'fluidez'].includes(prioridadeDe(q)), q);
+  }
 });

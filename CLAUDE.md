@@ -77,6 +77,36 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **1080p e 60 quadros são do Vorcaro Turbo**, e a régua (`qualidades.ts`) vale tanto na
   escolha quanto na hora de transmitir. É trava do app, não do servidor: o LiveKit não
   limita bitrate por participante, então é regra de conduta, não cerca.
+- **Numa cena pesada não cabem nitidez e fluidez — e quem escolhe é a pessoa, no menu.**
+  Medido no servidor de produção, sala descartável, dois participantes reais, cena difícil
+  (textura fina em panorâmica):
+
+  | pedido | protegendo quadros (`motion`) | protegendo nitidez (`detail`) |
+  |---|---|---|
+  | 720p30, 2,5 Mbps | 960x540 | 1280x720 |
+  | 1080p30, 5 Mbps | 960x540 | 1920x1080 |
+  | 1080p60, 8 Mbps | 960x540 | 1920x1080 |
+  | 1080p60, **16** Mbps | 960x540 | — |
+
+  **Dobrar o teto de banda não devolve um pixel** — 8, 12 e 16 Mbps deram os mesmos
+  960x540 —, então "está ruim, sobe o bitrate" não é caminho. Era essa a queixa de imagem
+  "de 360p", e ela caía nas **quatro** opções por igual: trocar de opção não mudava nada
+  porque todas terminavam em 540p. Pior, a volta é lenta: medido, ~20 s de cena leve para
+  sair de 540p e chegar a 1080p, aos saltos — e como jogo alterna pesado e leve o tempo
+  todo, a transmissão vive lá embaixo. Protegendo a nitidez a volta é imediata (5 s).
+  Hoje o `contentHint` sai da escolha: 30 quadros → `detail` (modo de tela, resolução
+  intocável, quadros cedem); 60 → `motion` (quadros intocados, resolução cede). No modo de
+  tela a `degradationPreference` é ignorada — medido: `maintain-framerate`,
+  `maintain-resolution` e `text` deram exatamente o mesmo.
+- **H.264 é o pior dos codecs aqui, não o melhor.** A intuição diz "hardware, VideoToolbox,
+  deve ganhar"; medido na mesma cena e no mesmo teto de 8 Mbps: VP8 960x540, VP9 1280x720,
+  **H.264 480x270**. VP9 entrega um degrau a mais de resolução, mas custa ~1,6x o tempo de
+  codificação (7,9 ms/quadro contra 4,9) e perde quadros — não foi adotado, e não foi
+  exercido em máquina fraca.
+- **O registro de quem transmite diz o que saiu de verdade.** `useRoom` anota aos 10 s e
+  aos 45 s a resolução, os quadros e o bitrate que o codificador está mandando. Sem isso,
+  "a imagem está ruim" não tinha resposta: a resolução que sai não é a que se pediu, e
+  descobrir os 960x540 exigiu montar uma sala de medição no servidor de produção.
 - **A janela nasce escondida** e só aparece quando a consulta de atualização resolve — ou
   já com a barra de progresso. Quem clica no ícone espera um app já atualizado.
 - **`volume` de elemento de áudio só aceita de 0 a 1.** Passar disso lança exceção, e
@@ -88,6 +118,9 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Imagem e som são validados pela assinatura dos bytes**, nunca pelo `content-type`.
 - **A tela vai sem simulcast.** Com ele, o `adaptiveStream` de quem assiste escolhia a
   versão menor sempre que a janela era menor que a tela transmitida — era a imagem borrada.
+  Com uma faixa só, `adaptiveStream` não tira nada: medido, quem assiste num `<video>` de
+  1280x720 recebe os 1920x1080 inteiros. O `dynacast` continua útil — ele para de mandar
+  quando ninguém assiste (medido: sala sem plateia, 0 kbps) e volta sozinho.
 - **O seletor de tela é sempre o nosso, inclusive no Mac.** O do sistema não chama o nosso
   handler, e é só dentro dele que se concede `audio: 'loopback'`: por ele vêm 0 faixas de
   áudio, pelo nosso vem 1, rotulada "System audio". Transmissão muda não serve.
@@ -252,6 +285,12 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 - A atualização abrindo já atualizada no Windows (v0.16.2) — exige uma atualização real
   acontecendo com alguém do outro lado.
 - Som, câmera, microfone e compartilhamento de tela em máquinas que não são este Mac.
+- **Se o modo de tela (`detail`) segura os quadros no conteúdo real dele.** O que está
+  medido é o extremo: numa cena artificial de ruído fino em panorâmica, protegendo a
+  nitidez a transmissão cai para 2–4 quadros — inútil. Nenhuma tela de verdade é tão
+  difícil (na cena realista foram 30 quadros cheios, imediatos), mas jogo pesado a 30
+  quadros é justamente o caso que não foi exercido. Se travar, o caminho é escolher 60
+  quadros, que segue protegendo a fluidez como antes.
 - **Se o certificado próprio realmente segura a permissão no macOS 26.** O que está medido
   é o requisito ficar idêntico entre builds; que o TCC case a permissão por ele é
   comportamento documentado da Apple, não coisa medida aqui — o `TCC.db` não abre sem

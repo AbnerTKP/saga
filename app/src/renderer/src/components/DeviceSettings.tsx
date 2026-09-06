@@ -66,8 +66,11 @@ export function DeviceSettings({ room, souTurbo, onRegistro, onClose }: {
               ))}
             </select>
             <small className="muted">
-              Vale a partir da próxima vez que você compartilhar. O servidor reenvia sua
-              transmissão para cada pessoa na sala, então quanto mais gente, mais pesa.
+              Vale a partir da próxima vez que você compartilhar. Numa cena pesada não cabem
+              nitidez e fluidez ao mesmo tempo: a 30 quadros a imagem fica nítida e os
+              quadros é que caem; a 60, os quadros seguem e a imagem é que perde nitidez.
+              O servidor reenvia sua transmissão para cada pessoa na sala, então quanto mais
+              gente, mais pesa.
               {!souTurbo && ' 1080p e 60 quadros são do Vorcaro Turbo.'}
             </small>
           </label>

@@ -12,11 +12,37 @@ export const QUALIDADE_LIVRE: Qualidade = '720p30';
 export const TODAS: Qualidade[] = ['720p30', '1080p30', '720p60', '1080p60'];
 
 export const COMO_SE_LE: Record<Qualidade, string> = {
-  '720p30': '720p · 30 quadros — a mais leve',
-  '1080p30': '1080p · 30 quadros — nítida, para slide e leitura',
-  '720p60': '720p · 60 quadros — fluida, para jogo e vídeo',
-  '1080p60': '1080p · 60 quadros — a melhor, e a mais pesada',
+  '720p30': '720p · 30 quadros — nitidez em primeiro lugar',
+  '1080p30': '1080p · 30 quadros — a mais nítida, para slide, leitura e filme',
+  '720p60': '720p · 60 quadros — fluidez em primeiro lugar, para jogo',
+  '1080p60': '1080p · 60 quadros — a mais fluida, e a mais pesada',
 };
+
+/**
+ * O que fica intocado quando a cena aperta — e é preciso escolher, porque não cabem os
+ * dois. Medido no servidor de verdade, com alguém assistindo, numa cena pesada:
+ *
+ * | pedido        | protegendo quadros | protegendo nitidez |
+ * |---------------|--------------------|--------------------|
+ * | 1080p, 8 Mbps | 960x540 a 59       | 1920x1080          |
+ * | 1080p, 16 Mbps| 960x540 a 59       | —                  |
+ *
+ * Dobrar o teto de banda não devolve um pixel: a 60 quadros, 1080p de cena pesada não
+ * cabe, e o codificador resolve o conflito jogando fora a metade que a gente não disse
+ * que importava. Era essa a "imagem de 360p" — e caía em TODAS as quatro opções, que é
+ * por que trocar de opção não adiantava nada.
+ *
+ * Voltar da queda também é lento (medido: ~20 s de cena leve para sair de 540p e chegar
+ * a 1080p, aos saltos), e cena de jogo alterna pesada e leve o tempo todo — então na
+ * prática a transmissão vive lá embaixo. Protegendo a nitidez, a subida é imediata: 5 s.
+ *
+ * Quem escolheu 30 quadros já disse que quer nitidez; quem escolheu 60 já disse que quer
+ * fluidez. É só honrar o que o menu diz.
+ */
+export type Prioridade = 'nitidez' | 'fluidez';
+
+export const prioridadeDe = (q: Qualidade): Prioridade =>
+  q.endsWith('60') ? 'fluidez' : 'nitidez';
 
 /** Só o 720p30 é livre; o resto pede Turbo. */
 export const ehDoTurbo = (q: Qualidade) => q !== QUALIDADE_LIVRE;
