@@ -106,6 +106,25 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   `file://`, então `'self'` não cobre o servidor.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
+- **Enquadrar não é recortar.** Recortar significa redesenhar a imagem, e um GIF
+  redesenhado perde a animação — o que o Vorcaro Turbo destrava. Guardamos posição e
+  aproximação, e aplicamos ao mostrar; o arquivo enviado nunca é tocado. A imagem também
+  não é reduzida: vai como veio, e o que torna isso aceitável é o nome ser o hash do
+  conteúdo, então cada pessoa baixa uma vez. A conta é uma só (`enquadramento.ts`), usada
+  pela prévia do editor e por todo lugar que desenha — é isso que faz o resultado ser o
+  que a pessoa viu ao ajustar. O servidor tem a mesma régua, porque o que vem do app
+  nunca é palavra final.
+- **Quem diz o tipo do aviso é o servidor**, não o app adivinhando pelo texto. "Isso é do
+  Vorcaro Turbo" é convite, não falha, e pintá-lo de vermelho faz a pessoa achar que
+  quebrou alguma coisa. Erro fica na tela até fecharem; o resto some sozinho.
+- **O marcador de mensagem lida fica no computador de quem lê**, e viaja na busca de
+  salas que já acontecia. Guardar no banco pediria tabela nova para um problema que
+  ninguém tem. Ele só anda para a frente: uma resposta atrasada desmarcaria o que já foi
+  lido. O que a própria pessoa escreveu não conta como não lido.
+- **GIF no chat não é do Turbo.** O que o Turbo destrava é a imagem animada no perfil.
+- **Os sons de aviso vão dentro do app.** São 30 KB; aviso que precisa ser baixado chega
+  depois do fato. O mesmo som não repete em menos de 400 ms, senão três pessoas entrando
+  juntas viram ruído.
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
 
@@ -126,7 +145,7 @@ hipótese de regressão, e descartado sem teste.
 ## Testes
 
 ```bash
-pnpm test        # servidor (171) + app (32), segundos, sem nada externo
+pnpm test        # servidor (184) + app (58), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -134,65 +153,6 @@ Os do app usam `--experimental-strip-types`, então rodam o `.ts` direto e o imp
 da extensão (`allowImportingTsExtensions` no tsconfig).
 
 `TESTE_SERVIDOR=76.13.225.79:3001 TESTE_SENHA=… pnpm test:sala`
-
-## A próxima versão (v0.17.0) — combinada, não começada
-
-### 1. GIF no chat — dívida
-Quando perguntei onde a busca do Giphy deveria entrar, a resposta foi "nos dois lugares":
-perfil e chat. Só o perfil foi entregue, e isso não foi avisado. Entra primeiro, e não
-conta como novidade.
-
-Onde mexer: `giphy.mjs` já busca e baixa (com lista de hosts permitidos); `EscolherGif.tsx`
-já é a tela de busca. Falta ligar os dois no `Chat.tsx` e guardar a mensagem sabendo que é
-imagem, não texto.
-
-### 2. Aviso de mensagem nova
-Sala de texto existe desde a v0.13.0 e ninguém sabe quando chega mensagem: sem bolinha,
-sem contador, a sala só é vista por quem lembra de abrir. Fica **dentro do app** —
-decisão do dono: nada de som nem notificação do sistema. Junto, aviso discreto quando
-alguém entra numa sala de voz.
-
-Onde mexer: `useChat.ts` já busca só o que chegou depois da última mensagem (`depoisDe`) —
-é daí que sai a contagem. Guardar por sala o que já foi lido; a sala aberta zera sozinha.
-
-### 3. Design dos avisos
-Parar de usar a mesma tarja vermelha para tudo. Erro, aviso, sucesso e convite ao Turbo
-com cores e pesos próprios: "isso é do Vorcaro Turbo" é convite, não falha.
-
-Onde mexer: o toast de hoje é uma string só, em `App.tsx` e `styles.css` (`.toast`). Vira
-tipo + texto. Lembrar do `-webkit-app-region: no-drag`, senão o clique não chega.
-
-### 4. Enquadrar foto e banner — sem recortar
-**O app nunca modifica o arquivo enviado.** Guarda a posição e o zoom escolhidos e aplica
-na exibição.
-
-Por quê: recortar significa redesenhar a imagem, e um GIF redesenhado perde a animação —
-esvaziaria justamente o que o Turbo destrava. Enquadrando, o mesmo mecanismo serve para
-imagem parada e animada.
-
-O dono também decidiu **não reduzir a resolução**: a imagem vai como veio. O custo é
-arquivo grande; o que o torna aceitável é o endereço ser o hash do conteúdo, então o
-navegador guarda em cache para sempre e cada pessoa baixa uma vez por imagem.
-
-Implica: guardar o ajuste (posição e zoom) junto da imagem, e aplicá-lo em todo lugar
-onde ela aparece — avatar, cartão, lista de pessoas, trilha.
-
-Onde mexer: coluna nova no fim de `MIGRACOES` (nunca no meio) e impressão digital nova em
-`banco.test.mjs`; o ajuste viaja junto da foto em todas as respostas que já mandam `foto` e
-`banner`; exibição em `Avatar.tsx`, no cartão da pessoa, `ListaDeMembros.tsx`,
-`TrilhaDeServidores.tsx` e na prévia do `EscolherImagem.tsx`. `arquivos.mjs` não muda: ele
-guarda o arquivo como veio, e o endereço continua sendo o hash do conteúdo.
-
-### 5. Sons de entrada, saída e live
-Três avisos curtos, gravados pelo dono: alguém entrou na call, alguém saiu, alguém abriu
-a live. Vão dentro do app (30 KB somados) — aviso que precisa ser baixado chega depois do
-fato. Só as regras ficam em `avisos.ts`, testáveis sem navegador; os arquivos, em `sons/`.
-O mesmo aviso não toca duas vezes em menos de 400 ms, senão três pessoas entrando juntas
-viram ruído. Quem está de ouvido desligado não ouve aviso nenhum.
-
-### 6. Zoom na foto de perfil
-Clicar na foto de alguém abre a imagem maior, para ver direito. Com o enquadramento
-aplicado — é a mesma imagem, vista de perto.
 
 ## Depois disso
 
