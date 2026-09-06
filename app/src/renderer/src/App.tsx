@@ -8,6 +8,8 @@ import {
 } from './api';
 import { useRoom } from './useRoom';
 import { useChat } from './useChat';
+import { useAvisos } from './useAvisos';
+import { Avisos } from './components/Avisos';
 import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
@@ -44,6 +46,7 @@ export function App() {
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
   const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
+  const notas = useAvisos();
   // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
   // porque mudam quando alguém os edita.
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -102,10 +105,39 @@ export function App() {
     }
   }, [rm]);
 
+  // O que a sala de voz tem a dizer entra na mesma fila do resto: um lugar só para todo
+  // aviso, em vez da tarja vermelha presa no topo do palco.
+  useEffect(() => {
+    if (!rm.error) return;
+    notas.mostrar(rm.tipoDoAviso, rm.error);
+    rm.setError(null);
+  }, [rm.error, rm.tipoDoAviso]);
+
   // A busca de salas vive dentro de um intervalo. Lendo o marcador por referência, marcar
   // uma sala como lida não derruba e recria esse intervalo a cada mensagem.
   const lidasRef = useRef(lidas);
   useEffect(() => { lidasRef.current = lidas; guardar(lidas); }, [lidas]);
+
+  // Quem já estava em cada sala na busca anterior. Sem isso, a primeira busca anunciaria
+  // como "chegou agora" todo mundo que já estava lá.
+  const jaVistos = useRef<Map<number, Set<string>> | null>(null);
+  const anunciarQuemChegou = useCallback((lista: RoomInfo[]) => {
+    const agora = new Map(lista.map((s) => [s.id, new Set(s.participants.map((p) => p.identity))]));
+    const antes = jaVistos.current;
+    jaVistos.current = agora;
+    if (!antes) return;
+
+    for (const sala of lista) {
+      if (sala.tipo !== 'voz') continue;
+      // Na sala em que estou, quem avisa é o som. Aqui é para o que eu não veria.
+      if (sala.name === rm.roomName) continue;
+      const conhecidos = antes.get(sala.id);
+      if (!conhecidos) continue;
+      for (const p of sala.participants) {
+        if (!conhecidos.has(p.identity)) notas.mostrar('info', `${p.name} entrou em ${sala.name}.`);
+      }
+    }
+  }, [rm.roomName, notas]);
 
   // Quem está em cada sala
   useEffect(() => {
@@ -114,7 +146,10 @@ export function App() {
     const tick = async () => {
       try {
         const lista = await buscarSalas(paraParametro(lidasRef.current));
-        if (vivo) { setRooms(lista); setPollError(null); }
+        if (!vivo) return;
+        anunciarQuemChegou(lista);
+        setRooms(lista);
+        setPollError(null);
       } catch (e) {
         if (!vivo) return;
         // Sessão derrubada com o app aberto (expulso ou banido): volta para o login.
@@ -172,16 +207,16 @@ export function App() {
   }, [rooms]);
 
   const moderarPeloMenu = useCallback(async (alvo: number, acao: Acao, extra?: { minutos?: number; cargo?: number }) => {
-    try { await moderar(acao, alvo, extra); } catch (e) { rm.setError((e as Error).message); }
-  }, [rm]);
+    try { await moderar(acao, alvo, extra); } catch (e) { notas.mostrarFalha(e); }
+  }, [notas]);
 
   // O seletor do sistema, quando entra, escolhe a janela sozinho — abrir o nosso ali
   // significaria escolher duas vezes. Quem decide qual é qual é o processo principal.
   const compartilhar = useCallback(async () => {
     if (rm.screenOn) return rm.stopScreen();
     if (!seletorDoSistema) return setPicker(true);
-    try { await rm.startScreen(null, true); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
-  }, [rm, seletorDoSistema]);
+    try { await rm.startScreen(null, true); } catch (e) { notas.mostrarFalha(e, 'Tela'); }
+  }, [rm, seletorDoSistema, notas]);
 
   // Quem faz parte do servidor muda devagar — cargo novo, alguém que entrou. De dez em
   // dez segundos basta, e não concorre com a busca de salas, que é de quatro.
@@ -228,7 +263,8 @@ export function App() {
       <>
         <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} onRegistro={() => setRegistro(true)} />
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
-        <UpdateToast estado={atualizacao} />
+        <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
+      <UpdateToast estado={atualizacao} />
         <Versao />
       </>
     );
@@ -279,7 +315,6 @@ export function App() {
         rm={rm}
         pessoas={pessoas}
         onPessoa={abrirMenu}
-        onRegistro={() => setRegistro(true)}
         salaAberta={salaAberta}
         chat={chat}
         meuId={eu.id}
@@ -289,7 +324,7 @@ export function App() {
           onClose={() => setPicker(false)}
           onPick={async (id, audio) => {
             setPicker(false);
-            try { await rm.startScreen(id, audio); } catch (e) { rm.setError(`Tela: ${(e as Error).message}`); }
+            try { await rm.startScreen(id, audio); } catch (e) { notas.mostrarFalha(e, 'Tela'); }
           }}
         />
       )}
@@ -360,6 +395,7 @@ export function App() {
         />
       )}
       {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
+      <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
       <UpdateToast estado={atualizacao} />
       <Versao />
     </div>

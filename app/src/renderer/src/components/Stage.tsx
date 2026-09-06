@@ -40,11 +40,10 @@ function VideoTile({ tile, big, onClick, onMenu }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meuId }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
-  onRegistro: () => void;
   /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra. */
   salaAberta: RoomInfo | null;
   chat: {
@@ -106,15 +105,7 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meu
             {rm.semTransmissoes ? 'assistir de novo' : 'não assistir'}
           </button>
         )}
-        {rm.error && (
-          <span className="error inline">
-            {rm.error}{' '}
-            {/* O atalho fica aqui porque é onde a pessoa está olhando quando algo quebra —
-                pedir para ela procurar nos ajustes é pedir demais no pior momento. */}
-            <button className="link" onClick={onRegistro}>ver registro</button>{' '}
-            <button className="link" onClick={() => rm.setError(null)}>fechar</button>
-          </span>
-        )}
+
       </header>
 
       {salaAberta?.tipo === 'texto' ? (

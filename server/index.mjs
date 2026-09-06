@@ -237,7 +237,8 @@ function guardarComRegraDoTurbo(eu, bruto, papel, de) {
   const animada = nome.endsWith('.gif');
   // O servidor é do dono, então a imagem dele não passa por essa régua.
   if (animada && de === 'usuario' && !eu.turbo) {
-    throw new ErroDeConta('Imagem animada é do Vorcaro Turbo. Peça ao dono, ou use PNG, JPG ou WEBP.', 403);
+    throw new ErroDeConta(
+      'Imagem animada é do Vorcaro Turbo. Peça ao dono, ou use PNG, JPG ou WEBP.', 403, 'turbo');
   }
   return nome;
 }
@@ -604,7 +605,9 @@ const servidor = http.createServer(async (req, res) => {
   try {
     return json(res, 200, await rota(req));
   } catch (e) {
-    if (e instanceof ErroDeConta || e instanceof ErroDeArquivo) return json(res, e.status, { error: e.message });
+    if (e instanceof ErroDeConta || e instanceof ErroDeArquivo) {
+      return json(res, e.status, { error: e.message, tipo: e.tipo ?? 'erro' });
+    }
     console.error(chave, e);
     return json(res, 500, { error: 'erro no servidor' });
   }

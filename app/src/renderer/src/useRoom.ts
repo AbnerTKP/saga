@@ -4,6 +4,7 @@ import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from '
 import { VOLUME } from './volume';
 import { qualidadeValida, type Qualidade } from './qualidades';
 import { criarAvisos } from './avisos';
+import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 
 type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
@@ -73,7 +74,18 @@ export function useRoom(souTurbo = false) {
   const [status, setStatus] = useState<Status>('idle');
   const [roomName, setRoomName] = useState<string | null>(null);
   const [deafened, setDeafenedState] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorCru] = useState<string | null>(null);
+  // Nem tudo que a sala tem a dizer é falha: "compartilhando sem o áudio do sistema" é
+  // aviso, e pintá-lo de vermelho faz parecer que o compartilhamento não funcionou.
+  const [tipoDoAviso, setTipoDoAviso] = useState<TipoDeAviso>('erro');
+  const setError = useCallback((texto: string | null) => {
+    setTipoDoAviso('erro');
+    setErrorCru(texto);
+  }, []);
+  const avisar = useCallback((tipo: TipoDeAviso, texto: string) => {
+    setTipoDoAviso(tipo);
+    setErrorCru(texto);
+  }, []);
   const deafenedRef = useRef(false);
   const micBeforeDeafen = useRef(true);
 
@@ -141,7 +153,7 @@ export function useRoom(souTurbo = false) {
   }, []);
 
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
-  const avisar = useMemo(() => criarAvisos(ARQUIVOS), []);
+  const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS), []);
 
   useEffect(() => {
     const onSubscribed = (track: Track, _pub: unknown, participante: Participant) => {
@@ -174,13 +186,13 @@ export function useRoom(souTurbo = false) {
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.Reconnecting, () => setStatus('reconnecting'))
       .on(RoomEvent.Reconnected, () => setStatus('connected'))
-      .on(RoomEvent.ParticipantConnected, () => { avisar('entrou', deafenedRef.current); bump(); })
-      .on(RoomEvent.ParticipantDisconnected, () => { avisar('saiu', deafenedRef.current); bump(); })
+      .on(RoomEvent.ParticipantConnected, () => { tocarAviso('entrou', deafenedRef.current); bump(); })
+      .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
       .on(RoomEvent.ActiveSpeakersChanged, bump)
       .on(RoomEvent.TrackMuted, bump)
       .on(RoomEvent.TrackUnmuted, bump)
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication) => {
-        if (pub.source === Track.Source.ScreenShare) avisar('live', deafenedRef.current);
+        if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
@@ -192,7 +204,7 @@ export function useRoom(souTurbo = false) {
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, avisar]);
+  }, [room, aplicarAudio, tocarAviso]);
 
   const join = useCallback(async (url: string, token: string, name: string) => {
     setError(null);
@@ -208,7 +220,7 @@ export function useRoom(souTurbo = false) {
       setRoomName(name);
       setStatus('connected');
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
-      avisar('entrou', deafenedRef.current);
+      tocarAviso('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
       if (!deafenedRef.current) {
         await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
@@ -221,12 +233,12 @@ export function useRoom(souTurbo = false) {
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room, avisar]);
+  }, [room, tocarAviso]);
 
   const leave = useCallback(async () => {
-    avisar('saiu', deafenedRef.current);
+    tocarAviso('saiu', deafenedRef.current);
     await room.disconnect();
-  }, [room, avisar]);
+  }, [room, tocarAviso]);
 
   const lp = (): LocalParticipant => room.localParticipant;
 
@@ -316,19 +328,19 @@ export function useRoom(souTurbo = false) {
         if (audio && modo !== 'nao' && !veioAudio) {
           anotar('aviso', 'tela', `modo "${modo}" foi aceito, mas nenhuma faixa de áudio foi publicada`);
           const permissao = await window.desktop.screenPermission().catch(() => 'unknown');
-          setError(explicarTelaMuda(window.desktop.platform, permissao));
+          avisar('aviso', explicarTelaMuda(window.desktop.platform, permissao));
         } else if (audio && veioAudio) {
           anotar('info', 'tela', `áudio da tela publicado no modo "${modo}"`);
         }
 
         if (modo === 'loopbackWithMute') {
           anotar('info', 'tela', 'áudio do sistema só passou no modo com silenciamento local');
-          setError('Compartilhando com o áudio, mas o Windows exigiu silenciar o som aqui no seu PC — os outros ouvem, você não. Foi o único jeito que sua placa de som aceitou.');
+          avisar('aviso', 'Compartilhando com o áudio, mas o Windows exigiu silenciar o som aqui no seu PC — os outros ouvem, você não. Foi o único jeito que sua placa de som aceitou.');
         } else if (modo === 'nao' && audio) {
           // O loopback do Chromium foi recusado. Tenta a porta dos fundos: capturar o
           // áudio da saída pela entrada "Mixagem estéreo", quando a máquina tiver uma.
           const pelaMixagem = await tentarMixagemDoSistema();
-          setError(pelaMixagem
+          avisar('aviso', pelaMixagem
             ? 'Compartilhando com o áudio pela "Mixagem estéreo", já que o caminho normal foi recusado por este computador.'
             : explicarFalhaDeAudio(ultimoMotivo));
         }
@@ -355,7 +367,7 @@ export function useRoom(souTurbo = false) {
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room, souTurbo]);
+  }, [room, souTurbo, avisar]);
 
   const stopScreen = useCallback(async () => {
     // A faixa de mixagem é nossa, publicada à parte: o LiveKit não a recolhe sozinho.
@@ -386,7 +398,7 @@ export function useRoom(souTurbo = false) {
   /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
   const tocarSom = useCallback(async (url: string) => {
     if (room.state !== 'connected') {
-      setError('Entre numa sala antes de tocar um som.');
+      avisar('aviso', 'Entre numa sala antes de tocar um som.');
       return;
     }
     try {
@@ -420,7 +432,7 @@ export function useRoom(souTurbo = false) {
     } catch (e) {
       setError(`Som: ${(e as Error).message}`);
     }
-  }, [room]);
+  }, [room, avisar]);
 
   /** Liga e desliga o recebimento das transmissões alheias. */
   const alternarTransmissoes = useCallback(() => {
@@ -471,7 +483,7 @@ export function useRoom(souTurbo = false) {
   }
 
   return {
-    room, status, roomName, error, setError, participants, tiles, deafened,
+    room, status, roomName, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,

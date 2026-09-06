@@ -164,6 +164,40 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 #audio-root { display: none; }
 
 /* Aviso de atualização */
+/* Avisos. Antes tudo era a mesma tarja vermelha: falha de rede e "isso é do Vorcaro
+   Turbo" tinham a mesma cara de coisa quebrada. Agora cada um se anuncia pela cor, e a
+   barra da esquerda é o que se lê de relance, antes de qualquer palavra.
+   Empilham acima do aviso de atualização, que mora no mesmo canto. */
+.avisos { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: 72px;
+  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 21; max-width: min(420px, calc(100vw - 32px)); }
+.aviso { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--bg1); border: 1px solid var(--line); border-left: 3px solid var(--text3);
+  border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.45); font-size: 13px; line-height: 1.45;
+  animation: aviso-entra .18s ease-out; }
+@keyframes aviso-entra { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .aviso { animation: none; } }
+
+.aviso-icone { flex: none; display: grid; place-items: center; height: 19px; color: var(--text3); }
+.aviso-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.aviso .link { flex: none; align-self: center; }
+.aviso-fechar { flex: none; width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: 4px; color: var(--text3); }
+.aviso-fechar:hover { background: var(--bg3); color: var(--white); }
+
+.aviso.erro    { border-left-color: var(--danger); }
+.aviso.erro    .aviso-icone { color: var(--danger); }
+.aviso.aviso   { border-left-color: var(--warn); }
+.aviso.aviso   .aviso-icone { color: var(--warn); }
+.aviso.sucesso { border-left-color: var(--ok); }
+.aviso.sucesso .aviso-icone { color: var(--ok); }
+/* Turbo é convite, não recusa: roxo, o mesmo do raio na lista de pessoas. */
+/* Alguém entrou numa sala: informação, não acontecimento. Fica em azul, discreto. */
+.aviso.info    { border-left-color: var(--accent); }
+.aviso.info    .aviso-icone { color: var(--accent); }
+.aviso.turbo   { border-left-color: #c084fc; background: linear-gradient(90deg, rgba(192,132,252,.14), var(--bg1) 60%); }
+.aviso.turbo   .aviso-icone { color: #c084fc; }
+.aviso.turbo   .aviso-texto { color: var(--white); }
+
 .toast { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: 16px; background: var(--bg1); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 20; font-size: 14px; }
 .primary.sm { padding: 6px 12px; font-size: 13px; }
 

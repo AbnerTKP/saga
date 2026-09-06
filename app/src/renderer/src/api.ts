@@ -103,7 +103,13 @@ export const guardarToken = (token: string | null) => {
 // --- chamadas ---------------------------------------------------------------
 
 export class ErroDoServidor extends Error {
-  constructor(mensagem: string, readonly status: number) { super(mensagem); }
+  /**
+   * Com que cara a tela deve mostrar isto. Quem decide é o servidor: "isso é do Vorcaro
+   * Turbo" é convite, não falha, e o app não deveria adivinhar isso pelo texto.
+   */
+  constructor(mensagem: string, readonly status: number, readonly tipo = 'erro') {
+    super(mensagem);
+  }
 }
 
 // Toda falha de servidor entra no registro. 401 fica de fora: é o caminho normal de
@@ -134,7 +140,8 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<
   }
   const dados = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const falha = new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+    const corpo = dados as { error?: string; tipo?: string };
+    const falha = new ErroDoServidor(corpo.error ?? `erro ${res.status}`, res.status, corpo.tipo ?? 'erro');
     anotarFalha(`${metodo} ${rota}`, falha);
     throw falha;
   }
