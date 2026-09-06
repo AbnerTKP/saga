@@ -1,7 +1,7 @@
 {
   "name": "app",
   "productName": "Cantinho do Vorcaro",
-  "version": "0.20.1",
+  "version": "0.21.0",
   "description": "Voz, vídeo e tela entre amigos",
   "private": true,
   "main": "./out/main/index.js",
