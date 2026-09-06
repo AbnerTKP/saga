@@ -3,6 +3,8 @@ import { anotar } from './registro';
 import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros';
 import { VOLUME } from './volume';
 import { qualidadeValida, type Qualidade } from './qualidades';
+import { criarAvisos } from './avisos';
+import { ARQUIVOS } from './sons';
 
 type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
 import {
@@ -13,6 +15,7 @@ import {
   VideoPresets,
   VideoPreset,
   type LocalParticipant,
+  type RemoteTrackPublication,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
 } from 'livekit-client';
@@ -137,6 +140,9 @@ export function useRoom(souTurbo = false) {
     return r;
   }, []);
 
+  // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
+  const avisar = useMemo(() => criarAvisos(ARQUIVOS), []);
+
   useEffect(() => {
     const onSubscribed = (track: Track, _pub: unknown, participante: Participant) => {
       if (track.kind === Track.Kind.Audio) {
@@ -168,12 +174,15 @@ export function useRoom(souTurbo = false) {
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.Reconnecting, () => setStatus('reconnecting'))
       .on(RoomEvent.Reconnected, () => setStatus('connected'))
-      .on(RoomEvent.ParticipantConnected, bump)
-      .on(RoomEvent.ParticipantDisconnected, bump)
+      .on(RoomEvent.ParticipantConnected, () => { avisar('entrou', deafenedRef.current); bump(); })
+      .on(RoomEvent.ParticipantDisconnected, () => { avisar('saiu', deafenedRef.current); bump(); })
       .on(RoomEvent.ActiveSpeakersChanged, bump)
       .on(RoomEvent.TrackMuted, bump)
       .on(RoomEvent.TrackUnmuted, bump)
-      .on(RoomEvent.TrackPublished, bump)
+      .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication) => {
+        if (pub.source === Track.Source.ScreenShare) avisar('live', deafenedRef.current);
+        bump();
+      })
       .on(RoomEvent.TrackUnpublished, bump)
       .on(RoomEvent.LocalTrackPublished, bump)
       .on(RoomEvent.LocalTrackUnpublished, bump)
@@ -183,7 +192,7 @@ export function useRoom(souTurbo = false) {
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio]);
+  }, [room, aplicarAudio, avisar]);
 
   const join = useCallback(async (url: string, token: string, name: string) => {
     setError(null);
@@ -198,6 +207,8 @@ export function useRoom(souTurbo = false) {
       );
       setRoomName(name);
       setStatus('connected');
+      // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
+      avisar('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
       if (!deafenedRef.current) {
         await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
@@ -210,11 +221,12 @@ export function useRoom(souTurbo = false) {
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room]);
+  }, [room, avisar]);
 
   const leave = useCallback(async () => {
+    avisar('saiu', deafenedRef.current);
     await room.disconnect();
-  }, [room]);
+  }, [room, avisar]);
 
   const lp = (): LocalParticipant => room.localParticipant;
 

@@ -183,7 +183,14 @@ Onde mexer: coluna nova no fim de `MIGRACOES` (nunca no meio) e impressão digit
 `TrilhaDeServidores.tsx` e na prévia do `EscolherImagem.tsx`. `arquivos.mjs` não muda: ele
 guarda o arquivo como veio, e o endereço continua sendo o hash do conteúdo.
 
-### 5. Zoom na foto de perfil
+### 5. Sons de entrada, saída e live
+Três avisos curtos, gravados pelo dono: alguém entrou na call, alguém saiu, alguém abriu
+a live. Vão dentro do app (30 KB somados) — aviso que precisa ser baixado chega depois do
+fato. Só as regras ficam em `avisos.ts`, testáveis sem navegador; os arquivos, em `sons/`.
+O mesmo aviso não toca duas vezes em menos de 400 ms, senão três pessoas entrando juntas
+viram ruído. Quem está de ouvido desligado não ouve aviso nenhum.
+
+### 6. Zoom na foto de perfil
 Clicar na foto de alguém abre a imagem maior, para ver direito. Com o enquadramento
 aplicado — é a mesma imagem, vista de perto.
 
