@@ -129,7 +129,8 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   ignorada. Por dentro é captura por processo, então pede Windows 11 ou macOS 14.2: onde
   não houver, ou lança (e a fila cai para `loopback`) ou vem muda — e é só por isso que
   faixa muda **neste modo** cai para o próximo, em vez de só avisar como nos outros. Cair
-  de `loopback` para `loopbackWithMute` seria pior que o problema.
+  de `loopback` para `loopbackWithMute` seria pior que o problema. De quebra, ele destravou
+  a máquina do headset Logitech — ver "A limitação que caiu sem ser atacada".
 - **Ad-hoc não é identidade estável — é o contrário disso.** O `afterPack` assina, e
   assinar é obrigatório: sem assinatura nenhuma o macOS não tem a que associar permissão de
   microfone, câmera e tela. Mas ad-hoc não resolve, e por anos estava escrito aqui e no
@@ -202,19 +203,26 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
 
-## Limitação conhecida, encerrada
+## A limitação que caiu sem ser atacada
 
 Numa das cinco máquinas (Windows 11 25H2, headset USB Logitech como único dispositivo de
-áudio), o áudio do sistema no compartilhamento falha com `Could not start audio source`.
-Investigado a fundo e **encerrado por decisão do dono** — não reabrir sem pedido.
+áudio), o áudio do sistema no compartilhamento falhava com `Could not start audio source`.
+Foi investigado a fundo, não se achou saída, e o dono encerrou o caso. **Voltou a funcionar
+na v0.20.0**, confirmado por ele: parou exatamente nessa versão, naquela máquina.
 
-Descartados por evidência do registro: escolha de tela ou janela, modo exclusivo, elevação
-de privilégio, ausência de dispositivo, nossas opções de captura e as do LiveKit. Os dois
-modos do Chromium (`loopback` e `loopbackWithMute`) falham igual; Chrome, Meet e Teams
-funcionam na mesma máquina porque usam o seletor interno do navegador, um caminho que um
-app Electron não alcança. A máquina não tem "Mixagem estéreo", então o plano B pela entrada
-de áudio também não se aplica. Um build com Electron 35 foi preparado para testar a
-hipótese de regressão, e descartado sem teste.
+Ninguém foi atrás disso. O que mudou foi a entrada do `loopbackWithoutChrome`, feita para
+cortar o retorno de voz — e ela pegou o caso de carona. O motivo é a diferença de caminho
+por dentro do Chromium: `loopback` e `loopbackWithMute` abrem o **dispositivo de saída
+padrão**, e era ali que a placa recusava; a captura por processo do `loopbackWithoutChrome`
+**não abre o endpoint**, então nem passa pelo trecho que falhava. Foi por isso que os dois
+modos antigos falhavam igual, e por isso Chrome, Meet e Teams funcionavam na mesma máquina.
+
+A lição, que é o que interessa guardar: a investigação estava certa em tudo que descartou —
+escolha de tela ou janela, modo exclusivo, elevação de privilégio, ausência de dispositivo,
+nossas opções de captura e as do LiveKit — e mesmo assim não achou a saída, porque a saída
+não estava em nenhuma opção nossa: estava num modo de captura que a gente não sabia existir.
+Antes de encerrar um caso por esgotamento, vale perguntar que caminho o próprio motor tem e
+a gente não conhece.
 
 ## Testes
 
