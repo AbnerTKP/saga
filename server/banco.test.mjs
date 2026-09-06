@@ -30,6 +30,7 @@ const IMPRESSOES = [
   'def5e5aab371',  // 17 convites
   '393600a0c9a2',  // 18 índice de convites
   '7e000e21d81b',  // 19 coluna criado_por em servidores
+  'e47efb98833d',  // 20 coluna imagem em mensagens
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

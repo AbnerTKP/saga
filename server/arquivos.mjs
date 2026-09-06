@@ -12,6 +12,7 @@ export const LIMITES = {
   foto: 3 * 1024 * 1024,     // 3 MB — cabe GIF curto de avatar
   banner: 8 * 1024 * 1024,   // 8 MB — banner é maior, e GIF pesa
   som: 2 * 1024 * 1024,      // 2 MB — soundboard é efeito curto, não música
+  chat: 5 * 1024 * 1024,     // 5 MB — GIF de chat é maior que avatar e menor que banner
 };
 
 // Assinaturas de verdade, lidas do começo do arquivo. O content-type que o app manda é

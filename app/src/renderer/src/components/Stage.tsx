@@ -4,6 +4,7 @@ import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { MenuDaTela } from './MenuDaTela';
+import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import type { Mensagem, RoomInfo } from '../api';
 import type { PessoaNaCall } from './MenuDaPessoa';
@@ -46,11 +47,17 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meu
   onRegistro: () => void;
   /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra. */
   salaAberta: RoomInfo | null;
-  chat: { mensagens: Mensagem[]; erro: string | null; enviar: (t: string) => Promise<void> };
+  chat: {
+    mensagens: Mensagem[];
+    erro: string | null;
+    enviar: (t: string) => Promise<void>;
+    enviarGif: (url: string) => Promise<void>;
+  };
   meuId: number;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
+  const [imagemAberta, setImagemAberta] = useState<string | null>(null);
 
 
 
@@ -116,6 +123,8 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meu
             mensagens={chat.mensagens}
             erro={chat.erro}
             onEnviar={chat.enviar}
+            onEnviarGif={chat.enviarGif}
+            onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
             grande
@@ -176,11 +185,14 @@ export function Stage({ rm, pessoas, onPessoa, onRegistro, salaAberta, chat, meu
           mensagens={chat.mensagens}
           erro={chat.erro}
           onEnviar={chat.enviar}
+          onEnviarGif={chat.enviarGif}
+          onVerImagem={setImagemAberta}
           sala={salaAberta?.name ?? null}
           meuId={meuId}
         />
       </div>
       )}
+      {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
       {menuDaTela && (
         <MenuDaTela
           nome={menuDaTela.nome}

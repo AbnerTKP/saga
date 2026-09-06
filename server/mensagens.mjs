@@ -11,7 +11,7 @@ const TAMANHO_MAXIMO = 2000;
 export const QUANTAS = 100;
 
 const SELECT = `
-  SELECT m.id, m.texto, m.criado_em, m.usuario_id,
+  SELECT m.id, m.texto, m.imagem, m.criado_em, m.usuario_id,
          COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
          u.foto, mem.turbo, mem.id_exibido
     FROM mensagens m
@@ -33,6 +33,7 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
   return linhas.map((m) => ({
     id: m.id,
     texto: m.texto,
+    imagem: m.imagem ?? null,
     criadoEm: m.criado_em,
     autorId: m.usuario_id,
     // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não.
@@ -43,19 +44,21 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
   }));
 }
 
-export function enviarMensagem(db, servidorId, quem, salaId, texto) {
+/** `imagem` é o nome do arquivo já guardado — um GIF do Giphy, por exemplo. */
+export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = null) {
   const sala = buscarSala(db, servidorId, salaId);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
 
   const limpo = String(texto ?? '').trim();
-  if (!limpo) throw new ErroDeConta('Mensagem vazia.');
+  // Mensagem só de imagem é o caso normal do GIF: o texto vazio ali não é engano.
+  if (!limpo && !imagem) throw new ErroDeConta('Mensagem vazia.');
   if (limpo.length > TAMANHO_MAXIMO) {
     throw new ErroDeConta(`A mensagem passa de ${TAMANHO_MAXIMO} caracteres.`);
   }
 
   const info = db.prepare(
-    'INSERT INTO mensagens (sala_id, usuario_id, texto, criado_em) VALUES (?, ?, ?, ?)',
-  ).run(sala.id, quem.id, limpo, Date.now());
+    'INSERT INTO mensagens (sala_id, usuario_id, texto, imagem, criado_em) VALUES (?, ?, ?, ?, ?)',
+  ).run(sala.id, quem.id, limpo, imagem, Date.now());
 
   const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: Number(info.lastInsertRowid) - 1 });
   return nova;

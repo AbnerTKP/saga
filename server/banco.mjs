@@ -130,6 +130,10 @@ export const MIGRACOES = [
   `CREATE INDEX convites_servidor ON convites(servidor_id)`,
   // Quem criou o servidor. Serve para não deixar o último dono sair e trancar todo mundo.
   `ALTER TABLE servidores ADD COLUMN criado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`,
+
+  // GIF no chat. A imagem é guardada como qualquer outra (nome = hash do conteúdo), e a
+  // mensagem aponta para ela. Mensagem com imagem pode vir sem texto nenhum.
+  `ALTER TABLE mensagens ADD COLUMN imagem TEXT`,
 ];
 
 export function abrirBanco(caminho) {

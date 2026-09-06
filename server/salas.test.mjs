@@ -170,3 +170,28 @@ test('a mensagem carrega quem escreveu, para a tela não precisar buscar', () =>
     { nome: 'abner', autorId: dono.id, turbo: false },
   );
 });
+
+test('mensagem só de imagem vale — é o caso do GIF', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('TKP');
+  const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
+
+  const m = enviarMensagem(db, sid, dono, sala.id, '', 'abc123.gif');
+  assert.equal(m.texto, '');
+  assert.equal(m.imagem, 'abc123.gif');
+  assert.equal(listarMensagens(db, sid, sala.id)[0].imagem, 'abc123.gif');
+});
+
+test('sem texto e sem imagem continua sendo mensagem vazia', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('TKP');
+  const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
+  assert.throws(() => enviarMensagem(db, sid, dono, sala.id, '   ', null), /vazia/);
+});
+
+test('mensagem de texto não ganha imagem por acidente', () => {
+  const { db, sid, cria } = cenario();
+  const dono = cria('TKP');
+  const sala = criarSala(db, sid, dono, { nome: 'papo', tipo: 'texto' });
+  assert.equal(enviarMensagem(db, sid, dono, sala.id, 'oi').imagem, null);
+});

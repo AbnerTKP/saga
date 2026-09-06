@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { Mensagem } from '../api';
+import { urlDoArquivo, type Mensagem } from '../api';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
+import { EscolherGif } from './EscolherGif';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -11,15 +12,18 @@ const hora = (t: number) =>
  * O mesmo chat serve à coluna lateral de uma sala de voz e à tela inteira de uma sala de
  * texto: muda o tamanho, não o comportamento.
  */
-export function Chat({ mensagens, erro, onEnviar, sala, meuId, grande }: {
+export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala, meuId, grande }: {
   mensagens: Mensagem[];
   erro: string | null;
   onEnviar: (texto: string) => Promise<void>;
+  onEnviarGif: (url: string) => Promise<void>;
+  onVerImagem: (url: string) => void;
   sala: string | null;
   meuId: number;
   grande?: boolean;
 }) {
   const [texto, setTexto] = useState('');
+  const [gifAberto, setGifAberto] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
 
   // Rola para o fim quando chega mensagem — é onde a conversa está.
@@ -52,12 +56,30 @@ export function Chat({ mensagens, erro, onEnviar, sala, meuId, grande }: {
               <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
               <span className="time">{hora(m.criadoEm)}</span>
             </div>
-            <div className="text">{m.texto}</div>
+            {m.texto && <div className="text">{m.texto}</div>}
+            {m.imagem && (
+              <button
+                className="msg-imagem"
+                title="Ver maior"
+                onClick={() => onVerImagem(urlDoArquivo(m.imagem)!)}
+              >
+                <img src={urlDoArquivo(m.imagem)!} alt="GIF" draggable={false} />
+              </button>
+            )}
           </div>
         ))}
       </div>
 
       <form className="chat-input" onSubmit={enviar}>
+        <button
+          type="button"
+          className="icon"
+          title="Mandar um GIF"
+          disabled={semSala}
+          onClick={() => setGifAberto(true)}
+        >
+          <Icon name="gif" size={18} />
+        </button>
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -67,6 +89,10 @@ export function Chat({ mensagens, erro, onEnviar, sala, meuId, grande }: {
         />
         <button disabled={semSala || !texto.trim()} title="Enviar"><Icon name="send" size={18} /></button>
       </form>
+
+      {gifAberto && (
+        <EscolherGif onEscolher={onEnviarGif} onClose={() => setGifAberto(false)} />
+      )}
     </div>
   );
 }

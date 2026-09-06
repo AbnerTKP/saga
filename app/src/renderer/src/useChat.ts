@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { lerMensagens, enviarMensagem, type Mensagem } from './api';
+import { lerMensagens, enviarMensagem, enviarGifNoChat, type Mensagem } from './api';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
 // e para cinco amigos, dois segundos passam por instantâneo.
@@ -35,20 +35,29 @@ export function useChat(salaId: number | null) {
     return () => { vivo = false; clearInterval(id); };
   }, [salaId]);
 
+  // Quem acabou de escrever não pode esperar a próxima busca para se ver na tela.
+  const mostrarJa = useCallback((m: Mensagem) => {
+    ultima.current = Math.max(ultima.current, m.id);
+    setMensagens((antigas) => (antigas.some((x) => x.id === m.id) ? antigas : [...antigas, m]));
+    setErro(null);
+  }, []);
+
   const enviar = useCallback(async (texto: string) => {
     if (!salaId) return;
     const limpo = texto.trim();
     if (!limpo) return;
     try {
-      const m = await enviarMensagem(salaId, limpo);
-      // Aparece na hora para quem escreveu, sem esperar a próxima busca.
-      ultima.current = Math.max(ultima.current, m.id);
-      setMensagens((antigas) => (antigas.some((x) => x.id === m.id) ? antigas : [...antigas, m]));
-      setErro(null);
+      mostrarJa(await enviarMensagem(salaId, limpo));
     } catch (e) {
       setErro((e as Error).message);
     }
-  }, [salaId]);
+  }, [salaId, mostrarJa]);
 
-  return { mensagens, erro, enviar };
+  const enviarGif = useCallback(async (url: string) => {
+    if (!salaId) return;
+    // Deixa o erro subir: quem abriu o seletor de GIF precisa vê-lo lá dentro.
+    mostrarJa(await enviarGifNoChat(salaId, url));
+  }, [salaId, mostrarJa]);
+
+  return { mensagens, erro, enviar, enviarGif };
 }

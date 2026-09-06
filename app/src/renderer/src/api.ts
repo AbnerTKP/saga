@@ -199,6 +199,8 @@ export const reordenarSalas = (ids: number[]) => pedir<{ salas: Sala[] }>('POST'
 export type Mensagem = {
   id: number;
   texto: string;
+  /** Nome do arquivo, quando a mensagem é uma imagem (um GIF do Giphy). */
+  imagem: string | null;
   criadoEm: number;
   autorId: number | null;
   nome: string;
@@ -216,6 +218,10 @@ export const lerMensagens = async (sala: number, depoisDe?: number) =>
 
 export const enviarMensagem = async (sala: number, texto: string) =>
   (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
+
+/** O servidor baixa o GIF, guarda como qualquer imagem e publica a mensagem. */
+export const enviarGifNoChat = async (sala: number, url: string) =>
+  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens/gif', { sala, url })).mensagem;
 
 export const renomearServidor = (nome: string) =>
   pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });

@@ -375,6 +375,19 @@ const ROTAS = {
     return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, texto) };
   },
 
+  // O GIF do chat também é baixado e guardado aqui, pelo mesmo motivo do GIF de perfil:
+  // continua funcionando se sumir do Giphy, e passa pela conferência de bytes de sempre.
+  // Não é do Turbo: o que o Turbo destrava é a imagem animada NO PERFIL.
+  'POST /mensagens/gif': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { sala, url } = await lerCorpo(req);
+    const bruto = await baixarGif(url, LIMITES.chat);
+    const nome = salvarImagem(ARQUIVOS, bruto, 'chat');
+    return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, '', nome) };
+  },
+
   'POST /token': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
