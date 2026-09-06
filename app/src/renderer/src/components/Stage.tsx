@@ -58,7 +58,7 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
       <div className="tile-label">
         {isScreen && <Icon name="screen" size={14} />}
-        {name}{tile.local ? ' (você)' : ''}{isScreen ? ' · tela' : ''}
+        {name}{tile.local ? ' (você)' : ''}{isScreen ? (big ? ' · tela' : ' · clique para assistir') : ''}
       </div>
       {isScreen && (
         <button
@@ -112,15 +112,23 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
 
 
 
-  // Foca automaticamente a primeira tela compartilhada que aparecer
+  /**
+   * O palco não escolhe sozinho. Quem escolhe é quem assiste.
+   *
+   * Antes ele focava a primeira transmissão que aparecesse — e "a primeira" é a ordem em
+   * que os participantes calharam de vir, que muda quando alguém liga a câmera ou troca
+   * de faixa. Com duas pessoas transmitindo, o quadro grande pulava de uma para a outra
+   * sozinho, e não havia como dizer "quero ESTA". Agora não há palpite: sem clique, todas
+   * ficam do mesmo tamanho, esperando.
+   *
+   * A escolha vale para imagem E som: a que está no palco é a que se vê e a única que se
+   * ouve. Sem escolha, palco vazio — e silêncio, que é o que audivel.ts já dizia.
+   */
   const screens = rm.tiles.filter((t) => t.source === Track.Source.ScreenShare);
-  const focusTile = rm.tiles.find((t) => t.key === focus) ?? (screens[0] ?? null);
+  const focusTile = rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
-  // A live que está no palco: a em destaque ou, se o destaque for uma câmera, a primeira
-  // que estiver no ar. É ela que se ouve e é ela que vai para o quadro flutuante — uma
-  // conta só, senão clicar numa câmera deixava o palco sem live e o som de todas voltava.
-  const liveNoPalco = (focusTile?.source === Track.Source.ScreenShare ? focusTile : null) ?? screens[0] ?? null;
+  const liveNoPalco = focusTile?.source === Track.Source.ScreenShare ? focusTile : null;
   const identidadeNoPalco = liveNoPalco?.participant.identity ?? null;
   useEffect(() => { rm.definirLiveNoPalco(identidadeNoPalco); }, [identidadeNoPalco, rm]);
 

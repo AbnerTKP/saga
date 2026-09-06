@@ -294,6 +294,12 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
   diferença entre esconder e sumir: uma live que você cortou sem deixar rastro obriga a
   procurar o caminho de volta, e não havia um. Vale para qualquer coisa que a pessoa
   desliga — o desligado precisa continuar visível, senão não tem como religar.
+- **O palco não escolhe a transmissão; quem assiste escolhe.** Ele focava a primeira que
+  aparecesse, e "a primeira" é a ordem em que os participantes calharam de vir — que muda
+  quando alguém liga a câmera ou troca de faixa. Com duas pessoas transmitindo, o quadro
+  grande pulava de uma para a outra sozinho e não havia como dizer "quero esta". Sem
+  clique, todas ficam do mesmo tamanho, esperando. A escolha vale para imagem **e** som:
+  palco vazio é silêncio, que é o que `audivel.ts` já dizia.
 - **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
