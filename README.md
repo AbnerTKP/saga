@@ -126,18 +126,32 @@ keyUsage=critical,digitalSignature
 extendedKeyUsage=critical,codeSigning
 EOF
 
-openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+openssl req -x509 -newkey rsa:2048 -sha256 -days 7300 -nodes \
   -keyout chave.pem -out cert.pem -config cert.cnf
-openssl pkcs12 -legacy -export -out cantinho.p12 -inkey chave.pem -in cert.pem
-base64 -i cantinho.p12 | pbcopy      # cola isto no secret MAC_CERT_P12
+# O openssl que vem no macOS é LibreSSL e NÃO tem a opção -legacy que a internet manda usar.
+openssl pkcs12 -export -out cantinho.p12 -inkey chave.pem -in cert.pem
 ```
 
-No GitHub, em **Settings › Secrets and variables › Actions**, crie `MAC_CERT_P12` (o texto
-colado) e `MAC_CERT_SENHA` (a senha que você digitou no `pkcs12`). O `CN` precisa bater com
-`MAC_CERT_NOME` em `.github/workflows/release.yml`. **Guarde o `cantinho.p12`**: perder a
-chave privada é voltar à estaca zero, porque o requisito muda junto com o certificado.
+Depois, os dois secrets (dá para fazer pelo site, em **Settings › Secrets and variables ›
+Actions**, ou pela linha de comando):
 
-Sem os secrets, o build sai em ad-hoc como antes — o CI não quebra, só não conserta.
+```bash
+base64 -i cantinho.p12 | gh secret set MAC_CERT_P12 --repo AbnerTKP/cantinho-do-vorcaro
+gh secret set MAC_CERT_SENHA --repo AbnerTKP/cantinho-do-vorcaro   # a senha do pkcs12
+```
+
+O `CN` precisa bater com `MAC_CERT_NOME` em `.github/workflows/release.yml`. **Guarde o
+`cantinho.p12` e a senha**: perder a chave privada é voltar à estaca zero, porque o
+requisito muda junto com o certificado. Neste projeto eles moram em
+`~/Documents/cantinho-certificado` — fora do repositório, que é público.
+
+Sem os secrets, o build sai em ad-hoc como antes — o CI não quebra, só não conserta. Para
+conferir qual dos dois aconteceu, o registro do build imprime o requisito:
+
+```
+• assinado com "Cantinho do Vorcaro"  …/Cantinho do Vorcaro.app
+• designated => identifier "br.com.vorcaro.cantinho" and certificate leaf = H"…"
+```
 
 Na **primeira** versão assinada, cada pessoa ainda precisa reconceder uma vez, porque o
 requisito muda de hash para certificado justamente nesse build: em **Ajustes do Sistema ›
