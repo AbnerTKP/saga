@@ -68,7 +68,14 @@ export function App() {
     window.desktop.updateAtual().then((s) => { if (s) aplicar(s); });
     window.desktop.onUpdate(aplicar);
   }, []);
-  const rm = useRoom(sessao?.eu?.turbo ?? false);
+  // Alguém entrou na sala em que estou: o som avisa quem está de fone, e este recado
+  // avisa quem está com a janela noutro lugar. Sala em que não estou não vira aviso —
+  // seria barulho por acontecimento que não é meu.
+  const aoChegarAlguem = useCallback(
+    (nome: string) => notas.mostrar('info', `${nome} entrou na sala.`),
+    [notas.mostrar],
+  );
+  const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem);
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 
@@ -120,27 +127,6 @@ export function App() {
   const lidasRef = useRef(lidas);
   useEffect(() => { lidasRef.current = lidas; guardar(lidas); }, [lidas]);
 
-  // Quem já estava em cada sala na busca anterior. Sem isso, a primeira busca anunciaria
-  // como "chegou agora" todo mundo que já estava lá.
-  const jaVistos = useRef<Map<number, Set<string>> | null>(null);
-  const anunciarQuemChegou = useCallback((lista: RoomInfo[]) => {
-    const agora = new Map(lista.map((s) => [s.id, new Set(s.participants.map((p) => p.identity))]));
-    const antes = jaVistos.current;
-    jaVistos.current = agora;
-    if (!antes) return;
-
-    for (const sala of lista) {
-      if (sala.tipo !== 'voz') continue;
-      // Na sala em que estou, quem avisa é o som. Aqui é para o que eu não veria.
-      if (sala.name === rm.roomName) continue;
-      const conhecidos = antes.get(sala.id);
-      if (!conhecidos) continue;
-      for (const p of sala.participants) {
-        if (!conhecidos.has(p.identity)) notas.mostrar('info', `${p.name} entrou em ${sala.name}.`);
-      }
-    }
-  }, [rm.roomName, notas]);
-
   // Quem está em cada sala
   useEffect(() => {
     if (!sessao?.servidor) return;
@@ -149,7 +135,6 @@ export function App() {
       try {
         const lista = await buscarSalas(paraParametro(lidasRef.current));
         if (!vivo) return;
-        anunciarQuemChegou(lista);
         setRooms(lista);
         setPollError(null);
       } catch (e) {

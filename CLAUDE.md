@@ -121,6 +121,9 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   salas que já acontecia. Guardar no banco pediria tabela nova para um problema que
   ninguém tem. Ele só anda para a frente: uma resposta atrasada desmarcaria o que já foi
   lido. O que a própria pessoa escreveu não conta como não lido.
+- **O aviso de quem chegou é da sala em que você está**, e só dela. O som avisa quem está
+  de fone; o recado na tela avisa quem está com a janela noutro lugar — que é justamente
+  quando você não vê a lista lateral. Sala em que você não está não vira aviso.
 - **GIF no chat não é do Turbo.** O que o Turbo destrava é a imagem animada no perfil.
 - **Os sons de aviso vão dentro do app.** São 30 KB; aviso que precisa ser baixado chega
   depois do fato. O mesmo som não repete em menos de 400 ms, senão três pessoas entrando

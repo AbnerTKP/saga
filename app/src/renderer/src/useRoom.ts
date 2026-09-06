@@ -68,7 +68,11 @@ function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<
 }
 
 /** Recebe se a pessoa é Turbo porque a qualidade de transmissão depende disso. */
-export function useRoom(souTurbo = false) {
+/**
+ * `aoChegarAlguem` é chamado quando alguém entra na sala em que você está — é dali que
+ * sai o aviso na tela. Vem de fora porque quem desenha aviso é o App, não este gancho.
+ */
+export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => void) {
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const [status, setStatus] = useState<Status>('idle');
@@ -186,7 +190,11 @@ export function useRoom(souTurbo = false) {
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.Reconnecting, () => setStatus('reconnecting'))
       .on(RoomEvent.Reconnected, () => setStatus('connected'))
-      .on(RoomEvent.ParticipantConnected, () => { tocarAviso('entrou', deafenedRef.current); bump(); })
+      .on(RoomEvent.ParticipantConnected, (p: Participant) => {
+        tocarAviso('entrou', deafenedRef.current);
+        aoChegarAlguem?.(p.name || p.identity);
+        bump();
+      })
       .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
       .on(RoomEvent.ActiveSpeakersChanged, bump)
       .on(RoomEvent.TrackMuted, bump)
@@ -204,7 +212,7 @@ export function useRoom(souTurbo = false) {
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem]);
 
   const join = useCallback(async (url: string, token: string, name: string) => {
     setError(null);
