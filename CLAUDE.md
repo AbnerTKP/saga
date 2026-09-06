@@ -103,6 +103,10 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
 - **Reordenar sala é só dado, e por isso não derruba ninguém da call.** A sala do LiveKit
   é o id; arrastar mexe em `ordem` e `categoria_id`, e em id nenhum. A lista muda na hora
   e a busca seguinte confirma — dando errado, é ela que devolve a ordem de verdade.
+- **Pegar a sala pelo botão de dentro arrasta a linha inteira** — medido no Electron deste
+  projeto, com o protocolo do DevTools: `dragstart` na linha, `dragover` no alvo e `drop`
+  no contêiner, mesmo com o ponteiro caindo sobre o `<button>`. Não é preciso alça
+  separada nem `-webkit-user-drag`.
 - **A conta de arrastar mora em `ordenacao.ts`, longe da tela.** É onde esse tipo de código
   erra: tirar da posição velha desloca a nova, e aparar o índice antes de descontar a
   própria sala fazia "soltar no fim" parar em penúltimo — o teste pegou.

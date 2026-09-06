@@ -122,7 +122,16 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                     idExibido: p.idExibido ?? null, speaking: false,
                   }));
               return (
-                <div key={r.name} className="room-block">
+                <li
+                  key={r.id}
+                  className={`linha-de-sala ${naMao === r.id ? 'na-mao' : ''}`}
+                  draggable={podeGerirSalas}
+                  onDragStart={(e) => { setNaMao(r.id); e.dataTransfer.effectAllowed = 'move'; }}
+                  onDragEnd={() => { setNaMao(null); setAlvo(null); }}
+                  onDragOver={(e) => mirar(e, g.categoria?.id ?? null, i)}
+                >
+                  {risco(g.categoria?.id ?? null, i)}
+                  <div className="room-block">
                   <button
                     className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
                     onClick={() => onAbrir(r)}
@@ -156,7 +165,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                       </li>
                     ))}
                   </ul>
-                </div>
+                  </div>
+                </li>
               );
                 })}
                 {/* O fim do grupo também é um lugar de soltar, senão não dá para pôr uma
