@@ -125,28 +125,17 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
    * ouve. Sem escolha, palco vazio — e silêncio, que é o que audivel.ts já dizia.
    */
   const screens = rm.tiles.filter((t) => t.source === Track.Source.ScreenShare);
-  const focusTile = rm.tiles.find((t) => t.key === focus) ?? null;
+
+  /**
+   * A transmissão escolhida manda no palco. As outras nem chegam — não estão inscritas —,
+   * então não há o que mostrar delas além do nome na faixa de cima.
+   *
+   * Sem escolha, o palco fica com as câmeras; e aí vale o destaque manual de sempre, que
+   * é o que permite ampliar a câmera de alguém.
+   */
+  const liveNoPalco = screens.find((t) => t.participant.identity === rm.assistindo) ?? null;
+  const focusTile = liveNoPalco ?? rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
-
-  const liveNoPalco = focusTile?.source === Track.Source.ScreenShare ? focusTile : null;
-  const identidadeNoPalco = liveNoPalco?.participant.identity ?? null;
-  useEffect(() => { rm.definirLiveNoPalco(identidadeNoPalco); }, [identidadeNoPalco, rm]);
-
-  // Quem estava cortado não tem faixa, então não tem em que focar ainda. Guarda-se o
-  // pedido e ele é cumprido quando o vídeo chega — senão, voltar a ver uma live com outra
-  // no palco não levava a nada visível, e parecia que o clique não tinha funcionado.
-  const [aguardandoPalco, setAguardandoPalco] = useState<string | null>(null);
-  useEffect(() => {
-    if (!aguardandoPalco) return;
-    const chegou = screens.find((t) => t.participant.identity === aguardandoPalco);
-    if (chegou) { setFocus(chegou.key); setAguardandoPalco(null); }
-  }, [aguardandoPalco, screens]);
-
-  const porNoPalco = (identity: string, cortada: boolean) => {
-    const tela = screens.find((t) => t.participant.identity === identity);
-    if (tela) { setFocus(tela.key); return; }
-    if (cortada) { rm.alternarLive(identity); setAguardandoPalco(identity); }
-  };
 
   // Só transmissão tem volume próprio; câmera não carrega áudio separado.
   const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
@@ -187,36 +176,25 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       {!idle && rm.lives.length > 0 && (
         <div className="lives">
           <span className="lives-titulo"><Icon name="screen" size={14} /> transmitindo</span>
-          {rm.lives.map((l) => {
-            const noPalco = !l.cortada && l.identity === identidadeNoPalco;
-            return (
-              <div key={l.identity} className={`live-chip ${noPalco ? 'no-palco' : ''} ${l.cortada ? 'cortada' : ''}`}>
-                <button
-                  className="live-ver"
-                  title={l.cortada ? `Voltar a ver a live de ${l.nome}`
-                    : noPalco ? `A live de ${l.nome} já está no palco` : `Pôr a live de ${l.nome} no palco`}
-                  onClick={() => porNoPalco(l.identity, l.cortada)}
-                >
-                  <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
-                    enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} />
-                  <span className="live-nome">{l.nome}</span>
-                  {noPalco && <span className="live-estado">no palco</span>}
-                  {l.cortada && <span className="live-estado">parada</span>}
-                </button>
-                {/* A sua própria live não se corta: para parar, é parar de compartilhar. */}
-                {!l.local && (
-                  <button
-                    className="link live-acao"
-                    title={l.cortada ? 'Voltar a receber esta live'
-                      : 'Parar de receber esta live — economiza banda, não só esconde'}
-                    onClick={() => rm.alternarLive(l.identity)}
-                  >
-                    {l.cortada ? 'ver' : 'parar'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          {rm.lives.map((l) => (
+            <div key={l.identity} className={`live-chip ${l.assistindo ? 'no-palco' : ''}`}>
+              <button
+                className="live-ver"
+                title={l.assistindo ? `Parar de assistir ${l.nome}` : `Assistir a transmissão de ${l.nome}`}
+                onClick={() => rm.assistir(l.assistindo ? null : l.identity)}
+              >
+                <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
+                  enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} />
+                <span className="live-nome">{l.nome}</span>
+                <span className="live-estado">{l.assistindo ? 'assistindo' : 'assistir'}</span>
+              </button>
+            </div>
+          ))}
+          {/* Dito uma vez, no lugar onde se escolhe: as outras não estão chegando, e é
+              por isso que não aparecem no palco. */}
+          <span className="lives-nota muted small">
+            {rm.assistindo ? 'só esta está sendo recebida' : 'escolha uma para assistir'}
+          </span>
         </div>
       )}
 

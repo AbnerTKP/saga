@@ -108,18 +108,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .live-chip { display: flex; align-items: center; gap: 2px; flex: none; background: var(--bg1);
   border: 1px solid transparent; border-radius: 999px; padding: 2px 8px 2px 3px; }
 .live-chip.no-palco { border-color: var(--accent); background: var(--bg3); }
-.live-chip.cortada { opacity: .6; }
-.live-chip.cortada:hover { opacity: 1; }
+.lives-nota { flex: none; margin-left: 4px; }
 .live-ver { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 999px; color: var(--text); }
 .live-ver:hover { color: var(--white); }
 .live-nome { font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-estado { font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
   color: var(--text3); background: var(--bg0); padding: 1px 6px; border-radius: 999px; }
 .live-chip.no-palco .live-estado { color: var(--white); background: var(--accent); }
-/* Discreta de propósito: o nome é o que se procura, a ação só precisa estar ao alcance. */
-.live-acao { flex: none; padding: 3px 6px; border-radius: 999px; color: var(--text3); }
-.live-chip:hover .live-acao { color: #00a8fc; }
-.live-acao:hover { background: var(--bg0); }
 
 .tile { position: relative; background: var(--bg1); border-radius: 8px; overflow: hidden; min-height: 0; display: grid; place-items: center; cursor: pointer; border: 2px solid transparent; }
 .tile.speaking { border-color: var(--ok); }
