@@ -664,3 +664,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--white); }
 .mini-live .tile { border-radius: 0; aspect-ratio: 16 / 9; }
 .mini-live .tile-label { display: none; }
+
+/* O som que está no ar: o botão vira "parar", então precisa parecer outra coisa. */
+.som.tocando .tocar { background: var(--accent); color: #fff; }
+.som.tocando .tocar:hover:not(:disabled) { background: var(--accent-h); }

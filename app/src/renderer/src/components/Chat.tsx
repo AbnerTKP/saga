@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { urlDoArquivo, type Mensagem } from '../api';
 import { Icon } from './Icon';
+import { partirEmLinks } from '../links';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherGif } from './EscolherGif';
@@ -12,6 +13,22 @@ const hora = (t: number) =>
  * O mesmo chat serve à coluna lateral de uma sala de voz e à tela inteira de uma sala de
  * texto: muda o tamanho, não o comportamento.
  */
+/**
+ * O texto da mensagem com os endereços clicáveis.
+ *
+ * Nada de HTML montado a partir do que a pessoa escreveu: `partirEmLinks` devolve pedaços
+ * e o React desenha `<a>` só onde este código disse que é link. O `setWindowOpenHandler`
+ * do processo principal manda para o navegador do sistema — abrir dentro do app seria
+ * navegar a janela do app para fora dele.
+ */
+function comLinks(texto: string) {
+  return partirEmLinks(texto).map((p, i) => (
+    p.tipo === 'link'
+      ? <a key={i} href={p.href} target="_blank" rel="noreferrer noopener">{p.valor}</a>
+      : <span key={i}>{p.valor}</span>
+  ));
+}
+
 export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala, meuId, grande }: {
   mensagens: Mensagem[];
   erro: string | null;
@@ -56,7 +73,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
               <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
               <span className="time">{hora(m.criadoEm)}</span>
             </div>
-            {m.texto && <div className="text">{m.texto}</div>}
+            {m.texto && <div className="text">{comLinks(m.texto)}</div>}
             {m.imagem && (
               <button
                 className="msg-imagem"

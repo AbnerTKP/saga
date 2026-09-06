@@ -364,6 +364,9 @@ export function App() {
           eu={eu}
           naSala={rm.status === 'connected'}
           onTocar={rm.tocarSom}
+          onParar={rm.pararSom}
+          tocando={rm.somTocando}
+          restantes={rm.sonsRestantes}
           onClose={() => setSoundboard(false)}
         />
       )}

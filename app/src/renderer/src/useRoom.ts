@@ -124,6 +124,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   // assim tocar não depende de estar com o microfone ligado, e mutar alguém não muta os
   // sons dele. A faixa é publicada uma vez e reaproveitada.
   const audio = useRef<AudioContext | null>(null);
+  // O que está tocando agora, e quantos já foram nesta entrada na sala. Ver tocarSom.
+  const fonteDoSom = useRef<AudioBufferSourceNode | null>(null);
+  const [somTocando, setSomTocando] = useState<string | null>(null);
+  const sonsTocados = useRef(0);
   const destinoDoSom = useRef<MediaStreamAudioDestinationNode | null>(null);
   const faixaDoSom = useRef<MediaStreamTrack | null>(null);
   const buffers = useRef(new Map<string, AudioBuffer>());
@@ -223,6 +227,9 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     };
     const onDisconnected = () => {
       // A publicação morre junto com a sala; a próxima entrada publica de novo.
+      try { fonteDoSom.current?.stop(); } catch { /* já tinha acabado */ }
+      fonteDoSom.current = null;
+      setSomTocando(null);
       medicoes.current.forEach(clearTimeout);
       medicoes.current = [];
       faixaDoSom.current = null;
@@ -280,6 +287,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       );
       setSalaDaVoz(sala);
       setStatus('connected');
+      sonsTocados.current = 0;   // a conta do soundboard é por entrada na sala
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
       tocarAviso('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
@@ -553,9 +561,39 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   }, [room, aplicarAudio]);
 
   /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
+  /**
+   * Um som por vez, e cinco por entrada na sala para quem não é Berserk.
+   *
+   * Dava para segurar o botão e empilhar som em cima de som, o que não é soundboard, é
+   * ruído — e ninguém na sala tem como se defender disso. Duas travas, e as duas do lado
+   * do app: publicar áudio é do app, e o servidor não tem como cercar quem alterar o
+   * próprio programa. Como a régua de 1080p, é regra de conduta, não cerca.
+   *
+   * A primeira é a fila de um: enquanto um som toca, nenhum outro começa. Quem tocou
+   * corta o dele quando quiser, e aí o próximo já pode ir — é o contrário de esperar
+   * calado.
+   *
+   * A segunda é a conta: cinco por entrada na sala. Zera ao entrar, porque o incômodo é
+   * dentro da conversa, e é lá que ele se resolve. Sem limite é o que o Berserk destrava.
+   */
+  const LIMITE_SEM_BERSERK = 5;
+
+  const pararSom = useCallback(() => {
+    // O `onended` é quem limpa: parar e acabar sozinho têm de deixar o mesmo estado.
+    try { fonteDoSom.current?.stop(); } catch { /* já tinha acabado */ }
+  }, []);
+
   const tocarSom = useCallback(async (url: string) => {
     if (room.state !== 'connected') {
       avisar('aviso', 'Entre numa sala antes de tocar um som.');
+      return;
+    }
+    if (fonteDoSom.current) {
+      avisar('aviso', 'Um som por vez. Pare o que está tocando para soltar outro.');
+      return;
+    }
+    if (!souBerserk && sonsTocados.current >= LIMITE_SEM_BERSERK) {
+      avisar('turbo', `São ${LIMITE_SEM_BERSERK} sons por entrada na sala. Soltar à vontade é do Berserk.`);
       return;
     }
     try {
@@ -585,11 +623,20 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       fonte.buffer = buffer;
       fonte.connect(destinoDoSom.current);       // para a sala
       fonte.connect(audio.current.destination);  // e para quem tocou
+      fonte.onended = () => {
+        // Vale para os dois fins: o natural e o `stop()`.
+        if (fonteDoSom.current === fonte) { fonteDoSom.current = null; setSomTocando(null); }
+      };
       fonte.start();
+      fonteDoSom.current = fonte;
+      setSomTocando(url);
+      sonsTocados.current += 1;
     } catch (e) {
+      fonteDoSom.current = null;
+      setSomTocando(null);
       setError(`Som: ${(e as Error).message}`);
     }
-  }, [room, avisar]);
+  }, [room, avisar, souBerserk]);
 
   /**
    * Para, ou volta a receber, a live de uma pessoa.
@@ -669,7 +716,9 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
-    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, tocarSom, volumeDe, definirVolume,
+    join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
+    tocarSom, pararSom, somTocando,
+    sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
     lives, alternarLive,
     volumeDaTelaDe, definirVolumeDaTela, definirLiveNoPalco,
   };

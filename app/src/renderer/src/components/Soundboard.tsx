@@ -2,10 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { pode, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som } from '../api';
 import { Icon } from './Icon';
 
-export function Soundboard({ eu, naSala, onTocar, onClose }: {
+export function Soundboard({ eu, naSala, onTocar, onParar, tocando, restantes, onClose }: {
   eu: Membro;
   naSala: boolean;
   onTocar: (url: string) => void;
+  /** Corta o som que está tocando. Quem tocou não fica refém do próprio clique. */
+  onParar: () => void;
+  /** O endereço do som que está tocando agora, ou null. */
+  tocando: string | null;
+  /** Quantos ainda cabem nesta entrada na sala; `null` quando não há limite (Berserk). */
+  restantes: number | null;
   onClose: () => void;
 }) {
   const [sons, setSons] = useState<Som[] | null>(null);
@@ -60,15 +66,27 @@ export function Soundboard({ eu, naSala, onTocar, onClose }: {
             </p>
           )}
           <div className="sons">
-            {sons?.map((s) => (
-              <div key={s.id} className="som">
+            {sons?.map((s) => {
+              const url = urlDoArquivo(s.arquivo)!;
+              const esteToca = tocando === url;
+              // Com um som no ar, os outros ficam fora de alcance: é a fila de um, dita
+              // pelo botão em vez de recusada depois do clique.
+              const bloqueado = !naSala || (!!tocando && !esteToca) || (!esteToca && restantes === 0);
+              return (
+              <div key={s.id} className={`som ${esteToca ? 'tocando' : ''}`}>
                 <button
                   className="tocar"
-                  disabled={!naSala}
-                  title={naSala ? `Tocar ${s.nome}` : 'Entre numa sala primeiro'}
-                  onClick={() => onTocar(urlDoArquivo(s.arquivo)!)}
+                  disabled={bloqueado}
+                  title={
+                    !naSala ? 'Entre numa sala primeiro'
+                    : esteToca ? `Parar ${s.nome}`
+                    : tocando ? 'Espere o som que está tocando, ou pare ele'
+                    : restantes === 0 ? 'Acabaram os sons desta entrada na sala — sem limite é do Berserk'
+                    : `Tocar ${s.nome}`
+                  }
+                  onClick={() => (esteToca ? onParar() : onTocar(url))}
                 >
-                  <Icon name="speaker" size={16} />
+                  <Icon name={esteToca ? 'close' : 'speaker'} size={16} />
                   <span>{s.nome}</span>
                 </button>
                 {podeGerir && (
@@ -78,8 +96,18 @@ export function Soundboard({ eu, naSala, onTocar, onClose }: {
                   </button>
                 )}
               </div>
-            ))}
+            );})}
           </div>
+
+          {/* A conta só aparece para quem tem conta a fazer. */}
+          {restantes !== null && naSala && (
+            <p className="muted small" style={{ marginTop: 10 }}>
+              {restantes > 0
+                ? `Faltam ${restantes} ${restantes === 1 ? 'som' : 'sons'} nesta entrada na sala.`
+                : 'Acabaram os sons desta entrada na sala.'}
+              {' '}Soltar à vontade é do Berserk.
+            </p>
+          )}
         </section>
 
         {podeGerir && (
