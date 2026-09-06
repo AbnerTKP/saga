@@ -8,6 +8,14 @@ import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 
 type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
+
+/** Captura sem o processamento de microfone, e em estéreo. Ver o comentário em startScreen. */
+const SOM_DE_VERDADE: AudioCaptureOptions = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+  channelCount: 2,
+};
 import {
   Room,
   RoomEvent,
@@ -16,6 +24,8 @@ import {
   VideoPresets,
   VideoPreset,
   type LocalParticipant,
+  AudioPresets,
+  type AudioCaptureOptions,
   type RemoteTrackPublication,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
@@ -298,6 +308,15 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     }
   }, [room]);
 
+  /**
+   * O áudio da tela é SOM, não voz.
+   *
+   * Sem dizer isso, o Chromium entrega a captura com o processamento de microfone ligado:
+   * ganho automático, cancelamento de eco e supressão de ruído, e ainda em mono. Medido
+   * aqui: `{autoGainControl: true, echoCancellation: true, noiseSuppression: true,
+   * channelCount: 1}`. Num filme, o ganho automático é justamente o que "estoura" — ele
+   * empurra as partes altas para cima e bombeia. Era a queixa de som de cinema estourado.
+   */
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
     const preset = QUALIDADES[qualidadeValida(lerQualidadeGuardada(), souTurbo)];
@@ -308,6 +327,13 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       contentHint: 'motion',
     };
     const publicacao: TrackPublishOptions = {
+      // 128 kbps em estéreo, em vez dos 48 kbps mono do preset de voz que vem por padrão.
+      audioPreset: AudioPresets.musicHighQualityStereo,
+      forceStereo: true,
+      // DTX corta o que julga silêncio; em música isso vira bombeamento. RED repete
+      // pedaços para aguentar perda, o que faz sentido em fala e atrapalha aqui.
+      dtx: false,
+      red: false,
       screenShareEncoding: preset.encoding,
       // Se a banda apertar, prefira borrar a imagem a perder fluidez.
       degradationPreference: 'maintain-framerate',
@@ -328,15 +354,18 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     for (const modo of modos) {
       try {
         if (sourceId) await window.desktop.chooseSource(sourceId, modo);
-        await lp().setScreenShareEnabled(true, { ...captura, audio: modo !== 'nao' }, publicacao);
+        await lp().setScreenShareEnabled(
+          true,
+          { ...captura, audio: modo !== 'nao' ? SOM_DE_VERDADE : false },
+          publicacao,
+        );
 
         // Áudio recusado não lança erro: vira uma faixa morta, calada. É o que deixou o Mac
         // transmitindo mudo sem nada no registro. Quem sabe se veio ou não é a publicação.
         const veioAudio = !!lp().getTrackPublication(Track.Source.ScreenShareAudio);
         if (audio && modo !== 'nao' && !veioAudio) {
           anotar('aviso', 'tela', `modo "${modo}" foi aceito, mas nenhuma faixa de áudio foi publicada`);
-          const permissao = await window.desktop.screenPermission().catch(() => 'unknown');
-          avisar('aviso', explicarTelaMuda(window.desktop.platform, permissao));
+          avisar('aviso', explicarTelaMuda(window.desktop.platform));
         } else if (audio && veioAudio) {
           anotar('info', 'tela', `áudio da tela publicado no modo "${modo}"`);
         }

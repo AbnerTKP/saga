@@ -99,6 +99,26 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .tile { position: relative; background: var(--bg1); border-radius: 8px; overflow: hidden; min-height: 0; display: grid; place-items: center; cursor: pointer; border: 2px solid transparent; }
 .tile.speaking { border-color: var(--ok); }
 .tile video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+/* Preencher corta as bordas em vez de deixar tarja preta: uma tela 16:9 numa janela 16:10
+   sempre sobra faixa, e tem quem prefira perder um pedaço a ver a moldura. */
+.tile.preencher video { object-fit: cover; }
+
+/* Em tela cheia o quadro é a tela toda do computador. */
+.tile:fullscreen { width: 100vw; height: 100vh; border-radius: 0; background: #000; }
+.tile:fullscreen video { object-fit: contain; }
+.tile.preencher:fullscreen video { object-fit: cover; }
+
+.tile-expandir { position: absolute; right: 8px; bottom: 8px; width: 30px; height: 30px;
+  display: grid; place-items: center; border-radius: 6px; color: #fff;
+  background: rgba(0,0,0,.55); opacity: 0; transition: opacity .12s; }
+.tile:hover .tile-expandir { opacity: 1; }
+.tile-expandir:hover { background: rgba(0,0,0,.8); }
+@media (prefers-reduced-motion: reduce) { .tile-expandir { transition: none; } }
+
+.menu-check { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; font-size: 13px; }
+.menu-check input { margin-top: 2px; flex: none; }
+.menu-check .block { display: block; }
+.menu-dica { padding: 0 10px 10px; }
 .tile video.mirror { transform: scaleX(-1); }
 .tile-label { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px; }
 .tile.audio { cursor: default; }
@@ -552,3 +572,50 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .16em; text-align: center; font-weight: 700;
 }
+
+/* Cartão do perfil ---------------------------------------------------------
+   Perfil em tamanho de gente: banner, foto grande, nome e o que a pessoa é aqui
+   dentro. Antes clicar na foto só esticava a imagem, o que não dizia nada. */
+.modal.perfil { width: 420px; position: relative; overflow: hidden; }
+.perfil-fechar { position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%;
+  background: rgba(0,0,0,.45); color: #fff; }
+.perfil-fechar:hover { background: rgba(0,0,0,.7); }
+
+.perfil-banner { height: 130px; overflow: hidden; background: var(--bg4); flex: none; }
+.perfil-banner.vazio { background: linear-gradient(135deg, var(--bg4), var(--bg3)); }
+/* Sem banner próprio, o Turbo ganha a faixa colorida — é a distinção que ele compra. */
+.perfil-banner.turbo.vazio { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
+  background-size: 300% 100%; animation: arco-iris 8s linear infinite; }
+.perfil-banner img { width: 100%; height: 100%; display: block; cursor: zoom-in; }
+@media (prefers-reduced-motion: reduce) { .perfil-banner.turbo.vazio { animation: none; } }
+
+.perfil-corpo { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
+
+.perfil-foto {
+  width: 96px; height: 96px; margin: -48px 0 0; border-radius: 50%;
+  border: 5px solid var(--bg2); background: var(--accent); color: #fff;
+  font-size: 36px; font-weight: 600; display: grid; place-items: center;
+  overflow: hidden; flex: none;
+}
+.perfil-foto.com-foto { background: none; cursor: zoom-in; }
+.perfil-foto.turbo { border-color: #c084fc; }
+.perfil-foto img { width: 100%; height: 100%; display: block; }
+
+.perfil-nome { font-size: 22px; font-weight: 700; color: var(--white); line-height: 1.2;
+  overflow-wrap: anywhere; }
+
+.perfil-selos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.perfil-cargo { font-size: 13px; font-weight: 600; color: var(--text2); }
+.perfil-selo { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 10px; background: var(--bg4); color: var(--text2);
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.perfil-selo.turbo { background: rgba(192,132,252,.16); color: #d8b4fe; }
+.perfil-selo.ok { background: rgba(35,165,89,.16); color: #57d98a; }
+
+.perfil-dados { margin: 4px 0 0; padding: 12px 14px; display: grid; gap: 10px;
+  background: var(--bg0); border-radius: 8px; }
+.perfil-dados div { display: grid; gap: 2px; }
+.perfil-dados dt { font-size: 11px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .04em; }
+.perfil-dados dd { margin: 0; font-size: 14px; color: var(--text); }

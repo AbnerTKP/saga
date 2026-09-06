@@ -41,16 +41,17 @@ export const pareceMixagemDoSistema = (rotulo: string) =>
  * recusada no macOS vira uma faixa morta — sem erro, sem aviso. Foi assim que o Mac
  * passou a transmitir mudo sem ninguém descobrir por quê. Quando a faixa não vem,
  * é esta função que diz o que houve.
+ *
+ * Não perguntamos ao sistema se a permissão existe: ele já respondeu "negado" com as
+ * chaves ligadas nos Ajustes, porque a permissão guardada é a da versão anterior do app.
  */
-export function explicarTelaMuda(plataforma: string, permissaoDeTela: string): string {
-  if (plataforma === 'darwin' && permissaoDeTela !== 'granted') {
-    return 'Transmitindo sem o áudio: no Mac ele só vem pelo seletor do próprio app, e esse '
-      + 'seletor depende da permissão de Gravação de Tela. Ligue o Cantinho do Vorcaro em '
-      + 'Ajustes do Sistema › Privacidade e Segurança › Gravação de Tela e abra o app de novo.';
-  }
+export function explicarTelaMuda(plataforma: string): string {
   if (plataforma === 'darwin') {
     return 'Transmitindo sem o áudio: o macOS aceitou compartilhar a tela, mas não entregou o '
-      + 'som do sistema junto.';
+      + 'som do sistema. Em Ajustes do Sistema › Privacidade e Segurança › Gravação do Áudio '
+      + 'do Sistema e da Tela, ligue o Cantinho do Vorcaro — e se a chave já estiver ligada, '
+      + 'desligue e ligue de novo, porque depois de atualizar o macOS guarda a permissão da '
+      + 'versão anterior. Depois feche e abra o app.';
   }
   return 'Transmitindo sem o áudio do sistema: ele foi pedido, mas não veio junto com a tela.';
 }

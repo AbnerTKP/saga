@@ -7,19 +7,20 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
   const [tab, setTab] = useState<'screen' | 'window'>('screen');
   const [sel, setSel] = useState<string | null>(null);
   const [audio, setAudio] = useState(true);
-  const [perm, setPerm] = useState<string>('granted');
 
   useEffect(() => {
     (async () => {
-      const p = await window.desktop.screenPermission();
-      setPerm(p);
       const list = await window.desktop.listSources();
       setSources(list);
       setSel(list.find((s) => s.kind === 'screen')?.id ?? list[0]?.id ?? null);
     })();
   }, []);
 
-  const denied = perm === 'denied' || perm === 'restricted';
+  // Quem diz se a permissão existe é o sistema devolver, ou não, a lista de telas. O
+  // `getMediaAccessStatus` já respondeu "negado" com as chaves ligadas nos Ajustes: a
+  // entrada na lista guarda a assinatura da versão anterior, e cada build nossa tem a
+  // sua. A lista vazia é o sintoma real, e é nele que se confia.
+  const semAcesso = sources !== null && sources.length === 0;
   const shown = (sources ?? []).filter((s) => s.kind === tab);
 
   return (
@@ -30,13 +31,17 @@ export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick:
           <button className="icon" onClick={onClose}><Icon name="close" /></button>
         </div>
 
-        {denied ? (
+        {semAcesso ? (
           <div className="pad">
-            <p>O macOS ainda não deixou o Cantinho do Vorcaro gravar a tela.</p>
+            <p>O macOS não está deixando o Cantinho do Vorcaro ver as telas.</p>
             <ol>
-              <li>Abra <b>Ajustes do Sistema › Privacidade e Segurança › Gravação de Tela</b>.</li>
-              <li>Ligue a chave do <b>Cantinho do Vorcaro</b>.</li>
-              <li>Feche e abra o app de novo.</li>
+              <li>Abra <b>Ajustes do Sistema › Privacidade e Segurança › Gravação do Áudio do Sistema e da Tela</b>.</li>
+              <li>
+                Ligue a chave do <b>Cantinho do Vorcaro</b>. <b>Se ela já estiver ligada,
+                desligue e ligue de novo</b> — depois de atualizar, a permissão guardada é
+                a da versão anterior, e o macOS continua mostrando a chave ligada.
+              </li>
+              <li>Feche e abra o app.</li>
             </ol>
             <button className="primary" onClick={() => window.desktop.openScreenSettings()}>Abrir Ajustes</button>
           </div>

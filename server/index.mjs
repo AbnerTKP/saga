@@ -118,6 +118,7 @@ const verMembro = (m) => m && ({
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
   castigoAte: m.silenciado_ate ?? null,
+  entrouEm: m.entrou_em ?? null,
 });
 
 const verServidor = (sid) => {
@@ -208,6 +209,7 @@ async function participantesDaSala(sid, sala) {
         foto: membro.foto ?? null,
         banner: membro.banner ?? null,
         enquadramento: enquadramento.ler(membro.enquadramento),
+        entrouEm: membro.entrou_em ?? null,
         turbo: !!membro.turbo,
         idExibido: membro.id_exibido ?? null,
       } : {}),

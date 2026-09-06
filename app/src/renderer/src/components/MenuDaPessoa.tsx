@@ -14,11 +14,13 @@ export type PessoaNaCall = {
   banner?: string | null;
   /** Como a pessoa enquadrou a própria foto e o próprio banner. */
   enquadramento?: Enquadramentos;
+  /** Quando entrou neste servidor. */
+  entrouEm?: number | null;
   turbo?: boolean;
   idExibido?: string | null;
 };
 
-export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerFoto, onClose }: {
+export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose }: {
   pessoa: PessoaNaCall;
   eu: Membro;
   /** Os cargos que podem ser dados: os abaixo do meu, e nunca o de dono. */
@@ -27,8 +29,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   volume: number;
   onVolume: (v: number) => void;
   onAcao: (acao: Acao, extra?: { minutos?: number; cargo?: number }) => Promise<void>;
-  /** Clicar na foto abre ela maior: no cartão ela é pequena demais para se ver. */
-  onVerFoto: (url: string) => void;
+  /** Clicar na foto abre o perfil inteiro: aqui ela é pequena demais para dizer algo. */
+  onVerPerfil: () => void;
   onClose: () => void;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
@@ -80,8 +82,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
           foto={pessoa.foto}
           enquadramento={pessoa.enquadramento?.foto}
           tamanho="big"
-          titulo={pessoa.foto ? 'Ver a foto maior' : undefined}
-          onClick={() => { const u = urlDoArquivo(pessoa.foto); if (u) { onVerFoto(u); onClose(); } }}
+          titulo="Ver o perfil"
+          onClick={() => { onVerPerfil(); onClose(); }}
         />
         <div className="quem">
           <div className="strong nome-do-cartao">

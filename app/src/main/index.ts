@@ -13,27 +13,20 @@ type ModoDeAudio = 'nao' | 'loopback' | 'loopbackWithMute';
 
 let pendingSource: { id: string; audio: ModoDeAudio } | null = null;
 
-// Qual seletor de tela usar. No Windows não existe o nativo, então é sempre o nosso.
+// Qual seletor de tela usar: sempre o nosso.
 //
-// No Mac já foi o contrário: o seletor do sistema era o primeiro, porque escolher a janela
-// nele é a própria autorização — não há permissão de Gravação de Tela para o sistema
-// guardar nem para revogar sozinho, que é a origem do "já autorizei e ele pede de novo".
-// Só que o seletor do sistema não chama o nosso handler — e é só dentro dele que se concede o
-// áudio do sistema (`audio: 'loopback'`). Medido neste Mac: pelo seletor do sistema vêm 0
-// faixas de áudio; pelo nosso, 1, rotulada "System audio". Por isso, no Mac, o seletor do
-// sistema virou plano B: só entra quando falta a permissão de Gravação de Tela, sem a qual
-// o nosso seletor não consegue nem listar as telas.
-let SELETOR_DO_SISTEMA = false;
-function decidirSeletor() {
-  if (process.platform !== 'darwin') return false;
-  // Existe em tempo de execução desde a Electron 30, mas ainda não está nas tipagens.
-  const capturador = desktopCapturer as { isDisplayMediaSystemPickerAvailable?: () => boolean };
-  if (!capturador.isDisplayMediaSystemPickerAvailable?.()) return false;
-  // 'not-determined' é a primeira vez: aí vale usar o nosso, que faz o macOS perguntar.
-  // Só quem já disse não fica com o seletor do sistema — mudo, mas ao menos transmitindo.
-  const permissao = systemPreferences.getMediaAccessStatus('screen');
-  return permissao === 'denied' || permissao === 'restricted';
-}
+// O do sistema tem uma vantagem — escolher a janela nele é a própria autorização, e não há
+// permissão de Gravação de Tela para o macOS revogar. Mas ele não chama o nosso handler, e
+// é só ali que se concede `audio: 'loopback'`. Medido: pelo seletor do sistema vêm 0 faixas
+// de áudio; pelo nosso, 1, rotulada "System audio". Transmissão muda não serve.
+//
+// Já tentamos escolher entre os dois por `getMediaAccessStatus('screen')`, e deu errado na
+// prática: com as duas chaves ligadas nos Ajustes, a resposta continuou vindo "negado" —
+// a entrada na lista guarda a assinatura da versão anterior, e cada build nossa é assinada
+// em ad-hoc, ou seja, tem assinatura própria. O app ficava preso no caminho sem som sem
+// jeito de sair. Quem diz se a permissão existe passa a ser a única prova que não mente:
+// o sistema devolver, ou não, a lista de telas.
+const SELETOR_DO_SISTEMA = false;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -101,11 +94,6 @@ app.whenReady().then(async () => {
     callback(['media', 'display-capture', 'notifications'].includes(permission));
   });
 
-  SELETOR_DO_SISTEMA = decidirSeletor();
-  registrar('info', 'tela', SELETOR_DO_SISTEMA
-    ? 'seletor do sistema (o áudio da tela não vem por aqui: falta a permissão de Gravação de Tela)'
-    : 'seletor do app (o áudio da tela pode vir junto)');
-
   // Com o seletor nativo ligado, este handler não é chamado — o macOS resolve sozinho.
   // Ele continua aqui para o Windows e para macOS antigo, onde o seletor não existe.
   session.defaultSession.setDisplayMediaRequestHandler(
@@ -134,6 +122,11 @@ app.whenReady().then(async () => {
       thumbnailSize: { width: 320, height: 180 },
       fetchWindowIcons: true,
     });
+    // Lista vazia é o sintoma de permissão faltando — e a única prova que não mente,
+    // já que `getMediaAccessStatus` respondeu "negado" com as chaves ligadas nos Ajustes.
+    if (sources.length === 0) {
+      registrar('aviso', 'tela', 'o sistema não devolveu nenhuma tela: permissão de Gravação de Tela');
+    }
     return sources
       .filter((s) => !s.name.startsWith('Cantinho do Vorcaro'))
       .map((s) => ({

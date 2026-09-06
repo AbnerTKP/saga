@@ -55,6 +55,8 @@ export type Membro = {
   banido: boolean;
   banidoPor: string | null;
   castigoAte: number | null;
+  /** Quando entrou neste servidor. */
+  entrouEm: number | null;
 };
 
 export type Servidor = { id: number; nome: string; foto: string | null; banner: string | null };
@@ -62,7 +64,8 @@ export type Servidor = { id: number; nome: string; foto: string | null; banner: 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
   usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
-  banner?: string | null; enquadramento?: Enquadramentos; turbo?: boolean; idExibido?: string | null;
+  banner?: string | null; enquadramento?: Enquadramentos; entrouEm?: number | null;
+  turbo?: boolean; idExibido?: string | null;
 };
 export type TipoDeSala = 'voz' | 'texto';
 export type RoomInfo = {

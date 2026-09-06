@@ -10,7 +10,7 @@ import { useRoom } from './useRoom';
 import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
-import { VerImagem } from './components/VerImagem';
+import { CartaoDoPerfil } from './components/CartaoDoPerfil';
 import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
@@ -48,7 +48,7 @@ export function App() {
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
   const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
   const notas = useAvisos();
-  const [fotoAberta, setFotoAberta] = useState<string | null>(null);
+  const [perfilAberto, setPerfilAberto] = useState<PessoaNaCall | null>(null);
   // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
   // porque mudam quando alguém os edita.
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -179,7 +179,7 @@ export function App() {
       pessoas.set(p.identity, {
         identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo,
         foto: p.foto ?? null, banner: p.banner ?? null, enquadramento: p.enquadramento,
-        turbo: p.turbo, idExibido: p.idExibido ?? null,
+        entrouEm: p.entrouEm ?? null, turbo: p.turbo, idExibido: p.idExibido ?? null,
       });
     }
   }
@@ -373,11 +373,18 @@ export function App() {
           onAcao={async (acao, extra) => {
             if (menu.pessoa.usuarioId !== undefined) await moderarPeloMenu(menu.pessoa.usuarioId, acao, extra);
           }}
-          onVerFoto={setFotoAberta}
+          onVerPerfil={() => setPerfilAberto(menu.pessoa)}
           onClose={() => setMenu(null)}
         />
       )}
-      {fotoAberta && <VerImagem url={fotoAberta} onClose={() => setFotoAberta(null)} />}
+      {perfilAberto && (
+        <CartaoDoPerfil
+          pessoa={perfilAberto}
+          naVoz={perfilAberto.usuarioId !== undefined && naVoz.has(perfilAberto.usuarioId)}
+          souEu={perfilAberto.usuarioId === eu.id}
+          onClose={() => setPerfilAberto(null)}
+        />
+      )}
       {novoServidor && (
         <NovoServidor
           onPronto={trocarDeServidor}

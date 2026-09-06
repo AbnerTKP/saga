@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 
 /** Volume de uma transmissão específica, aberto com o botão direito sobre ela. */
-export function MenuDaTela({ nome, em, volume, onVolume, onClose }: {
+export function MenuDaTela({ nome, em, volume, onVolume, preencher, onPreencher, onClose }: {
   nome: string;
   em: { x: number; y: number };
   volume: number;
   onVolume: (v: number) => void;
+  preencher: boolean;
+  onPreencher: (v: boolean) => void;
   onClose: () => void;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
@@ -21,7 +23,7 @@ export function MenuDaTela({ nome, em, volume, onVolume, onClose }: {
 
   const largura = 220;
   const x = Math.min(em.x, window.innerWidth - largura - 8);
-  const y = Math.min(em.y, window.innerHeight - 130);
+  const y = Math.min(em.y, window.innerHeight - 190);
 
   return (
     <div ref={caixa} className="menu-pessoa" style={{ left: x, top: Math.max(8, y), width: largura }}>
@@ -39,6 +41,16 @@ export function MenuDaTela({ nome, em, volume, onVolume, onClose }: {
           onChange={(e) => onVolume(Number(e.target.value) / 100)}
         />
       </label>
+
+      <label className="menu-check">
+        <input type="checkbox" checked={preencher} onChange={(e) => onPreencher(e.target.checked)} />
+        <span>
+          Preencher a tela
+          <span className="muted small block">corta as bordas em vez de deixar tarja preta</span>
+        </span>
+      </label>
+
+      <div className="muted small menu-dica">Dois cliques na transmissão abrem em tela cheia.</div>
     </div>
   );
 }

@@ -64,19 +64,13 @@ test('não confunde microfone comum com mixagem', () => {
   }
 });
 
-test('tela muda no Mac sem permissão manda ligar a Gravação de Tela', () => {
-  const m = explicarTelaMuda('darwin', 'denied');
-  assert.match(m, /Gravação de Tela/);
-  assert.match(m, /abra o app de novo/);
-});
-
-test('tela muda no Mac com permissão não manda mexer em permissão', () => {
-  const m = explicarTelaMuda('darwin', 'granted');
-  assert.doesNotMatch(m, /Gravação de Tela/);
-  assert.match(m, /não entregou o som/);
+test('tela muda no Mac manda mexer na permissão, inclusive religar a chave', () => {
+  const m = explicarTelaMuda('darwin');
+  assert.match(m, /Gravação do Áudio do Sistema e da Tela/);
+  assert.match(m, /desligue e ligue de novo/, 'é o caso de quem acabou de atualizar');
 });
 
 test('tela muda fora do Mac não fala do macOS', () => {
-  const m = explicarTelaMuda('win32', 'granted');
-  assert.doesNotMatch(m, /macOS|Mac\b/);
+  const m = explicarTelaMuda('win32');
+  assert.doesNotMatch(m, /macOS|Ajustes do Sistema/);
 });

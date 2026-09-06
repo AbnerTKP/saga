@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
@@ -11,11 +11,15 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-function VideoTile({ tile, big, onClick, onMenu }: {
-  tile: Tile; big?: boolean; onClick?: () => void;
+function VideoTile({ tile, big, preencher, onClick, onMenu }: {
+  tile: Tile; big?: boolean;
+  /** Cortar as bordas para ocupar tudo, em vez de deixar tarja preta. */
+  preencher?: boolean;
+  onClick?: () => void;
   onMenu?: (e: React.MouseEvent) => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const caixa = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -24,18 +28,36 @@ function VideoTile({ tile, big, onClick, onMenu }: {
   }, [tile.track]);
   const name = tile.participant.name || tile.participant.identity;
   const isScreen = tile.source === Track.Source.ScreenShare;
+
+  // Tela cheia de verdade, na tela inteira do computador — não só maior dentro da janela.
+  const telaCheia = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+    else caixa.current?.requestFullscreen().catch(() => undefined);
+  };
+
   return (
     <div
-      className={`tile ${big ? 'big' : ''} ${tile.participant.isSpeaking && !isScreen ? 'speaking' : ''}`}
+      ref={caixa}
+      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${tile.participant.isSpeaking && !isScreen ? 'speaking' : ''}`}
       onClick={onClick}
+      onDoubleClick={(e) => { e.stopPropagation(); telaCheia(); }}
       onContextMenu={onMenu}
-      title={isScreen ? 'Botão direito para o volume desta transmissão' : undefined}
+      title={isScreen ? 'Dois cliques: tela cheia. Botão direito: volume e ajuste.' : undefined}
     >
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
       <div className="tile-label">
         {isScreen && <Icon name="screen" size={14} />}
         {name}{tile.local ? ' (você)' : ''}{isScreen ? ' · tela' : ''}
       </div>
+      {isScreen && (
+        <button
+          className="tile-expandir"
+          title="Tela cheia (dois cliques também)"
+          onClick={(e) => { e.stopPropagation(); telaCheia(); }}
+        >
+          <Icon name="expandir" size={16} />
+        </button>
+      )}
     </div>
   );
 }
@@ -57,6 +79,15 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
   const [focus, setFocus] = useState<string | null>(null);
   const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
+  // Preferência de quem assiste, não de quem transmite: uma tela 16:9 numa janela 16:10
+  // sobra tarja preta, e tem quem prefira cortar as bordas a ver a faixa.
+  const [preencher, setPreencher] = useState(() => {
+    try { return localStorage.getItem('cantinho.preencher') === '1'; } catch { return false; }
+  });
+  const trocarPreencher = useCallback((v: boolean) => {
+    setPreencher(v);
+    try { localStorage.setItem('cantinho.preencher', v ? '1' : '0'); } catch { /* sem guardar, volta ao padrão */ }
+  }, []);
 
 
 
@@ -145,10 +176,10 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
           )}
           {!idle && focusTile && (
             <div className="focus-layout">
-              <VideoTile tile={focusTile} big onClick={() => setFocus(null)} onMenu={menuDaTransmissao(focusTile)} />
+              <VideoTile tile={focusTile} big preencher={preencher} onClick={() => setFocus(null)} onMenu={menuDaTransmissao(focusTile)} />
               {(rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
-                  {rest.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
+                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
@@ -162,7 +193,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
           )}
           {!idle && !focusTile && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
-              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
+              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => setFocus(t.key)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
                   <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="huge" />
@@ -191,6 +222,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
           em={menuDaTela.em}
           volume={rm.volumeDaTelaDe(menuDaTela.identity)}
           onVolume={(v) => rm.definirVolumeDaTela(menuDaTela.identity, v)}
+          preencher={preencher}
+          onPreencher={trocarPreencher}
           onClose={() => setMenuDaTela(null)}
         />
       )}

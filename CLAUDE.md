@@ -88,13 +88,23 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Imagem e som são validados pela assinatura dos bytes**, nunca pelo `content-type`.
 - **A tela vai sem simulcast.** Com ele, o `adaptiveStream` de quem assiste escolhia a
   versão menor sempre que a janela era menor que a tela transmitida — era a imagem borrada.
-- **No Mac o seletor do sistema é plano B, não o padrão.** Ele não chama o nosso handler,
-  e é só dentro dele que se concede `audio: 'loopback'` — sem isso a transmissão vai muda.
-  Medido nesta máquina: pelo seletor do sistema vêm 0 faixas de áudio; pelo nosso, 1,
-  rotulada "System audio". Ele só volta a entrar quando a Gravação de Tela foi **negada**,
-  porque aí o nosso seletor não lista nada; com a permissão pendente usamos o nosso, que
-  faz o macOS perguntar. O motivo de um dia ele ter sido o padrão continua valendo: escolher
-  no seletor do sistema é a própria autorização, e não há permissão a revogar.
+- **O seletor de tela é sempre o nosso, inclusive no Mac.** O do sistema não chama o nosso
+  handler, e é só dentro dele que se concede `audio: 'loopback'`: por ele vêm 0 faixas de
+  áudio, pelo nosso vem 1, rotulada "System audio". Transmissão muda não serve.
+- **Não se pergunta ao macOS se a permissão de tela existe.** `getMediaAccessStatus('screen')`
+  respondeu "negado" com as duas chaves ligadas nos Ajustes — a permissão guardada é a da
+  versão anterior, porque cada build nossa é assinada em ad-hoc e tem assinatura própria.
+  Chegamos a escolher o seletor por essa resposta, e o app ficou preso no caminho sem som
+  sem jeito de sair. A prova que não mente é o sistema devolver, ou não, a lista de telas:
+  lista vazia é permissão faltando, e é aí que a instrução aparece — incluindo "desligue e
+  ligue de novo a chave", que é o que reregistra a versão nova.
+- **O áudio da tela é som, não voz.** Pedindo `audio: true` cru, o Chromium entrega a
+  captura com o processamento de microfone ligado — ganho automático, cancelamento de eco e
+  supressão de ruído — e em mono. Medido: `{autoGainControl: true, echoCancellation: true,
+  noiseSuppression: true, channelCount: 1}`. Num filme, o ganho automático é o que "estoura":
+  empurra as partes altas e bombeia. Desligamos os três, pedimos estéreo, e publicamos a
+  128 kbps em vez dos 48 kbps mono do preset de voz, sem DTX nem RED — os dois foram feitos
+  para fala e atrapalham música.
 - **Áudio de tela recusado não lança erro** — vira faixa muda, e a própria Electron
   documenta isso. Depois de publicar, conferimos se a faixa existe; sem essa conferência
   o Mac transmitiu mudo por versões seguidas sem nada aparecer no registro.
