@@ -28,7 +28,7 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
 
       <div className="rooms">
         {rooms.map((r) => {
-          const live = rm.roomName === r.name;
+          const live = rm.salaDaVoz?.id === r.id;
           const people = live
             ? rm.participants.map((p) => ({
                 identity: p.identity, name: p.name || p.identity,
@@ -89,7 +89,12 @@ export function Sidebar({ rooms, pollError, eu, servidor, rm, pessoas, onPessoa,
             <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
             <div className="voice-texto">
               <div className="strong">{rm.status === 'connected' ? 'Voz conectada' : rm.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}</div>
-              <div className="small muted">{rm.roomName}</div>
+              {/* Com a voz noutro servidor, dizer só o nome da sala esconde metade do
+                  fato: "Geral" de qual? */}
+              <div className="small muted">
+                {rm.salaDaVoz?.nome}
+                {rm.salaDaVoz && rm.salaDaVoz.servidorId !== servidor.id && ` · em ${rm.salaDaVoz.servidorNome}`}
+              </div>
             </div>
             {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
           </div>

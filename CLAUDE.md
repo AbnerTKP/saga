@@ -70,7 +70,18 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
 - **Permissão inventada é descartada**, e **ninguém dá a um cargo permissão que não tem** —
   seria contornar o próprio limite criando um cargo mais forte e vestindo-o depois.
 - **A sala no LiveKit é identificada pelo id, não pelo nome.** Duas salas "Geral" em
-  servidores diferentes cairiam na mesma conversa.
+  servidores diferentes cairiam na mesma conversa. O **app** demorou a aprender a mesma
+  lição: ele guardava só o nome da sala em que a voz estava, e comparava por nome para
+  saber "estou aqui?". Com dois servidores isso acende a sala errada na barra lateral e
+  faz o clique na sala certa não fazer nada — "você já está aí". Hoje a voz guarda
+  `SalaDaVoz`: id, nome, e de que servidor é.
+- **Trocar de servidor não desliga a voz.** Desligava, com som de saída e tudo, como se
+  você tivesse encerrado a call — e às vezes a pessoa só quer espiar o que está
+  acontecendo do outro lado. Olhar não é sair. Tecnicamente nunca foi preciso: a sala do
+  LiveKit é o id, então falar no "Geral" de um servidor enquanto se lê outro sempre
+  coube. Por isso o mapa de quem-é-quem **acumula** em vez de refletir só o servidor
+  aberto: quem está na sua call não vem no `/rooms` do servidor que você está olhando, e
+  sem guardar os rostos da conversa virariam iniciais no meio dela.
 - **Pedir por um servidor de que não se faz parte cai no seu próprio**, sem erro e sem
   entrada: saber o número de um servidor alheio não abre porta.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.

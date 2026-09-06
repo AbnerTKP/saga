@@ -46,6 +46,7 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
+  const conhecidos = useRef(new Map<string, PessoaNaCall>());
   const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
   const notas = useAvisos();
   const [perfilAberto, setPerfilAberto] = useState<PessoaNaCall | null>(null);
@@ -101,11 +102,18 @@ export function App() {
     setSessao(s);
   }, []);
 
-  /** Trocar de servidor recarrega tudo: cargo, salas e pessoas são de lá, não daqui. */
+  /**
+   * Trocar de servidor recarrega tudo: cargo, salas e pessoas são de lá, não daqui.
+   *
+   * A voz NÃO cai junto, e isso é o ponto. Antes caía: clicar noutro servidor desligava a
+   * call e tocava o som de saída, como se você tivesse desligado — e às vezes você só
+   * queria espiar o que está acontecendo do outro lado. Olhar não é sair. A sala no
+   * LiveKit é identificada pelo id, então continuar falando em "Geral" de um servidor
+   * enquanto se lê outro nunca foi um problema técnico: era só esta linha.
+   */
   const trocarDeServidor = useCallback(async (id: number) => {
     guardarServidorAtual(id);
     setSalaAbertaId(null);
-    await rm.leave().catch(() => undefined);
     try {
       const r = await quemSou();
       setSessao((atual) => (atual ? { ...atual, eu: r.eu, servidor: r.servidor, salas: r.salas } : atual));
@@ -152,10 +160,15 @@ export function App() {
   const abrirSala = useCallback(async (sala: RoomInfo) => {
     setSalaAbertaId(sala.id);
     // Sala de texto não tem voz: abrir é só passar a ler e escrever nela.
-    if (sala.tipo !== 'voz' || rm.roomName === sala.name) return;
+    // Pelo id, não pelo nome: clicar em "Geral" de outro servidor tem de levar você para
+    // lá, e comparando nome o app achava que você já estava e não fazia nada.
+    if (sala.tipo !== 'voz' || rm.salaDaVoz?.id === sala.id) return;
     try {
       const { url, token } = await pedirTokenDaSala(sala.name);
-      await rm.join(url, token, sala.name);
+      await rm.join(url, token, {
+        id: sala.id, nome: sala.name,
+        servidorId: sessao?.servidor?.id ?? 0, servidorNome: sessao?.servidor?.nome ?? '',
+      });
     } catch (e) {
       rm.setError((e as Error).message);
     }
@@ -173,7 +186,12 @@ export function App() {
   // Identidade -> quem é a pessoa, montado do que o servidor manda. O LiveKit sabe quem
   // está falando mas não sabe de foto nem de cargo; a barra lateral, o palco e o menu
   // precisam das duas coisas, então o mapa é montado aqui, uma vez.
-  const pessoas = new Map<string, PessoaNaCall>();
+  //
+  // Ele ACUMULA em vez de só refletir o servidor aberto. Com a voz num servidor e os
+  // olhos noutro, quem está na sua call não vem no /rooms daqui — e sem guardar, os
+  // rostos da conversa virariam iniciais no meio dela. O que a busca traz sobrescreve,
+  // então o dado do servidor aberto continua sendo o mais novo.
+  const pessoas = conhecidos.current;
   for (const sala of rooms) {
     for (const p of sala.participants) {
       pessoas.set(p.identity, {
@@ -304,9 +322,13 @@ export function App() {
         pessoas={pessoas}
         onPessoa={abrirMenu}
         salaAberta={salaAberta}
+        servidorId={servidor.id}
         onVoltarAVoz={() => {
-          const naVozAgora = rooms.find((r) => r.name === rm.roomName);
-          if (naVozAgora) setSalaAbertaId(naVozAgora.id);
+          if (!rm.salaDaVoz) return;
+          // A voz pode estar noutro servidor: voltar para ela é voltar para lá também,
+          // senão o id da sala não existe na lista daqui e o palco fica vazio.
+          if (rm.salaDaVoz.servidorId !== servidor.id) trocarDeServidor(rm.salaDaVoz.servidorId);
+          setSalaAbertaId(rm.salaDaVoz.id);
         }}
         chat={chat}
         meuId={eu.id}

@@ -76,12 +76,15 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltarAVoz }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, onVoltarAVoz }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
-  /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra. */
+  /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra — ou de
+      outro servidor, se a pessoa foi espiar o vizinho sem desligar a call. */
   salaAberta: RoomInfo | null;
+  /** O servidor que está sendo olhado, que nem sempre é o da voz. */
+  servidorId: number;
   chat: {
     mensagens: Mensagem[];
     erro: string | null;
@@ -157,12 +160,14 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
     <main className="stage">
       <header className="stage-head">
         <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
-        <span className="strong">{salaAberta?.name ?? rm.roomName ?? 'Escolha uma sala'}</span>
+        <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
         {/* Estando na voz de uma sala e lendo outra, as duas aparecem: senão o topo diz
-            "papo" enquanto sua voz está em "Geral", e ninguém entende onde está falando. */}
-        {!idle && rm.roomName && rm.roomName !== salaAberta?.name && (
+            "papo" enquanto sua voz está em "Geral", e ninguém entende onde está falando.
+            Vale também entre servidores — e aí o nome da sala sozinho não resolve. */}
+        {!idle && rm.salaDaVoz && salaAberta && rm.salaDaVoz.id !== salaAberta.id && (
           <span className="muted small na-voz-de">
-            <Icon name="speaker" size={13} /> voz em {rm.roomName}
+            <Icon name="speaker" size={13} /> voz em {rm.salaDaVoz.nome}
+            {rm.salaDaVoz.servidorId !== servidorId && ` · ${rm.salaDaVoz.servidorNome}`}
           </span>
         )}
       </header>

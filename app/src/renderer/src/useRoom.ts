@@ -42,6 +42,15 @@ const ehDaLive = (fonte: Track.Source) =>
   fonte === Track.Source.ScreenShare || fonte === Track.Source.ScreenShareAudio;
 export type Status = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
+/**
+ * Onde a sua voz está — a sala E o servidor dela.
+ *
+ * Era só o nome, e o nome não basta: "Geral" existe em todo servidor. Com o nome, trocar
+ * de servidor deixava a barra lateral acender a sala errada e o clique na sala certa não
+ * fazer nada ("você já está aí"). O id é único; o nome é para ler.
+ */
+export type SalaDaVoz = { id: number; nome: string; servidorId: number; servidorNome: string };
+
 let audioRoot: HTMLDivElement | null = null;
 function getAudioRoot() {
   if (!audioRoot) {
@@ -94,7 +103,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const [status, setStatus] = useState<Status>('idle');
-  const [roomName, setRoomName] = useState<string | null>(null);
+  const [salaDaVoz, setSalaDaVoz] = useState<SalaDaVoz | null>(null);
   const [deafened, setDeafenedState] = useState(false);
   const [error, setErrorCru] = useState<string | null>(null);
   // Nem tudo que a sala tem a dizer é falha: "compartilhando sem o áudio do sistema" é
@@ -219,7 +228,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       faixaDoSom.current = null;
       getAudioRoot().innerHTML = '';
       setStatus('idle');
-      setRoomName(null);
+      setSalaDaVoz(null);
       bump();
     };
     const onError = (e: Error) => setError(e.message);
@@ -258,7 +267,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     };
   }, [room, aplicarAudio, tocarAviso, aoChegarAlguem]);
 
-  const join = useCallback(async (url: string, token: string, name: string) => {
+  const join = useCallback(async (url: string, token: string, sala: SalaDaVoz) => {
     setError(null);
     if (room.state !== 'disconnected') await room.disconnect();
     setStatus('connecting');
@@ -269,7 +278,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
         `O servidor de voz (${url}) não respondeu em ${LIMITE_DE_CONEXAO / 1000}s. ` +
           'A rede pode estar bloqueando essa porta — tente por outra rede, por exemplo o 4G do celular.',
       );
-      setRoomName(name);
+      setSalaDaVoz(sala);
       setStatus('connected');
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
       tocarAviso('entrou', deafenedRef.current);
@@ -656,7 +665,7 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   }
 
   return {
-    room, status, roomName, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
+    room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
