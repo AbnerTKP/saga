@@ -134,15 +134,25 @@ Quando perguntei onde a busca do Giphy deveria entrar, a resposta foi "nos dois 
 perfil e chat. Só o perfil foi entregue, e isso não foi avisado. Entra primeiro, e não
 conta como novidade.
 
+Onde mexer: `giphy.mjs` já busca e baixa (com lista de hosts permitidos); `EscolherGif.tsx`
+já é a tela de busca. Falta ligar os dois no `Chat.tsx` e guardar a mensagem sabendo que é
+imagem, não texto.
+
 ### 2. Aviso de mensagem nova
 Sala de texto existe desde a v0.13.0 e ninguém sabe quando chega mensagem: sem bolinha,
 sem contador, a sala só é vista por quem lembra de abrir. Fica **dentro do app** —
 decisão do dono: nada de som nem notificação do sistema. Junto, aviso discreto quando
 alguém entra numa sala de voz.
 
+Onde mexer: `useChat.ts` já busca só o que chegou depois da última mensagem (`depoisDe`) —
+é daí que sai a contagem. Guardar por sala o que já foi lido; a sala aberta zera sozinha.
+
 ### 3. Design dos avisos
 Parar de usar a mesma tarja vermelha para tudo. Erro, aviso, sucesso e convite ao Turbo
 com cores e pesos próprios: "isso é do Vorcaro Turbo" é convite, não falha.
+
+Onde mexer: o toast de hoje é uma string só, em `App.tsx` e `styles.css` (`.toast`). Vira
+tipo + texto. Lembrar do `-webkit-app-region: no-drag`, senão o clique não chega.
 
 ### 4. Enquadrar foto e banner — sem recortar
 **O app nunca modifica o arquivo enviado.** Guarda a posição e o zoom escolhidos e aplica
@@ -159,8 +169,15 @@ navegador guarda em cache para sempre e cada pessoa baixa uma vez por imagem.
 Implica: guardar o ajuste (posição e zoom) junto da imagem, e aplicá-lo em todo lugar
 onde ela aparece — avatar, cartão, lista de pessoas, trilha.
 
+Onde mexer: coluna nova no fim de `MIGRACOES` (nunca no meio) e impressão digital nova em
+`banco.test.mjs`; o ajuste viaja junto da foto em todas as respostas que já mandam `foto` e
+`banner`; exibição em `Avatar.tsx`, no cartão da pessoa, `ListaDeMembros.tsx`,
+`TrilhaDeServidores.tsx` e na prévia do `EscolherImagem.tsx`. `arquivos.mjs` não muda: ele
+guarda o arquivo como veio, e o endereço continua sendo o hash do conteúdo.
+
 ### 5. Zoom na foto de perfil
-Clicar na foto de alguém abre a imagem maior, para ver direito.
+Clicar na foto de alguém abre a imagem maior, para ver direito. Com o enquadramento
+aplicado — é a mesma imagem, vista de perto.
 
 ## Depois disso
 
