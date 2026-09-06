@@ -4,6 +4,7 @@ import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from '
 import { VOLUME } from './volume';
 import { qualidadeValida, prioridadeDe, type Qualidade } from './qualidades';
 import { criarAvisos } from './avisos';
+import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 
@@ -119,6 +120,9 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   // Quem não quer ver transmissão nenhuma. Não basta esconder: desinscrever para de
   // receber o vídeo, que é onde está o peso — esconder gastaria a banda do mesmo jeito.
   const [semTransmissoes, setSemTransmissoes] = useState(false);
+  // Espelho em ref: aplicarAudio roda fora do ciclo do React — uma faixa que chega logo
+  // depois do clique em "não assistir" seria julgada pelo valor velho e entraria tocando.
+  const semTransmissoesRef = useRef(false);
 
   // Faixa do plano B do áudio da transmissão, publicada por fora do LiveKit.
   const faixaDeMixagem = useRef<MediaStreamTrack | null>(null);
@@ -132,9 +136,9 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
   const volumesDaTela = useRef(new Map<string, number>());
   const [, redesenharVolumes] = useReducer((x: number) => x + 1, 0);
 
-  // Só a transmissão em foco é ouvida. Com duas pessoas compartilhando, ouvir as duas ao
-  // mesmo tempo seria uma sopa; quem manda é qual está em destaque no palco.
-  const focoDaTela = useRef<string | null>(null);
+  // A live que está no palco — só ela é ouvida. Quem decide é o Stage; a regra de quem
+  // cala mora em audivel.ts, testada.
+  const liveNoPalco = useRef<string | null>(null);
 
   /**
    * Decide volume e mudo de cada elemento de áudio. Um lugar só: antes, cada ajuste
@@ -147,12 +151,14 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
       // cinza. Ajustar áudio é acessório; ficar sem o app, não.
       try {
         const identity = el.dataset.identity ?? '';
-        const ehTela = el.dataset.source === Track.Source.ScreenShareAudio;
-        const guardado = (ehTela ? volumesDaTela : volumes).current.get(identity) ?? 1;
+        const ehLive = el.dataset.source === Track.Source.ScreenShareAudio;
+        const guardado = (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
         el.volume = VOLUME(guardado);
-        el.muted = ehTela
-          ? deafenedRef.current || (!!focoDaTela.current && identity !== focoDaTela.current)
-          : deafenedRef.current;
+        el.muted = mudo({ ehLive, identity }, {
+          surdo: deafenedRef.current,
+          semTransmissoes: semTransmissoesRef.current,
+          liveNoPalco: liveNoPalco.current,
+        });
       } catch (e) {
         anotar('erro', 'audio', e);
       }
@@ -179,13 +185,24 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
         const el = track.attach() as HTMLMediaElement;
         el.dataset.identity = participante.identity;
         el.dataset.source = track.source;
+        // A faixa é quem identifica o elemento na hora de tirá-lo; ver onUnsubscribed.
+        el.dataset.sid = track.sid ?? '';
         getAudioRoot().appendChild(el);
         aplicarAudio();
       }
       bump();
     };
     const onUnsubscribed = (track: Track) => {
+      // O `detach` sozinho não basta: medido, no momento do TrackUnsubscribed ele devolve
+      // ZERO elementos — o LiveKit já esqueceu quais eram —, então o `<audio>` ficava na
+      // página para sempre. Voltar a assistir criava outro, e a cada ida e volta sobrava
+      // mais um. Por isso o elemento carrega o sid da faixa: é assim que se acha o dono.
       track.detach().forEach((el) => el.remove());
+      if (track.sid) {
+        getAudioRoot()
+          .querySelectorAll(`audio[data-sid="${CSS.escape(track.sid)}"]`)
+          .forEach((el) => el.remove());
+      }
       bump();
     };
     const onDisconnected = () => {
@@ -554,19 +571,28 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     }
   }, [room, avisar]);
 
-  /** Liga e desliga o recebimento das transmissões alheias. */
+  /**
+   * Liga e desliga o recebimento das transmissões alheias.
+   *
+   * O som da live anda numa publicação PRÓPRIA (`ScreenShareAudio`), separada do vídeo.
+   * Desinscrever só o vídeo deixava o som de todas as lives entrando e tocando com a tela
+   * apagada — e o botão promete parar de receber, não esconder.
+   */
   const alternarTransmissoes = useCallback(() => {
     const novo = !semTransmissoes;
     setSemTransmissoes(novo);
+    semTransmissoesRef.current = novo;
+    const daLive = (f: Track.Source) => f === Track.Source.ScreenShare || f === Track.Source.ScreenShareAudio;
     for (const p of room.remoteParticipants.values()) {
       for (const pub of p.trackPublications.values()) {
-        if (pub.source === Track.Source.ScreenShare && 'setSubscribed' in pub) {
+        if (daLive(pub.source) && 'setSubscribed' in pub) {
           (pub as { setSubscribed(v: boolean): void }).setSubscribed(!novo);
         }
       }
     }
+    aplicarAudio();
     bump();
-  }, [room, semTransmissoes]);
+  }, [room, semTransmissoes, aplicarAudio]);
 
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
@@ -584,10 +610,10 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     redesenharVolumes();
   }, [aplicarAudio]);
 
-  /** Quem está em destaque no palco; só o áudio dessa transmissão é ouvido. */
-  const definirFocoDaTela = useCallback((identity: string | null) => {
-    if (focoDaTela.current === identity) return;
-    focoDaTela.current = identity;
+  /** Qual live está no palco; só o som dela é ouvido, e `null` é silêncio. */
+  const definirLiveNoPalco = useCallback((identity: string | null) => {
+    if (liveNoPalco.current === identity) return;
+    liveNoPalco.current = identity;
     aplicarAudio();
   }, [aplicarAudio]);
 
@@ -609,6 +635,6 @@ export function useRoom(souTurbo = false, aoChegarAlguem?: (nome: string) => voi
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, tocarSom, volumeDe, definirVolume,
     semTransmissoes, alternarTransmissoes,
-    volumeDaTelaDe, definirVolumeDaTela, definirFocoDaTela,
+    volumeDaTelaDe, definirVolumeDaTela, definirLiveNoPalco,
   };
 }

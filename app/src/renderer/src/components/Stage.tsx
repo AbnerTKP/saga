@@ -114,11 +114,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
   const focusTile = rm.tiles.find((t) => t.key === focus) ?? (screens[0] ?? null);
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
-  // O áudio segue o destaque: só a transmissão em foco é ouvida.
-  const identidadeEmFoco = focusTile?.source === Track.Source.ScreenShare
-    ? focusTile.participant.identity
-    : null;
-  useEffect(() => { rm.definirFocoDaTela(identidadeEmFoco); }, [identidadeEmFoco, rm]);
+  // A live que está no palco: a em destaque ou, se o destaque for uma câmera, a primeira
+  // que estiver no ar. É ela que se ouve e é ela que vai para o quadro flutuante — uma
+  // conta só, senão clicar numa câmera deixava o palco sem live e o som de todas voltava.
+  const liveNoPalco = (focusTile?.source === Track.Source.ScreenShare ? focusTile : null) ?? screens[0] ?? null;
+  const identidadeNoPalco = liveNoPalco?.participant.identity ?? null;
+  useEffect(() => { rm.definirLiveNoPalco(identidadeNoPalco); }, [identidadeNoPalco, rm]);
 
   // Só transmissão tem volume próprio; câmera não carrega áudio separado.
   const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
@@ -134,10 +135,6 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
 
 
   const idle = rm.status === 'idle';
-  // A que está em destaque; sem destaque, a primeira transmissão de tela.
-  const liveEmMiniatura = focusTile?.source === Track.Source.ScreenShare
-    ? focusTile
-    : rm.tiles.find((t) => t.source === Track.Source.ScreenShare) ?? null;
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
 
   return (
@@ -239,12 +236,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
 
       {/* Abriu o chat com uma live rodando: ela continua aqui, pequena. Sem isto, ir ao
           chat obrigava a voltar na sala de voz para ver de novo quem está transmitindo. */}
-      {salaAberta?.tipo === 'texto' && liveEmMiniatura && (
+      {salaAberta?.tipo === 'texto' && liveNoPalco && (
         <div className="mini-live">
           <div className="mini-live-topo">
             <span className="mini-live-nome">
               <Icon name="screen" size={13} />
-              {liveEmMiniatura.participant.name || liveEmMiniatura.participant.identity}
+              {liveNoPalco.participant.name || liveNoPalco.participant.identity}
             </span>
             {onVoltarAVoz && (
               <button className="link" onClick={onVoltarAVoz} title="Voltar para a sala de voz">
@@ -252,7 +249,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltar
               </button>
             )}
           </div>
-          <VideoTile tile={liveEmMiniatura} preencher={preencher} onMenu={menuDaTransmissao(liveEmMiniatura)} />
+          <VideoTile tile={liveNoPalco} preencher={preencher} onMenu={menuDaTransmissao(liveNoPalco)} />
         </div>
       )}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}

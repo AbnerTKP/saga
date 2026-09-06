@@ -46,7 +46,7 @@ módulos que não sabem de HTTP: `permissoes.mjs` (regras puras de quem pode o q
 **App** — Electron + React. `useRoom.ts` cuida do LiveKit; `useChat.ts` do chat; a lógica
 que dá para testar sem tela fica em módulos puros: `permissoes` do lado do servidor tem
 paralelo em `api.ts` (`pode`, `podeSobre`), e `qualidades.ts`, `volume.ts`, `sinal.ts`,
-`erros.ts` são pequenos e testados.
+`erros.ts` e `audivel.ts` são pequenos e testados.
 
 **Identidade** — a conta (apelido + senha) é global; cargo, banimento, castigo, nome
 exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
@@ -211,6 +211,20 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
+- **O som da live também anda em faixa própria** (`ScreenShareAudio`), separada do vídeo.
+  Quem corta a live tem de cortar as duas: "não assistir" desinscrevia só o vídeo, e o som
+  de todas as lives continuava entrando e tocando com a tela apagada. Medido: cortando só
+  o vídeo, `screen_share=cortado` e `screen_share_audio=RECEBENDO`.
+- **Só a live que está no palco é ouvida, e "nenhuma no palco" quer dizer silêncio.** A
+  regra antiga só calava uma live quando havia OUTRA em destaque — sem destaque, não calava
+  nada, que é o mesmo que tocar todas. Bastava clicar numa câmera, ou pedir "não assistir",
+  para o palco ficar sem live e a sopa voltar. A regra mora em `audivel.ts`, pura e testada,
+  e o palco é uma conta só (`Stage`): a live em destaque ou, se o destaque for câmera, a
+  primeira no ar — a mesma que vai para o quadro flutuante.
+- **`track.detach()` no `TrackUnsubscribed` devolve ZERO elementos.** Medido no servidor de
+  verdade: o LiveKit já esqueceu quais eram, então o `<audio>` ficava na página para sempre
+  e cada "não assistir / assistir de novo" deixava mais um para trás. Por isso o elemento
+  carrega o `sid` da faixa: é por ele que se acha o dono na hora de tirar.
 - **Enquadrar não é recortar.** Recortar significa redesenhar a imagem, e um GIF
   redesenhado perde a animação — o que o Vorcaro Turbo destrava. Guardamos posição e
   aproximação, e aplicamos ao mostrar; o arquivo enviado nunca é tocado. A imagem também
