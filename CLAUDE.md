@@ -127,18 +127,48 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 
 `TESTE_SERVIDOR=76.13.225.79:3001 TESTE_SENHA=… pnpm test:sala`
 
-## Próximos passos
+## A próxima versão (v0.17.0) — combinada, não começada
 
-Tudo que estava planejado (v0.12.0 a v0.16.2) está no ar. O que sobrou:
+### 1. GIF no chat — dívida
+Quando perguntei onde a busca do Giphy deveria entrar, a resposta foi "nos dois lugares":
+perfil e chat. Só o perfil foi entregue, e isso não foi avisado. Entra primeiro, e não
+conta como novidade.
 
-1. **Design dos avisos** — hoje todo aviso é a mesma tarja vermelha, inclusive os que não
-   são erro: "isso é do Vorcaro Turbo" é convite, não falha.
-2. **Atualização automática no Mac** — hoje só avisa e abre o download, porque o mecanismo
-   do macOS confere assinatura e recusa a nossa, que é ad-hoc. Dá para o app baixar e se
-   substituir sozinho, contornando esse mecanismo.
-3. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
-4. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
-5. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
+### 2. Aviso de mensagem nova
+Sala de texto existe desde a v0.13.0 e ninguém sabe quando chega mensagem: sem bolinha,
+sem contador, a sala só é vista por quem lembra de abrir. Fica **dentro do app** —
+decisão do dono: nada de som nem notificação do sistema. Junto, aviso discreto quando
+alguém entra numa sala de voz.
+
+### 3. Design dos avisos
+Parar de usar a mesma tarja vermelha para tudo. Erro, aviso, sucesso e convite ao Turbo
+com cores e pesos próprios: "isso é do Vorcaro Turbo" é convite, não falha.
+
+### 4. Enquadrar foto e banner — sem recortar
+**O app nunca modifica o arquivo enviado.** Guarda a posição e o zoom escolhidos e aplica
+na exibição.
+
+Por quê: recortar significa redesenhar a imagem, e um GIF redesenhado perde a animação —
+esvaziaria justamente o que o Turbo destrava. Enquadrando, o mesmo mecanismo serve para
+imagem parada e animada.
+
+O dono também decidiu **não reduzir a resolução**: a imagem vai como veio. O custo é
+arquivo grande; o que o torna aceitável é o endereço ser o hash do conteúdo, então o
+navegador guarda em cache para sempre e cada pessoa baixa uma vez por imagem.
+
+Implica: guardar o ajuste (posição e zoom) junto da imagem, e aplicá-lo em todo lugar
+onde ela aparece — avatar, cartão, lista de pessoas, trilha.
+
+### 5. Zoom na foto de perfil
+Clicar na foto de alguém abre a imagem maior, para ver direito.
+
+## Depois disso
+
+1. **Atualização automática no Mac** — hoje só avisa, porque o mecanismo do macOS confere
+   assinatura e recusa a nossa, que é ad-hoc.
+2. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
+3. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
+4. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
 
 ## O que só o dono pode confirmar
 
