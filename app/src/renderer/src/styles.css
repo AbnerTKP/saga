@@ -77,11 +77,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .user-actions button.off { color: var(--danger); }
 
 /* Palco */
-.stage { background: var(--bg2); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.stage { position: relative; background: var(--bg2); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .stage-head { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 16px; box-shadow: 0 1px 0 var(--line); color: var(--text2); -webkit-app-region: drag; }
 .stage-head button, .stage-head .error { -webkit-app-region: no-drag; }
-.stage-body { flex: 1; display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
-.videos { padding: 12px; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg0); margin: 12px 0 12px 12px; border-radius: 8px; }
+/* Uma coisa por vez no palco: vídeo OU chat. Quando eram duas colunas, a transmissão
+   ficava espremida e o chat também — e chat não é da sala de voz, é da sala de chat. */
+.stage-body { flex: 1; display: grid; grid-template-columns: 1fr; min-height: 0; }
+.videos { padding: 12px; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg0); margin: 12px; border-radius: 8px; }
 .empty { flex: 1; display: grid; place-items: center; text-align: center; color: var(--text2); gap: 8px; align-content: center; }
 .avatars { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
 
@@ -138,6 +140,10 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .chat-input button { width: 36px; display: grid; place-items: center; color: var(--text2); }
 .chat-input button:hover:not(:disabled) { color: var(--white); }
 .chat-input button:disabled { opacity: .4; }
+
+/* Voz numa sala, lendo outra: o topo precisa dizer as duas. */
+.na-voz-de { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 10px; background: var(--bg1); color: var(--ok); }
 
 /* GIF na conversa. Altura limitada porque um GIF alto empurraria a conversa inteira para
    fora da tela; quem quiser ver maior clica e abre no visualizador. */
@@ -619,3 +625,15 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .perfil-dados dt { font-size: 11px; font-weight: 700; color: var(--text3);
   text-transform: uppercase; letter-spacing: .04em; }
 .perfil-dados dd { margin: 0; font-size: 14px; color: var(--text); }
+
+/* Live em miniatura, para quem foi ao chat sem querer perder a transmissão. Fica no canto,
+   por cima, e sai do caminho: dois cliques nela abrem em tela cheia como qualquer outra. */
+.mini-live { -webkit-app-region: no-drag; position: absolute; right: 16px; bottom: 84px;
+  width: 300px; z-index: 15; background: var(--bg1); border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.55); }
+.mini-live-topo { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px;
+  font-size: 12px; color: var(--text2); }
+.mini-live-nome { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--white); }
+.mini-live .tile { border-radius: 0; aspect-ratio: 16 / 9; }
+.mini-live .tile-label { display: none; }

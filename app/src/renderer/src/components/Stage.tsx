@@ -62,7 +62,7 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId, onVoltarAVoz }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
@@ -75,6 +75,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
     enviarGif: (url: string) => Promise<void>;
   };
   meuId: number;
+  /** Volta para a sala de voz em que você está, a partir do chat. */
+  onVoltarAVoz?: () => void;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
@@ -118,14 +120,25 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
 
 
   const idle = rm.status === 'idle';
+  // A que está em destaque; sem destaque, a primeira transmissão de tela.
+  const liveEmMiniatura = focusTile?.source === Track.Source.ScreenShare
+    ? focusTile
+    : rm.tiles.find((t) => t.source === Track.Source.ScreenShare) ?? null;
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
 
   return (
     <main className="stage">
       <header className="stage-head">
-        <Icon name="speaker" />
+        <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
         <span className="strong">{salaAberta?.name ?? rm.roomName ?? 'Escolha uma sala'}</span>
-        {salaAberta?.tipo === 'voz' && rm.status !== 'idle' && (
+        {/* Estando na voz de uma sala e lendo outra, as duas aparecem: senão o topo diz
+            "papo" enquanto sua voz está em "Geral", e ninguém entende onde está falando. */}
+        {!idle && rm.roomName && rm.roomName !== salaAberta?.name && (
+          <span className="muted small na-voz-de">
+            <Icon name="speaker" size={13} /> voz em {rm.roomName}
+          </span>
+        )}
+        {!idle && (
           <button
             className={`link ${rm.semTransmissoes ? 'ligado' : ''}`}
             title={rm.semTransmissoes
@@ -139,6 +152,9 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
 
       </header>
 
+      {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
+          espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
+          Quem está na voz e abre o chat não perde a live: ela vira o quadro flutuante. */}
       {salaAberta?.tipo === 'texto' ? (
         <div className="stage-body so-chat">
           <Chat
@@ -204,16 +220,26 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, chat, meuId }: {
           )}
         </section>
 
-        <Chat
-          mensagens={chat.mensagens}
-          erro={chat.erro}
-          onEnviar={chat.enviar}
-          onEnviarGif={chat.enviarGif}
-          onVerImagem={setImagemAberta}
-          sala={salaAberta?.name ?? null}
-          meuId={meuId}
-        />
       </div>
+      )}
+
+      {/* Abriu o chat com uma live rodando: ela continua aqui, pequena. Sem isto, ir ao
+          chat obrigava a voltar na sala de voz para ver de novo quem está transmitindo. */}
+      {salaAberta?.tipo === 'texto' && liveEmMiniatura && (
+        <div className="mini-live">
+          <div className="mini-live-topo">
+            <span className="mini-live-nome">
+              <Icon name="screen" size={13} />
+              {liveEmMiniatura.participant.name || liveEmMiniatura.participant.identity}
+            </span>
+            {onVoltarAVoz && (
+              <button className="link" onClick={onVoltarAVoz} title="Voltar para a sala de voz">
+                voltar
+              </button>
+            )}
+          </div>
+          <VideoTile tile={liveEmMiniatura} preencher={preencher} onMenu={menuDaTransmissao(liveEmMiniatura)} />
+        </div>
       )}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
       {menuDaTela && (

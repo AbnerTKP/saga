@@ -304,6 +304,10 @@ export function App() {
         pessoas={pessoas}
         onPessoa={abrirMenu}
         salaAberta={salaAberta}
+        onVoltarAVoz={() => {
+          const naVozAgora = rooms.find((r) => r.name === rm.roomName);
+          if (naVozAgora) setSalaAbertaId(naVozAgora.id);
+        }}
         chat={chat}
         meuId={eu.id}
       />

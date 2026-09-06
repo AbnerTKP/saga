@@ -114,6 +114,10 @@ exibido, Turbo e identificador pertencem ao vínculo pessoa↔servidor.
   flutuante precisa de `-webkit-app-region: no-drag`.
 - **O CSP precisa de `http:`/`https:` em `img-src` e `media-src`**: a página vem de
   `file://`, então `'self'` não cobre o servidor.
+- **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
+  sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
+  da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
+  vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
 - **Enquadrar não é recortar.** Recortar significa redesenhar a imagem, e um GIF
