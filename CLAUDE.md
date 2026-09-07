@@ -136,6 +136,13 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Pedir por um servidor de que não se faz parte cai no seu próprio**, sem erro e sem
   entrada: saber o número de um servidor alheio não abre porta.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.
+- **Não há freio de tentativas de senha, e a saída não é pôr de volta o que havia.** Havia
+  um: 20 tentativas por IP a cada 10 minutos. Ele contava as tentativas CERTAS junto com
+  as erradas e agrupava por IP — então o grupo todo atrás do mesmo roteador dividia um
+  balde de 20, e bastava entrar e sair algumas vezes para trancar todo mundo. Um amigo do
+  dono ficou 10 minutos de fora por errar a senha, e foi por isso que ele saiu. Um freio
+  que vale a pena contaria só o que falhou, por CONTA e não por IP, e atrasaria a resposta
+  em vez de fechar a porta — quem erra a senha é quase sempre quem a esqueceu.
 - **Reordenar sala é só dado, e por isso não derruba ninguém da call.** A sala do LiveKit
   é o id; arrastar mexe em `ordem` e `categoria_id`, e em id nenhum. A lista muda na hora
   e a busca seguinte confirma — dando errado, é ela que devolve a ordem de verdade.

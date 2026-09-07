@@ -105,16 +105,6 @@ function lerBinario(req, limite) {
   });
 }
 
-// Freio contra chute de senha: 20 tentativas por IP a cada 10 minutos.
-const tentativas = new Map();
-function demais(ip) {
-  const agora = Date.now();
-  const recentes = (tentativas.get(ip) ?? []).filter((t) => agora - t < 10 * 60_000);
-  recentes.push(agora);
-  tentativas.set(ip, recentes);
-  return recentes.length > 20;
-}
-
 /** Como o app enxerga uma pessoa: sem hash de senha, sem nada interno. */
 const verMembro = (m) => m && ({
   id: m.id,
@@ -674,7 +664,6 @@ const ROTAS = {
 };
 
 const servidor = http.createServer(async (req, res) => {
-  const ip = req.socket.remoteAddress ?? '?';
   const url = new URL(req.url ?? '/', 'http://x');
 
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
@@ -705,11 +694,6 @@ const servidor = http.createServer(async (req, res) => {
   const chave = `${req.method} ${url.pathname}`;
   const rota = ROTAS[chave];
   if (!rota) return json(res, 404, { error: 'não encontrado' });
-
-  // Só o que aceita senha é freado: o resto já exige sessão válida.
-  if ((chave === 'POST /entrar' || chave === 'POST /cadastrar') && demais(ip)) {
-    return json(res, 429, { error: 'muitas tentativas, espere 10 minutos' });
-  }
 
   try {
     return json(res, 200, await rota(req));

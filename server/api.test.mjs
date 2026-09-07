@@ -135,6 +135,21 @@ test('entrar com a senha certa devolve nova sessão; com a errada, 401', async (
   assert.equal(nao.status, 401);
 });
 
+test('errar a senha muitas vezes não tranca ninguém para fora', async () => {
+  // Havia um freio de 20 tentativas por IP a cada 10 minutos, e ele contava as CERTAS
+  // junto — então o grupo inteiro atrás do mesmo roteador dividia o mesmo balde, e quem
+  // errasse duas vezes tomava 10 minutos de porta fechada. Um amigo do dono ficou de
+  // fora por isso. Errar é 401 e continua sendo 401; a próxima certa entra na hora.
+  await cadastrar('trombadinha');
+  for (let i = 0; i < 30; i++) {
+    const r = await chamar('POST', '/entrar', { corpo: { apelido: 'trombadinha', senha: 'chute' + i } });
+    assert.equal(r.status, 401, `a tentativa ${i + 1} respondeu ${r.status}, não 401`);
+  }
+  const certa = await chamar('POST', '/entrar', { corpo: { apelido: 'trombadinha', senha: 'segredo123' } });
+  assert.equal(certa.status, 200, 'depois de errar muito, a senha certa não entrou');
+  assert.ok(certa.corpo.token);
+});
+
 test('o token da sala é emitido para quem tem sessão, e recusa sala inexistente', async () => {
   const { token } = await sessaoDe('abner');
   const ok = await chamar('POST', '/token', { sessao: token, corpo: { room: 'Geral' } });
