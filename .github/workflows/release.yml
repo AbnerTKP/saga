@@ -32,22 +32,45 @@ jobs:
     needs: testes
     runs-on: ubuntu-latest
     steps:
+      # A história inteira, com as tags: sem ela não dá para saber o que mudou desde a
+      # versão anterior, e o checkout padrão traz um commit só.
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - run: |
           gh release view "$TAG" >/dev/null 2>&1 && exit 0
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes "$NOTAS"
+
+          # O que mudou sai dos ASSUNTOS DOS COMMITS desde a tag anterior. Escrever a
+          # mesma coisa duas vezes — uma no commit, outra na nota — é escrever a segunda
+          # com pressa; e a nota que ninguém escreve é a que fica vazia para sempre.
+          # Os commits de versão ("v0.9.0") saem: eles não são mudança, são a etiqueta.
+          ANTERIOR=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -n "$ANTERIOR" ]; then
+            MUDANCAS=$(git log --no-merges --format='%s' "$ANTERIOR..$TAG" \
+              | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+: //' | sed 's/^/- /')
+          fi
+          [ -n "$MUDANCAS" ] || MUDANCAS="- Ajustes internos."
+
+          # As marcas são para a página de download: é por elas que ela acha o trecho e
+          # deixa de fora a instalação, que é igual em toda versão. O GitHub não mostra
+          # comentário de HTML, então elas não aparecem para quem lê o Release.
+          printf '%s\n' \
+            '<!-- mudancas -->' \
+            "$MUDANCAS" \
+            '<!-- /mudancas -->' \
+            '' \
+            '---' \
+            '' \
+            '**Windows:** baixe o arquivo `.exe`. O Windows vai avisar "Windows protegeu o seu PC" — clique em **Mais informações › Executar mesmo assim**. É só porque o app não tem certificado pago; não há nada de errado com ele.' \
+            '' \
+            '**Mac:** baixe o `.dmg` e arraste para Aplicativos. Na primeira vez, abra pelo menu **Ajustes do Sistema › Privacidade e Segurança › Abrir Mesmo Assim**.' \
+            '' \
+            'Ao abrir, o endereço do servidor já vem preenchido: basta a senha do grupo e o seu nome.' \
+            > notas.md
+
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notas.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-          NOTAS: |
-            **Windows:** baixe o arquivo `.exe`. O Windows vai avisar "Windows protegeu o seu PC" —
-            clique em **Mais informações › Executar mesmo assim**. É só porque o app não tem
-            certificado pago; não há nada de errado com ele.
-
-            **Mac:** baixe o `.dmg` e arraste para Aplicativos. Na primeira vez, abra pelo menu
-            **Ajustes do Sistema › Privacidade e Segurança › Abrir Mesmo Assim**.
-
-            Ao abrir, o endereço do servidor já vem preenchido: basta a senha do grupo e o seu nome.
 
   build:
     needs: criar-release

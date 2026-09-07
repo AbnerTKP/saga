@@ -526,6 +526,19 @@ a gente não conhece.
 - **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).
   Sem ele, com duas salas cheias não se sabe quem está com quem.
 
+- **As notas de versão saem dos assuntos dos commits**, entre a tag anterior e a nova.
+  Escrever a mesma coisa duas vezes — uma no commit, outra na nota — é escrever a segunda
+  com pressa, e a nota que ninguém escreve é a que fica vazia para sempre. Isso obriga o
+  assunto do commit a ser uma frase que um amigo entenda, que é como já se escrevia aqui.
+  O `criar-release` precisa de `fetch-depth: 0`: o checkout padrão traz um commit só e
+  nenhuma tag.
+- **A página de download acha as notas por MARCA, não por posição.** O corpo do Release
+  tem o que mudou e, depois, a instalação — igual em toda versão e notícia nenhuma. Ler
+  "tudo até o primeiro `---`" seria palpite sobre como alguém escreveu; `<!-- mudancas -->`
+  é acordo. O GitHub não mostra comentário de HTML, então a marca não aparece para quem lê
+  o Release. Sem nota nenhuma, a seção inteira some: título com nada embaixo é pior que
+  seção nenhuma.
+
 ## Testes
 
 ```bash

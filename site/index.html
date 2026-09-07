@@ -114,6 +114,28 @@
   footer { padding: 44px 0 64px; border-top: 1px solid var(--linha); font-size: 13.5px; color: var(--fraco); }
   footer .linhas { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
   footer .cresce { flex: 1; }
+
+  /* A cascata das versões. <details> nativo: abre e fecha sem uma linha de script, e
+     funciona com teclado e leitor de tela de graça. */
+  .cascata { display: grid; gap: 10px; }
+  .versao-item { background: var(--carta); border: 1px solid var(--linha); border-radius: var(--raio);
+    overflow: hidden; transition: border-color .15s; }
+  .versao-item:hover { border-color: var(--carta2); }
+  .versao-item[open] { border-color: var(--carta2); }
+  .versao-item > summary { display: flex; align-items: center; gap: 12px; padding: 15px 18px;
+    cursor: pointer; list-style: none; font-weight: 600; }
+  .versao-item > summary::-webkit-details-marker { display: none; }
+  .versao-item .seta { margin-left: auto; flex: none; opacity: .5; transition: transform .18s; }
+  .versao-item[open] .seta { transform: rotate(90deg); }
+  .versao-etiqueta { font-size: 16px; color: var(--suave); letter-spacing: -.01em; }
+  .versao-nova { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    padding: 3px 8px; border-radius: 999px; background: rgba(88,101,242,.18); color: #a3adfa; }
+  .versao-quando { font-size: 13px; font-weight: 400; opacity: .6; }
+  .versao-item ul { margin: 0; padding: 0 18px 18px 36px; display: grid; gap: 8px; }
+  .versao-item li { line-height: 1.55; opacity: .88; }
+  @media (max-width: 560px) {
+    .versao-quando { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -208,6 +230,19 @@
         servidores na mesma conta — cada um com o seu cargo e o seu nome.</p>
       </article>
     </div>
+  </div>
+</section>
+
+<!-- Some sozinha quando não há nota nenhuma: uma seção vazia com um título é pior que
+     seção nenhuma. Ver o script no fim. -->
+<section id="mudancas" hidden>
+  <div class="largura">
+    <h2>O que mudou</h2>
+    <p class="sub">Cada versão, do que saiu agora ao que já era. Clique para abrir.</p>
+    <div class="cascata" id="cascata"></div>
+    <p class="nota">
+      No Windows o app se atualiza sozinho. No Mac, baixe a versão nova por aqui.
+    </p>
   </div>
 </section>
 
@@ -330,6 +365,41 @@
         '<strong style="color:var(--suave);font-weight:600">' + (meu.rel.tag_name || '') + '</strong>'
         + (quando ? ' · ' + quando : '') + nota
         + ' · <a href="https://github.com/' + REPO + '/releases" rel="noopener">ver todas as versões</a>';
+
+      // A cascata das versões. O corpo do Release traz o que mudou entre as marcas e,
+      // depois, a instalação — que é a mesma em toda versão e não é notícia nenhuma.
+      // Por isso a leitura é pelas marcas, e não "tudo até o primeiro ---": marca é
+      // acordo, e traço é palpite sobre como alguém escreveu.
+      var esc = function (t) {
+        return String(t).replace(/[&<>"]/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+      };
+      var itens = [];
+      for (var k = 0; k < rels.length && itens.length < 10; k++) {
+        var m = /<!--\s*mudancas\s*-->([\s\S]*?)<!--\s*\/mudancas\s*-->/.exec(rels[k].body || '');
+        if (!m) continue;
+        var linhas = m[1].split('\n').map(function (l) {
+          return l.replace(/^\s*[-*]\s?/, '').trim();
+        }).filter(function (l) { return l.length > 0; });
+        if (!linhas.length) continue;
+        itens.push({ tag: rels[k].tag_name || '', quando: dia(rels[k].published_at), linhas: linhas });
+      }
+
+      // Sem nota nenhuma, a seção não aparece: título com nada embaixo é pior que nada.
+      if (!itens.length) return;
+      var seta = '<svg class="seta" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"'
+        + ' aria-hidden="true"><path d="M9 6l6 6-6 6z"/></svg>';
+      document.getElementById('cascata').innerHTML = itens.map(function (v, i) {
+        return '<details class="versao-item"' + (i === 0 ? ' open' : '') + '>'
+          + '<summary><span class="versao-etiqueta">' + esc(v.tag) + '</span>'
+          + (i === 0 ? '<span class="versao-nova">agora</span>' : '')
+          + (v.quando ? '<span class="versao-quando">' + esc(v.quando) + '</span>' : '')
+          + seta + '</summary>'
+          + '<ul>' + v.linhas.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>'
+          + '</details>';
+      }).join('');
+      document.getElementById('mudancas').hidden = false;
     })
     .catch(function () { /* fica o link para a página de versões, que também é sempre a mais nova */ });
 })();
