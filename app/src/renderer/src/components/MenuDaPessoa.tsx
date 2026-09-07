@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } from '../api';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
-import { urlDoArquivo } from '../api';
-import { estilo, type Enquadramentos } from '../enquadramento';
+import { type Enquadramentos } from '../enquadramento';
 
 export type PessoaNaCall = {
   identity: string;
@@ -38,7 +37,6 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   const caixa = useRef<HTMLDivElement>(null);
   const [ocupado, setOcupado] = useState(false);
   const souEu = pessoa.usuarioId === eu.id;
-  const banner = urlDoArquivo(pessoa.banner);
 
   // Espelho da regra do servidor, só para não mostrar botão que será recusado. Tirar e
   // pôr castigo são a mesma permissão; desbanir é a mesma de banir.
@@ -67,18 +65,14 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   // Mantém o menu dentro da janela.
   const largura = 220;
   const x = Math.min(em.x, window.innerWidth - largura - 8);
-  const y = Math.min(em.y, window.innerHeight - 300);
+  const y = Math.min(em.y, window.innerHeight - 260);
 
   return (
     <div ref={caixa} className="menu-pessoa" style={{ left: x, top: Math.max(8, y), width: largura }}>
-      {/* O banner vira o topo do cartão, como num perfil — é onde ele faz sentido. */}
-      {banner && (
-        <div className="cartao-banner">
-          <img src={banner} alt="" draggable={false} style={estilo(pessoa.enquadramento?.banner)} />
-        </div>
-      )}
-
-      <div className={`menu-topo ${banner ? 'sob-banner' : ''}`}>
+      {/* Só quem é, para não errar de pessoa na hora de banir. O retrato grande, o
+          banner e o "desde quando" ficam no clique esquerdo, que abre o perfil — este
+          menu é a mão pesada, e mão pesada não precisa de cartão de visita. */}
+      <div className="menu-topo enxuto">
         <Avatar
           nome={pessoa.nome}
           foto={pessoa.foto}
@@ -95,7 +89,6 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
             <span style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}>
               {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
             </span>
-            {pessoa.turbo && <span className="selo-berserk">BERSERK</span>}
           </div>
         </div>
       </div>
@@ -110,7 +103,7 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
         </label>
       )}
 
-      {souEu && <div className="menu-nota muted small">Ajuste o próprio volume nos Dispositivos.</div>}
+      {souEu && <div className="menu-nota muted small">Ajuste o próprio volume em Sua conta, na engrenagem.</div>}
 
       {(posso('mutar') || posso('desconectar') || posso('timeout') || posso('expulsar') || posso('banir') || posso('cargo')) && (
         <div className="menu-acoes">

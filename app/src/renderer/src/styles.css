@@ -593,6 +593,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .menu-topo.sob-banner {
   flex-direction: column; align-items: flex-start; gap: 4px; margin-top: -22px;
 }
+.menu-topo.enxuto { padding-bottom: 2px; }
 .menu-topo.sob-banner .avatar {
   border: 3px solid var(--bg2); width: 48px; height: 48px; font-size: 17px;
 }
@@ -732,13 +733,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 /* Cartão do perfil ---------------------------------------------------------
    Perfil em tamanho de gente: banner, foto grande, nome e o que a pessoa é aqui
    dentro. Antes clicar na foto só esticava a imagem, o que não dizia nada. */
-.modal.perfil { width: 420px; position: relative; overflow: hidden; }
+.modal.perfil { width: 480px; position: relative; overflow: hidden; }
 .perfil-fechar { position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%;
   background: rgba(0,0,0,.45); color: #fff; }
 .perfil-fechar:hover { background: rgba(0,0,0,.7); }
 
-.perfil-banner { height: 130px; overflow: hidden; background: var(--bg4); flex: none; }
+.perfil-banner { height: 168px; overflow: hidden; background: var(--bg4); flex: none; }
 .perfil-banner.vazio { background: linear-gradient(135deg, var(--bg4), var(--bg3)); }
 /* Sem banner próprio, o Berserk ganha a faixa colorida — é a distinção que ele compra. */
 .perfil-banner.berserk.vazio { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
@@ -749,16 +750,16 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .perfil-corpo { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
 
 .perfil-foto {
-  width: 96px; height: 96px; margin: -48px 0 0; border-radius: 50%;
-  border: 5px solid var(--bg2); background: var(--accent); color: #fff;
-  font-size: 36px; font-weight: 600; display: grid; place-items: center;
+  width: 128px; height: 128px; margin: -64px 0 0; border-radius: 50%;
+  border: 6px solid var(--bg2); background: var(--accent); color: #fff;
+  font-size: 48px; font-weight: 600; display: grid; place-items: center;
   overflow: hidden; flex: none;
 }
 .perfil-foto.com-foto { background: none; cursor: zoom-in; }
 .perfil-foto.berserk { border-color: #c084fc; }
 .perfil-foto img { width: 100%; height: 100%; display: block; }
 
-.perfil-nome { font-size: 22px; font-weight: 700; color: var(--white); line-height: 1.2;
+.perfil-nome { font-size: 26px; font-weight: 700; color: var(--white); line-height: 1.2;
   overflow-wrap: anywhere; }
 
 .perfil-selos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

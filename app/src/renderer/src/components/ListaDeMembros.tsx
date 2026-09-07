@@ -13,7 +13,8 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
   /** Ids de quem está em alguma sala de voz agora. */
   naVoz: Set<number>;
   eu: Membro;
-  onPessoa: (m: Membro, em: { x: number; y: number }) => void;
+  /** Esquerdo abre o perfil; direito, as ações. */
+  onPessoa: (m: Membro, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
 }) {
   // Do cargo mais alto para o mais baixo, como se lê uma hierarquia.
   const grupos = cargos
@@ -43,7 +44,8 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
                   key={m.id}
                   className={`membro-linha ${online ? 'na-voz' : ''} ${m.banido ? 'banido' : ''}`}
                   title={`${m.nome} — ${m.cargoNome}${online ? ' · na voz agora' : ''}`}
-                  onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY })}
+                  onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY }, 'perfil')}
+                  onContextMenu={(e) => { e.preventDefault(); onPessoa(m, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                 >
                   <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto}
                     tamanho="big" status={m.status} />

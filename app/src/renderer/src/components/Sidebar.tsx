@@ -22,7 +22,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
   onAbrir: (sala: RoomInfo) => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
-  onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
+  /** Esquerdo abre o perfil; direito, as ações. */
+  onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
   onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   donoDaSaga: boolean;
@@ -166,8 +167,9 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                       <li
                         key={p.identity}
                         className={`clicavel ${p.speaking ? 'speaking' : ''}`}
-                        title={`${p.name} — clique para opções`}
-                        onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
+                        title={`${p.name} — clique para o perfil, botão direito para as opções`}
+                        onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil')}
+                        onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                       >
                         <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto}
                       status={pessoas.get(p.identity)?.status} />

@@ -251,8 +251,17 @@ export function App() {
   const naVoz = new Set<number>();
   for (const sala of rooms) for (const p of sala.participants) if (p.usuarioId) naVoz.add(p.usuarioId);
 
-  const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }) => {
-    setMenu({ pessoa: pessoas.get(identity) ?? { identity, nome }, em });
+  /**
+   * Esquerdo abre o PERFIL; direito, as AÇÕES.
+   *
+   * Era tudo no mesmo popover: a foto minúscula no topo e, logo abaixo, banir e expulsar.
+   * Ver quem é a pessoa é o que mais se faz, e era o que menos aparecia — enquanto o que
+   * quase nunca se usa, e não se quer errar, ficava a um clique de distância.
+   */
+  const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes' = 'perfil') => {
+    const pessoa = pessoas.get(identity) ?? { identity, nome };
+    if (tipo === 'perfil') { setPerfilAberto(pessoa); return; }
+    setMenu({ pessoa, em });
   // pessoas é remontado a cada render; depender dele aqui só criaria a função à toa.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rooms]);
@@ -471,13 +480,14 @@ export function App() {
         cargos={cargos}
         naVoz={naVoz}
         eu={eu}
-        onPessoa={(m, em) => setMenu({
-          pessoa: {
+        onPessoa={(m, em, tipo) => {
+          const pessoa = {
             identity: `u${m.id}`, nome: m.nome, usuarioId: m.id, cargo: m.cargo,
             foto: m.foto, banner: m.banner, turbo: m.turbo, idExibido: m.idExibido, status: m.status,
-          },
-          em,
-        })}
+            entrouEm: m.entrouEm, enquadramento: m.enquadramento,
+          };
+          if (tipo === 'perfil') setPerfilAberto(pessoa); else setMenu({ pessoa, em });
+        }}
       />
 
       <TrilhaDeServidores

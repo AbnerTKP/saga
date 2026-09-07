@@ -81,7 +81,8 @@ function VideoTile({ tile, big, preencher, falando, onClick, onMenu }: {
 export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, onVoltarAVoz }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
-  onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
+  /** Esquerdo abre o perfil; direito, as ações. */
+  onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
   /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra — ou de
       outro servidor, se a pessoa foi espiar o vizinho sem desligar a call. */
   salaAberta: RoomInfo | null;
@@ -207,7 +208,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
-            onPessoa={(id, nome, em) => onPessoa(`u${id}`, nome, em)}
+            onPessoa={(id, nome, em, tipo) => onPessoa(`u${id}`, nome, em, tipo)}
             grande
           />
         </div>
@@ -222,11 +223,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   <span
                     key={p.identity}
                     className="clicavel"
-                    onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}
+                    onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
+                    onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                   >
                     <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto}
                       enquadramento={pessoas.get(p.identity)?.enquadramento?.foto}
-                      tamanho="huge" extra={rm.falando.has(p.identity) ? 'speaking' : ''} titulo={`${p.name} — clique para opções`} />
+                      tamanho="huge" extra={rm.falando.has(p.identity) ? 'speaking' : ''} titulo={`${p.name} — clique para o perfil, botão direito para as opções`} />
                   </span>
                 ))}
               </div>
@@ -266,7 +268,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   ))}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${rm.falando.has(p.identity) ? 'speaking' : ''}`}
-                      onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
+                      onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
+                    onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
                       <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>
