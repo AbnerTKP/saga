@@ -333,6 +333,10 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   `TrackPublished` só fala das que começam DEPOIS de você chegar; as que já estavam vêm
   direto em `TrackSubscribed`, e as duas apareciam rodando até o primeiro clique. Por isso
   o `TrackSubscribed` também recusa: chegou tela de quem não é o escolhido, desinscreve.
+  Medido contra a produção, entrando numa sala com duas telas no ar: **0 `TrackPublished`
+  e 2 `TrackSubscribed`**. E desinscrever de dentro do próprio `TrackSubscribed` pega —
+  não é ignorado por chegar cedo demais: `TrackUnsubscribed` dispara e a publicação fica
+  `subscribed=false`, enquanto a escolhida fica `true`.
 - **A escolha é um clique na própria imagem, não numa lista à parte.** Chegou a ser uma
   faixa de fichas no alto da tela, e escolher longe do que se escolhe foi rejeitado na
   hora. O palco tem dois campos: em cima a escolhida, embaixo quem está no ar. Sem
