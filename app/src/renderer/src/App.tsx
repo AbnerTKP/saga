@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import logo from './marca.png';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
   pode, criarSala, reordenarSalas, criarCategoria, renomearCategoria, apagarCategoria,
@@ -337,6 +338,18 @@ export function App() {
   const servidor = sessao.servidor;
 
   return (
+    <div className="app-raiz">
+      {/* No Mac os botões da janela ficam POR CIMA do conteúdo, então o cabeçalho do
+          servidor dividia a linha com eles — e um nome grande no alto da janela é lido
+          como o nome do programa, não como onde você está. A faixa devolve o lugar dos
+          botões à janela e diz quem é o app; o servidor desce para dentro da barra, que
+          é o lugar dele. No Windows não existe: lá a barra de título é do sistema. */}
+      {window.desktop.platform === 'darwin' && (
+        <div className="faixa-da-janela">
+          <img src={logo} alt="" width={17} height={17} />
+          <span>Saga</span>
+        </div>
+      )}
     <div className="app">
       <Sidebar
         rooms={rooms}
@@ -487,6 +500,7 @@ export function App() {
       <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
       <UpdateToast estado={atualizacao} />
       <Versao />
+    </div>
     </div>
   );
 }
