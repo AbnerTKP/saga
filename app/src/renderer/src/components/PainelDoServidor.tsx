@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  pode, podeSobre, verServidor, renomearServidor, mudarMeuNome, moderar,
-  minhaFoto, meuBanner, fotoDoServidor, bannerDoServidor, usarGif, salvarEnquadramento,
+  pode, podeSobre, verServidor, renomearServidor, moderar,
+  fotoDoServidor, bannerDoServidor, usarGif, salvarEnquadramento,
   criarSala, renomearSala, apagarSala,
   criarCargo, editarCargo, apagarCargo, criarConvite, type Convite,
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
@@ -23,9 +23,9 @@ const posso = (eu: Membro, acao: AcaoDeModeracao, alvo: Membro) =>
 
 const emCastigo = (m: Membro) => !!m.castigoAte && m.castigoAte > Date.now();
 
-export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
+export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
   eu: Membro; servidor: Servidor;
-  onEu: (m: Membro) => void; onServidor: (s: Servidor) => void; onClose: () => void;
+  onServidor: (s: Servidor) => void; onClose: () => void;
 }) {
   const [membros, setMembros] = useState<Membro[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -36,7 +36,6 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
   const [novaSala, setNovaSala] = useState('');
   const [tipoNovo, setTipoNovo] = useState<TipoDeSala>('voz');
   const [nomeServidor, setNomeServidor] = useState(servidor.nome);
-  const [meuNome, setMeuNome] = useState(eu.nome);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -72,15 +71,6 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
     catch (e) { setErro((e as Error).message); } finally { setOcupado(false); }
   };
 
-  const salvarMeuNome = async () => {
-    setErro(null); setOcupado(true);
-    try {
-      const r = await mudarMeuNome(meuNome);
-      onEu(r.eu); setMeuNome(r.eu.nome); setAviso('Seu nome foi salvo.');
-      await recarregar();
-    } catch (e) { setErro((e as Error).message); } finally { setOcupado(false); }
-  };
-
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal painel" onClick={(e) => e.stopPropagation()}>
@@ -95,33 +85,10 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
         {erro && <div className="error">{erro}</div>}
         {aviso && <div className="aviso-ok">{aviso}</div>}
 
-        <section className="painel-bloco">
-          <h3>Seu perfil</h3>
-          <div className="imagens">
-            <EscolherImagem
-              rotulo="Sua foto" formato="redondo" atual={eu.foto}
-              papel="foto" enquadramento={eu.enquadramento?.foto}
-              onEnquadrar={async (v) => { setErro(null); onEu(await salvarEnquadramento('foto', v)); await recarregar(); }}
-              onEnviar={async (a) => { setErro(null); try { onEu((await minhaFoto(a)).eu); await recarregar(); } catch (e) { setErro((e as Error).message); } }}
-              onGif={async (url) => { setErro(null); const r = await usarGif('usuario.foto', url); if (r.eu) { onEu(r.eu); await recarregar(); } }}
-            />
-            <EscolherImagem
-              rotulo="Seu banner" formato="faixa" atual={eu.banner}
-              papel="banner" enquadramento={eu.enquadramento?.banner}
-              onEnquadrar={async (v) => { setErro(null); onEu(await salvarEnquadramento('banner', v)); }}
-              onEnviar={async (a) => { setErro(null); try { onEu((await meuBanner(a)).eu); } catch (e) { setErro((e as Error).message); } }}
-              onGif={async (url) => { setErro(null); const r = await usarGif('usuario.banner', url); if (r.eu) onEu(r.eu); }}
-            />
-          </div>
-          <p className="muted small">
-            Seu nome aqui é o que os outros veem. O apelido de entrada continua <b>{eu.apelido}</b> e não muda.
-            {!eu.turbo && ' Imagem animada é do Berserk; parada, todo mundo pode.'}
-          </p>
-          <div className="linha-campo">
-            <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
-            <button onClick={salvarMeuNome} disabled={ocupado || meuNome === eu.nome}>Salvar</button>
-          </div>
-        </section>
+        {/* "Seu perfil" morava aqui e foi para a engrenagem, com o resto que é seu. A
+            conta é global: a sua foto vai com você para todos os servidores, então
+            trocá-la pelo painel de UM servidor sempre foi o lugar errado — e era o único
+            que existia. */}
 
         {pode(eu.cargo, 'gerirServidor') && (
           <section className="painel-bloco">

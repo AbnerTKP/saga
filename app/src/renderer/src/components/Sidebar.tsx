@@ -79,7 +79,7 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
       {/* O nome do servidor é onde você está: ganha a foto dele, peso de título e uma
           seta dizendo que abre. Era um texto solto, do mesmo tamanho do resto. */}
       <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
-        <button className="cabeca-do-servidor" onClick={onPainel} title={`${servidor.nome} — abrir o painel`}>
+        <button className="cabeca-do-servidor" onClick={onPainel} title={`${servidor.nome} — configurações do servidor`}>
           <Avatar nome={servidor.nome} foto={servidor.foto} tamanho="big" />
           <span className="nome-do-servidor">{servidor.nome}</span>
           <span className="seta-do-servidor">▾</span>
@@ -283,7 +283,9 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
           <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
             <Icon name={rm.deafened ? 'headOff' : 'head'} />
           </button>
-          <button onClick={onSettings} title="Dispositivos"><Icon name="gear" /></button>
+          {/* A engrenagem é "as suas coisas": perfil, microfone, câmera. As do servidor
+              ficam no nome dele, lá em cima, e no botão direito do quadrado à direita. */}
+          <button onClick={onSettings} title="Sua conta: perfil, microfone e câmera"><Icon name="gear" /></button>
         </div>
       </div>
     </aside>

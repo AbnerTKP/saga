@@ -22,7 +22,7 @@ import { PainelDaSaga } from './components/PainelDaSaga';
 import { statusParaMandar, type Status } from './presenca';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
-import { DeviceSettings } from './components/DeviceSettings';
+import { PainelDaConta } from './components/PainelDaConta';
 import { UpdateToast } from './components/UpdateToast';
 import { TelaDeAtualizacao } from './components/TelaDeAtualizacao';
 import { PainelDoServidor } from './components/PainelDoServidor';
@@ -438,9 +438,11 @@ export function App() {
         />
       )}
       {devices && (
-        <DeviceSettings
+        <PainelDaConta
+          eu={eu}
           room={rm.room}
           souBerserk={eu.turbo}
+          onEu={atualizarEu}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}
         />
@@ -449,7 +451,6 @@ export function App() {
         <PainelDoServidor
           eu={eu}
           servidor={servidor}
-          onEu={atualizarEu}
           onServidor={atualizarServidor}
           onClose={() => setPainel(false)}
         />
@@ -483,6 +484,9 @@ export function App() {
         servidores={sessao.servidores.length ? sessao.servidores : [servidor]}
         atual={servidor.id}
         onEscolher={trocarDeServidor}
+        // Botão direito noutro servidor: troca primeiro e só então abre — o painel lê
+        // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
+        onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
         onConfigurar={() => setNovoServidor(true)}
       />
 

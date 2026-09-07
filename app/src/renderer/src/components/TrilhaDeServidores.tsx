@@ -6,10 +6,12 @@ import { PODE_CRIAR_SERVIDOR } from '../travas';
  * Discord, que põe redondo à esquerda. Hoje mostra um servidor; a estrutura já é de lista
  * porque é o que vem em seguida.
  */
-export function TrilhaDeServidores({ servidores, atual, onEscolher, onConfigurar }: {
+export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, onConfigurar }: {
   servidores: Servidor[];
   atual: number;
   onEscolher: (id: number) => void;
+  /** Botão direito no quadrado: as configurações DAQUELE servidor. */
+  onAjustar: (id: number) => void;
   onConfigurar: () => void;
 }) {
   return (
@@ -20,8 +22,9 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onConfigurar
           <button
             key={s.id}
             className={`quadro-servidor ${s.id === atual ? 'atual' : ''}`}
-            title={s.nome}
+            title={`${s.nome} — botão direito para as configurações`}
             onClick={() => onEscolher(s.id)}
+            onContextMenu={(e) => { e.preventDefault(); onAjustar(s.id); }}
           >
             {foto ? <img src={foto} alt="" draggable={false} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
           </button>
