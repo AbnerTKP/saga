@@ -3,6 +3,10 @@ services:
   livekit:
     image: livekit/livekit-server:v1.9
     restart: unless-stopped
+    # A máquina tem 1 núcleo e ~4 GB, e já travou inteira por pressão de memória: o
+    # kernel respondia ping e nada mais conseguia rodar, nem o sshd. Com teto, quem
+    # estourar morre sozinho e volta pelo `restart` — em vez de levar o resto junto.
+    mem_limit: 1500m
     command: --config /etc/livekit.yaml
     network_mode: host
     volumes:
@@ -16,6 +20,7 @@ services:
   token:
     build: .
     restart: unless-stopped
+    mem_limit: 512m
     env_file: .env
     # As contas moram aqui. Sem este volume elas sumiriam a cada atualização do servidor.
     volumes:

@@ -1,4 +1,10 @@
-# LiveKit para até ~10 amigos num VPS pequeno.
+# MODELO. O arquivo de produção chama-se `livekit.yaml` e vive SÓ na VPS, com a chave
+# de verdade. Este aqui tem placeholder, e por isso não pode ter o nome do de lá:
+# um `scp livekit.yaml` já sobrescreveu a produção com este conteúdo, e o LiveKit
+# subiu recusando a chave ("secret is too short") na primeira vez que reiniciou — horas
+# depois, quando ninguém ligava mais uma coisa à outra. Nome diferente, engano impossível.
+#
+# Para criar o de produção: copie este, gere um par de chaves e ponha o domínio real.
 port: 7880
 rtc:
   tcp_port: 7881

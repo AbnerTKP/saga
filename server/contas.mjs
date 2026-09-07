@@ -71,6 +71,26 @@ export function criarConta(db, { apelido, senha, senhaRepetida }) {
   return buscarPorId(db, Number(info.lastInsertRowid));
 }
 
+/**
+ * Troca a senha de uma conta.
+ *
+ * Passa pela mesma `hashDaSenha` do cadastro de propósito: uma segunda cópia dos
+ * parâmetros do scrypt, num script solto, é como isso passa a divergir sem ninguém ver —
+ * e o sintoma seria "a senha certa não entra", que ninguém liga à causa.
+ *
+ * Não existe caminho para isto no app, e por enquanto é assim: o grupo tem oito pessoas
+ * e quem esquece pede ao dono. O que não podia existir era só o jeito errado.
+ */
+export function trocarSenha(db, usuarioId, senha) {
+  if (String(senha ?? '').length < SENHA_MINIMA) {
+    throw new ErroDeConta(`A senha precisa ter pelo menos ${SENHA_MINIMA} caracteres.`);
+  }
+  const info = db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?')
+    .run(hashDaSenha(senha), Number(usuarioId));
+  if (info.changes === 0) throw new ErroDeConta('Essa conta não existe.', 404);
+  return buscarPorId(db, Number(usuarioId));
+}
+
 export const buscarPorId = (db, id) =>
   db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id) ?? null;
 

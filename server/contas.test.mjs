@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirBanco } from './banco.mjs';
-import { criarConta, entrar, usuarioDaSessao, sair, derrubarSessoes, senhaConfere, buscarPorApelido, esquecerAnotacoes } from './contas.mjs';
+import { criarConta, entrar, usuarioDaSessao, sair, derrubarSessoes, senhaConfere, buscarPorApelido, esquecerAnotacoes, trocarSenha } from './contas.mjs';
 
 const novo = () => abrirBanco(':memory:');
 const conta = (db, apelido = 'abner', senha = 'segredo123') =>
@@ -132,4 +132,20 @@ test('vista_em é anotado uma vez por minuto, não a cada pedido', () => {
   esquecerAnotacoes();
   usuarioDaSessao(db, token);
   assert.notEqual(quando(), 1, 'depois do intervalo, devia ter anotado');
+});
+
+
+test('trocar a senha faz a nova entrar e a antiga parar de entrar', () => {
+  const db = novo();
+  const u = criarConta(db, { apelido: 'ana', senha: 'segredo123', senhaRepetida: 'segredo123' });
+  trocarSenha(db, u.id, 'outrasenha456');
+  assert.throws(() => entrar(db, { apelido: 'ana', senha: 'segredo123' }), /senha/i);
+  assert.ok(entrar(db, { apelido: 'ana', senha: 'outrasenha456' }).token);
+});
+
+test('a senha nova passa pela mesma régua de tamanho do cadastro', () => {
+  const db = novo();
+  const u = criarConta(db, { apelido: 'ana', senha: 'segredo123', senhaRepetida: 'segredo123' });
+  assert.throws(() => trocarSenha(db, u.id, 'curta'), /pelo menos/);
+  assert.throws(() => trocarSenha(db, 999, 'senhalonga123'), /não existe/);
 });

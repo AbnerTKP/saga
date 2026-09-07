@@ -35,9 +35,46 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
 
 Publicar servidor: `scp *.mjs Dockerfile root@…:/root/server/` e
-`docker compose -f docker-compose.ip.yml up -d --build token`. Depois, confira a linha
+`docker compose -f docker-compose.ip.yml up -d --build token`.
+
+**Nunca mande `livekit.yaml` daqui.** O de produção tem a chave de verdade e mora só na
+VPS; o do repositório é modelo e chama-se `livekit.exemplo.yaml` justamente porque um
+`scp` já sobrescreveu a produção com o placeholder. O LiveKit continuou de pé com a
+configuração antiga na memória e só recusou a chave HORAS depois, no primeiro reinício —
+quando ninguém ligava mais uma coisa à outra. Depois, confira a linha
 `arquivos em /dados/arquivos (N)` no `docker logs`: se o N zerar, alguma coisa saiu do
 volume outra vez.
+
+## A vez que a VPS travou inteira
+
+Em 7 de setembro de 2026 a máquina parou por ~25 minutos: respondia **ping** (0% de perda,
+19 ms) e nenhuma porta TCP atendia — o SSH conectava e o `sshd` nunca mandava o banner.
+Kernel de pé, userspace sufocado.
+
+O que ficou escrito, e é a única pista que sobrou:
+
+```
+17:52:16 systemd-journald: Under memory pressure, flushing caches.
+17:53:30 systemd-journald: Under memory pressure, flushing caches.
+17:54:37 systemd-journald: Under memory pressure, flushing caches.   ← última linha
+```
+
+**Não houve OOM kill** e o disco tinha 46 GB livres. A máquina tem **um núcleo** e **não
+tinha swap nenhum**: sem swap o kernel não tem para onde despejar e fica reciclando cache
+até nada mais conseguir rodar — nem o `sshd`, que é como se perde o acesso. Quem consumiu
+a memória **não foi identificado**: o registro do arranque anterior não guardou nada além
+disso, e o processo já não existia. Fica em aberto, e é honesto dizer que várias mudanças
+minhas foram para produção naquele dia.
+
+O que se fez, que vale independente da causa:
+- **2 GB de swap** (`/swapfile`, no `fstab`, `vm.swappiness=10`). Sem ele, qualquer pico
+  vira máquina inacessível em vez de máquina lenta.
+- **Teto de memória por contêiner** (`mem_limit`): quem estourar morre sozinho e volta
+  pelo `restart`, em vez de levar o resto junto.
+
+E a lição que interessa: **numa máquina de um núcleo sem swap, "sem memória" não vira
+erro — vira uma máquina que responde ping e mais nada.** Não há log a consultar depois,
+porque escrever log também precisa de memória.
 
 ## Como está montado
 

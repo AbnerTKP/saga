@@ -1,6 +1,6 @@
 # Sobe tudo num VPS: LiveKit (mídia), servidor de token e Caddy (HTTPS automático).
 # 1) copie .env.example para .env e preencha
-# 2) edite livekit.yaml (chaves) e Caddyfile (domínio)
+# 2) copie livekit.exemplo.yaml para livekit.yaml, ponha as chaves, e edite o Caddyfile
 # 3) docker compose up -d
 services:
   livekit:
