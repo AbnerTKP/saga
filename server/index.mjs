@@ -279,7 +279,20 @@ async function trocarImagem(req, de, papel) {
     db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
     return { servidor: verServidor(sid) };
   }
-  db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
+  /*
+   * Trocar a imagem zera o enquadramento DELA.
+   *
+   * O enquadramento é "onde esta imagem foi arrastada e o quanto foi aproximada" — é da
+   * imagem, não da pessoa. Mantendo-o, a foto nova entrava com a aproximação da antiga:
+   * quem tinha dado zoom num banner largo e subiu outro, mais estreito, via um pedaço
+   * gigante e branco no lugar do desenho. Foi assim que apareceu.
+   *
+   * O do outro papel não é tocado: trocar o banner não mexe em como a foto está posta.
+   */
+  const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(eu.id);
+  const semOEnquadramentoAntigo = enquadramento.guardar(atual?.enquadramento, papel, null);
+  db.prepare(`UPDATE usuarios SET ${papel} = ?, enquadramento = ? WHERE id = ?`)
+    .run(nome, semOEnquadramentoAntigo, eu.id);
   return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
 }
 

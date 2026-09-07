@@ -705,6 +705,41 @@ test('o Berserk atravessa os servidores; o cargo, não', async () => {
   assert.equal(naCasa.cargo.dono, false, 'o cargo, esse, continua sendo de cada servidor');
 });
 
+test('trocar a imagem zera o enquadramento dela, e só o dela', async () => {
+  // Foi o bug de verdade: quem tinha dado zoom num banner e subia outro via a imagem
+  // nova com a aproximação da antiga — um pedaço gigante no lugar do desenho.
+  const { token } = await sessaoDe('abner');
+
+  assert.equal((await subir('/eu/foto', token, PNG)).status, 200);
+  assert.equal((await subir('/eu/banner', token, GIF)).status, 200);
+
+  const enquadrar = (papel, valor) =>
+    chamar('PATCH', '/eu/enquadramento', { sessao: token, corpo: { papel, valor } });
+  await enquadrar('foto', { x: 20, y: 30, zoom: 2 });
+  await enquadrar('banner', { x: 80, y: 10, zoom: 3 });
+
+  const antes = (await chamar('GET', '/eu', { sessao: token })).corpo.eu;
+  assert.deepEqual(antes.enquadramento.banner, { x: 80, y: 10, zoom: 3 });
+  assert.deepEqual(antes.enquadramento.foto, { x: 20, y: 30, zoom: 2 });
+
+  // troca só o banner
+  assert.equal((await subir('/eu/banner', token, GIF)).status, 200);
+  const depois = (await chamar('GET', '/eu', { sessao: token })).corpo.eu;
+  assert.equal(depois.enquadramento.banner, undefined, 'o enquadramento do banner tinha de zerar');
+  assert.deepEqual(depois.enquadramento.foto, { x: 20, y: 30, zoom: 2 },
+    'trocar o banner não pode mexer em como a foto está posta');
+});
+
+test('tirar a imagem também leva o enquadramento dela', async () => {
+  const { token } = await sessaoDe('abner');
+  assert.equal((await subir('/eu/banner', token, GIF)).status, 200);
+  await chamar('PATCH', '/eu/enquadramento', { sessao: token, corpo: { papel: 'banner', valor: { x: 10, y: 90, zoom: 2 } } });
+  assert.equal((await subir('/eu/banner', token, Buffer.alloc(0))).status, 200);
+  const eu = (await chamar('GET', '/eu', { sessao: token })).corpo.eu;
+  assert.equal(eu.banner, null);
+  assert.equal(eu.enquadramento.banner, undefined);
+});
+
 test('convite leva alguém para dentro', async () => {
   const bruno = await sessaoDe('bruno');
   const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores

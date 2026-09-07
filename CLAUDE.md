@@ -337,6 +337,11 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
   verdade: o LiveKit já esqueceu quais eram, então o `<audio>` ficava na página para sempre
   e cada "não assistir / assistir de novo" deixava mais um para trás. Por isso o elemento
   carrega o `sid` da faixa: é por ele que se acha o dono na hora de tirar.
+- **Trocar a imagem zera o enquadramento DELA.** O enquadramento é "onde esta imagem foi
+  arrastada e o quanto foi aproximada" — é da imagem, não da pessoa. Sem zerar, a nova
+  entrava com a aproximação da antiga: quem tinha dado zoom num banner e subia outro via
+  um pedaço gigante no lugar do desenho. O do outro papel não é tocado; trocar o banner
+  não mexe em como a foto está posta.
 - **Enquadrar não é recortar.** Recortar significa redesenhar a imagem, e um GIF
   redesenhado perde a animação — o que o Berserk destrava. Guardamos posição e
   aproximação, e aplicamos ao mostrar; o arquivo enviado nunca é tocado. A imagem também
