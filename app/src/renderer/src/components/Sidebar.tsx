@@ -129,7 +129,7 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                     enquadramento: pessoas.get(p.identity)?.enquadramento,
                     turbo: pessoas.get(p.identity)?.turbo ?? false,
                     idExibido: pessoas.get(p.identity)?.idExibido ?? null,
-                    speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
+                    speaking: rm.falando.has(p.identity), muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
                   }))
                 : ocupantes(r.participants, { euSou: `u${eu.id}`, estouNesta: false })
                     .map((p) => ({

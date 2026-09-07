@@ -12,10 +12,12 @@ import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
 
-function VideoTile({ tile, big, preencher, onClick, onMenu }: {
+function VideoTile({ tile, big, preencher, falando, onClick, onMenu }: {
   tile: Tile; big?: boolean;
   /** Cortar as bordas para ocupar tudo, em vez de deixar tarja preta. */
   preencher?: boolean;
+  /** Quem está falando agora, medido do som — ver niveis.ts. */
+  falando: Set<string>;
   onClick?: () => void;
   onMenu?: (e: React.MouseEvent) => void;
 }) {
@@ -49,7 +51,7 @@ function VideoTile({ tile, big, preencher, onClick, onMenu }: {
   return (
     <div
       ref={caixa}
-      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${tile.participant.isSpeaking && !isScreen ? 'speaking' : ''}`}
+      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${falando.has(tile.participant.identity) && !isScreen ? 'speaking' : ''}`}
       onClick={onClick}
       onDoubleClick={(e) => { e.stopPropagation(); telaCheia(); }}
       onContextMenu={onMenu}
@@ -224,7 +226,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   >
                     <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto}
                       enquadramento={pessoas.get(p.identity)?.enquadramento?.foto}
-                      tamanho="huge" extra={p.isSpeaking ? 'speaking' : ''} titulo={`${p.name} — clique para opções`} />
+                      tamanho="huge" extra={rm.falando.has(p.identity) ? 'speaking' : ''} titulo={`${p.name} — clique para opções`} />
                   </span>
                 ))}
               </div>
@@ -237,7 +239,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           {!idle && (focusTile || rm.lives.length > 0) && (
             <div className="focus-layout">
               {focusTile
-                ? <VideoTile tile={focusTile} big preencher={preencher} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)} />
+                ? <VideoTile tile={focusTile} big preencher={preencher} falando={rm.falando} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)} />
                 : (
                   <div className="tile grande-vazio">
                     <div className="muted">
@@ -248,7 +250,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                 )}
               {(rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
-                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
+                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
                   {apagadas.map((l) => (
                     <button key={l.identity} className="tile live-apagada"
                       title={`Assistir a transmissão de ${l.nome}`}
@@ -263,7 +265,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                     </button>
                   ))}
                   {audioOnly.map((p) => (
-                    <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
+                    <div key={p.identity} className={`tile audio clicavel ${rm.falando.has(p.identity) ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
                       <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
@@ -275,9 +277,9 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           )}
           {!idle && !focusTile && rm.lives.length === 0 && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
-              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
+              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (
-                <div key={p.identity} className={`tile audio ${p.isSpeaking ? 'speaking' : ''}`}>
+                <div key={p.identity} className={`tile audio ${rm.falando.has(p.identity) ? 'speaking' : ''}`}>
                   <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="huge" />
                   <div className="tile-label">{p.name || p.identity}</div>
                 </div>
@@ -304,7 +306,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               </button>
             )}
           </div>
-          <VideoTile tile={liveNoPalco} preencher={preencher} onMenu={menuDaTransmissao(liveNoPalco)} />
+          <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} onMenu={menuDaTransmissao(liveNoPalco)} />
         </div>
       )}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}

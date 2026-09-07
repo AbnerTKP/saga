@@ -474,11 +474,34 @@ a gente não conhece.
   testada, e conserta junto o "saí da call e continuo aparecendo".
 - **Falando é o azul da logo, não verde.** O verde já quer dizer "deu certo" no resto do
   app — o selo "no ar", a bolinha de online —, e falar não é um resultado.
-- **Quem decide "está falando" é o LiveKit, e o padrão dele demora meio segundo.** Medido
-  na produção com dois participantes reais: 305, 410, 487, 516 e 595 ms, mediana **487**.
-  O padrão mede de 400 em 400 ms e suaviza por 4 medições — é ajuste de sala de reunião
-  cheia. Está em `livekit.yaml` como 150 e 2. **Mexer nisso reinicia o LiveKit e derruba
-  quem estiver em call**, então não vai junto com o servidor de token.
+- **Quem está falando é decidido AQUI, do som, não perguntado ao servidor.** O caminho do
+  LiveKit é juntar, decidir e mandar de volta; o meu microfone não sai da máquina, e o
+  áudio do outro já chegou quando o servidor ainda está decidindo. Medido contra a
+  produção, sete voltas na mesma rodada, pelo caminho que o app usa:
+
+  | caminho | mediana |
+  |---|---|
+  | eu, medindo o meu próprio microfone | **25 ms** |
+  | o outro, medindo o áudio que chegou aqui | **267 ms** |
+  | o outro, esperando o LiveKit avisar | **394 ms** |
+
+  Cheguei a baixar o `update_interval` do LiveKit de 400/4 para 150/2 e voltei atrás: com
+  a conta feita no cliente, ninguém lê mais o `ActiveSpeakersChanged`, e um botão que
+  nada exercita é pior que botão nenhum — ainda mais um que só se aplica reiniciando o
+  LiveKit, o que derruba todo mundo que estiver em call.
+- **A faixa remota só entrega amostras se alguém a estiver consumindo.** Medir o nível de
+  uma faixa que chegou, sem `<audio>` preso nela, lê **zero para sempre** — e sem erro
+  nenhum, então o anel simplesmente nunca acenderia para os outros e nada apareceria no
+  registro. Medido: com o `attach`, 267 ms; sem ele, nunca. Funciona porque o
+  `onSubscribed` já prende um elemento em toda faixa de áudio que chega; quem mexer nisso
+  precisa saber que o medidor depende disso.
+- **O laço que mede se conserta sozinho a cada volta**, em vez de acompanhar eventos de
+  faixa. Com oito pessoas entrando, saindo, mutando e trocando de dispositivo, um medidor
+  perdido deixaria alguém aceso para sempre. Comparar o que existe com o que está medido
+  é barato e não tem ordem de evento para errar.
+- **Contexto de áudio suspenso lê zero em tudo**, e não lança nada: seria o anel nunca
+  acendendo, para ninguém, sem pista. Entrar na call é sempre um clique, então o
+  `resume()` passa — mas ele precisa estar lá.
 - **A bolinha de presença tem um anel da cor do fundo.** Sem ele encosta na foto e some
   em cima de imagem clara. E "offline" não é uma cor: é a ausência dela, senão um cinza
   cheio competiria com as três que significam algo.

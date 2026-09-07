@@ -7,6 +7,7 @@ import { criarAvisos } from './avisos';
 import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
+import { falando, nivelDe, LIMIAR } from './niveis';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -102,6 +103,10 @@ function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<
 export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => void) {
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
+  /** Quem está falando agora, medido do som e não perguntado ao servidor — ver niveis.ts. */
+  const [falandoAgora, setFalandoAgora] = useState<Set<string>>(new Set());
+  const medidores = useRef(new Map<string, { an: AnalyserNode; buf: Float32Array<ArrayBuffer>; pico: number }>());
+  const ctxDosNiveis = useRef<AudioContext | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [salaDaVoz, setSalaDaVoz] = useState<SalaDaVoz | null>(null);
   const [deafened, setDeafenedState] = useState(false);
@@ -265,7 +270,6 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
       })
       .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
-      .on(RoomEvent.ActiveSpeakersChanged, bump)
       .on(RoomEvent.TrackMuted, bump)
       .on(RoomEvent.TrackUnmuted, bump)
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
@@ -696,6 +700,68 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   const participants: Participant[] = status === 'idle' ? [] : [room.localParticipant, ...room.remoteParticipants.values()];
 
+  // Quem está falando sai do SOM, não do servidor. Medido: 30 ms para mim e 178 ms para
+  // o outro, contra 294 ms esperando o LiveKit avisar — ver niveis.ts.
+  //
+  // O laço se conserta sozinho a cada volta em vez de acompanhar eventos de faixa: com
+  // oito pessoas entrando, saindo, mutando e trocando de dispositivo, um medidor perdido
+  // deixaria alguém aceso para sempre. Comparar o que existe com o que está medido é
+  // barato e não tem ordem de eventos para errar.
+  useEffect(() => {
+    if (status === 'idle') {
+      medidores.current.clear();
+      setFalandoAgora((antes) => (antes.size ? new Set() : antes));
+      return;
+    }
+    const sala = roomRef.current;
+    if (!sala) return;
+    if (!ctxDosNiveis.current) ctxDosNiveis.current = new AudioContext();
+    const ctx = ctxDosNiveis.current;
+    // Contexto suspenso lê zero em tudo, e aí ninguém acende NUNCA — falha silenciosa,
+    // porque não lança nada. Entrar na call é sempre um clique, então o retomar passa.
+    if (ctx.state === 'suspended') ctx.resume().catch((e) => anotar('erro', 'niveis', e));
+
+    const id = setInterval(() => {
+      const vivos = new Set<string>();
+      const agora = Date.now();
+      const acesos = new Set<string>();
+
+      for (const p of [sala.localParticipant, ...sala.remoteParticipants.values()]) {
+        vivos.add(p.identity);
+        const faixa = p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+        // Microfone desligado é silêncio, e silêncio não acende: quem está mutado não
+        // pode aparecer falando por causa da sustentação do último pico.
+        if (!faixa || !p.isMicrophoneEnabled) { medidores.current.delete(p.identity); continue; }
+
+        let m = medidores.current.get(p.identity);
+        if (!m || m.an.context.state === 'closed') {
+          // Isto só funciona porque `onSubscribed` prende um <audio> em toda faixa que
+          // chega: no Chromium a faixa remota não entrega amostra nenhuma se ninguém a
+          // estiver consumindo. Medido — sem o <audio>, o medidor lê zero PARA SEMPRE, e
+          // sem erro nenhum: o anel simplesmente nunca acende para os outros.
+          const fonte = ctx.createMediaStreamSource(new MediaStream([faixa]));
+          const an = ctx.createAnalyser();
+          an.fftSize = 512;
+          fonte.connect(an);
+          m = { an, buf: new Float32Array(an.fftSize), pico: 0 };
+          medidores.current.set(p.identity, m);
+        }
+        m.an.getFloatTimeDomainData(m.buf);
+        if (nivelDe(m.buf) > LIMIAR) m.pico = agora;
+        if (falando(0, m.pico, agora)) acesos.add(p.identity);
+      }
+
+      for (const quem of medidores.current.keys()) if (!vivos.has(quem)) medidores.current.delete(quem);
+
+      setFalandoAgora((antes) => {
+        if (antes.size === acesos.size && [...acesos].every((x) => antes.has(x))) return antes;
+        return acesos;
+      });
+    }, 60);
+
+    return () => clearInterval(id);
+  }, [status]);
+
   const tiles: Tile[] = [];
   for (const p of participants) {
     for (const pub of p.trackPublications.values()) {
@@ -719,6 +785,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   return {
     room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
+    falando: falandoAgora,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
