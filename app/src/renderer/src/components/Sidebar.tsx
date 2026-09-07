@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
 import { moverSala, type Alvo } from '../ordenacao';
+import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
@@ -10,7 +11,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, donoDaSaga, onPainelDaSaga }: {
+export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, donoDaSaga, onPainelDaSaga, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
@@ -25,6 +26,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   donoDaSaga: boolean;
   onPainelDaSaga: () => void;
+  statusEscolhido: Status;
+  onStatus: (s: Status) => void;
 }) {
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
@@ -34,6 +37,7 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
   const [naMao, setNaMao] = useState<number | null>(null);
   const [alvo, setAlvo] = useState<Alvo | null>(null);
   const [fechadas, setFechadas] = useState<Set<number>>(new Set());
+  const [escolhendoStatus, setEscolhendoStatus] = useState(false);
 
   const ordemDosGrupos: (number | null)[] = [null, ...categorias.map((c) => c.id)];
   const grupos = ordemDosGrupos.map((g) => ({
@@ -163,7 +167,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                         title={`${p.name} — clique para opções`}
                         onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY })}
                       >
-                        <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto} />
+                        <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto}
+                      status={pessoas.get(p.identity)?.status} />
                         <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                         <span className="pico">
                           {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
@@ -223,13 +228,39 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
       )}
 
       <div className="user-panel">
-        <Avatar nome={eu.nome} foto={eu.foto} enquadramento={eu.enquadramento?.foto} tamanho="big" />
+        {/* O seu status fica junto de você, e é onde a mão procura: clicar no seu nome
+            abre a escolha. Antes não havia lugar nenhum para isso. */}
+        <button className="eu-status" onClick={() => setEscolhendoStatus((v) => !v)} title="Mudar seu status">
+          <Avatar nome={eu.nome} foto={eu.foto} enquadramento={eu.enquadramento?.foto}
+            tamanho="big" status={statusEscolhido} />
+        </button>
         <div className="uname">
-          <div className="strong" title={`${eu.cargoNome} · entra como ${eu.apelido}`}>
+          <button className="strong nome-clicavel" title="Mudar seu status"
+            onClick={() => setEscolhendoStatus((v) => !v)}>
             <Nome membro={eu} />
-          </div>
-          <button className="link" onClick={onLogout}>sair</button>
+          </button>
+          <span className="muted small">{COMO_SE_LE[statusEscolhido]}</span>
         </div>
+        {escolhendoStatus && (
+          <div className="escolher-status" onMouseLeave={() => setEscolhendoStatus(false)}>
+            {(['online', 'ausente', 'ocupado'] as Status[]).map((s) => (
+              <button key={s} className={s === statusEscolhido ? 'atual' : ''}
+                onClick={() => { onStatus(s); setEscolhendoStatus(false); }}>
+                <span className={`presenca ${s}`} />
+                <span className="quem">
+                  <span className="strong">{COMO_SE_LE[s]}</span>
+                  <span className="muted small">{EXPLICACAO[s]}</span>
+                </span>
+              </button>
+            ))}
+            <div className="menu-risco" />
+            {/* "Sair" vivia na mesma linha do nome e disputava espaço com os botões; aqui
+                ele fica onde já se fala de você, e a linha volta a caber. */}
+            <button onClick={onLogout}>
+              <span className="quem"><span className="strong">Sair da conta</span></span>
+            </button>
+          </div>
+        )}
         <div className="user-actions">
           <button className={!rm.micOn && connected ? 'off' : ''} onClick={rm.toggleMic} disabled={!connected || rm.deafened} title="Mutar microfone">
             <Icon name={rm.micOn || !connected ? 'mic' : 'micOff'} />
@@ -237,7 +268,6 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
           <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
             <Icon name={rm.deafened ? 'headOff' : 'head'} />
           </button>
-          <button onClick={onPainel} title="Pessoas e servidor"><Icon name="pessoas" /></button>
           {/* Só de quem cuida da Saga. Fica aqui, junto de você, e não nas configurações
               do servidor: o que se decide lá vale em todos eles. */}
           {donoDaSaga && (

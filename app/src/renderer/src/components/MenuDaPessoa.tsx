@@ -12,6 +12,8 @@ export type PessoaNaCall = {
   cargo?: Cargo | null;
   foto?: string | null;
   banner?: string | null;
+  /** 'online' | 'ausente' | 'ocupado' | 'offline'. */
+  status?: string;
   /** Como a pessoa enquadrou a própria foto e o próprio banner. */
   enquadramento?: Enquadramentos;
   /** Quando entrou neste servidor. */

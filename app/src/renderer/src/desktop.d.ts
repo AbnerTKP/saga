@@ -36,6 +36,8 @@ declare global {
       updateAtual: () => Promise<UpdateState | null>;
       installUpdate: () => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+  /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
+  ociosidade: () => Promise<number>;
     };
   }
 }

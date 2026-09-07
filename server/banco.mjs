@@ -164,6 +164,12 @@ export const MIGRACOES = [
   // servidor tem: aquele manda no servidor dele; este manda no app. Fica na conta porque
   // a conta é o que existe acima dos servidores.
   `ALTER TABLE usuarios ADD COLUMN dono INTEGER NOT NULL DEFAULT 0`,
+
+  // Presença. `status` é o que a pessoa escolheu ou o que o app deduziu (ausente);
+  // `visto_em` é o último sinal de vida, e é ele que separa "ausente" de "offline" —
+  // status guardado sem sinal recente é lembrança, não presença.
+  `ALTER TABLE usuarios ADD COLUMN status TEXT NOT NULL DEFAULT 'online'`,
+  `ALTER TABLE usuarios ADD COLUMN visto_em INTEGER`,
 ];
 
 export function abrirBanco(caminho) {

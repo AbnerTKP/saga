@@ -5,7 +5,7 @@ import { estilo, type Enquadramento } from '../enquadramento';
 export type TamanhoDoAvatar = 'normal' | 'big' | 'huge';
 
 /** Foto da pessoa, ou a inicial do nome enquanto não houver foto. */
-export function Avatar({ nome, foto, enquadramento, tamanho = 'normal', extra, titulo, onClick }: {
+export function Avatar({ nome, foto, enquadramento, tamanho = 'normal', extra, titulo, status, onClick }: {
   nome: string;
   foto?: string | null;
   /** Como a pessoa posicionou a própria foto. Sem isto ela aparece torta aqui e certa lá. */
@@ -13,6 +13,8 @@ export function Avatar({ nome, foto, enquadramento, tamanho = 'normal', extra, t
   tamanho?: TamanhoDoAvatar;
   extra?: string;
   titulo?: string;
+  /** Bolinha de presença no canto. Sem isto, não desenha nenhuma. */
+  status?: string;
   onClick?: () => void;
 }) {
   const url = urlDoArquivo(foto);
@@ -25,12 +27,24 @@ export function Avatar({ nome, foto, enquadramento, tamanho = 'normal', extra, t
 
   const classe = ['avatar', tamanho !== 'normal' ? tamanho : '', temFoto ? 'com-foto' : '',
     onClick && temFoto ? 'clicavel' : '', extra ?? ''].filter(Boolean).join(' ');
+  const corpo = temFoto
+    ? <img src={url} alt="" draggable={false} style={estilo(enquadramento)} onError={() => setQuebrada(url)} />
+    : nome.slice(0, 1).toUpperCase();
+
+  // Sem status, nada muda: a bolinha só existe onde faz sentido mostrá-la.
+  if (!status) {
+    return (
+      <span className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
+        {corpo}
+      </span>
+    );
+  }
   return (
-    <span className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
-      {temFoto
-        ? <img src={url} alt="" draggable={false} style={estilo(enquadramento)}
-            onError={() => setQuebrada(url)} />
-        : nome.slice(0, 1).toUpperCase()}
+    <span className={`com-presenca ${tamanho !== 'normal' ? tamanho : ''}`}>
+      <span className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
+        {corpo}
+      </span>
+      <span className={`presenca ${status}`} title={titulo} />
     </span>
   );
 }

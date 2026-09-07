@@ -29,7 +29,7 @@ function comLinks(texto: string) {
   ));
 }
 
-export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala, meuId, grande }: {
+export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala, meuId, grande, onPessoa }: {
   mensagens: Mensagem[];
   erro: string | null;
   onEnviar: (texto: string) => Promise<void>;
@@ -38,6 +38,8 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
   sala: string | null;
   meuId: number;
   grande?: boolean;
+  /** Mesma abertura de perfil de todo lugar: a pessoa é a mesma, o gesto também. */
+  onPessoa?: (usuarioId: number, nome: string, em: { x: number; y: number }) => void;
 }) {
   const [texto, setTexto] = useState('');
   const [gifAberto, setGifAberto] = useState(false);
@@ -69,8 +71,11 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
         {mensagens.map((m) => (
           <div key={m.id} className={`msg ${m.autorId === meuId ? 'mine' : ''}`}>
             <div className="msg-topo">
-              <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
-              <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
+              <button className="quem-falou" title={`${m.nome} — clique para o perfil`}
+                onClick={(e) => m.autorId && onPessoa?.(m.autorId, m.nome, { x: e.clientX, y: e.clientY })}>
+                <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} tamanho="big" />
+                <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
+              </button>
               <span className="time">{hora(m.criadoEm)}</span>
             </div>
             {m.texto && <div className="text">{comLinks(m.texto)}</div>}

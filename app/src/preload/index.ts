@@ -17,6 +17,9 @@ const desktop = {
   updateAtual: (): Promise<unknown> => ipcRenderer.invoke('update:atual'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
+  /** Segundos que a MÁQUINA está parada. É a única forma de saber que a pessoa saiu de
+      perto: dentro da janela, ninguém vê teclado nem mouse fora do app. */
+  ociosidade: (): Promise<number> => ipcRenderer.invoke('presenca:ociosidade'),
 };
 
 contextBridge.exposeInMainWorld('desktop', desktop);

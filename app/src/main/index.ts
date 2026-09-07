@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor } from 'electron';
 import { join, dirname } from 'node:path';
 import { cpSync, existsSync } from 'node:fs';
 import { setupUpdates } from './update';
@@ -178,6 +178,17 @@ app.whenReady().then(async () => {
     },
     { useSystemPicker: SELETOR_DO_SISTEMA },
   );
+
+  /**
+   * Quanto tempo a MÁQUINA está parada, em segundos.
+   *
+   * "Ausente mesmo fora da máquina" só o processo principal sabe dizer: dentro da janela
+   * não se vê teclado nem mouse fora do app, então a página acharia que você está ali
+   * enquanto você foi almoçar. Com a tela bloqueada, o sistema já conta como ociosidade.
+   */
+  ipcMain.handle('presenca:ociosidade', () => {
+    try { return powerMonitor.getSystemIdleTime(); } catch { return 0; }
+  });
 
   ipcMain.handle('sources:list', async () => {
     // Sem permissão de Gravação de Tela, o macOS 26 com Electron 39 não devolve lista

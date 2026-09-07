@@ -404,6 +404,21 @@ não estava em nenhuma opção nossa: estava num modo de captura que a gente nã
 Antes de encerrar um caso por esgotamento, vale perguntar que caminho o próprio motor tem e
 a gente não conhece.
 
+## Presença
+
+- **Status guardado sem sinal recente é lembrança, não presença.** Quem fechou o app no
+  "ocupado" continuaria ocupado para sempre. Por isso `visto_em`: sem sinal há mais de
+  90 s (o app bate a cada 30), a pessoa está **offline**, seja qual for o status escrito.
+  A regra é pura e testada (`presenca.mjs`), e sair do app apaga o sinal na hora.
+- **Quem decide "ausente" é o app de quem está ausente**, não o servidor: só ele sabe se a
+  pessoa largou a máquina. E só o processo PRINCIPAL sabe disso — dentro da janela não se
+  vê teclado nem mouse fora do app, então a página acharia que você está ali enquanto você
+  foi almoçar. Vem de `powerMonitor.getSystemIdleTime()`, e com a tela bloqueada o sistema
+  já conta como ociosidade.
+- **"Ocupado" não vira ausente sozinho.** É recado para os outros, não medição: quem se
+  pôs ocupado continua ocupado mesmo saindo de perto. Já "online" vira ausente sozinho —
+  um padrão que mente sobre você estar ali não serve para ninguém.
+
 ## O visual
 
 - **A paleta sai da logo, não do Discord.** O acento era `#5865f2` — letra por letra o
@@ -416,6 +431,11 @@ a gente não conhece.
 - **Hierarquia por peso, não por tamanho.** Sala em 15px/500, categoria em 11px/800
   versalete, nome do servidor em 15,5px/700 com a foto ao lado — antes tudo tinha peso de
   legenda e nada se destacava.
+- **A pessoa se abre pelo mesmo gesto em todo lugar** — na lista de salas, na call, na
+  lista de pessoas e no chat. Era diferente em cada um, e no chat não abria nada.
+- **A bolinha de presença tem um anel da cor do fundo.** Sem ele encosta na foto e some
+  em cima de imagem clara. E "offline" não é uma cor: é a ausência dela, senão um cinza
+  cheio competiria com as três que significam algo.
 - **Existe uma escada de espaço** (`--e1`..`--e5`, 4 a 24). Antes era tudo 4 e 8, e por
   isso nada tinha grupo nem respiro: a lista de salas era uma coluna contínua.
 - **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).

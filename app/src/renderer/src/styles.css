@@ -120,16 +120,16 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
    só e não se sabe quem está com quem. */
 .people { list-style: none; margin: 2px 0 var(--e2) 19px; padding: 0 0 0 var(--e3);
   border-left: 2px solid var(--bg3); }
-.people li { display: flex; align-items: center; gap: var(--e2); padding: 3px 6px;
-  border-radius: 6px; color: var(--text2); font-size: 14px; }
+.people li { display: flex; align-items: center; gap: 9px; padding: 5px 6px;
+  border-radius: 6px; color: var(--text2); font-size: 14.5px; font-weight: 500; }
 .people li:hover { background: var(--bg3); color: var(--text); }
 .people li.speaking .avatar { box-shadow: 0 0 0 2px var(--ok); }
 .people li.speaking { color: var(--white); }
 .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .pico { display: flex; gap: 2px; color: var(--text3); }
 .pico svg { width: 14px; height: 14px; }
-.avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
-.avatar.big { width: 32px; height: 32px; font-size: 14px; }
+.avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
+.avatar.big { width: 34px; height: 34px; font-size: 14px; }
 .avatar.huge { width: 80px; height: 80px; font-size: 32px; transition: box-shadow .15s; }
 .avatar.huge.speaking { box-shadow: 0 0 0 4px var(--ok); }
 
@@ -143,11 +143,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .voice-actions button.on { background: var(--accent); color: #fff; }
 .voice-actions button.danger { background: var(--danger); color: #fff; }
 
-.user-panel { background: #232428; display: flex; align-items: center; gap: 8px; padding: 6px 8px; height: 52px; }
+.user-panel { position: relative; background: var(--bg0); border-top: 1px solid var(--line);
+  display: flex; align-items: center; gap: 9px; padding: 8px var(--e2); min-height: 58px; }
+
 .uname { flex: 1; min-width: 0; line-height: 1.2; }
 .uname .strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-actions { display: flex; }
-.user-actions button { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--text); }
+.user-actions button { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--text); }
 .user-actions button:hover:not(:disabled) { background: var(--bg3); }
 .user-actions button.off { color: var(--danger); }
 
@@ -665,9 +667,9 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 }
 
 .membro-linha {
-  width: 100%; display: flex; align-items: center; gap: 9px;
-  padding: 6px 8px; border-radius: 6px; text-align: left; color: var(--text2);
-  font-size: 14.5px; font-weight: 500;
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 8px; text-align: left; color: var(--text2);
+  font-size: 15px; font-weight: 500;
 }
 .membro-linha:hover { background: var(--bg3); color: var(--text); }
 /* Quem não está na voz aparece apagado, como no Discord: dá para ver quem está sem ler. */
@@ -812,3 +814,36 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .conta-da-saga button { display: flex; align-items: center; gap: 5px; padding: 7px 12px;
   border-radius: 8px; background: var(--bg3); color: var(--text); font-size: 13px; font-weight: 600; }
 .conta-da-saga button:hover:not(:disabled) { background: var(--bg4); color: var(--white); }
+
+/* ---- presença ---- */
+/* A bolinha vive no canto do avatar, com um anel da cor do fundo em volta: sem o anel
+   ela encosta na foto e some em cima de imagem clara. */
+.com-presenca { position: relative; display: inline-flex; flex: none; }
+.presenca { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px;
+  border-radius: 50%; border: 2.5px solid var(--bg1); box-sizing: content-box; }
+.com-presenca.big .presenca { width: 11px; height: 11px; }
+.presenca.online  { background: var(--ok); }
+.presenca.ausente { background: var(--warn); }
+.presenca.ocupado { background: var(--danger); }
+/* Offline não é uma cor: é a ausência dela. Um cinza cheio competiria com as outras. */
+.presenca.offline { background: var(--bg4); border-color: var(--bg1); }
+
+.eu-status { padding: 0; border-radius: 50%; }
+.nome-clicavel { display: block; text-align: left; padding: 0; color: inherit; }
+.nome-clicavel:hover { text-decoration: underline; }
+
+.escolher-status {
+  position: absolute; left: 8px; right: 8px; bottom: 100%; margin-bottom: 6px; z-index: 30;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 5px;
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,.7); display: grid; gap: 2px;
+}
+.escolher-status button { display: flex; align-items: flex-start; gap: 9px; padding: 8px 10px;
+  border-radius: 8px; text-align: left; color: var(--text); }
+.escolher-status button:hover { background: var(--bg3); }
+.escolher-status button.atual { background: var(--accent-tenue); }
+.escolher-status .presenca { position: static; margin-top: 4px; border-color: transparent; }
+.escolher-status .quem { display: grid; gap: 1px; }
+
+/* No chat, a pessoa se abre pelo mesmo gesto de todo lugar. */
+.quem-falou { display: flex; align-items: center; gap: 9px; padding: 0; color: inherit; }
+.quem-falou:hover .from { text-decoration: underline; }

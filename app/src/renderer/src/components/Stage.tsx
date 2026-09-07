@@ -205,6 +205,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
+            onPessoa={(id, nome, em) => onPessoa(`u${id}`, nome, em)}
             grande
           />
         </div>

@@ -15,6 +15,7 @@ import * as enquadramento from './enquadramento.mjs';
 import * as salasM from './salas.mjs';
 import * as categoriasM from './categorias.mjs';
 import * as plataforma from './plataforma.mjs';
+import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
@@ -131,6 +132,8 @@ const verMembro = (m) => m && ({
   turbo: !!m.turbo,
   // Dono da SAGA. É outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor.
   donoDaSaga: !!m.dono,
+  // O que vale AGORA: status guardado sem sinal recente é lembrança, não presença.
+  status: presenca.statusDeVerdade(m.status, m.visto_em),
   idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
@@ -323,7 +326,13 @@ const ROTAS = {
     return { ...sessao, impedimento: barrado };
   },
 
-  'POST /sair': async (req) => { sair(db, req.headers['x-sessao']); return { ok: true }; },
+  'POST /sair': async (req) => {
+    // Apaga o sinal de vida junto: sem isto, quem sai fica "online" até o silêncio vencer.
+    const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
+    if (usuario) presenca.saiu(db, usuario.id);
+    sair(db, req.headers['x-sessao']);
+    return { ok: true };
+  },
 
   'GET /eu': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
@@ -428,6 +437,12 @@ const ROTAS = {
   },
 
   // --- o que é da Saga, e não de um servidor ---------------------------------
+  'POST /eu/presenca': async (req) => {
+    const eu = exigirConta(req);
+    const { status } = await lerCorpo(req);
+    return { status: presenca.bater(db, eu.id, status) };
+  },
+
   'GET /saga/contas': async (req) => {
     const eu = exigirConta(req);
     return { contas: plataforma.listarContas(db, eu.id) };

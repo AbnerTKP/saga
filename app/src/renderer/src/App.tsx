@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import logo from './marca.png';
 import {
-  buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar,
+  buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar, baterPresenca,
   pode, criarSala, reordenarSalas, criarCategoria, renomearCategoria, apagarCategoria,
   guardarServidorAtual, lerServidorAtual, meusServidores,
   type Acao,
@@ -19,6 +19,7 @@ import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
 import { PedirNome } from './components/PedirNome';
 import { PainelDaSaga } from './components/PainelDaSaga';
+import { statusParaMandar, type Status } from './presenca';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
@@ -36,6 +37,7 @@ import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
 const ULTIMO_APELIDO = 'cantinho.apelido';
+const STATUS_ESCOLHIDO = 'cantinho.status';
 
 export function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
@@ -45,6 +47,10 @@ export function App() {
   const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
   const [pedido, setPedido] = useState<AcaoDeSala | null>(null);
   const [painelDaSaga, setPainelDaSaga] = useState(false);
+  // O que a pessoa escolheu. O que vai para o servidor pode ser outro: ver statusParaMandar.
+  const [statusEscolhido, setStatusEscolhido] = useState<Status>(() => {
+    try { return (localStorage.getItem(STATUS_ESCOLHIDO) as Status) ?? 'online'; } catch { return 'online'; }
+  });
   const [pollError, setPollError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
@@ -139,6 +145,34 @@ export function App() {
     rm.setError(null);
   }, [rm.error, rm.tipoDoAviso]);
 
+  /**
+   * Sinal de vida, a cada 30 s.
+   *
+   * O status que vai não é só o escolhido: quem está "online" e largou a máquina vira
+   * ausente sozinho — quem sabe disso é o processo principal, porque dentro da janela não
+   * se vê teclado nem mouse fora do app. A regra é `statusParaMandar`, testada.
+   */
+  useEffect(() => {
+    if (!sessao?.eu) return;
+    let vivo = true;
+    const bater = async () => {
+      try {
+        const ocioso = await window.desktop.ociosidade();
+        if (!vivo) return;
+        await baterPresenca(statusParaMandar(statusEscolhido, ocioso));
+      } catch { /* rede piscou; o próximo batimento resolve */ }
+    };
+    bater();
+    const id = setInterval(bater, 30_000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [sessao?.eu?.id, statusEscolhido]);
+
+  const escolherStatus = useCallback((s: Status) => {
+    setStatusEscolhido(s);
+    try { localStorage.setItem(STATUS_ESCOLHIDO, s); } catch { /* sem storage */ }
+    baterPresenca(s).catch(() => undefined);
+  }, []);
+
   // A busca de salas vive dentro de um intervalo. Lendo o marcador por referência, marcar
   // uma sala como lida não derruba e recria esse intervalo a cada mensagem.
   const lidasRef = useRef(lidas);
@@ -208,6 +242,7 @@ export function App() {
         identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo,
         foto: p.foto ?? null, banner: p.banner ?? null, enquadramento: p.enquadramento,
         entrouEm: p.entrouEm ?? null, turbo: p.turbo, idExibido: p.idExibido ?? null,
+        status: p.status,
       });
     }
   }
@@ -371,6 +406,8 @@ export function App() {
         onPessoa={abrirMenu}
         onPainel={() => setPainel(true)}
         donoDaSaga={!!eu.donoDaSaga}
+        statusEscolhido={statusEscolhido}
+        onStatus={escolherStatus}
         onPainelDaSaga={() => setPainelDaSaga(true)}
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
@@ -436,7 +473,7 @@ export function App() {
         onPessoa={(m, em) => setMenu({
           pessoa: {
             identity: `u${m.id}`, nome: m.nome, usuarioId: m.id, cargo: m.cargo,
-            foto: m.foto, banner: m.banner, turbo: m.turbo, idExibido: m.idExibido,
+            foto: m.foto, banner: m.banner, turbo: m.turbo, idExibido: m.idExibido, status: m.status,
           },
           em,
         })}

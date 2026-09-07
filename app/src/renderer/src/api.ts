@@ -52,6 +52,8 @@ export type Membro = {
   turbo: boolean;
   /** Dono da SAGA — outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor. */
   donoDaSaga?: boolean;
+  /** O que vale agora: 'online' | 'ausente' | 'ocupado' | 'offline'. */
+  status?: string;
   /** Identificador curto que aparece antes do nome. */
   idExibido: string | null;
   banido: boolean;
@@ -68,6 +70,7 @@ export type RoomParticipant = {
   usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
   banner?: string | null; enquadramento?: Enquadramentos; entrouEm?: number | null;
   turbo?: boolean; idExibido?: string | null;
+  status?: string;
 };
 export type TipoDeSala = 'voz' | 'texto';
 export type RoomInfo = {
@@ -253,6 +256,8 @@ export type Mensagem = {
   turbo: boolean;
   /** Dono da SAGA — outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor. */
   donoDaSaga?: boolean;
+  /** O que vale agora: 'online' | 'ausente' | 'ocupado' | 'offline'. */
+  status?: string;
   idExibido: string | null;
 };
 
@@ -411,3 +416,7 @@ export const contasDaSaga = async () =>
 
 export const definirBerserk = async (alvo: number, berserk: boolean) =>
   (await pedir<{ conta: ContaDaSaga }>('POST', '/saga/berserk', { alvo, berserk })).conta;
+
+/** Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. */
+export const baterPresenca = async (status?: string) =>
+  (await pedir<{ status: string }>('POST', '/eu/presenca', status ? { status } : {})).status;
