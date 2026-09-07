@@ -182,10 +182,6 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
         )}
       </header>
 
-      {/* O hub das lives. Ele é a resposta a "parei de ver e não achei como voltar": quem
-          está transmitindo continua listado aqui mesmo depois de você cortar, e voltar é
-          um clique no nome. O controle antigo era um link no topo, geral e sem estado
-          visível — cortava todas de uma vez e não dizia de quem eram. */}
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
           Quem está na voz e abre o chat não perde a live: ela vira o quadro flutuante. */}
@@ -221,11 +217,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   </span>
                 ))}
               </div>
-              <div className="muted">
-                {rm.lives.length > 0
-                  ? 'Você parou de ver as lives. Clique num nome ali em cima para voltar.'
-                  : 'Só voz por enquanto. Ligue a câmera ou compartilhe a tela.'}
-              </div>
+              <div className="muted">Só voz por enquanto. Ligue a câmera ou compartilhe a tela.</div>
             </div>
           )}
           {/* Dois campos: em cima a que você escolheu, embaixo todas, para escolher.

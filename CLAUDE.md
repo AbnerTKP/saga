@@ -383,6 +383,23 @@ não estava em nenhuma opção nossa: estava num modo de captura que a gente nã
 Antes de encerrar um caso por esgotamento, vale perguntar que caminho o próprio motor tem e
 a gente não conhece.
 
+## O visual
+
+- **A paleta sai da logo, não do Discord.** O acento era `#5865f2` — letra por letra o
+  *blurple* do Discord —, e os cinzas de fundo também eram os dele. Enquanto isso estivesse
+  ali, qualquer arrumação continuaria parecendo cópia. Hoje as cores são lidas do próprio
+  ícone: azul-céu `#b7e3fc` no alto do balão, azure `#4379cf` no meio, marinho `#17336d` na
+  ponta; os fundos acompanham, puxados para o frio.
+- **"Você está aqui" é cor da casa e um risco à esquerda**, não um bloco cinza. O bloco
+  cinza é o que o Discord faz, e não distinguia a sala aberta da sala em que a voz está.
+- **Hierarquia por peso, não por tamanho.** Sala em 15px/500, categoria em 11px/800
+  versalete, nome do servidor em 15,5px/700 com a foto ao lado — antes tudo tinha peso de
+  legenda e nada se destacava.
+- **Existe uma escada de espaço** (`--e1`..`--e5`, 4 a 24). Antes era tudo 4 e 8, e por
+  isso nada tinha grupo nem respiro: a lista de salas era uma coluna contínua.
+- **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).
+  Sem ele, com duas salas cheias não se sabe quem está com quem.
+
 ## Testes
 
 ```bash

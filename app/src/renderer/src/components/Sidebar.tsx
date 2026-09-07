@@ -68,8 +68,14 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
 
   return (
     <aside className="sidebar">
+      {/* O nome do servidor é onde você está: ganha a foto dele, peso de título e uma
+          seta dizendo que abre. Era um texto solto, do mesmo tamanho do resto. */}
       <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
-        <span title={servidor.nome}>{servidor.nome}</span>
+        <button className="cabeca-do-servidor" onClick={onPainel} title={`${servidor.nome} — abrir o painel`}>
+          <Avatar nome={servidor.nome} foto={servidor.foto} tamanho="big" />
+          <span className="nome-do-servidor">{servidor.nome}</span>
+          <span className="seta-do-servidor">▾</span>
+        </button>
         {pollError && <span className="dot-warn" title={pollError} />}
       </div>
 
