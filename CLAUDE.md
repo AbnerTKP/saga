@@ -34,8 +34,15 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
 | Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
 
-Publicar servidor: `scp *.mjs Dockerfile root@…:/root/server/` e
-`docker compose -f docker-compose.ip.yml up -d --build token`.
+**Publicar servidor: `cd server && ./publicar.sh`** — nunca o `scp` na mão. Cada trava
+lá dentro é um erro que já aconteceu, e o comentário ao lado diz qual: teste falhando,
+arquivo de configuração indo junto, VPS sem swap ou sem memória, chave do LiveKit que
+não bate com a do `.env`, contêiner em loop depois de subir. `./publicar.sh --so-conferir`
+confere e não manda nada. **"Ter cuidado" não sobrevive a um dia corrido; uma conferência
+que roda, sim.** A primeira versão da conferência do LiveKit subia o servidor de verdade
+para ver se ele reclamava — e travava justamente quando a configuração estava BOA, porque
+aí o processo não termina. Verificação que trava é pior que verificação nenhuma; hoje ela
+é estática.
 
 **Nunca mande `livekit.yaml` daqui.** O de produção tem a chave de verdade e mora só na
 VPS; o do repositório é modelo e chama-se `livekit.exemplo.yaml` justamente porque um
