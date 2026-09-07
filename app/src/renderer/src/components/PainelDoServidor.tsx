@@ -40,14 +40,30 @@ export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  /**
+   * Falhar em carregar NÃO é o mesmo que não ter nada.
+   *
+   * A busca caía — a conexão com o servidor some de vez em quando — e as listas ficavam
+   * como nasceram: vazias. O painel então dizia, com todas as letras, que o servidor não
+   * tinha cargo, nem sala, nem gente. O dono achou que os cargos dele tinham sumido, e a
+   * tela dava razão a ele. Hoje, sem ter carregado uma vez, o painel não desenha seção
+   * nenhuma: diz que não conseguiu e oferece tentar de novo.
+   */
+  const [carregou, setCarregou] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+
   const recarregar = useCallback(async () => {
+    setCarregando(true);
     try {
       const r = await verServidor();
       setMembros(r.membros);
       setSalas(r.salas);
       setCargos(r.cargos);
       setPermissoes(r.permissoes);
+      setCarregou(true);
+      setErro(null);
     } catch (e) { setErro((e as Error).message); }
+    finally { setCarregando(false); }
   }, []);
 
   useEffect(() => { recarregar(); }, [recarregar]);
@@ -84,6 +100,27 @@ export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
         <div className="painel-corpo">
         {erro && <div className="error">{erro}</div>}
         {aviso && <div className="aviso-ok">{aviso}</div>}
+
+        {!carregou && (
+          <section className="painel-bloco">
+            {carregando
+              ? <p className="muted small">Carregando as configurações…</p>
+              : (
+                <>
+                  <h3>Não consegui carregar</h3>
+                  <p className="muted small">
+                    As configurações deste servidor não chegaram — nada foi perdido, é a
+                    busca que não completou. Tente de novo.
+                  </p>
+                  <div className="linha-campo">
+                    <button onClick={recarregar}>Tentar de novo</button>
+                  </div>
+                </>
+              )}
+          </section>
+        )}
+
+        {carregou && (<>
 
         {/* "Seu perfil" morava aqui e foi para a engrenagem, com o resto que é seu. A
             conta é global: a sua foto vai com você para todos os servidores, então
@@ -385,6 +422,7 @@ export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
             ))}
           </ul>
         </section>
+        </>)}
         </div>
       </div>
     </div>

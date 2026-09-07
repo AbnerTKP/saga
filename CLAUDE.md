@@ -414,6 +414,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   pela prévia do editor e por todo lugar que desenha — é isso que faz o resultado ser o
   que a pessoa viu ao ajustar. O servidor tem a mesma régua, porque o que vem do app
   nunca é palavra final.
+- **Falhar em carregar não é o mesmo que não ter nada.** O painel do servidor pedia a
+  configuração ao abrir e, se a busca caísse, ficava com as listas como nasceram: vazias.
+  A tela então afirmava que o servidor não tinha cargo, nem sala, nem gente — e o dono
+  achou que os cargos dele tinham sumido. O banco estava intacto o tempo todo. Hoje, sem
+  ter carregado UMA vez, ele não desenha seção nenhuma: diz que não conseguiu e oferece
+  tentar de novo. Vale para qualquer tela que abra pedindo dados.
+- **A conexão com o servidor cai em blocos, e não foi explicado.** No registro do dono há
+  206 falhas `→ 0` num único minuto, e elas começam um dia antes de qualquer mudança —
+  não é corrida de keep-alive: medido, 25 pedidos a 4 s e a 4,9 s de intervalo (a borda
+  dos 5 s do Node) passaram todos. Fica em aberto; o que se fez foi a tela parar de
+  mentir quando isso acontece.
 - **Quem diz o tipo do aviso é o servidor**, não o app adivinhando pelo texto. "Isso é do
   Berserk" é convite, não falha, e pintá-lo de vermelho faz a pessoa achar que
   quebrou alguma coisa. Erro fica na tela até fecharem; o resto some sozinho.
