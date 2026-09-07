@@ -73,10 +73,18 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   tela — e app e servidor sobem separados, então renomear o que viaja entre eles faria a
   versão velha de um não entender a nova do outro. Um aviso de tipo desconhecido cairia em
   vermelho, que é justamente o que "isso é do Berserk" não pode parecer.
-- **A marca do Berserk é o Mjölnir, cheio e sem detalhe.** Ele vive a 13 px ao lado do
-  nome, e ali só sobrevive silhueta densa — o raio antigo funcionava por isso. Um valknut
-  e uma runa Thurisaz foram desenhados e olhados nos três tamanhos antes de escolher:
-  viraram triângulo e seta.
+- **A marca do Berserk é o S da Saga.** Foi o Mjölnir, e antes dele um raio; um valknut e
+  uma runa Thurisaz chegaram a ser desenhados e viraram triângulo e seta a 13 px. O que
+  faltava a todos era o mesmo: eram símbolo à parte, e a distinção é do app. O desenho
+  **não foi imitado de olho** — a logo foi lida em grade (silhueta clara dentro do disco
+  preto, 60x30) e os oito vértices vieram convertidos daí, então as duas mordidas e a
+  inclinação são as de lá. As três primeiras tentativas feitas de olho saíram "Z": a
+  diagonal do meio desce da esquerda para a direita, e é ela que decide se é S ou Z.
+  Continua cheio e sem detalhe, porque ele vive a 13 px ao lado do nome.
+- **O Berserk não aparece dentro da call.** A linha da call é a mais estreita do app e
+  carrega até quatro marcas; o nome de quem tem Berserk já vem na cor dele, então o ícone
+  repetia o que a cor diz e ocupava a vaga de câmera, microfone e live — que dizem coisas
+  do momento, não da conta. Nos outros lugares ele fica.
 - **Ninguém age sobre alguém de cargo igual ou superior** — é o que sustenta toda a
   moderação. A regra vive em `permissoes.mjs`, puro e testado à exaustão, e só vale para
   ações que recaem sobre alguém: criar sala não pergunta "acima de quem?".

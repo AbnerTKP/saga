@@ -79,7 +79,7 @@ export function PainelDaSaga({ meuId, onClose }: { meuId: number; onClose: () =>
                   title={c.berserk ? 'Tirar o Berserk' : 'Dar Berserk'}
                   onClick={() => alternar(c)}
                 >
-                  <Icon name="mjolnir" size={14} /> {c.berserk ? 'tirar' : 'dar'}
+                  <Icon name="berserk" size={14} /> {c.berserk ? 'tirar' : 'dar'}
                 </button>
               </div>
             ))}

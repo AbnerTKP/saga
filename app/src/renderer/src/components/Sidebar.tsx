@@ -171,7 +171,11 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                       status={pessoas.get(p.identity)?.status} />
                         <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                         <span className="pico">
-                          {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
+                          {/* O Berserk não entra aqui. A linha da call é a mais estreita do
+                              app e já carrega até quatro marcas; o nome dele já vem na cor
+                              do Berserk, então o ícone repetia o que a cor diz e roubava a
+                              vaga de câmera, microfone e live — que dizem coisas do momento.
+                              Nos outros lugares ele continua. */}
                           {p.screen && <span className="transmitindo" title="Transmitindo agora"><Icon name="screen" /></span>}
                           {p.camera && <Icon name="camera" />}
                           {p.muted && <Icon name="micOff" />}

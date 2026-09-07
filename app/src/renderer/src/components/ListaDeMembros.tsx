@@ -50,7 +50,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
                   <span className="membro-nome" style={g.cargo?.cor && !m.turbo ? { color: g.cargo.cor } : undefined}>
                     <Nome membro={m} />
                   </span>
-                  {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
+                  {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="berserk" size={13} /></span>}
                   {m.id === eu.id && <span className="muted small">você</span>}
                 </button>
               );

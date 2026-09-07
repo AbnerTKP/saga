@@ -126,8 +126,11 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .people li.speaking .avatar { box-shadow: 0 0 0 2px var(--ok); }
 .people li.speaking { color: var(--white); }
 .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.pico { display: flex; gap: 2px; color: var(--text3); }
-.pico svg { width: 14px; height: 14px; }
+.pico { display: flex; align-items: center; gap: 2px; color: var(--text3); }
+/* O que entra aqui envolto num <span> (por causa do título) precisa ser caixa também:
+   como <span> solto ele volta a se apoiar na linha de base e o ícone desce sozinho. */
+.pico > span { display: inline-flex; align-items: center; }
+.pico svg { width: 14px; height: 14px; display: block; }
 .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
 .avatar.big { width: 34px; height: 34px; font-size: 14px; }
 .avatar.huge { width: 80px; height: 80px; font-size: 32px; transition: box-shadow .15s; }
@@ -841,7 +844,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
    ela encosta na foto e some em cima de imagem clara. */
 .com-presenca { position: relative; display: inline-flex; flex: none; }
 .presenca { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px;
-  border-radius: 50%; border: 2.5px solid var(--bg1); box-sizing: content-box; }
+  border-radius: 50%; border: 2.5px solid var(--bg1); box-sizing: content-box; flex: none; }
 .com-presenca.big .presenca { width: 11px; height: 11px; }
 .presenca.online  { background: var(--ok); }
 .presenca.ausente { background: var(--warn); }
