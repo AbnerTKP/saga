@@ -9,7 +9,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const SENHA_DO_GRUPO = 'convite-secreto';
 let processo, base, pasta;
 
 before(async () => {
@@ -20,7 +19,6 @@ before(async () => {
     env: {
       ...process.env,
       PORT: String(porta),
-      APP_PASSWORD: SENHA_DO_GRUPO,
       ROOMS: 'Geral,Jogos',
       DONO: 'abner',
       BANCO: join(pasta, 'teste.db'),
@@ -72,13 +70,16 @@ async function sessaoDe(apelido, senha = 'segredo123') {
 }
 
 const cadastrar = (apelido, senha = 'segredo123') =>
-  chamar('POST', '/cadastrar', { corpo: { apelido, senha, senhaRepetida: senha, senhaDoGrupo: SENHA_DO_GRUPO } });
+  chamar('POST', '/cadastrar', { corpo: { apelido, senha, senhaRepetida: senha } });
 
-test('sem a senha do grupo ninguém se cadastra', async () => {
+test('cadastrar não pede mais senha de grupo', async () => {
+  // Ela saiu por pedido do dono. Este teste existe para que voltar a exigi-la seja uma
+  // decisão, e não um efeito de alguém mexer no cadastro sem saber que ela tinha saído.
   const r = await chamar('POST', '/cadastrar', {
-    corpo: { apelido: 'intruso', senha: 'segredo123', senhaRepetida: 'segredo123', senhaDoGrupo: 'chute' },
+    corpo: { apelido: 'semconvite', senha: 'segredo123', senhaRepetida: 'segredo123' },
   });
-  assert.equal(r.status, 401);
+  assert.equal(r.status, 200);
+  assert.ok(r.corpo.token);
 });
 
 test('cadastro devolve sessão, servidor e salas de uma vez', async () => {

@@ -25,7 +25,6 @@ import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
 
 const PORT = Number(process.env.PORT ?? 3001);
-const SENHA_DO_GRUPO = process.env.APP_PASSWORD ?? '';
 const SALAS_INICIAIS = (process.env.ROOMS ?? 'Geral').split(',').map((s) => s.trim()).filter(Boolean);
 const NOME_DO_SERVIDOR = process.env.SERVER_NAME ?? 'Saga';
 const DONO = process.env.DONO ?? '';            // apelido que vira dono; vazio = o primeiro a entrar
@@ -50,8 +49,8 @@ const SECRET = process.env.LIVEKIT_API_SECRET;
 const HOST = process.env.LIVEKIT_HOST ?? 'http://localhost:7880';
 const PUBLIC_URL = process.env.LIVEKIT_PUBLIC_URL ?? 'ws://localhost:7880';
 
-if (!KEY || !SECRET || !SENHA_DO_GRUPO) {
-  console.error('Defina LIVEKIT_API_KEY, LIVEKIT_API_SECRET e APP_PASSWORD');
+if (!KEY || !SECRET) {
+  console.error('Defina LIVEKIT_API_KEY e LIVEKIT_API_SECRET');
   process.exit(1);
 }
 
@@ -299,8 +298,10 @@ async function trocarImagem(req, de, papel) {
 
 const ROTAS = {
   'POST /cadastrar': async (req) => {
+    // A senha do grupo saiu por pedido do dono. Ela era o convite: sem ela, quem souber
+    // o endereço do servidor cria conta. O que continua barrando é o convite por servidor
+    // (`/servidores/entrar`) — a conta nova cai no servidor de casa e mais nada.
     const c = await lerCorpo(req);
-    if (c.senhaDoGrupo !== SENHA_DO_GRUPO) throw new ErroDeConta('Senha do grupo incorreta.', 401);
     const usuario = criarConta(db, c);
     const { token } = entrar(db, { apelido: usuario.apelido, senha: c.senha });
     return sessaoCompleta(usuario, token);

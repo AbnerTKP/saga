@@ -12,7 +12,6 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   const [apelido, setApelido] = useState(apelidoInicial);
   const [senha, setSenha] = useState('');
   const [senhaRepetida, setSenhaRepetida] = useState('');
-  const [senhaDoGrupo, setSenhaDoGrupo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -24,7 +23,7 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
     setOcupado(true);
     try {
       const sessao = criando
-        ? await cadastrar({ apelido, senha, senhaRepetida, senhaDoGrupo })
+        ? await cadastrar({ apelido, senha, senhaRepetida })
         : await entrar({ apelido, senha });
       guardarToken(sessao.token);
       onPronto(sessao);
@@ -39,7 +38,6 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
     setModo(novo);
     setErro(null);
     setSenhaRepetida('');
-    setSenhaDoGrupo('');
   };
 
   return (
@@ -94,16 +92,6 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
                 autoComplete="new-password"
                 required
               />
-            </label>
-            <label>
-              Senha do grupo
-              <input
-                type="password"
-                value={senhaDoGrupo}
-                onChange={(e) => setSenhaDoGrupo(e.target.value)}
-                required
-              />
-              <small className="muted">É o convite, pedida só desta vez. Peça a quem te chamou.</small>
             </label>
           </>
         )}

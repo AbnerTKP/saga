@@ -32,6 +32,7 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Repositório | `AbnerTKP/saga`, link fixo `/releases/latest` |
 | Dono | apelido `TKP` |
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
+| Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
 
 Publicar servidor: `scp *.mjs Dockerfile root@…:/root/server/` e
 `docker compose -f docker-compose.ip.yml up -d --build token`. Depois, confira a linha
@@ -136,6 +137,12 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Pedir por um servidor de que não se faz parte cai no seu próprio**, sem erro e sem
   entrada: saber o número de um servidor alheio não abre porta.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.
+- **Cadastrar não pede convite nenhum**, por decisão do dono. Havia a senha do grupo, e ela
+  era a única porta: quem soubesse o endereço e não soubesse a senha não criava conta. Hoje
+  quem souber o endereço cria. O que ainda barra é o convite POR SERVIDOR: a conta nova cai
+  no servidor de casa e só entra noutro com o código dele. `api.test.mjs` trava isso, para
+  que voltar a exigir convite seja uma decisão e não o efeito de alguém mexer no cadastro
+  sem saber que ele tinha saído.
 - **Não há freio de tentativas de senha, e a saída não é pôr de volta o que havia.** Havia
   um: 20 tentativas por IP a cada 10 minutos. Ele contava as tentativas CERTAS junto com
   as erradas e agrupava por IP — então o grupo todo atrás do mesmo roteador dividia um

@@ -175,7 +175,7 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<
   return dados as T;
 }
 
-export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string; senhaDoGrupo: string }) =>
+export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string }) =>
   pedir<Sessao>('POST', '/cadastrar', c);
 
 export const entrar = (c: { apelido: string; senha: string }) =>

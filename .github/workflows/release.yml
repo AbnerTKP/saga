@@ -64,7 +64,7 @@ jobs:
             '' \
             '**Mac:** baixe o `.dmg` e arraste para Aplicativos. Na primeira vez, abra pelo menu **Ajustes do Sistema › Privacidade e Segurança › Abrir Mesmo Assim**.' \
             '' \
-            'Ao abrir, o endereço do servidor já vem preenchido: basta a senha do grupo e o seu nome.' \
+            'Ao abrir, o endereço do servidor já vem preenchido: crie a conta com um apelido e uma senha suas.' \
             > notas.md
 
           gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notas.md
