@@ -769,6 +769,9 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 .perfil-selo.berserk { background: rgba(192,132,252,.16); color: #d8b4fe; }
 .perfil-selo.ok { background: rgba(35,165,89,.16); color: #57d98a; }
+.perfil-volume { display: grid; gap: 6px; margin-top: 4px; padding: 12px 14px;
+  background: var(--bg1); border-radius: 10px; }
+.perfil-volume input[type=range] { width: 100%; }
 
 .perfil-dados { margin: 4px 0 0; padding: 12px 14px; display: grid; gap: 10px;
   background: var(--bg0); border-radius: 8px; }

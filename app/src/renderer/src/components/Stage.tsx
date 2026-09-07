@@ -224,7 +224,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                     key={p.identity}
                     className="clicavel"
                     onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
-                    onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                   >
                     <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto}
                       enquadramento={pessoas.get(p.identity)?.enquadramento?.foto}
@@ -269,7 +269,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${rm.falando.has(p.identity) ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
-                    onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
                       <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>

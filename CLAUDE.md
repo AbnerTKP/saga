@@ -420,11 +420,32 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   achou que os cargos dele tinham sumido. O banco estava intacto o tempo todo. Hoje, sem
   ter carregado UMA vez, ele não desenha seção nenhuma: diz que não conseguiu e oferece
   tentar de novo. Vale para qualquer tela que abra pedindo dados.
-- **A conexão com o servidor cai em blocos, e não foi explicado.** No registro do dono há
-  206 falhas `→ 0` num único minuto, e elas começam um dia antes de qualquer mudança —
-  não é corrida de keep-alive: medido, 25 pedidos a 4 s e a 4,9 s de intervalo (a borda
-  dos 5 s do Node) passaram todos. Fica em aberto; o que se fez foi a tela parar de
-  mentir quando isso acontece.
+- **A busca de salas pedia a lista do LiveKit UMA VEZ POR SALA.** `participantesDaSala`
+  chamava `listRooms()` — a lista inteira — para cada sala, dentro de um `for` com
+  `await`. Com 6 salas de voz, seis idas ao LiveKit em fila por pesquisa, e cada pessoa
+  pesquisa de 4 em 4 segundos. Numa VPS de **um núcleo**, isso comia um terço dele.
+  Medido, antes e depois de pedir a lista uma vez só e lembrá-la por 1 s:
+
+  | | antes | depois |
+  |---|---|---|
+  | chamadas ao LiveKit em 6 s | 74 | **12** |
+  | `/health` (rota que não faz nada) mediana | 77 ms | **57 ms** |
+  | `/health` p90 | 433 ms | **86 ms** |
+  | `/health` máx | 857 ms | **149 ms** |
+
+  Comparar `/health` com o ICMP é o que separa rede de aplicação: 29 ms de ICMP contra
+  77 ms numa rota vazia quer dizer que o problema não é a rede — é o event loop. A VPS
+  fica em Campinas e o ping é de 29 ms com 0% de perda; a rede nunca foi o problema.
+- **Um segundo de memória vale mais que qualquer micro-otimização aqui.** Oito pessoas
+  pesquisando de 4 em 4 segundos pedem a MESMA lista. `lembrado()` guarda por 1 s e ainda
+  junta as buscas simultâneas numa só (`indo`), senão duas chegando juntas disparariam
+  duas. Quando somos NÓS que mudamos a sala — expulsar, tirar da call —, a memória é
+  esquecida na hora: expulsar que parece não funcionar é pior que expulsar devagar.
+- **O `keepAliveTimeout` do Node é 5 s e o app pesquisa a cada 4.** Um segundo de margem,
+  e o registro do dono tem centenas de `→ 0` — a conexão morrendo na mão do cliente.
+  Passou para 60 s (com `headersTimeout` acima disso, senão ele é quem fecha). Medir não
+  reproduziu a corrida com o agente do Node, que repete pedido idempotente sozinho; o
+  `fetch` do renderer não repete.
 - **Quem diz o tipo do aviso é o servidor**, não o app adivinhando pelo texto. "Isso é do
   Berserk" é convite, não falha, e pintá-lo de vermelho faz a pessoa achar que
   quebrou alguma coisa. Erro fica na tela até fecharem; o resto some sozinho.

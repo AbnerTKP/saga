@@ -74,7 +74,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
             <div className="msg-topo">
               <button className="quem-falou" title={`${m.nome} — clique para o perfil`}
                 onClick={(e) => m.autorId && onPessoa?.(m.autorId, m.nome, { x: e.clientX, y: e.clientY }, 'perfil')}
-                onContextMenu={(e) => { if (!m.autorId) return; e.preventDefault(); onPessoa?.(m.autorId, m.nome, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
+                onContextMenu={(e) => { if (!m.autorId) return; e.preventDefault(); e.stopPropagation(); onPessoa?.(m.autorId, m.nome, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
                 <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} tamanho="big" />
                 <span className="from"><Nome nome={m.nome} id={m.idExibido} turbo={m.turbo} /></span>
               </button>

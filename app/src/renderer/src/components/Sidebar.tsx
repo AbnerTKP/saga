@@ -166,8 +166,10 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                         key={p.identity}
                         className={`clicavel ${p.speaking ? 'speaking' : ''}`}
                         title={`${p.name} — clique para o perfil, botão direito para as opções`}
-                        onClick={(e) => onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil')}
-                        onContextMenu={(e) => { e.preventDefault(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}
+                        onClick={(e) => { e.stopPropagation(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil'); }}
+                        /* Sem parar aqui, o clique sobe até a lista de salas e abre O MENU DELA junto:
+                           dois menus na tela, um por cima do outro. */
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                       >
                         <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto}
                       status={pessoas.get(p.identity)?.status} />

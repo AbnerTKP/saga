@@ -517,6 +517,8 @@ export function App() {
           pessoa={perfilAberto}
           naVoz={perfilAberto.usuarioId !== undefined && naVoz.has(perfilAberto.usuarioId)}
           souEu={perfilAberto.usuarioId === eu.id}
+          volume={rm.volumeDe(perfilAberto.identity)}
+          onVolume={(v) => rm.definirVolume(perfilAberto.identity, v)}
           onClose={() => setPerfilAberto(null)}
         />
       )}

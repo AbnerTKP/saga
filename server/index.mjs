@@ -204,12 +204,51 @@ function exigirSessao(req) {
   return exigirMembro(req).membro;
 }
 
-async function participantesDaSala(sid, sala) {
+/**
+ * A lista de salas do LiveKit, lembrada por um segundo.
+ *
+ * Toda pesquisa do app pedia esta lista UMA VEZ POR SALA, dentro de um `for` com `await`:
+ * com 6 salas de voz, seis idas ao LiveKit, uma depois da outra, a cada pesquisa. E cada
+ * pessoa pesquisa de 4 em 4 segundos. Medido na produção, com isso: `/health` — que não
+ * faz nada — levava 77 ms de mediana e picos de 857 ms, contra 29 ms de ICMP; o servidor
+ * de token comia 34% do ÚNICO núcleo da VPS. A conta bate: 8 pessoas × 158 ms ÷ 4 s.
+ *
+ * Um segundo de memória resolve as duas coisas de uma vez: seis buscas viram uma por
+ * pedido, e as de várias pessoas ao mesmo tempo viram uma só. `indo` existe para que
+ * duas chegando juntas não disparem duas buscas — a segunda espera a primeira.
+ */
+const LEMBRAR = 1000;
+const memoria = { salas: { em: 0, valor: [], indo: null }, gente: new Map() };
+
+function lembrado(caixa, buscar) {
+  const agora = Date.now();
+  if (agora - caixa.em < LEMBRAR) return Promise.resolve(caixa.valor);
+  if (caixa.indo) return caixa.indo;
+  caixa.indo = buscar()
+    .catch(() => [])
+    .then((v) => { caixa.valor = v; caixa.em = Date.now(); caixa.indo = null; return v; });
+  return caixa.indo;
+}
+
+const salasVivas = () => lembrado(memoria.salas, () => svc.listRooms());
+
+function genteDaSala(nome) {
+  let caixa = memoria.gente.get(nome);
+  if (!caixa) { caixa = { em: 0, valor: [], indo: null }; memoria.gente.set(nome, caixa); }
+  return lembrado(caixa, () => svc.listParticipants(nome));
+}
+
+/** Esquece o que foi lembrado: usado quando NÓS mudamos a sala e não dá para esperar. */
+function esquecerSalas() {
+  memoria.salas.em = 0;
+  for (const c of memoria.gente.values()) c.em = 0;
+}
+
+async function participantesDaSala(sid, sala, vivas) {
   const nome = salaNoLiveKit(sala);
-  const vivas = await svc.listRooms().catch(() => []);
-  const r = vivas.find((x) => x.name === nome);
+  const r = (vivas ?? await salasVivas()).find((x) => x.name === nome);
   if (!r || r.numParticipants === 0) return [];
-  const ps = await svc.listParticipants(nome).catch(() => []);
+  const ps = await genteDaSala(nome);
   return ps.map((p) => {
     const base = verParticipante(p);
     const membro = membros.buscarMembro(db, sid, idDaIdentidade(p.identity));
@@ -236,6 +275,9 @@ async function participantesDaSala(sid, sala) {
 async function tirarDaSala(sid, usuarioId) {
   const onde = await ondeEsta(sid, usuarioId);
   if (onde) await svc.removeParticipant(onde.sala, identidadeDe(usuarioId)).catch(() => {});
+  // Sem isto, a pesquisa seguinte ainda mostraria a pessoa na sala por até um segundo —
+  // e expulsar que não parece funcionar é pior que expulsar devagar.
+  esquecerSalas();
 }
 
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
@@ -366,19 +408,20 @@ const ROTAS = {
     // O app manda até onde já leu cada sala, e recebe de volta quanto falta. Assim o
     // aviso de mensagem nova sai na mesma busca que já acontece, sem uma segunda.
     const lidas = mensagens.lerMarcadores(new URL(req.url, 'http://x').searchParams.get('lidas'));
-    const salas = [];
-    for (const s of salasDoServidor(sid)) {
-      salas.push({
-        id: s.id,
-        name: s.nome,
-        tipo: s.tipo,
-        // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
-        participants: s.tipo === 'voz' ? await participantesDaSala(sid, s) : [],
-        naoLidas: s.tipo === 'texto'
-          ? mensagens.contarNaoLidas(db, s.id, lidas.get(s.id) ?? 0, eu.id)
-          : 0,
-      });
-    }
+    // A lista do LiveKit vem UMA vez e serve todas as salas; antes cada sala pedia a sua,
+    // em fila. E o que sobra — a gente de cada sala ocupada — vai em paralelo, porque uma
+    // não depende da outra.
+    const vivas = await salasVivas();
+    const salas = await Promise.all(salasDoServidor(sid).map(async (s) => ({
+      id: s.id,
+      name: s.nome,
+      tipo: s.tipo,
+      // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
+      participants: s.tipo === 'voz' ? await participantesDaSala(sid, s, vivas) : [],
+      naoLidas: s.tipo === 'texto'
+        ? mensagens.contarNaoLidas(db, s.id, lidas.get(s.id) ?? 0, eu.id)
+        : 0,
+    })));
     // As gavetas vão junto: a barra lateral desenha as duas coisas na mesma passada, e
     // uma segunda busca só para elas piscaria a lista a cada atualização.
     return { rooms: salas, categorias: categoriasM.listarCategorias(db, sid) };
@@ -709,6 +752,13 @@ const servidor = http.createServer(async (req, res) => {
 
 // Quem manda no app. Só semeia se ainda não houver dono: ver garantirDonoDaSaga.
 plataforma.garantirDonoDaSaga(db, DONO);
+
+// O app pesquisa de 4 em 4 segundos e o Node fecha a conexão ociosa aos 5 — um segundo
+// de margem, e o registro do dono tem centenas de `→ 0` (a conexão morrendo na mão do
+// cliente). Sessenta segundos tiram a corrida do caminho; o `headersTimeout` tem de ficar
+// acima disso, senão ele é quem fecha.
+servidor.keepAliveTimeout = 60_000;
+servidor.headersTimeout = 65_000;
 
 servidor.listen(PORT, () => {
   console.log(

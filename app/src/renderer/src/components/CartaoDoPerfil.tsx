@@ -21,11 +21,14 @@ const desde = (t: number | null | undefined) => {
  *
  * O enquadramento que ela escolheu vale aqui também — é a mesma imagem, vista de perto.
  */
-export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
+export function CartaoDoPerfil({ pessoa, naVoz, souEu, volume, onVolume, onClose }: {
   pessoa: PessoaNaCall;
   /** Está numa sala de voz agora. */
   naVoz?: boolean;
   souEu?: boolean;
+  /** Quão alto EU ouço esta pessoa. Não é moderação: não mexe no que os outros ouvem. */
+  volume: number;
+  onVolume: (v: number) => void;
   onClose: () => void;
 }) {
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -102,6 +105,21 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, onClose }: {
               )}
               <div><dt>Cargo</dt><dd>{pessoa.cargo?.nome ?? 'Sem cargo'}</dd></div>
             </dl>
+
+            {/* O volume mora aqui porque é sobre esta pessoa e vale só para MIM — não é
+                moderação, e não depende de cargo nenhum. Ele viveu só no menu do botão
+                direito, junto de banir e expulsar, e o pessoal deixou de achar: clicavam
+                na pessoa, caíam no perfil e não havia volume. */}
+            {!souEu && (
+              <label className="perfil-volume">
+                <span className="muted small">Volume · {Math.round(volume * 100)}%</span>
+                <input
+                  type="range" min={0} max={100} value={Math.round(volume * 100)}
+                  onChange={(e) => onVolume(Number(e.target.value) / 100)}
+                />
+                <small className="muted">Só para você. Ninguém mais é afetado.</small>
+              </label>
+            )}
           </div>
         </div>
       </div>
