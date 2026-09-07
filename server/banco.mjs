@@ -181,6 +181,10 @@ export const MIGRACOES = [
   `UPDATE servidores SET criado_por = (SELECT m.usuario_id FROM membros m JOIN cargos c ON c.id = m.cargo_id WHERE m.servidor_id = servidores.id AND c.dono = 1 LIMIT 1) WHERE criado_por IS NULL`,
   `UPDATE membros SET cargo_id = (SELECT c2.id FROM cargos c2 WHERE c2.servidor_id = membros.servidor_id AND c2.dono = 0 ORDER BY c2.nivel DESC, c2.id LIMIT 1), cargo = (SELECT c2.nivel FROM cargos c2 WHERE c2.servidor_id = membros.servidor_id AND c2.dono = 0 ORDER BY c2.nivel DESC, c2.id LIMIT 1) WHERE cargo_id IN (SELECT id FROM cargos WHERE dono = 1)`,
   `DELETE FROM cargos WHERE dono = 1`,
+
+  // Uma sala pode ter um PAPEL: hoje só 'notas', a das novidades de cada versão. Ela é
+  // do app e não do servidor — por isso não se renomeia, não se apaga e fica no topo.
+  `ALTER TABLE salas ADD COLUMN papel TEXT`,
 ];
 
 export function abrirBanco(caminho) {

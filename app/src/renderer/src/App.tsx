@@ -13,6 +13,7 @@ import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
 import { CartaoDoPerfil } from './components/CartaoDoPerfil';
+import { MOSTRAR_SERVIDORES } from './travas';
 import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
@@ -488,7 +489,9 @@ export function App() {
         }}
       />
 
-      <TrilhaDeServidores
+      {/* Guardada por escolha do dono — ver travas.ts. O que existe atrás dela continua
+          inteiro no banco e no código; some só o caminho de trocar de servidor. */}
+      {MOSTRAR_SERVIDORES && <TrilhaDeServidores
         servidores={sessao.servidores.length ? sessao.servidores : [servidor]}
         atual={servidor.id}
         onEscolher={trocarDeServidor}
@@ -496,7 +499,7 @@ export function App() {
         // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
         onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
         onConfigurar={() => setNovoServidor(true)}
-      />
+      />}
 
       {menu && (
         <MenuDaPessoa

@@ -45,9 +45,13 @@ jobs:
           # Os commits de versão ("v0.9.0") saem: eles não são mudança, são a etiqueta.
           ANTERIOR=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
           if [ -n "$ANTERIOR" ]; then
-            MUDANCAS=$(git log --no-merges --format='%s' "$ANTERIOR..$TAG" \
-              | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+: //' | sed 's/^/- /')
+            FAIXA="$ANTERIOR..$TAG"
+          else
+            # A primeira versão não tem anterior: vale a história inteira até ela, senão
+            # ela nasceria com "Ajustes internos." — que é o contrário de uma nota.
+            FAIXA="$TAG"
           fi
+          MUDANCAS=$(git log --no-merges --format='%s' "$FAIXA" | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+: //' | sed 's/^/- /')
           [ -n "$MUDANCAS" ] || MUDANCAS="- Ajustes internos."
 
           # As marcas são para a página de download: é por elas que ela acha o trecho e

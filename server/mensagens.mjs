@@ -37,8 +37,9 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
     imagem: m.imagem ?? null,
     criadoEm: m.criado_em,
     autorId: m.usuario_id,
-    // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não.
-    nome: m.nome ?? 'alguém',
+    // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não. Já na sala de
+    // notas ninguém escreveu de fato — foi a Saga —, e "alguém" ali seria mentira.
+    nome: m.nome ?? (sala.papel === 'notas' ? 'Saga' : 'alguém'),
     foto: m.foto ?? null,
     enquadramento: lerEnquadramento(m.enquadramento),
     turbo: !!m.turbo,

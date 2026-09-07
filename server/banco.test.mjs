@@ -43,6 +43,7 @@ const IMPRESSOES = [
   '82e31b667a97',  // 30 quem estava no cargo de dono é quem criou o servidor
   '97d33f11bb13',  // 31 e passa para o cargo mais alto que sobra
   '23b2a587c3d1',  // 32 o cargo de dono chumbado some
+  '9b6bdf868462',  // 33 coluna papel em salas (a sala de notas)
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

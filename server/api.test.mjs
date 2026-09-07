@@ -26,6 +26,7 @@ before(async () => {
       LIVEKIT_API_SECRET: 'secret-de-teste-bem-longo',
       LIVEKIT_HOST: 'http://127.0.0.1:1',      // não existe: as chamadas caem no catch
       LIVEKIT_PUBLIC_URL: 'ws://exemplo:7880',
+      SEM_NOTAS: '1',   // sem ir ao GitHub: o teste não depende da internet
     },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
@@ -91,8 +92,11 @@ test('cadastro devolve sessão, servidor e salas de uma vez', async () => {
   // poder vem de `criado_por`.
   assert.equal(r.corpo.eu.cargoNome, 'Moderador');
   assert.equal(r.corpo.eu.cargo.dono, true, 'o apelido de DONO devia mandar no servidor');
-  assert.deepEqual(r.corpo.salas.map((s) => s.nome), ['Geral', 'Jogos']);
-  assert.deepEqual(r.corpo.salas.map((s) => s.tipo), ['voz', 'voz'], 'as semeadas são de voz');
+  // A sala de notas vem primeiro e é do app, não do .env — por isso não está em ROOMS.
+  assert.deepEqual(r.corpo.salas.map((s) => s.nome), ['notas-da-versão', 'Geral', 'Jogos']);
+  assert.deepEqual(r.corpo.salas.filter((s) => !s.papel).map((s) => s.tipo), ['voz', 'voz'], 'as semeadas são de voz');
+  assert.equal(r.corpo.salas[0].papel, 'notas', 'a de notas é a primeira, e é de texto');
+  assert.equal(r.corpo.salas[0].tipo, 'texto');
   assert.equal(r.corpo.servidor.nome, 'Saga');
 });
 
@@ -392,7 +396,7 @@ test('/rooms responde mesmo com o LiveKit fora do ar', async () => {
   const dono = await sessaoDe('abner');
   const r = await chamar('GET', '/rooms', { sessao: dono.token });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.corpo.rooms.map((s) => s.name), ['Geral', 'Jogos']);
+  assert.deepEqual(r.corpo.rooms.map((s) => s.name), ['notas-da-versão', 'Geral', 'Jogos']);
   assert.deepEqual(r.corpo.rooms[0].participants, []);
 });
 

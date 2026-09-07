@@ -63,7 +63,9 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   derrubou o servidor duas vezes. **O `test` do app tinha o mesmo defeito** e por isso
   também virou glob: ele listava os treze arquivos à mão, então um teste novo simplesmente
   não rodava — e não rodar não dá erro nenhum. Ficaram cinco testes escritos, verdes na
-  minha mão e ausentes do `pnpm test` e do CI. Lista à mão de arquivo só falha em silêncio.
+  minha mão e ausentes do `pnpm test` e do CI. **O do servidor tinha o mesmo defeito**, e
+  caiu na mesma armadilha semanas depois, com `notas.test.mjs`. Lista à mão de arquivo só
+  falha em silêncio — os dois são glob agora.
 - **Cargo, banimento e nome exibido pertencem ao vínculo pessoa↔servidor**, não à pessoa.
   A conta é global. É o que permitirá vários servidores sem migrar dados.
 - **O Berserk é da conta, e não do vínculo** — é a exceção da linha acima, e a diferença
@@ -596,6 +598,27 @@ a gente não conhece.
 - **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).
   Sem ele, com duas salas cheias não se sabe quem está com quem.
 
+- **A sala de notas é do APP, não do servidor.** Ela é a primeira da lista, não se
+  renomeia, não se apaga e não sai do lugar — o dono do servidor manda em tudo lá dentro,
+  menos nisto, porque o conteúdo dela não vem de ninguém de lá. Marcada por
+  `salas.papel = 'notas'`, e não pelo nome: renomear à mão no banco não faz nascer uma
+  segunda. Reordenar simplesmente a ignora, sem erro — arrastar a lista não pode falhar
+  só porque ela estava no caminho.
+- **É o servidor que vai buscar as notas, não o CI que empurra.** Ele lê os Releases do
+  GitHub no arranque e de hora em hora, e publica o que faltar. Empurrar do CI pediria um
+  segredo e daria um jeito novo de a coisa parar em silêncio; puxar não precisa de nada e
+  se conserta sozinho na volta seguinte. O que já foi publicado se sabe pela ETIQUETA no
+  início do texto — sem coluna nova para o que uma busca resolve.
+- **A hora da mensagem é a do lançamento, não a da cópia.** As 53 versões antigas foram
+  copiadas de uma vez; com `Date.now()` apareceriam todas como sendo de hoje, e o chat
+  perderia justamente o que ele conta. E a data é sempre a de **São Paulo**: o contêiner
+  roda em UTC e o pessoal está no Brasil — uma versão publicada às 21h daqui cairia no
+  dia seguinte para quem lê.
+- **Vários servidores estão GUARDADOS, não removidos** (`travas.ts`). Some a barra de
+  servidores e o caminho de entrar noutro; os servidores, os cargos e as configurações
+  continuam no banco, e a voz que atravessa servidor continua funcionando por baixo. As
+  configurações do servidor seguem no nome dele, no alto da lista — era o outro caminho,
+  virou o único.
 - **As notas de versão saem dos assuntos dos commits**, entre a tag anterior e a nova.
   Escrever a mesma coisa duas vezes — uma no commit, outra na nota — é escrever a segunda
   com pressa, e a nota que ninguém escreve é a que fica vazia para sempre. Isso obriga o

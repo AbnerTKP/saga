@@ -22,15 +22,16 @@ const exigirGestaoDeSalas = (membro) => {
  */
 export const listarSalas = (db, servidorId) =>
   db.prepare(`
-    SELECT s.id, s.nome, s.tipo, s.ordem, s.categoria_id AS categoriaId
+    SELECT s.id, s.nome, s.tipo, s.ordem, s.papel, s.categoria_id AS categoriaId
       FROM salas s
       LEFT JOIN categorias c ON c.id = s.categoria_id
      WHERE s.servidor_id = ?
-     ORDER BY (s.categoria_id IS NOT NULL), c.ordem, c.id, s.ordem, s.id`)
+     ORDER BY CASE WHEN s.papel IS NULL THEN 1 ELSE 0 END,
+              (s.categoria_id IS NOT NULL), c.ordem, c.id, s.ordem, s.id`)
     .all(servidorId);
 
 export const buscarSala = (db, servidorId, id) =>
-  db.prepare('SELECT id, nome, tipo, ordem, categoria_id AS categoriaId FROM salas WHERE servidor_id = ? AND id = ?')
+  db.prepare('SELECT id, nome, tipo, ordem, papel, categoria_id AS categoriaId FROM salas WHERE servidor_id = ? AND id = ?')
     .get(servidorId, Number(id)) ?? null;
 
 function conferirNome(db, servidorId, nome, exceto = null) {
@@ -56,10 +57,20 @@ export function criarSala(db, servidorId, quem, { nome, tipo }) {
   return buscarSala(db, servidorId, Number(info.lastInsertRowid));
 }
 
+/**
+ * A sala de notas é do app, não do servidor: não se renomeia, não se apaga, não sai do
+ * topo. É o que "chumbada" quer dizer — o dono do servidor manda em tudo lá dentro,
+ * menos nisto, porque o conteúdo dela não vem de ninguém de lá.
+ */
+function exigirQueNaoSejaChumbada(sala, oQue) {
+  if (sala?.papel) throw new ErroDeConta(`A sala de notas não pode ser ${oQue}.`, 403);
+}
+
 export function renomearSala(db, servidorId, quem, id, nome) {
   exigirGestaoDeSalas(quem);
   const sala = buscarSala(db, servidorId, id);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
+  exigirQueNaoSejaChumbada(sala, 'renomeada');
   const limpo = conferirNome(db, servidorId, nome, sala.id);
   db.prepare('UPDATE salas SET nome = ? WHERE id = ?').run(limpo, sala.id);
   return buscarSala(db, servidorId, sala.id);
@@ -69,6 +80,7 @@ export function apagarSala(db, servidorId, quem, id) {
   exigirGestaoDeSalas(quem);
   const sala = buscarSala(db, servidorId, id);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
+  exigirQueNaoSejaChumbada(sala, 'apagada');
   // Um servidor sem sala nenhuma não teria para onde entrar, e o dono ficaria preso numa
   // tela vazia sem entender o que fez.
   if (listarSalas(db, servidorId).length <= 1) {
@@ -91,7 +103,9 @@ export function apagarSala(db, servidorId, quem, id) {
  */
 export function reordenarSalas(db, servidorId, quem, itens) {
   exigirGestaoDeSalas(quem);
-  const atuais = new Set(listarSalas(db, servidorId).map((s) => s.id));
+  // A chumbada fica de fora da conta, sem erro: arrastar a lista não pode falhar só
+  // porque ela estava no caminho — ela apenas não se move.
+  const atuais = new Set(listarSalas(db, servidorId).filter((s) => !s.papel).map((s) => s.id));
   const pedidos = (itens ?? []).map((x) => (
     typeof x === 'object' && x !== null
       ? { id: Number(x.id), categoriaId: x.categoriaId == null ? null : Number(x.categoriaId) }

@@ -94,12 +94,14 @@ export type RoomParticipant = {
 export type TipoDeSala = 'voz' | 'texto';
 export type RoomInfo = {
   id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[];
+  /** 'notas' na sala de novidades, que é do app: não se renomeia, apaga nem move. */
+  papel?: string | null;
   /** Quantas mensagens chegaram depois da última que eu li. Sala de voz é sempre 0. */
   naoLidas: number;
   /** A gaveta em que a sala está, ou null quando está solta no topo. */
   categoriaId: number | null;
 };
-export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null };
+export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null; papel?: string | null };
 /** A gaveta onde as salas ficam guardadas. Não guarda conversa: só agrupa. */
 export type Categoria = { id: number; nome: string; ordem: number };
 

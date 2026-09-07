@@ -788,6 +788,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* A sala das notas: é do app, não do servidor. Um risco embaixo a separa das salas que
+   o pessoal criou, e o cursor de arrastar não aparece porque ela não se move. */
+.linha-de-sala.chumbada { cursor: default; }
+.linha-de-sala.chumbada .room svg { color: var(--accent-claro); }
+.linha-de-sala.chumbada::after { content: ''; display: block; height: 1px;
+  margin: 8px 10px 6px; background: var(--line); }
+
 .perfil-volume { display: grid; gap: 6px; margin-top: 4px; padding: 12px 14px;
   background: var(--bg1); border-radius: 10px; }
 .perfil-volume input[type=range] { width: 100%; }

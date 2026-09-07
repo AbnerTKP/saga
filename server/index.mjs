@@ -15,6 +15,7 @@ import * as enquadramento from './enquadramento.mjs';
 import * as salasM from './salas.mjs';
 import * as categoriasM from './categorias.mjs';
 import * as plataforma from './plataforma.mjs';
+import * as notas from './notas.mjs';
 import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as servidoresM from './servidores.mjs';
@@ -416,6 +417,7 @@ const ROTAS = {
       id: s.id,
       name: s.nome,
       tipo: s.tipo,
+      papel: s.papel ?? null,
       // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
       participants: s.tipo === 'voz' ? await participantesDaSala(sid, s, vivas) : [],
       naoLidas: s.tipo === 'texto'
@@ -757,6 +759,35 @@ plataforma.garantirDonoDaSaga(db, DONO);
 // de margem, e o registro do dono tem centenas de `→ 0` (a conexão morrendo na mão do
 // cliente). Sessenta segundos tiram a corrida do caminho; o `headersTimeout` tem de ficar
 // acima disso, senão ele é quem fecha.
+/**
+ * As notas de versão se mantêm sozinhas.
+ *
+ * O servidor vai buscar os Releases no GitHub e publica na sala o que faltar — em vez de
+ * o processo de publicação ter de empurrar para cá, o que pediria um segredo no CI e
+ * daria um jeito novo de a coisa parar sem ninguém perceber. Falhar aqui não é motivo
+ * para nada: na próxima volta tenta de novo.
+ */
+const DE_QUANTO_EM_QUANTO = 60 * 60_000;
+
+// A sala existe sempre, mesmo sem internet: ela faz parte do formato do servidor, e o
+// teste não pode depender de o GitHub estar de pé para ela aparecer.
+notas.garantirSalaDeNotas(db, SERVIDOR.id);
+
+async function cuidarDasNotas() {
+  try {
+    const quantas = await notas.publicarNotas(db, SERVIDOR.id);
+    if (quantas) console.log(`notas de versão: ${quantas} publicada(s) na sala "${notas.NOME_DA_SALA}"`);
+  } catch (e) {
+    console.warn('notas de versão:', e.message);
+  }
+}
+// `SEM_NOTAS` existe para o teste: ir à internet num teste o torna lento e instável, e
+// faz falhar por motivo que não é do código.
+if (!process.env.SEM_NOTAS) {
+  cuidarDasNotas();
+  setInterval(cuidarDasNotas, DE_QUANTO_EM_QUANTO).unref();
+}
+
 servidor.keepAliveTimeout = 60_000;
 servidor.headersTimeout = 65_000;
 

@@ -138,8 +138,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
               return (
                 <li
                   key={r.id}
-                  className={`linha-de-sala ${naMao === r.id ? 'na-mao' : ''}`}
-                  draggable={podeGerirSalas}
+                  className={`linha-de-sala ${naMao === r.id ? 'na-mao' : ''} ${r.papel ? 'chumbada' : ''}`}
+                  draggable={podeGerirSalas && !r.papel}
                   onDragStart={(e) => { setNaMao(r.id); e.dataTransfer.effectAllowed = 'move'; }}
                   onDragEnd={() => { setNaMao(null); setAlvo(null); }}
                   onDragOver={(e) => mirar(e, g.categoria?.id ?? null, i)}
@@ -151,7 +151,8 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                     onClick={() => onAbrir(r)}
                     disabled={rm.status === 'connecting'}
                   >
-                    <Icon name={r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
+                    {/* A sala de notas é do app, e o ícone diz isso antes de qualquer texto. */}
+                    <Icon name={r.papel === 'notas' ? 'berserk' : r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
                     {/* Sem isto a sala de texto só era vista por quem lembrava de abrir. */}
                     {r.naoLidas > 0 && (
                       <span className="nao-lidas" title={`${r.naoLidas} ${r.naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}>
