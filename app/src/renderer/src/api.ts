@@ -24,11 +24,16 @@ export type Cargo = {
   cor: string | null;
   /** Hierarquia: ninguém age sobre alguém de nível igual ou maior. */
   nivel: number;
-  dono: boolean;
+  /**
+   * Só vem no cargo de um MEMBRO, e vale "esta pessoa criou o servidor". A lista de
+   * cargos do servidor não o traz: não há cargo de dono para vestir — mandar é de quem
+   * criou, e isso mora em `servidores.criado_por`, não num cargo.
+   */
+  dono?: boolean;
   permissoes: Permissao[];
 };
 
-/** O dono tem tudo por ser dono, não por constar na lista. */
+/** Quem criou o servidor tem tudo por ter criado, não por constar na lista. */
 export const pode = (cargo: Cargo | null | undefined, p: Permissao) =>
   !!cargo && (cargo.dono || cargo.permissoes.includes(p));
 
