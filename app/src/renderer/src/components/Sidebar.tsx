@@ -172,7 +172,7 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                         <span className="pname"><Nome nome={p.name} id={p.idExibido} turbo={p.turbo} /></span>
                         <span className="pico">
                           {p.turbo && <span className="marca-berserk" title="Berserk"><Icon name="mjolnir" size={13} /></span>}
-                          {p.screen && <Icon name="screen" />}
+                          {p.screen && <span className="transmitindo" title="Transmitindo agora"><Icon name="screen" /></span>}
                           {p.camera && <Icon name="camera" />}
                           {p.muted && <Icon name="micOff" />}
                         </span>
@@ -254,8 +254,17 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
               </button>
             ))}
             <div className="menu-risco" />
-            {/* "Sair" vivia na mesma linha do nome e disputava espaço com os botões; aqui
-                ele fica onde já se fala de você, e a linha volta a caber. */}
+            {/* Estes dois vivem aqui porque são "sobre você", e porque cada botão a mais
+                na linha de baixo rouba o espaço do seu nome — foi o que o atropelou. */}
+            {donoDaSaga && (
+              <button onClick={() => { onPainelDaSaga(); setEscolhendoStatus(false); }}>
+                <span className="presenca" style={{ background: 'transparent' }} />
+                <span className="quem">
+                  <span className="strong">Painel da Saga</span>
+                  <span className="muted small">Berserk e o que vale em todos os servidores.</span>
+                </span>
+              </button>
+            )}
             <button onClick={onLogout}>
               <span className="quem"><span className="strong">Sair da conta</span></span>
             </button>
@@ -268,13 +277,6 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
           <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
             <Icon name={rm.deafened ? 'headOff' : 'head'} />
           </button>
-          {/* Só de quem cuida da Saga. Fica aqui, junto de você, e não nas configurações
-              do servidor: o que se decide lá vale em todos eles. */}
-          {donoDaSaga && (
-            <button className="botao-da-saga" onClick={onPainelDaSaga} title="Saga — Berserk e o resto do app">
-              <Icon name="mjolnir" size={17} />
-            </button>
-          )}
           <button onClick={onSettings} title="Dispositivos"><Icon name="gear" /></button>
         </div>
       </div>

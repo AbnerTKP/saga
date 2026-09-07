@@ -490,7 +490,7 @@ export function App() {
         <MenuDaPessoa
           pessoa={menu.pessoa}
           eu={eu}
-          cargos={cargos.filter((c) => !c.dono && c.nivel < (eu.cargo?.nivel ?? 0))}
+          cargos={cargos.filter((c) => c.nivel < (eu.cargo?.nivel ?? 0))}
           em={menu.em}
           volume={rm.volumeDe(menu.pessoa.identity)}
           onVolume={(v) => rm.definirVolume(menu.pessoa.identity, v)}

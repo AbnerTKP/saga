@@ -6,25 +6,28 @@ import { buscarCargo } from './cargos.mjs';
 import { ErroDeConta, derrubarSessoes } from './contas.mjs';
 
 /**
- * Vincula a pessoa ao servidor, se ainda não estiver. O primeiro a entrar vira dono —
- * ou, se DONO estiver definido no .env, só aquele apelido vira, e os demais entram como
- * membros mesmo que cheguem antes.
+ * Vincula a pessoa ao servidor, se ainda não estiver.
+ *
+ * Quem manda no servidor semeado é quem `criado_por` disser — e quando ninguém disse
+ * ainda, é o primeiro a entrar, ou o apelido do `DONO` do `.env` se ele existir. Isso
+ * não é um cargo: mandar vem de ter criado, e o cargo que a pessoa veste é o mesmo que
+ * qualquer outra veste. O de todo mundo é o mais baixo; quem cria o servidor pela rota
+ * entra com o mais alto, em `servidores.mjs`.
  */
 export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
   const jaEsta = buscarMembro(db, servidorId, usuario.id);
   if (jaEsta) return jaEsta;
 
-  const cargos = db.prepare('SELECT id, nivel, dono FROM cargos WHERE servidor_id = ?').all(servidorId);
-  const oDoDono = cargos.find((c) => c.dono);
+  const cargos = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ?').all(servidorId);
   const oMaisBaixo = cargos.slice().sort((a, b) => a.nivel - b.nivel)[0];
+  const oMaisAlto = cargos.slice().sort((a, b) => b.nivel - a.nivel)[0];
 
-  const jaTemDono = db.prepare(
-    'SELECT count(*) c FROM membros WHERE servidor_id = ? AND cargo_id = ?',
-  ).get(servidorId, oDoDono?.id ?? -1).c > 0;
+  const servidor = db.prepare('SELECT criado_por FROM servidores WHERE id = ?').get(servidorId);
+  const semDono = !servidor?.criado_por;
+  const ehODono = semDono && (dono ? dono.trim().toLowerCase() === usuario.apelido_chave : true);
+  if (ehODono) db.prepare('UPDATE servidores SET criado_por = ? WHERE id = ?').run(usuario.id, servidorId);
 
-  const ehODono = dono ? dono.trim().toLowerCase() === usuario.apelido_chave : !jaTemDono;
-  const escolhido = ehODono ? oDoDono : oMaisBaixo;
-
+  const escolhido = ehODono ? oMaisAlto : oMaisBaixo;
   db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
     .run(servidorId, usuario.id, escolhido?.nivel ?? 10, escolhido?.id ?? null, Date.now());
   return buscarMembro(db, servidorId, usuario.id);
@@ -36,24 +39,50 @@ const SELECT_MEMBRO = `
          m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
          u.turbo, m.id_exibido, m.cargo_id,
          c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,
-         c.dono AS cargo_dono, c.permissoes AS cargo_permissoes,
+         c.permissoes AS cargo_permissoes, (s.criado_por = m.usuario_id) AS criou_o_servidor,
          COALESCE(NULLIF(m.nome_exibido, ''), u.apelido) AS nome
     FROM membros m
     JOIN usuarios u ON u.id = m.usuario_id
+    JOIN servidores s ON s.id = m.servidor_id
     LEFT JOIN cargos c ON c.id = m.cargo_id`;
 
-/** Junta o cargo à pessoa: as regras de permissão trabalham com o par, não com um número. */
-const comCargo = (m) => m && ({
-  ...m,
-  cargo: m.cargo_id ? {
+/**
+ * Junta o cargo à pessoa: as regras de permissão trabalham com o par, não com um número.
+ *
+ * `dono` NÃO vem mais do cargo — vem de a pessoa ter criado o servidor. Quem criou tem
+ * tudo e fica acima de todo mundo, mesmo sem cargo nenhum e mesmo que alguém edite o
+ * cargo dele no banco; sem isso, um servidor poderia ficar sem quem o consertasse. O
+ * nome e a cor que aparecem continuam sendo os do cargo de verdade, porque "dono" deixou
+ * de ser algo que se veste.
+ */
+const ACIMA_DE_TODOS = 1000;
+
+const comCargo = (m) => {
+  if (!m) return m;
+  const criou = !!m.criou_o_servidor;
+  const doCargo = m.cargo_id ? {
     id: m.cargo_id,
     nome: m.cargo_nome,
     cor: m.cargo_cor ?? null,
     nivel: m.cargo_nivel,
-    dono: !!m.cargo_dono,
     permissoes: JSON.parse(m.cargo_permissoes || '[]'),
-  } : null,
-});
+  } : null;
+  if (!criou) return { ...m, cargo: doCargo && { ...doCargo, dono: false } };
+  return {
+    ...m,
+    cargo: {
+      id: doCargo?.id ?? null,
+      // Sem cargo nenhum, fica sem nome — e não "Dono". Escrever "Dono" aqui devolveria
+      // pela porta dos fundos o cargo que acabou de sair: mandar é de quem criou, e isso
+      // não é um cargo que se vista, se perca ou apareça na lista do servidor.
+      nome: doCargo?.nome ?? null,
+      cor: doCargo?.cor ?? null,
+      nivel: ACIMA_DE_TODOS,
+      dono: true,
+      permissoes: doCargo?.permissoes ?? [],
+    },
+  };
+};
 
 export const buscarMembro = (db, servidorId, usuarioId) =>
   comCargo(db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? AND m.usuario_id = ?`)

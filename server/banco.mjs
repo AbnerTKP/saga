@@ -170,6 +170,17 @@ export const MIGRACOES = [
   // status guardado sem sinal recente é lembrança, não presença.
   `ALTER TABLE usuarios ADD COLUMN status TEXT NOT NULL DEFAULT 'online'`,
   `ALTER TABLE usuarios ADD COLUMN visto_em INTEGER`,
+
+  // O cargo "Dono" chumbado sai de cena. Mandar num servidor passa a vir de TER CRIADO
+  // ele, e não de vestir um cargo — cargo é do pessoal de lá, e um cargo que o app
+  // impõe aparece na lista como se alguém o tivesse feito.
+  //
+  // Antes de apagar, duas contas: quem estava nele é quem criou o servidor (é a única
+  // pista que existe nos que foram semeados, onde `criado_por` ficou nulo), e essa
+  // pessoa passa para o cargo mais alto que sobra, para não ficar sem nenhum.
+  `UPDATE servidores SET criado_por = (SELECT m.usuario_id FROM membros m JOIN cargos c ON c.id = m.cargo_id WHERE m.servidor_id = servidores.id AND c.dono = 1 LIMIT 1) WHERE criado_por IS NULL`,
+  `UPDATE membros SET cargo_id = (SELECT c2.id FROM cargos c2 WHERE c2.servidor_id = membros.servidor_id AND c2.dono = 0 ORDER BY c2.nivel DESC, c2.id LIMIT 1), cargo = (SELECT c2.nivel FROM cargos c2 WHERE c2.servidor_id = membros.servidor_id AND c2.dono = 0 ORDER BY c2.nivel DESC, c2.id LIMIT 1) WHERE cargo_id IN (SELECT id FROM cargos WHERE dono = 1)`,
+  `DELETE FROM cargos WHERE dono = 1`,
 ];
 
 export function abrirBanco(caminho) {
@@ -221,11 +232,17 @@ export function garantirServidor(db, { nome, salas }) {
   return servidor;
 }
 
-/** Permissões que cada um dos três cargos originais ganha ao virar cargo de verdade. */
+/**
+ * Os cargos com que um servidor começa.
+ *
+ * Não há "Dono" aqui, e é de propósito: quem manda é quem CRIOU o servidor, e isso está
+ * em `servidores.criado_por`. Um cargo de dono imposto pelo app aparecia na lista de
+ * cargos como se o pessoal de lá o tivesse feito — e ninguém podia apagá-lo nem
+ * renomeá-lo. Os dois abaixo são só um ponto de partida, e dá para mexer em tudo.
+ */
 const CARGOS_INICIAIS = [
-  { nome: 'Dono', nivel: 100, dono: 1, cor: '#f0b232', permissoes: [] },
   {
-    nome: 'Moderador', nivel: 50, dono: 0, cor: '#5865f2',
+    nome: 'Moderador', nivel: 50, dono: 0, cor: '#3f7fe0',
     permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons'],
   },
   { nome: 'Membro', nivel: 10, dono: 0, cor: null, permissoes: [] },

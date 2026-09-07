@@ -204,7 +204,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS), []);
 
   useEffect(() => {
-    const onSubscribed = (track: Track, _pub: unknown, participante: Participant) => {
+    const onSubscribed = (track: Track, pub: RemoteTrackPublication, participante: Participant) => {
+      // Entrar numa sala onde alguém JÁ estava transmitindo inscrevia a transmissão
+      // sozinho — o `TrackPublished` só fala das que começam depois de você chegar, e
+      // era por isso que as duas vinham rodando até você clicar numa.
+      if (ehDaLive(track.source) && participante.identity !== assistindoRef.current) {
+        pub.setSubscribed(false);
+        return;
+      }
       if (track.kind === Track.Kind.Audio) {
         const el = track.attach() as HTMLMediaElement;
         el.dataset.identity = participante.identity;

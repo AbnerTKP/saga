@@ -238,35 +238,32 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
             <h3>Cargos <span className="count">{cargos.length}</span></h3>
             <p className="muted small">
               O nível decide a hierarquia: ninguém age sobre alguém de nível igual ou
-              maior. O cargo de dono tem tudo e não se edita.
+              maior. Quem criou o servidor fica acima de todos eles sem ocupar nenhum —
+              não existe cargo de dono para vestir nem para perder.
             </p>
 
             <ul className="lista-cargos">
               {cargos.map((c) => (
-                <li key={c.id} className={c.dono ? 'intocavel' : ''}>
+                <li key={c.id}>
                   <span className="bolinha-cargo" style={{ background: c.cor ?? 'var(--text3)' }} />
                   <span className="nome-cargo">{c.nome}</span>
                   <span className="muted small">nível {c.nivel}</span>
                   <span className="muted small">
-                    {c.dono ? 'tudo' : `${c.permissoes.length} permiss${c.permissoes.length === 1 ? 'ão' : 'ões'}`}
+                    {c.permissoes.length} permiss{c.permissoes.length === 1 ? 'ão' : 'ões'}
                   </span>
-                  {!c.dono && (
-                    <>
-                      <button disabled={ocupado} onClick={() => setEditando({ ...c })}>editar</button>
-                      <button
-                        className="danger"
-                        disabled={ocupado}
-                        title={`Apagar ${c.nome}. Quem estiver nele desce para o cargo mais baixo.`}
-                        onClick={async () => {
-                          setErro(null); setOcupado(true);
-                          try { await apagarCargo(c.id); setAviso('Cargo apagado.'); await recarregar(); }
-                          catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
-                        }}
-                      >
-                        apagar
-                      </button>
-                    </>
-                  )}
+                  <button disabled={ocupado} onClick={() => setEditando({ ...c })}>editar</button>
+                  <button
+                    className="danger"
+                    disabled={ocupado}
+                    title={`Apagar ${c.nome}. Quem estiver nele desce para o cargo mais baixo.`}
+                    onClick={async () => {
+                      setErro(null); setOcupado(true);
+                      try { await apagarCargo(c.id); setAviso('Cargo apagado.'); await recarregar(); }
+                      catch (err) { setErro((err as Error).message); } finally { setOcupado(false); }
+                    }}
+                  >
+                    apagar
+                  </button>
                 </li>
               ))}
             </ul>
@@ -412,7 +409,7 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                       title="Cargo"
                     >
                       {cargos
-                        .filter((c) => !c.dono && c.nivel < (eu.cargo?.nivel ?? 0))
+                        .filter((c) => c.nivel < (eu.cargo?.nivel ?? 0))
                         .map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </select>
                   )}

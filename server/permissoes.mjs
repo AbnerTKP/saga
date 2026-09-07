@@ -58,10 +58,17 @@ export function podeAgir(quem, acao, alvo) {
   if (!temPermissao(quem.cargo, acao)) return { pode: false, motivo: 'seu cargo não permite isso' };
 
   if (SOBRE_ALGUEM.includes(acao)) {
-    if (quem.id === alvo.id) return { pode: false, motivo: 'não dá para fazer isso consigo mesmo' };
+    // Quem criou o servidor escolhe o próprio cargo. A regra de "não faça em si mesmo"
+    // existe para impedir autopromoção, e para ele isso não quer dizer nada: já tem
+    // tudo. Sem esta brecha, o dono ficava preso no cargo com que entrou e não conseguia
+    // vestir o que o pessoal de lá criou.
+    const escolhendoOProprioCargo = acao === 'definirCargo' && quem.id === alvo.id && quem.cargo?.dono;
+    if (quem.id === alvo.id && !escolhendoOProprioCargo) {
+      return { pode: false, motivo: 'não dá para fazer isso consigo mesmo' };
+    }
     // A regra que sustenta tudo: ninguém alcança um igual nem um superior. Sem ela,
     // dois moderadores se derrubariam, e o dono ficaria ao alcance de quem ele promoveu.
-    if ((alvo.cargo?.nivel ?? 0) >= (quem.cargo?.nivel ?? 0)) {
+    if (quem.id !== alvo.id && (alvo.cargo?.nivel ?? 0) >= (quem.cargo?.nivel ?? 0)) {
       return { pode: false, motivo: 'essa pessoa está no mesmo nível ou acima do seu' };
     }
   }
@@ -73,14 +80,15 @@ export function podeDarCargo(quem, alvo, cargoNovo) {
   const base = podeAgir(quem, 'definirCargo', alvo);
   if (!base.pode) return base;
   if (!cargoNovo) return { pode: false, motivo: 'cargo inválido' };
-  if (cargoNovo.dono) return { pode: false, motivo: 'não dá para passar o cargo de dono assim' };
-  if (cargoNovo.nivel >= (quem.cargo?.nivel ?? 0)) {
+  // Não há mais cargo de dono para passar; o que sobra é o limite de nível, e ele não
+  // vale para quem está escolhendo o PRÓPRIO cargo — ver podeAgir.
+  if (quem.id !== alvo.id && cargoNovo.nivel >= (quem.cargo?.nivel ?? 0)) {
     return { pode: false, motivo: 'não dá para dar um cargo do seu nível ou acima' };
   }
   return { pode: true };
 }
 
-/** Editar ou apagar um cargo exige estar acima dele — e o do dono não se toca. */
+/** Editar ou apagar um cargo exige estar acima dele. */
 export function podeMexerNoCargo(quem, cargo) {
   if (!temPermissao(quem?.cargo, 'gerirCargos')) return { pode: false, motivo: 'seu cargo não permite isso' };
   if (!cargo) return { pode: false, motivo: 'cargo não encontrado' };

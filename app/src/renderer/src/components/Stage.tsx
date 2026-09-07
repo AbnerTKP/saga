@@ -254,8 +254,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                       title={`Assistir a transmissão de ${l.nome}`}
                       onClick={() => rm.assistir(l.identity)}>
                       <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
-                        enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} tamanho="big" />
-                      <div className="tile-label"><Icon name="screen" size={13} /> {l.nome} · assistir</div>
+                        enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} tamanho="huge" />
+                      <span className="live-quem">
+                        <span className="selo-ao-vivo"><span className="ponto" /> ao vivo</span>
+                        <span className="strong">{l.nome}</span>
+                        <span className="live-chamada"><Icon name="screen" size={13} /> assistir</span>
+                      </span>
                     </button>
                   ))}
                   {audioOnly.map((p) => (

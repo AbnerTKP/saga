@@ -147,7 +147,12 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   display: flex; align-items: center; gap: 9px; padding: 8px var(--e2); min-height: 58px; }
 
 .uname { flex: 1; min-width: 0; line-height: 1.2; }
-.uname .strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uname .strong { font-size: 14px; display: block; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* O nome do Berserk é um gradiente recortado no texto; sem isto ele não obedece ao
+   corte do pai e escorre por cima dos botões. */
+.uname .nome-berserk { display: inline-block; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .user-actions { display: flex; }
 .user-actions button { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--text); }
 .user-actions button:hover:not(:disabled) { background: var(--bg3); }
@@ -178,23 +183,39 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .strip { display: flex; gap: 8px; height: 110px; overflow-x: auto; flex-shrink: 0; }
 .strip .tile { width: 180px; flex-shrink: 0; }
 
-/* Hub das lives: quem está transmitindo, sempre à vista.
-   Continua listando quem você cortou — é por aqui que se volta a ver, e era exatamente o
-   que faltava: antes a live sumia da tela e o caminho de volta era um link no topo. */
-.lives { display: flex; align-items: center; gap: 8px; padding: 8px 16px; overflow-x: auto;
-  box-shadow: 0 1px 0 var(--line); flex-shrink: 0; }
-.lives-titulo { display: flex; align-items: center; gap: 5px; flex: none; font-size: 11px;
-  text-transform: uppercase; letter-spacing: .04em; font-weight: 600; color: var(--text3); }
-.live-chip { display: flex; align-items: center; gap: 2px; flex: none; background: var(--bg1);
-  border: 1px solid transparent; border-radius: 999px; padding: 2px 8px 2px 3px; }
-.live-chip.no-palco { border-color: var(--accent); background: var(--bg3); }
-/* O campo de cima sem escolha: em vez de sumir, ele diz o que fazer. */
+/* A faixa de fichas no alto do palco viveu aqui e saiu: escolher a live numa lista longe
+   da live foi rejeitado na hora. A escolha é o clique no próprio quadro, abaixo. */
 /* A transmissão que está no ar e não está sendo recebida: existe, dá para clicar, e
-   não gasta um bit. É o contrário de sumir — sumir deixaria a escolha às cegas. */
-.live-apagada { display: grid; place-items: center; background: var(--bg1);
-  border: 2px dashed var(--bg4); opacity: .5; transition: opacity .12s, border-color .12s; }
-.live-apagada:hover { opacity: 1; border-color: var(--accent); }
-.live-apagada .tile-label { background: rgba(0,0,0,.5); }
+   não gasta um bit. É o contrário de sumir — sumir deixaria a escolha às cegas.
+   Apagada não quer dizer ilegível: quem está no ar precisa ser óbvio, senão o quadro
+   vira um borrão cinza e ninguém sabe de quem é. */
+/* Deitado, não empilhado: a faixa tem 110 px de altura, e selo + retrato + nome +
+   chamada empilhados não cabem — o selo acabava por cima do retrato. Largura é o que
+   sobra ali, então o retrato vai à esquerda e o texto ao lado. */
+.tile.live-apagada { display: flex; align-items: center; justify-content: flex-start;
+  gap: 11px; padding: 0 12px; text-align: left; background: var(--bg1);
+  border: 2px solid var(--linha-live, #3a4152); transition: border-color .12s, background .12s; }
+.strip .tile.live-apagada { width: 220px; }
+.tile.live-apagada:hover { border-color: var(--accent); background: var(--bg3); }
+.live-apagada .avatar.huge { width: 46px; height: 46px; font-size: 19px; }
+.live-quem { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.live-quem .strong { font-size: 14px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-chamada { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  font-weight: 600; color: var(--accent-claro); }
+
+/* O selo do que está no ar. Vermelho é a convenção, e o ponto pisca devagar: é para
+   avisar, não para puxar o olho o tempo todo. */
+.selo-ao-vivo { display: inline-flex; align-items: center;
+  gap: 5px; padding: 3px 8px; border-radius: 999px; background: rgba(224,72,82,.16);
+  color: #ff8a90; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.selo-ao-vivo .ponto { width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
+  animation: pulso-ao-vivo 2s ease-in-out infinite; }
+@keyframes pulso-ao-vivo { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .selo-ao-vivo .ponto { animation: none; } }
+
+/* Quem está transmitindo, na barra lateral: o ícone deixa de ser só mais um cinza. */
+.pico .transmitindo { color: #ff8a90; }
 
 .grande-vazio { flex: 1; cursor: default; border: 2px dashed var(--linha-tracejada, #3a3d44); background: transparent; }
 .grande-vazio .muted { display: grid; place-items: center; gap: 8px; text-align: center; }

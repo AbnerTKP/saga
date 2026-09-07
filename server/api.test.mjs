@@ -86,7 +86,10 @@ test('cadastro devolve sessão, servidor e salas de uma vez', async () => {
   assert.equal(r.status, 200);
   assert.ok(r.corpo.token);
   assert.equal(r.corpo.eu.apelido, 'abner');
-  assert.equal(r.corpo.eu.cargoNome, 'Dono', 'o apelido de DONO devia virar dono');
+  // Mandar não é mais um cargo: quem criou entra com o cargo mais alto que existe, e o
+  // poder vem de `criado_por`.
+  assert.equal(r.corpo.eu.cargoNome, 'Moderador');
+  assert.equal(r.corpo.eu.cargo.dono, true, 'o apelido de DONO devia mandar no servidor');
   assert.deepEqual(r.corpo.salas.map((s) => s.nome), ['Geral', 'Jogos']);
   assert.deepEqual(r.corpo.salas.map((s) => s.tipo), ['voz', 'voz'], 'as semeadas são de voz');
   assert.equal(r.corpo.servidor.nome, 'Saga');
@@ -535,8 +538,7 @@ test('apagar sala leva as mensagens junto', async () => {
 test('o servidor traz os cargos e a lista de permissões que existem', async () => {
   const dono = await sessaoDe('abner');
   const r = await chamar('GET', '/servidor', { sessao: dono.token });
-  assert.deepEqual(r.corpo.cargos.map((c) => c.nome), ['Dono', 'Moderador', 'Membro']);
-  assert.equal(r.corpo.cargos[0].dono, true);
+  assert.deepEqual(r.corpo.cargos.map((c) => c.nome), ['Moderador', 'Membro']);
   assert.ok(r.corpo.permissoes.banir, 'a tela precisa saber que permissões desenhar');
 });
 
@@ -557,12 +559,15 @@ test('membro não cria nem apaga cargo', async () => {
   assert.equal((await chamar('POST', '/cargos/apagar', { sessao: bruno.token, corpo: { id: 1 } })).status, 403);
 });
 
-test('o cargo de dono não se edita nem se apaga', async () => {
+test('todo cargo do servidor pode ser renomeado, inclusive o mais alto', async () => {
   const dono = await sessaoDe('abner');
   const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
-  const oDono = cargos.find((c) => c.dono);
-  assert.equal((await chamar('POST', '/cargos/editar', { sessao: dono.token, corpo: { id: oDono.id, nome: 'Rei', nivel: 100 } })).status, 403);
-  assert.equal((await chamar('POST', '/cargos/apagar', { sessao: dono.token, corpo: { id: oDono.id } })).status, 403);
+  // Não existe mais cargo intocável: todos são do pessoal do servidor, e quem criou pode
+  // renomear, mexer e apagar como quiser.
+  const oMaisAlto = cargos[0];
+  assert.equal((await chamar('POST', '/cargos/editar', { sessao: dono.token, corpo: { id: oMaisAlto.id, nome: 'Rei', nivel: 60, permissoes: [] } })).status, 200);
+  const depois = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  assert.ok(depois.some((c) => c.nome === 'Rei'), 'o cargo mais alto devia poder ser renomeado');
 });
 
 test('nível fora de 1 a 99 é recusado', async () => {
@@ -796,7 +801,7 @@ test('membro comum não gera convite', async () => {
   assert.equal(r.status, 403);
 });
 
-test('dá para sair de um servidor, menos se você é o dono', async () => {
+test('dá para sair de um servidor, menos se você o criou', async () => {
   const bruno = await sessaoDe('bruno');
   const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
     .find((s) => s.nome === 'Sala do Bruno');

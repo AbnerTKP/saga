@@ -121,12 +121,43 @@ test('o dono promove, e o promovido passa a poder moderar', () => {
   assert.ok(darTimeout(db, sid, bruno.id, caio.id, 5).silenciado_ate);
 });
 
-test('ninguém escala sozinho nem encosta no dono', () => {
+test('ninguém escala sozinho nem encosta em quem criou o servidor', () => {
   const { db, sid, cria, cargos } = cenario();
   const dono = cria('abner'), bruno = cria('bruno');
-  assert.throws(() => definirCargo(db, sid, bruno.id, bruno.id, cargos.Dono.id), /consigo mesmo|permite/);
+  assert.throws(() => definirCargo(db, sid, bruno.id, bruno.id, cargos.Moderador.id), /consigo mesmo|permite/);
   assert.throws(() => banir(db, sid, bruno.id, dono.id), /permite|nível ou acima/);
-  assert.throws(() => definirCargo(db, sid, dono.id, bruno.id, cargos.Dono.id), /dono/);
+});
+
+test('mandar vem de ter criado o servidor, não de vestir um cargo', () => {
+  // O cargo "Dono" chumbado saiu de cena: quem criou tem tudo mesmo usando o cargo mais
+  // baixo, e ninguém o alcança. É o que impede um servidor de ficar sem conserto.
+  const { db, sid, cria, cargos } = cenario();
+  const dono = cria('abner'), bruno = cria('bruno');
+  assert.equal(buscarMembro(db, sid, dono.id).cargo.dono, true);
+  assert.equal(buscarMembro(db, sid, bruno.id).cargo.dono, false);
+
+  definirCargo(db, sid, dono.id, dono.id, cargos.Membro.id);
+  const depois = buscarMembro(db, sid, dono.id);
+  assert.equal(depois.cargo.nome, 'Membro', 'o cargo que ele veste é o que ele escolheu');
+  assert.equal(depois.cargo.dono, true, 'e mesmo assim continua mandando');
+  assert.throws(() => banir(db, sid, bruno.id, dono.id), /nível ou acima|permite/);
+});
+
+test('nenhum cargo chamado "Dono" nasce com o servidor', () => {
+  const { cargos } = cenario();
+  assert.equal(cargos.Dono, undefined, 'o app não impõe cargo nenhum de dono');
+  assert.deepEqual(Object.keys(cargos).sort(), ['Membro', 'Moderador']);
+});
+
+test('sem cargo nenhum, quem criou fica sem nome de cargo — não vira "Dono"', () => {
+  // O nome do cargo é o que a lista de pessoas mostra. Inventar "Dono" aqui devolveria
+  // pela porta dos fundos o cargo que acabou de sair do banco.
+  const { db, sid, cria } = cenario();
+  const dono = cria('abner');
+  db.prepare('UPDATE membros SET cargo_id = NULL WHERE servidor_id = ? AND usuario_id = ?').run(sid, dono.id);
+  const m = buscarMembro(db, sid, dono.id);
+  assert.equal(m.cargo.nome, null, 'apareceu um nome de cargo que ninguém criou');
+  assert.equal(m.cargo.dono, true, 'e ele continua mandando, que é o que importa');
 });
 
 test('a lista sai do cargo mais alto para o mais baixo', () => {

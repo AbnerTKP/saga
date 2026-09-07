@@ -25,7 +25,7 @@ export type PessoaNaCall = {
 export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose }: {
   pessoa: PessoaNaCall;
   eu: Membro;
-  /** Os cargos que podem ser dados: os abaixo do meu, e nunca o de dono. */
+  /** Os cargos que podem ser dados: os abaixo do meu. */
   cargos: Cargo[];
   em: { x: number; y: number };
   volume: number;

@@ -33,10 +33,14 @@ test('a permissão sozinha não vence a hierarquia', () => {
   assert.equal(pode(mod, 'banir', OUTRO_MOD), false, 'alcançou um igual');
 });
 
-test('ninguém age sobre si mesmo, nem o dono', () => {
+test('ninguém age sobre si mesmo — com uma exceção', () => {
   for (const acao of SOBRE_ALGUEM) {
-    assert.equal(pode(DONO, acao, { ...DONO }), false, acao);
     assert.equal(pode(MOD, acao, { ...MOD }), false, acao);
+    // A exceção é escolher o PRÓPRIO cargo, e só para quem criou o servidor: ele já tem
+    // tudo, então "autopromoção" não quer dizer nada — e sem isso ele ficava preso no
+    // cargo com que entrou, sem poder vestir o que o pessoal de lá criou.
+    const esperado = acao === 'definirCargo';
+    assert.equal(pode(DONO, acao, { ...DONO }), esperado, acao);
   }
 });
 
@@ -69,10 +73,16 @@ test('cargo dado precisa estar abaixo de quem dá', () => {
   assert.equal(podeDarCargo(mod, MEMBRO, doMod).pode, false, 'deu o próprio nível');
 });
 
-test('o cargo de dono não se passa adiante por aqui', () => {
-  const r = podeDarCargo(DONO, MEMBRO, cargo(100, [], true));
-  assert.equal(r.pode, false);
-  assert.match(r.motivo, /dono/);
+test('ninguém dá a outro um cargo do próprio nível ou acima', () => {
+  const gestor = pessoa(9, cargo(50, ['definirCargo']));
+  assert.equal(podeDarCargo(gestor, MEMBRO, cargo(50)).pode, false);
+  assert.equal(podeDarCargo(gestor, MEMBRO, cargo(49)).pode, true);
+});
+
+test('quem criou o servidor escolhe qualquer cargo para si', () => {
+  // Mandar não vem do cargo que ele veste — vem de ter criado o servidor.
+  assert.equal(podeDarCargo(DONO, { ...DONO }, cargo(50)).pode, true);
+  assert.equal(podeDarCargo(DONO, { ...DONO }, cargo(10)).pode, true);
 });
 
 test('editar cargo exige a permissão e estar acima dele', () => {

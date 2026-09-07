@@ -65,8 +65,8 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **O Berserk é da conta, e não do vínculo** — é a exceção da linha acima, e a diferença
   importa: cargo é de cada servidor, Berserk é da Saga inteira. Ele nasceu em `membros`, o
   que fazia a mesma pessoa ser Berserk num servidor e não ser no vizinho. Hoje a coluna que
-  vale é `usuarios.turbo`; quem concede continua sendo o dono de um servidor (é lá que a
-  permissão é conferida), mas o que ele concede vale em todo canto. A coluna `membros.turbo`
+  vale é `usuarios.turbo`, e quem concede é o dono da SAGA, no painel dele — não o dono de
+  um servidor, que distribuiria distinção aparecendo em todos os outros. A coluna `membros.turbo`
   ficou onde estava, morta: migração publicada não se edita nem se remove.
 - **Três nomes ficaram "turbo" de propósito**: a coluna do banco, o campo `turbo` que anda
   entre app e servidor, e o `tipo: 'turbo'` do aviso. São protocolo e dado, não texto de
@@ -82,13 +82,22 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   ações que recaem sobre alguém: criar sala não pergunta "acima de quem?".
 - **O dono tem todas as permissões por ser dono**, não por constar numa lista: editar o
   cargo dele no banco não pode deixar o servidor sem conserto.
-- **Dono da Saga e cargo do topo de um servidor são coisas diferentes**, e confundi-las
-  fazia a Saga parecer o servidor. `usuarios.dono` é quem cuida do APP: mora na conta,
-  porque a conta é o que existe acima dos servidores, e é ele quem dá e tira o Berserk —
-  que também é da conta. `cargos.dono` é o cargo mais alto de UM servidor e manda só nele;
-  o nome dele é do pessoal de lá ("Lula", no CARDUME), e por isso passou a poder ser
-  renomeado: ele nasce no nível 100 e o limite geral é 1–99, o que fazia renomear bater em
-  "o nível precisa ser de 1 a 99".
+- **Dono da Saga e quem manda num servidor são coisas diferentes**, e confundi-las fazia
+  a Saga parecer o servidor. `usuarios.dono` é quem cuida do APP: mora na conta, porque a
+  conta é o que existe acima dos servidores, e é ele quem dá e tira o Berserk — que também
+  é da conta. Quem manda num servidor é `servidores.criado_por`, e só isso.
+- **Não existe cargo de dono.** Existiu chumbado, nível 100 e `dono = 1`, e aparecia na
+  lista do CARDUME junto dos cargos que o pessoal de lá criou — como se o app tivesse
+  opinião sobre a hierarquia deles. Hoje mandar vem de TER CRIADO o servidor: `comCargo`
+  monta o cargo de quem criou com o **nome e a cor do cargo que ele veste**, mas com
+  `dono: true` e nível 1000 — acima de qualquer coisa que se possa criar, já que o limite
+  é 99. Então ele aparece na lista de pessoas dentro do cargo dele ("Lula", no CARDUME),
+  continua com tudo, ninguém o alcança, e o app não impõe cargo nenhum. Sem cargo algum o
+  nome vem **nulo**, nunca "Dono": escrever isso ali devolveria pela porta dos fundos o
+  cargo que acabou de sair.
+- **Quem criou o servidor escolhe o próprio cargo.** "Não faça em si mesmo" existe para
+  impedir autopromoção, e para ele não quer dizer nada — já tem tudo. Sem essa brecha ele
+  ficava preso no cargo com que entrou, sem conseguir vestir o que o pessoal de lá criou.
 - **`concederTurbo` deixou de ser permissão de servidor.** Dar Berserk num servidor
   distribuiria distinção que aparece em todos os outros. Hoje é do dono da Saga, num
   painel próprio, **fora** das configurações do servidor — dentro delas pareceria uma
@@ -310,15 +319,28 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   diferença entre esconder e sumir: uma live que você cortou sem deixar rastro obriga a
   procurar o caminho de volta, e não havia um. Vale para qualquer coisa que a pessoa
   desliga — o desligado precisa continuar visível, senão não tem como religar.
-- **A imagem de todas chega; o som, só o da escolhida.** Cheguei a cortar o vídeo das
-  outras também — medido e funcionando, 0 bytes — e estava errado: economizava banda ao
-  preço de deixar a escolha às cegas, com o nome da pessoa e mais nada. Não dá para
-  escolher o que não se vê. O som continua sendo de uma só, porque duas transmissões
-  falando juntas é uma sopa em que não se entende nenhuma.
+- **Só a escolhida chega, imagem E som.** Este parágrafo já disse o contrário — que a
+  imagem de todas chegava e só o som era de uma. Estava errado, e a objeção que sustentava
+  isso ("não dá para escolher o que não se vê") tinha resposta melhor que gastar banda:
+  o **cartão**. Quem está no ar e não está sendo recebido aparece na faixa de baixo com
+  selo "AO VIVO" piscando, retrato grande e nome — dá para escolher entre pessoas, que é
+  o que se escolhe, e não entre nomes soltos. Medido, inscrita contra não inscrita:
+  229.809 bytes contra 0.
+- **Os cartões saem da PUBLICAÇÃO, não da faixa.** Uma faixa só existe se estiver
+  inscrita, então listar lives por faixa mostraria exatamente a única que já se está
+  vendo. `rm.lives` vem das publicações de tela dos participantes.
+- **Entrar numa sala onde alguém JÁ transmitia inscrevia a transmissão sozinho.** O
+  `TrackPublished` só fala das que começam DEPOIS de você chegar; as que já estavam vêm
+  direto em `TrackSubscribed`, e as duas apareciam rodando até o primeiro clique. Por isso
+  o `TrackSubscribed` também recusa: chegou tela de quem não é o escolhido, desinscreve.
 - **A escolha é um clique na própria imagem, não numa lista à parte.** Chegou a ser uma
   faixa de fichas no alto da tela, e escolher longe do que se escolhe foi rejeitado na
-  hora. O palco tem dois campos: em cima a escolhida, embaixo todas. Sem escolha, o campo
-  de cima não some — ele diz o que fazer.
+  hora. O palco tem dois campos: em cima a escolhida, embaixo quem está no ar. Sem
+  escolha, o campo de cima não some — ele diz o que fazer.
+- **O cartão da live é deitado, não empilhado.** A faixa de baixo tem 110 px de altura, e
+  selo + retrato + nome + chamada empilhados não cabem: o selo acabava por cima do
+  retrato. Largura é o que sobra ali. Medido renderizando o `styles.css` de verdade — o
+  primeiro desenho passou no typecheck e saiu quebrado na imagem.
 - **O palco não escolhe a transmissão; quem assiste escolhe.** Ele focava a primeira que
   aparecesse, e "a primeira" é a ordem em que os participantes calharam de vir — que muda
   quando alguém liga a câmera ou troca de faixa. Com duas pessoas transmitindo, o quadro
@@ -335,14 +357,11 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   Quem corta a live tem de cortar as duas: "não assistir" desinscrevia só o vídeo, e o som
   de todas as lives continuava entrando e tocando com a tela apagada. Medido: cortando só
   o vídeo, `screen_share=cortado` e `screen_share_audio=RECEBENDO`.
-- **Parar de ver é por pessoa, e quem foi cortado continua listado.** Era um link geral no
-  topo do palco: cortava todas de uma vez, não dizia de quem eram, e a live sumia da tela
-  — o caminho de volta era achar de novo aquele link. Hoje há a faixa de lives (`.lives`),
-  que sai da **publicação**, não da faixa: quem você cortou não tem faixa nenhuma e mesmo
-  assim continua ali, marcado "parada", a um clique de voltar. E o corte é por pessoa,
-  guardado por identidade, então sobrevive à pessoa parar e recomeçar a transmitir —
-  medido: cortado → parou → voltou a transmitir → continua cortado, e cortar um não mexe
-  no outro.
+- **"Parar de ver" saiu; o que existe é escolher.** Foram três formas antes desta: um link
+  geral no topo que cortava todas de uma vez sem dizer de quem eram; uma lista de cortadas
+  guardada por identidade; e uma faixa de fichas no alto. Todas partiam de "recebo tudo e
+  desligo o que não quero", e o pedido era o contrário — recebo uma. Sem lista de cortadas
+  não há estado para envelhecer: a pergunta "esta é a escolhida?" se responde sozinha.
 - **Só a live que está no palco é ouvida, e "nenhuma no palco" quer dizer silêncio.** A
   regra antiga só calava uma live quando havia OUTRA em destaque — sem destaque, não calava
   nada, que é o mesmo que tocar todas. Bastava clicar numa câmera, ou pedir "não assistir",
@@ -444,7 +463,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (184) + app (57), segundos, sem nada externo
+pnpm test        # servidor (213) + app (85), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

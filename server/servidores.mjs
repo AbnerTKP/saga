@@ -36,9 +36,11 @@ export function criarServidor(db, usuario, { nome }) {
   db.prepare("INSERT INTO salas (servidor_id, nome, tipo, ordem) VALUES (?, 'Geral', 'voz', 0)").run(servidorId);
   db.prepare("INSERT INTO salas (servidor_id, nome, tipo, ordem) VALUES (?, 'Avisos', 'texto', 1)").run(servidorId);
 
-  const doDono = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ? AND dono = 1').get(servidorId);
+  // Quem cria entra com o cargo mais alto que existe. O poder não vem daí — vem de
+  // `criado_por` —, mas a pessoa precisa de um cargo como qualquer outra.
+  const oMaisAlto = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC, id LIMIT 1').get(servidorId);
   db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
-    .run(servidorId, usuario.id, doDono.nivel, doDono.id, Date.now());
+    .run(servidorId, usuario.id, oMaisAlto?.nivel ?? 10, oMaisAlto?.id ?? null, Date.now());
 
   return buscarServidor(db, servidorId);
 }
@@ -93,12 +95,12 @@ export function usarConvite(db, usuario, codigo) {
 
 export function sairDoServidor(db, servidorId, usuario) {
   const meu = db.prepare(`
-    SELECT c.dono FROM membros m LEFT JOIN cargos c ON c.id = m.cargo_id
+    SELECT s.criado_por FROM membros m JOIN servidores s ON s.id = m.servidor_id
      WHERE m.servidor_id = ? AND m.usuario_id = ?`).get(servidorId, usuario.id);
   if (!meu) throw new ErroDeConta('Você não faz parte deste servidor.', 404);
-  // O dono saindo deixaria o servidor sem ninguém capaz de administrá-lo, e sem jeito
-  // de promover alguém depois.
-  if (meu.dono) throw new ErroDeConta('O dono não pode sair do próprio servidor.', 409);
+  // Quem criou o servidor saindo deixaria ele sem ninguém capaz de administrá-lo, e sem
+  // jeito de voltar. Mandar não é mais um cargo que se passe adiante: é ter criado.
+  if (meu.criado_por === usuario.id) throw new ErroDeConta('Quem criou o servidor não pode sair dele.', 409);
 
   db.prepare('DELETE FROM membros WHERE servidor_id = ? AND usuario_id = ?').run(servidorId, usuario.id);
   return { ok: true };

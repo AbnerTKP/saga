@@ -40,6 +40,9 @@ const IMPRESSOES = [
   'dbaf4d092025',  // 27 coluna dono em usuarios (dono da Saga, não do servidor)
   '4debb0eb4e71',  // 28 coluna status em usuarios
   'df3844962f6e',  // 29 coluna visto_em em usuarios
+  '82e31b667a97',  // 30 quem estava no cargo de dono é quem criou o servidor
+  '97d33f11bb13',  // 31 e passa para o cargo mais alto que sobra
+  '23b2a587c3d1',  // 32 o cargo de dono chumbado some
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -116,13 +119,13 @@ test('apagar a sala leva as mensagens junto', () => {
   void s;
 });
 
-test('o servidor nasce com os três cargos, e o de dono marcado', () => {
+test('o servidor nasce com dois cargos, e nenhum deles é imposto como dono', () => {
   const db = abrirBanco(':memory:');
   const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
   const cargos = db.prepare('SELECT nome, nivel, dono FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC').all(s.id);
-  assert.deepEqual(cargos.map((c) => c.nome), ['Dono', 'Moderador', 'Membro']);
-  assert.equal(cargos[0].dono, 1);
-  assert.equal(cargos[1].dono, 0);
+  assert.deepEqual(cargos.map((c) => c.nome), ['Moderador', 'Membro']);
+  // Nenhum é imposto como dono: mandar vem de ter criado o servidor, não de um cargo.
+  assert.equal(cargos.filter((c) => c.dono).length, 0);
 });
 
 test('rodar de novo não duplica cargos nem desfaz o que o dono mudou', () => {
@@ -132,12 +135,13 @@ test('rodar de novo não duplica cargos nem desfaz o que o dono mudou', () => {
 
   garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
   const cargos = db.prepare('SELECT nome FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC').all(s.id);
-  assert.deepEqual(cargos.map((c) => c.nome), ['Dono', 'Xerife', 'Membro']);
+  assert.deepEqual(cargos.map((c) => c.nome), ['Xerife', 'Membro']);
 });
 
 test('quem já era membro é ligado ao cargo certo pelo nível antigo', () => {
-  // A conversão precisa acontecer sem ninguém perder poder nem ganhar: quem era
-  // moderador continua moderador, e o dono continua dono.
+  // A conversão casa cada um com o cargo mais alto que não passe do nível antigo. Sem o
+  // cargo de 100, quem estava lá cai no mais alto que sobrou — e continua mandando, que
+  // agora é coisa de `criado_por` e não do cargo.
   const db = abrirBanco(':memory:');
   const s = garantirServidor(db, { nome: 'Cantinho', salas: ['Geral'] });
   db.prepare('INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES (?,?,?,?)').run('a', 'a', 'x', 1);
@@ -153,5 +157,5 @@ test('quem já era membro é ligado ao cargo certo pelo nível antigo', () => {
      WHERE m.servidor_id = ? ORDER BY u.apelido`).all(s.id)
     // O SQLite devolve objetos sem protótipo; a comparação estrita repara nisso.
     .map((r) => ({ ...r }));
-  assert.deepEqual(quem, [{ apelido: 'a', nome: 'Dono' }, { apelido: 'b', nome: 'Moderador' }]);
+  assert.deepEqual(quem, [{ apelido: 'a', nome: 'Moderador' }, { apelido: 'b', nome: 'Moderador' }]);
 });
