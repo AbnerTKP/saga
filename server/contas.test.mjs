@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirBanco } from './banco.mjs';
-import { criarConta, entrar, usuarioDaSessao, sair, derrubarSessoes, senhaConfere, buscarPorApelido } from './contas.mjs';
+import { criarConta, entrar, usuarioDaSessao, sair, derrubarSessoes, senhaConfere, buscarPorApelido, esquecerAnotacoes } from './contas.mjs';
 
 const novo = () => abrirBanco(':memory:');
 const conta = (db, apelido = 'abner', senha = 'segredo123') =>
@@ -107,4 +107,29 @@ test('apagar o usuário leva as sessões junto', () => {
   const { token } = entrar(db, { apelido: 'abner', senha: 'segredo123' });
   db.prepare('DELETE FROM usuarios WHERE id = ?').run(u.id);
   assert.equal(usuarioDaSessao(db, token), null);
+});
+
+
+test('vista_em é anotado uma vez por minuto, não a cada pedido', () => {
+  // Era a cada pedido autenticado, e o app faz um a cada 4 s por pessoa: uma transação
+  // de escrita com fsync por pedido. Medido na produção, o servidor escrevia 3,5 MB/s e
+  // a máquina passava metade do tempo esperando disco — para um campo que ninguém lê.
+  const db = abrirBanco(':memory:');
+  esquecerAnotacoes();
+  const u = criarConta(db, { apelido: 'ana', senha: 'segredo123', senhaRepetida: 'segredo123' });
+  const { token } = entrar(db, { apelido: 'ana', senha: 'segredo123' });
+
+  const quando = () => db.prepare('SELECT vista_em FROM sessoes WHERE usuario_id = ?').get(u.id).vista_em;
+
+  // A primeira chamada anota — é a que abre o minuto. As outras 49 não podem anotar.
+  usuarioDaSessao(db, token);
+  const primeiro = quando();
+  for (let i = 0; i < 49; i++) assert.ok(usuarioDaSessao(db, token), 'a sessão parou de valer');
+  assert.equal(quando(), primeiro, '49 pedidos mexeram no banco; nenhum devia ter mexido');
+
+  // Passado o minuto, ele anota de novo — o campo não congela para sempre.
+  db.prepare('UPDATE sessoes SET vista_em = ? WHERE usuario_id = ?').run(1, u.id);
+  esquecerAnotacoes();
+  usuarioDaSessao(db, token);
+  assert.notEqual(quando(), 1, 'depois do intervalo, devia ter anotado');
 });

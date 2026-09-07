@@ -96,14 +96,40 @@ export function entrar(db, { apelido, senha }) {
 }
 
 /** Sessões não expiram por tempo: o app abre já logado. Só somem se a pessoa sair ou for expulsa. */
+/**
+ * `vista_em` é anotado no máximo uma vez por minuto, por sessão.
+ *
+ * Era anotado a CADA pedido autenticado — e o app faz um a cada 4 s, por pessoa. Com o
+ * SQLite em WAL isso é uma transação de escrita por pedido, com fsync, no disco de uma
+ * VPS pequena. Medido: o servidor de token escrevia **3,5 MB/s** e a máquina passava
+ * 37–47% do tempo esperando disco. O campo, note-se, é escrito e NUNCA lido — era meio
+ * megabyte por minuto para um dado que ninguém consulta.
+ *
+ * Um minuto de granularidade não muda nada para quem venha a usá-lo, e tira a escrita do
+ * caminho de todo pedido. O mapa é limpo junto: sessão que sumiu não fica guardada.
+ */
+const ANOTAR_A_CADA = 60_000;
+const anotadas = new Map();
+
 export function usuarioDaSessao(db, token) {
   if (!token) return null;
   const hash = hashDoToken(token);
   const sessao = db.prepare('SELECT usuario_id FROM sessoes WHERE token_hash = ?').get(hash);
   if (!sessao) return null;
-  db.prepare('UPDATE sessoes SET vista_em = ? WHERE token_hash = ?').run(Date.now(), hash);
+
+  const agora = Date.now();
+  if (agora - (anotadas.get(hash) ?? 0) >= ANOTAR_A_CADA) {
+    db.prepare('UPDATE sessoes SET vista_em = ? WHERE token_hash = ?').run(agora, hash);
+    anotadas.set(hash, agora);
+    if (anotadas.size > 500) {
+      for (const [k, t] of anotadas) if (agora - t >= ANOTAR_A_CADA) anotadas.delete(k);
+    }
+  }
   return buscarPorId(db, sessao.usuario_id);
 }
+
+/** Só para os testes: o intervalo mora em memória e sobrevive entre um caso e outro. */
+export const esquecerAnotacoes = () => anotadas.clear();
 
 export const sair = (db, token) =>
   db.prepare('DELETE FROM sessoes WHERE token_hash = ?').run(hashDoToken(token ?? ''));

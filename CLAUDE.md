@@ -380,6 +380,23 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
   vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
+- **O soundboard é do cargo mais alto do servidor, e não de quem só tem a permissão.**
+  `gerirSons` continua existindo e continua sendo do dono do servidor desenhar, mas ela
+  só vale de fato no topo. Som é diferente de sala ou de castigo: toca para a call
+  inteira e quem não gostou não tem como desfazer. A regra é do APP, em `permissoes.mjs`,
+  justamente para não precisar mexer nos cargos que o pessoal criou. Quem criou o
+  servidor está sempre acima de todos, e empate no topo vale para os dois — não cabe ao
+  app desempatar cargos que alguém pôs no mesmo nível de propósito.
+- **Elemento com `transform` pinta acima dos irmãos seguintes que não estão posicionados.**
+  Quem ENQUADRA o banner ganha um `transform` na imagem, e o retrato do perfil — que vem
+  depois no HTML e sobe por `margin` negativa — ficava POR BAIXO dele, cortado ao meio.
+  Só acontecia com banner ajustado, que é por que passou despercebido. `position:
+  relative` + `z-index` no retrato resolve. Vale para qualquer coisa que suba por margem
+  negativa sobre uma imagem que a pessoa possa enquadrar.
+- **As barras de rolagem são nossas.** Sem `::-webkit-scrollbar`, o Windows desenha as
+  dele — largas e brancas — no meio de um app escuro, e é a única coisa na tela que não é
+  do app. No Mac elas são flutuantes e quase não aparecem, então o estrago só se vê do
+  outro lado: dá para passar meses sem notar.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
 - **O som da live também anda em faixa própria** (`ScreenShareAudio`), separada do vídeo.
@@ -441,6 +458,13 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   junta as buscas simultâneas numa só (`indo`), senão duas chegando juntas disparariam
   duas. Quando somos NÓS que mudamos a sala — expulsar, tirar da call —, a memória é
   esquecida na hora: expulsar que parece não funcionar é pior que expulsar devagar.
+- **`vista_em` era escrito a cada pedido, e nunca lido.** O app faz um pedido a cada 4 s
+  por pessoa, e cada um virava uma transação de escrita no SQLite com fsync. Medido: o
+  servidor de token escrevia **3,5 MB/s** e a máquina passava **37–47% do tempo esperando
+  disco**. Passou a ser anotado no máximo uma vez por minuto, por sessão — e o
+  `synchronous` foi de `FULL` para `NORMAL`, que é a recomendação da própria SQLite em
+  WAL. Depois: **0 blocos escritos por segundo, 0% de iowait.** O risco de `NORMAL` é
+  perder as últimas transações numa queda de energia, nunca o banco corrompido.
 - **O `keepAliveTimeout` do Node é 5 s e o app pesquisa a cada 4.** Um segundo de margem,
   e o registro do dono tem centenas de `→ 0` — a conexão morrendo na mão do cliente.
   Passou para 60 s (com `headersTimeout` acima disso, senão ele é quem fecha). Medir não

@@ -187,6 +187,12 @@ export function abrirBanco(caminho) {
   const db = new DatabaseSync(caminho);
   db.exec('PRAGMA journal_mode = WAL');   // leitura e escrita ao mesmo tempo
   db.exec('PRAGMA foreign_keys = ON');    // ON DELETE CASCADE só vale com isto ligado
+  // Com WAL, `NORMAL` é a recomendação da própria SQLite: o fsync deixa de acontecer a
+  // cada transação e passa a acontecer no checkpoint. O que se arrisca é perder as
+  // últimas transações numa queda de energia — nunca o banco corrompido, que é o que
+  // `FULL` protege a mais. Perder os últimos segundos de conversa numa queda de luz é
+  // aceitável; esperar o disco a cada pedido, numa VPS de um núcleo, não era.
+  db.exec('PRAGMA synchronous = NORMAL');
   migrar(db);
   return db;
 }

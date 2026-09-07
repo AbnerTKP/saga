@@ -464,6 +464,7 @@ export function App() {
       {soundboard && (
         <Soundboard
           eu={eu}
+          cargos={cargos}
           naSala={rm.status === 'connected'}
           onTocar={rm.tocarSom}
           onParar={rm.pararSom}

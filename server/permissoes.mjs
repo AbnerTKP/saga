@@ -88,6 +88,33 @@ export function podeDarCargo(quem, alvo, cargoNovo) {
   return { pode: true };
 }
 
+/**
+ * O soundboard é do cargo mais alto do servidor, e de mais ninguém.
+ *
+ * A permissão sozinha não bastava: dá para dá-la a um cargo do meio, e aí meia dúzia de
+ * pessoas mexe no que todo mundo ouve. Som é diferente de sala ou de castigo — ele toca
+ * para a call inteira, e quem não gostou não tem como desfazer. Por isso a regra é do
+ * APP e não uma permissão a mais: `gerirSons` continua existindo e continua sendo do
+ * dono do servidor desenhar, mas ela só vale de fato no topo.
+ *
+ * Quem criou o servidor está sempre acima de todos — não depende de nível nenhum.
+ * Empate no topo vale para os dois: se o pessoal criou dois cargos no mesmo nível
+ * máximo, são os dois o topo, e não cabe ao app desempatar.
+ */
+export function podeMexerNosSons(quem, cargosDoServidor) {
+  if (!temPermissao(quem?.cargo, 'gerirSons')) {
+    return { pode: false, motivo: 'seu cargo não permite isso' };
+  }
+  if (quem.cargo?.dono) return { pode: true };
+  const niveis = (cargosDoServidor ?? []).map((c) => c.nivel).filter((n) => Number.isFinite(n));
+  if (niveis.length === 0) return { pode: true };
+  const teto = Math.max(...niveis);
+  if ((quem.cargo?.nivel ?? 0) < teto) {
+    return { pode: false, motivo: 'o soundboard é do cargo mais alto do servidor' };
+  }
+  return { pode: true };
+}
+
 /** Editar ou apagar um cargo exige estar acima dele. */
 export function podeMexerNoCargo(quem, cargo) {
   if (!temPermissao(quem?.cargo, 'gerirCargos')) return { pode: false, motivo: 'seu cargo não permite isso' };

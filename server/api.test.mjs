@@ -562,11 +562,11 @@ test('o dono cria um cargo com as permissões que escolher', async () => {
   const dono = await sessaoDe('abner');
   const r = await chamar('POST', '/cargos/criar', {
     sessao: dono.token,
-    corpo: { nome: 'Faxineiro', cor: '#22c55e', nivel: 20, permissoes: ['gerirSons', 'inventada'] },
+    corpo: { nome: 'Faxineiro', cor: '#22c55e', nivel: 20, permissoes: ['gerirSons', 'gerirSalas', 'inventada'] },
   });
   assert.equal(r.status, 200);
   assert.equal(r.corpo.cargo.nome, 'Faxineiro');
-  assert.deepEqual(r.corpo.cargo.permissoes, ['gerirSons'], 'permissão inventada foi descartada');
+  assert.deepEqual(r.corpo.cargo.permissoes, ['gerirSons', 'gerirSalas'], 'permissão inventada foi descartada');
 });
 
 test('membro não cria nem apaga cargo', async () => {
@@ -599,12 +599,29 @@ test('dar um cargo muda o que a pessoa pode fazer', async () => {
   const bruno = await sessaoDe('bruno');
   const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
   const faxineiro = cargos.find((c) => c.nome === 'Faxineiro');
+  const criarSala = (t, nome) => chamar('POST', '/salas/criar', { sessao: t, corpo: { nome, tipo: 'voz' } });
 
-  // Antes: sem permissão de som.
-  assert.equal((await subirSom(bruno.token, 'antes')).status, 403);
-
+  assert.equal((await criarSala(bruno.token, 'antes')).status, 403);
   await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'cargo', alvo: bruno.eu.id, cargo: faxineiro.id } });
-  assert.equal((await subirSom(bruno.token, 'depois')).status, 200, 'o cargo novo não valeu');
+  assert.equal((await criarSala(bruno.token, 'depois')).status, 200, 'o cargo novo não valeu');
+});
+
+test('o soundboard é do cargo mais alto, e não de quem só tem a permissão', async () => {
+  // "Faxineiro" tem `gerirSons` e está no nível 20; o cargo do topo é outro. Som toca
+  // para a call inteira e quem não gostou não desfaz — por isso a permissão sozinha não
+  // basta. Quem CRIOU o servidor está sempre acima de todos, mesmo vestindo o cargo mais
+  // baixo, e por isso ele continua podendo.
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const faxineiro = cargos.find((c) => c.nome === 'Faxineiro');
+  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'cargo', alvo: bruno.eu.id, cargo: faxineiro.id } });
+
+  const r = await subirSom(bruno.token, 'do faxineiro');
+  assert.equal(r.status, 403, 'quem não é o topo subiu som');
+  assert.match(r.corpo.error, /cargo mais alto/);
+
+  assert.equal((await subirSom(dono.token, 'do dono')).status, 200, 'quem criou o servidor devia poder');
 });
 
 test('apagar cargo devolve quem estava nele ao mais baixo', async () => {

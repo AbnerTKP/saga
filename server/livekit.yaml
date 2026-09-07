@@ -24,4 +24,8 @@ room:
   empty_timeout: 120
   max_participants: 20
 logging:
-  level: info
+  # `info` grava UMA LINHA POR CHAMADA DE API. Com o app pesquisando de 4 em 4 segundos
+  # por pessoa, isso encheu 299 MB de log — e cada linha é uma escrita em disco, numa VPS
+  # de um núcleo que já passava metade do tempo esperando o disco. O que interessa quando
+  # algo dá errado é aviso e erro, e esses continuam.
+  level: warn

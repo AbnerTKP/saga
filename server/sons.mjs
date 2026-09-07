@@ -1,6 +1,6 @@
-// Soundboard: quem sobe são moderadores e o dono; tocar é de todo mundo.
+// Soundboard: quem sobe é o cargo mais alto do servidor; tocar é de todo mundo.
 import { ErroDeConta } from './contas.mjs';
-import { temPermissao } from './permissoes.mjs';
+import { podeMexerNosSons } from './permissoes.mjs';
 
 const NOME_VALIDO = /^.{1,40}$/u;
 
@@ -17,8 +17,13 @@ export const listarSons = (db, servidorId) =>
 export const buscarSom = (db, servidorId, id) =>
   db.prepare(`${SELECT} WHERE s.servidor_id = ? AND s.id = ?`).get(servidorId, Number(id)) ?? null;
 
+/** Os níveis dos cargos daquele servidor: é com o TETO deles que a regra compara. */
+const cargosDe = (db, servidorId) =>
+  db.prepare('SELECT nivel FROM cargos WHERE servidor_id = ?').all(servidorId);
+
 export function adicionarSom(db, servidorId, quem, { nome, arquivo }) {
-  if (!temPermissao(quem?.cargo, 'gerirSons')) throw new ErroDeConta('Seu cargo não permite subir sons.', 403);
+  const r = podeMexerNosSons(quem, cargosDe(db, servidorId));
+  if (!r.pode) throw new ErroDeConta(`Não dá para subir sons: ${r.motivo}.`, 403);
   const limpo = String(nome ?? '').trim();
   if (!NOME_VALIDO.test(limpo)) throw new ErroDeConta('Dê um nome ao som, de 1 a 40 caracteres.');
   if (db.prepare('SELECT 1 FROM sons WHERE servidor_id = ? AND nome = ? COLLATE NOCASE').get(servidorId, limpo)) {
@@ -31,7 +36,8 @@ export function adicionarSom(db, servidorId, quem, { nome, arquivo }) {
 }
 
 export function removerSom(db, servidorId, quem, id) {
-  if (!temPermissao(quem?.cargo, 'gerirSons')) throw new ErroDeConta('Seu cargo não permite apagar sons.', 403);
+  const r = podeMexerNosSons(quem, cargosDe(db, servidorId));
+  if (!r.pode) throw new ErroDeConta(`Não dá para apagar sons: ${r.motivo}.`, 403);
   const som = buscarSom(db, servidorId, id);
   if (!som) throw new ErroDeConta('Esse som não existe.', 404);
   db.prepare('DELETE FROM sons WHERE servidor_id = ? AND id = ?').run(servidorId, som.id);

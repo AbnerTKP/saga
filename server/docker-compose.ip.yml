@@ -7,6 +7,11 @@ services:
     network_mode: host
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
+    # Sem isto o log cresce para sempre: o do LiveKit chegou a 299 MB registrando UMA
+    # LINHA POR CHAMADA DE API. Cada linha é escrita em disco, e a VPS tem um núcleo só.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   token:
     build: .
@@ -18,3 +23,8 @@ services:
     environment:
       BANCO: /dados/cantinho.db
     network_mode: host
+    # Sem isto o log cresce para sempre: o do LiveKit chegou a 299 MB registrando UMA
+    # LINHA POR CHAMADA DE API. Cada linha é escrita em disco, e a VPS tem um núcleo só.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

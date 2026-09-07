@@ -749,7 +749,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 .perfil-corpo { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
 
+/* `position: relative` e `z-index` aqui não são enfeite: sem eles o retrato some.
+   Quem ENQUADRA o banner ganha um `transform` na imagem, e elemento transformado pinta
+   na camada dos posicionados — acima de qualquer irmão seguinte que não esteja
+   posicionado. O retrato vem depois no HTML e mesmo assim ficava por baixo, cortado ao
+   meio pela borda do banner. Só acontecia com banner ajustado, que é por que passou. */
 .perfil-foto {
+  position: relative; z-index: 1;
   width: 128px; height: 128px; margin: -64px 0 0; border-radius: 50%;
   border: 6px solid var(--bg2); background: var(--accent); color: #fff;
   font-size: 48px; font-weight: 600; display: grid; place-items: center;
@@ -769,6 +775,19 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 .perfil-selo.berserk { background: rgba(192,132,252,.16); color: #d8b4fe; }
 .perfil-selo.ok { background: rgba(35,165,89,.16); color: #57d98a; }
+/* As barras de rolagem são nossas.
+   Sem isto o Windows desenha as dele — largas e brancas — no meio de um app escuro, e é
+   a única coisa na tela que não é do app. No Mac elas são flutuantes e quase não
+   aparecem, então o estrago só se vê do outro lado. Fica fina, sem trilho, e o polegar
+   acende ao passar o mouse: presente quando se procura, discreta quando não. */
+* { scrollbar-color: var(--bg4) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 999px;
+  border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 .perfil-volume { display: grid; gap: 6px; margin-top: 4px; padding: 12px 14px;
   background: var(--bg1); border-radius: 10px; }
 .perfil-volume input[type=range] { width: 100%; }

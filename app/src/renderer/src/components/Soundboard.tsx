@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { pode, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som } from '../api';
+import { pode, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som, podeMexerNosSons, type Cargo } from '../api';
 import { Icon } from './Icon';
 
-export function Soundboard({ eu, naSala, onTocar, onParar, tocando, restantes, onClose }: {
+export function Soundboard({ eu, cargos, naSala, onTocar, onParar, tocando, restantes, onClose }: {
   eu: Membro;
   naSala: boolean;
   onTocar: (url: string) => void;
@@ -12,6 +12,8 @@ export function Soundboard({ eu, naSala, onTocar, onParar, tocando, restantes, o
   tocando: string | null;
   /** Quantos ainda cabem nesta entrada na sala; `null` quando não há limite (Berserk). */
   restantes: number | null;
+  /** Os cargos do servidor: é com o TETO deles que a regra compara. */
+  cargos: Cargo[];
   onClose: () => void;
 }) {
   const [sons, setSons] = useState<Som[] | null>(null);
@@ -20,7 +22,7 @@ export function Soundboard({ eu, naSala, onTocar, onParar, tocando, restantes, o
   const [ocupado, setOcupado] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
 
-  const podeGerir = pode(eu.cargo, 'gerirSons');
+  const podeGerir = podeMexerNosSons(eu, cargos);
 
   const recarregar = () => listarSons().then(setSons).catch((e) => setErro((e as Error).message));
   useEffect(() => { recarregar(); }, []);

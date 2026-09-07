@@ -37,6 +37,20 @@ export type Cargo = {
 export const pode = (cargo: Cargo | null | undefined, p: Permissao) =>
   !!cargo && (cargo.dono || cargo.permissoes.includes(p));
 
+/**
+ * O soundboard é do cargo mais alto do servidor.
+ *
+ * Espelho da regra do servidor (`podeMexerNosSons`), só para não mostrar botão que será
+ * recusado. Quem decide de verdade é o servidor. Som toca para a call inteira e quem não
+ * gostou não desfaz — por isso não basta a permissão, tem de ser o topo.
+ */
+export const podeMexerNosSons = (eu: Membro, cargos: Cargo[]) => {
+  if (!pode(eu.cargo, 'gerirSons')) return false;
+  if (eu.cargo?.dono) return true;
+  const niveis = cargos.map((c) => c.nivel).filter((n) => Number.isFinite(n));
+  return niveis.length === 0 || (eu.cargo?.nivel ?? 0) >= Math.max(...niveis);
+};
+
 /** Ações que recaem sobre alguém passam também pela hierarquia. */
 export const SOBRE_ALGUEM: Permissao[] = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo'];
 
