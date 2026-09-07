@@ -6,7 +6,7 @@ import { listarCargos } from './cargos.mjs';
 import {
   garantirMembro, buscarMembro, listarMembros, impedimento, mudarNomeExibido,
   banir, desbanir, darTimeout, tirarTimeout, expulsar, definirCargo,
-  definirTurbo, definirIdExibido,
+  definirIdExibido,
 } from './membros.mjs';
 
 function cenario({ dono } = {}) {
@@ -141,68 +141,12 @@ test('quem não é membro do servidor não entra', () => {
   assert.match(impedimento(buscarMembro(db, sid, 999)), /não faz parte/);
 });
 
-// --- Berserk e identificador ---------------------------------------------
+// --- identificador ---------------------------------------------------------
 
 test('ninguém nasce Berserk', () => {
   const { db, sid, cria } = cenario();
   const a = cria('abner');
   assert.equal(buscarMembro(db, sid, a.id).turbo, 0);
-});
-
-test('o dono concede e tira o Berserk', () => {
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner'), caio = cria('caio');
-  assert.equal(definirTurbo(db, sid, dono.id, caio.id, true).turbo, 1);
-  assert.equal(definirTurbo(db, sid, dono.id, caio.id, false).turbo, 0);
-});
-
-test('o dono pode dar Berserk a si mesmo', () => {
-  // Berserk é distinção, não moderação: a regra de "não agir sobre si" não se aplica.
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner');
-  assert.equal(definirTurbo(db, sid, dono.id, dono.id, true).turbo, 1);
-});
-
-test('o Berserk é da conta, não do servidor: vale em todos de uma vez', () => {
-  // É a diferença entre o Berserk e o cargo. Cargo, banimento e nome exibido são do
-  // vínculo com um servidor; o Berserk é da Saga, e quem tem, tem em todo canto.
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner'), caio = cria('caio');
-
-  const outro = garantirServidor(db, { nome: 'Outro', salas: ['Geral'] });
-  garantirMembro(db, outro.id, { id: caio.id, apelido: 'caio' });
-  garantirMembro(db, outro.id, { id: dono.id, apelido: 'abner' });
-
-  definirTurbo(db, sid, dono.id, caio.id, true);
-  assert.equal(buscarMembro(db, sid, caio.id).turbo, 1, 'no servidor onde foi dado');
-  assert.equal(buscarMembro(db, outro.id, caio.id).turbo, 1, 'e no outro também');
-
-  definirTurbo(db, sid, dono.id, caio.id, false);
-  assert.equal(buscarMembro(db, outro.id, caio.id).turbo, 0, 'tirar também vale em todos');
-});
-
-test('tirar o Berserk de alguém não mexe em mais ninguém', () => {
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner'), caio = cria('caio'), duda = cria('duda');
-  definirTurbo(db, sid, dono.id, caio.id, true);
-  definirTurbo(db, sid, dono.id, duda.id, true);
-  definirTurbo(db, sid, dono.id, caio.id, false);
-  assert.equal(buscarMembro(db, sid, caio.id).turbo, 0);
-  assert.equal(buscarMembro(db, sid, duda.id).turbo, 1);
-});
-
-test('moderador não concede Berserk', () => {
-  const { db, sid, cria, cargos } = cenario();
-  const dono = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
-  definirCargo(db, sid, dono.id, bruno.id, cargos.Moderador.id);
-  assert.throws(() => definirTurbo(db, sid, bruno.id, caio.id, true), /permite/);
-});
-
-test('membro não dá Berserk a si mesmo', () => {
-  const { db, sid, cria } = cenario();
-  cria('abner');
-  const caio = cria('caio');
-  assert.throws(() => definirTurbo(db, sid, caio.id, caio.id, true), /permite/);
 });
 
 test('o dono define e limpa o identificador', () => {
@@ -229,11 +173,4 @@ test('moderador não define identificador', () => {
   const dono = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
   definirCargo(db, sid, dono.id, bruno.id, cargos.Moderador.id);
   assert.throws(() => definirIdExibido(db, sid, bruno.id, caio.id, '1'), /permite/);
-});
-
-test('Turbo e identificador em quem não é do servidor dá erro claro', () => {
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner');
-  assert.throws(() => definirTurbo(db, sid, dono.id, 999, true), /não faz parte/);
-  assert.throws(() => definirIdExibido(db, sid, dono.id, 999, '1'), /não faz parte/);
 });

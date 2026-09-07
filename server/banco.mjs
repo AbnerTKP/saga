@@ -159,6 +159,11 @@ export const MIGRACOES = [
   `CREATE INDEX categorias_servidor ON categorias(servidor_id)`,
   // Apagar a gaveta não leva as salas junto: some a categoria, a conversa fica.
   `ALTER TABLE salas ADD COLUMN categoria_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL`,
+
+  // Dono da SAGA, não de um servidor. É outra coisa do cargo chamado "Dono" que cada
+  // servidor tem: aquele manda no servidor dele; este manda no app. Fica na conta porque
+  // a conta é o que existe acima dos servidores.
+  `ALTER TABLE usuarios ADD COLUMN dono INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export function abrirBanco(caminho) {

@@ -32,7 +32,7 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
 
 // Junta conta e vínculo numa linha só, que é como o app quer ver a pessoa.
 const SELECT_MEMBRO = `
-  SELECT u.id, u.apelido, u.foto, u.banner, u.enquadramento,
+  SELECT u.id, u.apelido, u.foto, u.banner, u.enquadramento, u.dono,
          m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
          u.turbo, m.id_exibido, m.cargo_id,
          c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,
@@ -88,23 +88,6 @@ export function mudarNomeExibido(db, servidorId, usuarioId, nome) {
 }
 
 const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, não pode roubar a linha
-
-/**
- * Berserk é do dono conceder. Vale para qualquer pessoa, inclusive ele mesmo.
- *
- * Quem concede é o dono DE UM SERVIDOR, mas o que ele concede é da CONTA: a pessoa passa
- * a ser Berserk em toda a Saga, não só ali. É por isso que a permissão é conferida no
- * servidor de quem dá, e a escrita é em `usuarios`.
- */
-export function definirTurbo(db, servidorId, quemId, alvoId, ligado) {
-  if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'concederTurbo')) {
-    throw new ErroDeConta('Seu cargo não permite conceder o Berserk.', 403);
-  }
-  const alvo = buscarMembro(db, servidorId, Number(alvoId));
-  if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
-  db.prepare('UPDATE usuarios SET turbo = ? WHERE id = ?').run(ligado ? 1 : 0, alvo.id);
-  return buscarMembro(db, servidorId, alvo.id);
-}
 
 /** Identificador curto que aparece antes do nome. Vazio remove. */
 export function definirIdExibido(db, servidorId, quemId, alvoId, id) {

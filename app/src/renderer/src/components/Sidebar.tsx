@@ -10,7 +10,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout }: {
+export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, donoDaSaga, onPainelDaSaga }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
@@ -22,6 +22,9 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
   pessoas: Map<string, PessoaNaCall>;
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }) => void;
   onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
+  /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
+  donoDaSaga: boolean;
+  onPainelDaSaga: () => void;
 }) {
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
@@ -235,6 +238,13 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
             <Icon name={rm.deafened ? 'headOff' : 'head'} />
           </button>
           <button onClick={onPainel} title="Pessoas e servidor"><Icon name="pessoas" /></button>
+          {/* Só de quem cuida da Saga. Fica aqui, junto de você, e não nas configurações
+              do servidor: o que se decide lá vale em todos eles. */}
+          {donoDaSaga && (
+            <button className="botao-da-saga" onClick={onPainelDaSaga} title="Saga — Berserk e o resto do app">
+              <Icon name="mjolnir" size={17} />
+            </button>
+          )}
           <button onClick={onSettings} title="Dispositivos"><Icon name="gear" /></button>
         </div>
       </div>

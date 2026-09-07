@@ -50,8 +50,8 @@ que dá para testar sem tela fica em módulos puros: `permissoes` do lado do ser
 paralelo em `api.ts` (`pode`, `podeSobre`), e `qualidades.ts`, `volume.ts`, `sinal.ts`,
 `erros.ts` e `audivel.ts` são pequenos e testados.
 
-**Identidade** — a conta (apelido + senha) e o **Berserk** são globais; cargo, banimento,
-castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
+**Identidade** — a conta (apelido + senha), o **Berserk** e o **dono da Saga** são globais;
+cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
 
 ## Decisões que não são óbvias no código
 
@@ -82,6 +82,22 @@ castigo, nome exibido e identificador pertencem ao vínculo pessoa↔servidor.
   ações que recaem sobre alguém: criar sala não pergunta "acima de quem?".
 - **O dono tem todas as permissões por ser dono**, não por constar numa lista: editar o
   cargo dele no banco não pode deixar o servidor sem conserto.
+- **Dono da Saga e cargo do topo de um servidor são coisas diferentes**, e confundi-las
+  fazia a Saga parecer o servidor. `usuarios.dono` é quem cuida do APP: mora na conta,
+  porque a conta é o que existe acima dos servidores, e é ele quem dá e tira o Berserk —
+  que também é da conta. `cargos.dono` é o cargo mais alto de UM servidor e manda só nele;
+  o nome dele é do pessoal de lá ("Lula", no CARDUME), e por isso passou a poder ser
+  renomeado: ele nasce no nível 100 e o limite geral é 1–99, o que fazia renomear bater em
+  "o nível precisa ser de 1 a 99".
+- **`concederTurbo` deixou de ser permissão de servidor.** Dar Berserk num servidor
+  distribuiria distinção que aparece em todos os outros. Hoje é do dono da Saga, num
+  painel próprio, **fora** das configurações do servidor — dentro delas pareceria uma
+  distinção daquele servidor. Cargo antigo que ainda a tenha guardada perde na leitura,
+  pela regra de sempre: permissão que não existe é descartada.
+- **O dono da Saga é semeado do `.env` (`DONO`), e só se ainda não houver nenhum.** Semear
+  sempre faria um `.env` trocado transferir o app em silêncio. E a semeadura acontece
+  também no login, não só no arranque: num servidor novo o apelido do dono já está no
+  `.env` mas a conta dele ainda não existe quando o processo sobe.
 - **Permissão inventada é descartada**, e **ninguém dá a um cargo permissão que não tem** —
   seria contornar o próprio limite criando um cargo mais forte e vestindo-o depois.
 - **A sala no LiveKit é identificada pelo id, não pelo nome.** Duas salas "Geral" em

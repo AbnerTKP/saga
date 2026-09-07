@@ -25,7 +25,14 @@ export const buscarCargo = (db, servidorId, id) =>
 export const cargoDoDono = (db, servidorId) =>
   paraFora(db.prepare('SELECT * FROM cargos WHERE servidor_id = ? AND dono = 1').get(servidorId));
 
-function conferir(db, servidorId, { nome, cor, nivel }, exceto = null) {
+/**
+ * `ehDoTopo` afrouxa o limite de nível só para o cargo mais alto do servidor.
+ *
+ * Ele nasce no nível 100 e o limite geral é 1–99, então renomear "Dono" para o que o
+ * pessoal chamar — "Lula", no CARDUME — batia em "o nível precisa ser de 1 a 99". O nome
+ * é do servidor; o que não muda é ele ser o de cima.
+ */
+function conferir(db, servidorId, { nome, cor, nivel }, exceto = null, ehDoTopo = false) {
   const limpo = String(nome ?? '').trim();
   if (!NOME_VALIDO.test(limpo)) {
     throw new ErroDeConta('O nome do cargo precisa ter de 1 a 24 caracteres, numa linha só.');
@@ -34,8 +41,11 @@ function conferir(db, servidorId, { nome, cor, nivel }, exceto = null) {
     throw new ErroDeConta('A cor precisa ser um código como #a855f7.');
   }
   const n = Number(nivel);
-  if (!Number.isInteger(n) || n < 1 || n > 99) {
-    throw new ErroDeConta('O nível precisa ser um número de 1 a 99. O 100 é do dono.');
+  const teto = ehDoTopo ? 100 : 99;
+  if (!Number.isInteger(n) || n < 1 || n > teto) {
+    throw new ErroDeConta(ehDoTopo
+      ? 'O nível precisa ser um número de 1 a 100.'
+      : 'O nível precisa ser um número de 1 a 99. O 100 é do cargo mais alto.');
   }
   const igual = db.prepare('SELECT id FROM cargos WHERE servidor_id = ? AND nome = ? COLLATE NOCASE')
     .get(servidorId, limpo);
@@ -65,7 +75,7 @@ export function editarCargo(db, servidorId, quem, id, dados) {
   const r = podeMexerNoCargo(quem, cargo);
   if (!r.pode) throw new ErroDeConta(r.motivo, 403);
 
-  const { nome, cor, nivel } = conferir(db, servidorId, dados, cargo.id);
+  const { nome, cor, nivel } = conferir(db, servidorId, dados, cargo.id, cargo.dono);
   if (!quem.cargo.dono && nivel >= quem.cargo.nivel) {
     throw new ErroDeConta('Não dá para pôr um cargo no seu nível ou acima.', 403);
   }

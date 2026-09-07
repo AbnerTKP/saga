@@ -263,10 +263,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       .on(RoomEvent.TrackUnmuted, bump)
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
-        // A imagem entra (é a miniatura por onde se escolhe); o som, só o da escolhida.
-        if (pub.source === Track.Source.ScreenShareAudio && quem.identity !== assistindoRef.current) {
-          pub.setSubscribed(false);
-        }
+        // Transmissão que começa não entra sozinha: ela aparece apagada na lista, e só
+        // baixa se você clicar. Sem isto, três pessoas transmitindo enchem a banda de
+        // todo mundo sem ninguém ter pedido.
+        if (ehDaLive(pub.source) && quem.identity !== assistindoRef.current) pub.setSubscribed(false);
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
@@ -647,22 +647,24 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   /**
    * Escolhe a transmissão que vai para o palco. `null` é nenhuma.
    *
-   * O VÍDEO de todas continua chegando: é a miniatura lá embaixo que deixa escolher, e
-   * não dá para escolher o que não se vê. O SOM é que é só o da escolhida — som de duas
-   * transmissões ao mesmo tempo é uma sopa em que não se entende nenhuma.
+   * Só a escolhida é inscrita — imagem e som. As outras não chegam: continuam na lista
+   * de baixo, apagadas e com o nome de quem transmite, esperando o clique. Isto é o
+   * ponto, e eu errei nos dois sentidos antes de acertar: cortar a lista inteira deixa a
+   * escolha às cegas; deixar todas rodando é o que a pessoa não quer, porque são três
+   * vídeos descendo para quem assiste um.
    *
-   * Cheguei a cortar o vídeo das outras também, e estava errado: economizava banda ao
-   * preço de deixar a escolha às cegas, com o nome da pessoa e mais nada.
+   * Quem desenha o cartão apagado é o Stage, a partir de `lives` — que sai da publicação
+   * e por isso continua listando quem não está sendo recebido.
    */
   const assistir = useCallback((identity: string | null) => {
     assistindoRef.current = identity;
     setAssistindoState(identity);
     for (const p of room.remoteParticipants.values()) {
+      const querVer = p.identity === identity;
       for (const pub of p.trackPublications.values()) {
-        if (!('setSubscribed' in pub)) continue;
-        const mexer = pub as { setSubscribed(v: boolean): void };
-        if (pub.source === Track.Source.ScreenShare) mexer.setSubscribed(true);
-        if (pub.source === Track.Source.ScreenShareAudio) mexer.setSubscribed(p.identity === identity);
+        if (ehDaLive(pub.source) && 'setSubscribed' in pub) {
+          (pub as { setSubscribed(v: boolean): void }).setSubscribed(querVer);
+        }
       }
     }
     aplicarAudio();

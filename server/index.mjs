@@ -14,6 +14,7 @@ import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
 import * as salasM from './salas.mjs';
 import * as categoriasM from './categorias.mjs';
+import * as plataforma from './plataforma.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
@@ -128,6 +129,8 @@ const verMembro = (m) => m && ({
   // num lugar e torta no outro.
   enquadramento: enquadramento.ler(m.enquadramento),
   turbo: !!m.turbo,
+  // Dono da SAGA. É outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor.
+  donoDaSaga: !!m.dono,
   idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
@@ -145,6 +148,11 @@ const salasDeVoz = (sid) => salasDoServidor(sid).filter((s) => s.tipo === 'voz')
 
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
+  // Também aqui, e não só no arranque: num servidor novo o `.env` já traz o apelido do
+  // dono, mas a conta dele ainda não existe quando o processo sobe. Semear só lá deixava
+  // a Saga sem dono para sempre. É idempotente — ver garantirDonoDaSaga.
+  plataforma.garantirDonoDaSaga(db, DONO);
+
   // Quem chega sem vínculo nenhum entra no semeado pelo .env — é o servidor de casa.
   const temVinculo = db.prepare('SELECT count(*) c FROM membros WHERE usuario_id = ?').get(usuario.id).c > 0;
   if (!temVinculo) membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
@@ -419,6 +427,18 @@ const ROTAS = {
     return categoriasM.apagarCategoria(db, sid, eu, id);
   },
 
+  // --- o que é da Saga, e não de um servidor ---------------------------------
+  'GET /saga/contas': async (req) => {
+    const eu = exigirConta(req);
+    return { contas: plataforma.listarContas(db, eu.id) };
+  },
+
+  'POST /saga/berserk': async (req) => {
+    const eu = exigirConta(req);
+    const { alvo, berserk } = await lerCorpo(req);
+    return { conta: plataforma.definirBerserk(db, eu.id, alvo, berserk) };
+  },
+
   'POST /categorias/ordem': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const { ids } = await lerCorpo(req);
@@ -592,7 +612,7 @@ const ROTAS = {
 
   'POST /moderar': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
-    const { acao, alvo, minutos, cargo, turbo, idExibido } = await lerCorpo(req);
+    const { acao, alvo, minutos, cargo, idExibido } = await lerCorpo(req);
 
     switch (acao) {
       // Banir e dar castigo também tiram da call. Sem isso a pessoa continua conversando
@@ -611,7 +631,6 @@ const ROTAS = {
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
       case 'cargo':      return { alvo: verMembro(membros.definirCargo(db, sid, eu.id, alvo, cargo)) };
-      case 'turbo':      return { alvo: verMembro(membros.definirTurbo(db, sid, eu.id, alvo, turbo)) };
       case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };
 
       case 'expulsar': {
@@ -687,6 +706,9 @@ const servidor = http.createServer(async (req, res) => {
     return json(res, 500, { error: 'erro no servidor' });
   }
 });
+
+// Quem manda no app. Só semeia se ainda não houver dono: ver garantirDonoDaSaga.
+plataforma.garantirDonoDaSaga(db, DONO);
 
 servidor.listen(PORT, () => {
   console.log(

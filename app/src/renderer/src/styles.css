@@ -187,6 +187,13 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   border: 1px solid transparent; border-radius: 999px; padding: 2px 8px 2px 3px; }
 .live-chip.no-palco { border-color: var(--accent); background: var(--bg3); }
 /* O campo de cima sem escolha: em vez de sumir, ele diz o que fazer. */
+/* A transmissão que está no ar e não está sendo recebida: existe, dá para clicar, e
+   não gasta um bit. É o contrário de sumir — sumir deixaria a escolha às cegas. */
+.live-apagada { display: grid; place-items: center; background: var(--bg1);
+  border: 2px dashed var(--bg4); opacity: .5; transition: opacity .12s, border-color .12s; }
+.live-apagada:hover { opacity: 1; border-color: var(--accent); }
+.live-apagada .tile-label { background: rgba(0,0,0,.5); }
+
 .grande-vazio { flex: 1; cursor: default; border: 2px dashed var(--linha-tracejada, #3a3d44); background: transparent; }
 .grande-vazio .muted { display: grid; place-items: center; gap: 8px; text-align: center; }
 .live-ver { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 999px; color: var(--text); }
@@ -794,3 +801,14 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 }
 .menu-risco { height: 1px; background: var(--line); margin: 4px 0; }
 .linha-botoes { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+
+/* Painel de quem cuida da Saga. */
+.botao-da-saga { color: var(--accent-claro) !important; }
+.contas-da-saga { display: grid; gap: var(--e2); margin-top: var(--e3); }
+.conta-da-saga { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3);
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 10px; }
+.conta-da-saga.berserk { border-color: rgba(192,132,252,.4); }
+.conta-quem { flex: 1; min-width: 0; }
+.conta-da-saga button { display: flex; align-items: center; gap: 5px; padding: 7px 12px;
+  border-radius: 8px; background: var(--bg3); color: var(--text); font-size: 13px; font-weight: 600; }
+.conta-da-saga button:hover:not(:disabled) { background: var(--bg4); color: var(--white); }

@@ -255,21 +255,33 @@ test('imagem parada continua livre para todos', async () => {
   assert.equal((await subir('/eu/foto', token, PNG)).status, 200);
 });
 
-test('com Turbo, a imagem animada passa', async () => {
+test('com Berserk, a imagem animada passa', async () => {
   const dono = await sessaoDe('abner');
-  const r = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'turbo', alvo: dono.eu.id, turbo: true } });
-  assert.equal(r.status, 200);
-  assert.equal(r.corpo.alvo.turbo, true, 'o dono pode dar Turbo a si mesmo');
+  const r = await chamar('POST', '/saga/berserk', { sessao: dono.token, corpo: { alvo: dono.eu.id, berserk: true } });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.equal(r.corpo.conta.berserk, true);
 
   const b = await subir('/eu/banner', dono.token, GIF);
   assert.equal(b.status, 200);
   assert.match(b.corpo.eu.banner, /\.gif$/);
 });
 
-test('membro não concede Turbo a si mesmo', async () => {
+test('quem não é dono da Saga não mexe no Berserk, nem no próprio', async () => {
+  // Dar Berserk deixou de ser permissão de servidor: quem manda no CARDUME não pode
+  // distribuir distinção que aparece em todos os outros servidores.
   const bruno = await sessaoDe('bruno');
-  const r = await chamar('POST', '/moderar', { sessao: bruno.token, corpo: { acao: 'turbo', alvo: bruno.eu.id, turbo: true } });
+  const r = await chamar('POST', '/saga/berserk', { sessao: bruno.token, corpo: { alvo: bruno.eu.id, berserk: true } });
   assert.equal(r.status, 403);
+  const lista = await chamar('GET', '/saga/contas', { sessao: bruno.token });
+  assert.equal(lista.status, 403);
+});
+
+test('o painel da Saga lista as contas para quem é dono', async () => {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('GET', '/saga/contas', { sessao: dono.token });
+  assert.equal(r.status, 200);
+  assert.ok(r.corpo.contas.some((c) => c.apelido === 'abner' && c.dono), 'o dono devia constar como dono');
+  assert.ok(r.corpo.contas.some((c) => c.apelido === 'bruno' && !c.dono));
 });
 
 test('o dono define o identificador, e ele volta na lista', async () => {
@@ -693,22 +705,32 @@ test('o Berserk atravessa os servidores; o cargo, não', async () => {
   const casa = meus.find((s) => s.id !== dele.id);
 
   const eu = (await chamar('GET', '/eu', { sessao: bruno.token, servidor: dele.id })).corpo.eu;
-  const deu = await chamar('POST', '/moderar', {
-    sessao: bruno.token, servidor: dele.id,
-    corpo: { acao: 'turbo', alvo: eu.id, turbo: true },
+  // Quem concede é o dono da Saga, de fora de qualquer servidor — o Bruno manda no
+  // servidor dele e mesmo assim não distribui Berserk.
+  const dono = await sessaoDe('abner');
+  const negado = await chamar('POST', '/saga/berserk', {
+    sessao: bruno.token, corpo: { alvo: eu.id, berserk: true },
+  });
+  assert.equal(negado.status, 403, 'dono de servidor não concede Berserk');
+
+  const deu = await chamar('POST', '/saga/berserk', {
+    sessao: dono.token, corpo: { alvo: eu.id, berserk: true },
   });
   assert.equal(deu.status, 200, JSON.stringify(deu.corpo));
-  assert.equal(deu.corpo.alvo.turbo, true);
+  assert.equal(deu.corpo.conta.berserk, true);
 
   const naCasa = (await chamar('GET', '/eu', { sessao: bruno.token, servidor: casa.id })).corpo.eu;
   assert.equal(naCasa.turbo, true, 'o Berserk tem de valer em todos os servidores');
   assert.equal(naCasa.cargo.dono, false, 'o cargo, esse, continua sendo de cada servidor');
+  assert.equal(naCasa.donoDaSaga, false, 'e mandar num servidor não é mandar na Saga');
+  assert.equal(naCasa.donoDaSaga, false, 'e mandar num servidor não é mandar na Saga');
 });
 
 test('trocar a imagem zera o enquadramento dela, e só o dela', async () => {
   // Foi o bug de verdade: quem tinha dado zoom num banner e subia outro via a imagem
   // nova com a aproximação da antiga — um pedaço gigante no lugar do desenho.
-  const { token } = await sessaoDe('abner');
+  const { token, eu } = await sessaoDe('abner');
+  await chamar('POST', '/saga/berserk', { sessao: token, corpo: { alvo: eu.id, berserk: true } });
 
   assert.equal((await subir('/eu/foto', token, PNG)).status, 200);
   assert.equal((await subir('/eu/banner', token, GIF)).status, 200);
@@ -731,11 +753,12 @@ test('trocar a imagem zera o enquadramento dela, e só o dela', async () => {
 });
 
 test('tirar a imagem também leva o enquadramento dela', async () => {
-  const { token } = await sessaoDe('abner');
-  assert.equal((await subir('/eu/banner', token, GIF)).status, 200);
-  await chamar('PATCH', '/eu/enquadramento', { sessao: token, corpo: { papel: 'banner', valor: { x: 10, y: 90, zoom: 2 } } });
-  assert.equal((await subir('/eu/banner', token, Buffer.alloc(0))).status, 200);
-  const eu = (await chamar('GET', '/eu', { sessao: token })).corpo.eu;
+  const sessao = await sessaoDe('abner');
+  await chamar('POST', '/saga/berserk', { sessao: sessao.token, corpo: { alvo: sessao.eu.id, berserk: true } });
+  assert.equal((await subir('/eu/banner', sessao.token, GIF)).status, 200);
+  await chamar('PATCH', '/eu/enquadramento', { sessao: sessao.token, corpo: { papel: 'banner', valor: { x: 10, y: 90, zoom: 2 } } });
+  assert.equal((await subir('/eu/banner', sessao.token, Buffer.alloc(0))).status, 200);
+  const eu = (await chamar('GET', '/eu', { sessao: sessao.token })).corpo.eu;
   assert.equal(eu.banner, null);
   assert.equal(eu.enquadramento.banner, undefined);
 });

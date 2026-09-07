@@ -37,6 +37,7 @@ const IMPRESSOES = [
   '0fced285c329',  // 24 categorias
   '51329ea7751a',  // 25 índice de categorias
   '75910a23ea2f',  // 26 coluna categoria_id em salas
+  'dbaf4d092025',  // 27 coluna dono em usuarios (dono da Saga, não do servidor)
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

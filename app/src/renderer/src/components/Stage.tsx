@@ -141,6 +141,16 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
    * O que o clique num quadro faz. Numa transmissão, escolher é assistir — e é o som que
    * muda de dono, não só o tamanho. Numa câmera, é só ampliar.
    */
+  /**
+   * As transmissões que estão no ar mas não estão sendo recebidas.
+   *
+   * Elas não têm faixa, logo não têm quadro — mas precisam continuar na fila de baixo,
+   * apagadas, para dar onde clicar. Sem isso, escolher outra viraria adivinhação.
+   */
+  const apagadas = rm.lives.filter(
+    (l) => !rm.tiles.some((t) => t.source === Track.Source.ScreenShare && t.participant.identity === l.identity),
+  );
+
   const escolher = (t: Tile) => {
     if (t.source === Track.Source.ScreenShare) {
       rm.assistir(t.participant.identity === rm.assistindo ? null : t.participant.identity);
@@ -223,7 +233,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           {/* Dois campos: em cima a que você escolheu, embaixo todas, para escolher.
               A escolha é um clique na própria imagem — era em fichas no alto da tela, e
               escolher longe do que se escolhe é o que estava ruim. */}
-          {!idle && (focusTile || screens.length > 0) && (
+          {!idle && (focusTile || rm.lives.length > 0) && (
             <div className="focus-layout">
               {focusTile
                 ? <VideoTile tile={focusTile} big preencher={preencher} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)} />
@@ -238,6 +248,15 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               {(rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
                   {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
+                  {apagadas.map((l) => (
+                    <button key={l.identity} className="tile live-apagada"
+                      title={`Assistir a transmissão de ${l.nome}`}
+                      onClick={() => rm.assistir(l.identity)}>
+                      <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
+                        enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} tamanho="big" />
+                      <div className="tile-label"><Icon name="screen" size={13} /> {l.nome} · assistir</div>
+                    </button>
+                  ))}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${p.isSpeaking ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY })}>
@@ -249,7 +268,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               )}
             </div>
           )}
-          {!idle && !focusTile && screens.length === 0 && rm.tiles.length > 0 && (
+          {!idle && !focusTile && rm.lives.length === 0 && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
               {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
               {audioOnly.map((p) => (

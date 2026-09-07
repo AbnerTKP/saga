@@ -390,16 +390,6 @@ export function PainelDoServidor({ eu, servidor, onEu, onServidor, onClose }: {
                     ? <button title="Desbanir" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
                     : <button className="danger" title="Banir para sempre" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
                   )}
-                  {pode(eu.cargo, 'concederTurbo') && (
-                    <button
-                      className={m.turbo ? 'berserk-on' : ''}
-                      title={m.turbo ? 'Tirar o Berserk' : 'Dar Berserk'}
-                      disabled={ocupado}
-                      onClick={() => agir('turbo', m, { turbo: !m.turbo })}
-                    >
-                      turbo
-                    </button>
-                  )}
                   {pode(eu.cargo, 'definirId') && (
                     <input
                       className="campo-id"

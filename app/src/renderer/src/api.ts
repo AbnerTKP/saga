@@ -16,7 +16,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'concederTurbo' | 'definirId';
+  | 'gerirServidor' | 'definirId';
 
 export type Cargo = {
   id: number;
@@ -50,6 +50,8 @@ export type Membro = {
   /** Como esta pessoa enquadrou a própria foto e o próprio banner. */
   enquadramento: Enquadramentos;
   turbo: boolean;
+  /** Dono da SAGA — outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor. */
+  donoDaSaga?: boolean;
   /** Identificador curto que aparece antes do nome. */
   idExibido: string | null;
   banido: boolean;
@@ -249,6 +251,8 @@ export type Mensagem = {
   foto: string | null;
   enquadramento?: Enquadramentos;
   turbo: boolean;
+  /** Dono da SAGA — outra coisa de `cargo.dono`, que é o cargo mais alto de um servidor. */
+  donoDaSaga?: boolean;
   idExibido: string | null;
 };
 
@@ -368,14 +372,14 @@ export type AcaoDeModeracao =
  * Turbo e identificador são distinção, não punição: o dono aplica em quem quiser,
  * inclusive em si. Por isso ficam fora da régua de moderação.
  */
-export type AcaoDoDono = 'turbo' | 'id';
+export type AcaoDoDono = 'id';
 
 export type Acao = AcaoDeModeracao | AcaoDoDono;
 
 export const moderar = (
   acao: Acao,
   alvo: number,
-  extra?: { minutos?: number; cargo?: number; turbo?: boolean; idExibido?: string },
+  extra?: { minutos?: number; cargo?: number; idExibido?: string },
 ) => pedir<{ alvo?: Membro; ok?: boolean }>('POST', '/moderar', { acao, alvo, ...extra });
 
 // --- Giphy ------------------------------------------------------------------
@@ -393,3 +397,17 @@ export const salvarEnquadramento = async (papel: Papel, valor: Enquadramento | n
 
 export const usarGif = (onde: OndeAImagemVai, url: string) =>
   pedir<{ eu?: Membro; servidor?: Servidor }>('POST', '/giphy/usar', { onde, url });
+
+// --- o que é da Saga, e não de um servidor ----------------------------------
+
+/** Uma conta vista do painel do dono da Saga. */
+export type ContaDaSaga = {
+  id: number; apelido: string; foto: string | null;
+  berserk: boolean; dono: boolean; criadoEm: number; servidores: number;
+};
+
+export const contasDaSaga = async () =>
+  (await pedir<{ contas: ContaDaSaga[] }>('GET', '/saga/contas')).contas;
+
+export const definirBerserk = async (alvo: number, berserk: boolean) =>
+  (await pedir<{ conta: ContaDaSaga }>('POST', '/saga/berserk', { alvo, berserk })).conta;

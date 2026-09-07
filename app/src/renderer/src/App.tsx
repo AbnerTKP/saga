@@ -18,6 +18,7 @@ import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
 import { PedirNome } from './components/PedirNome';
+import { PainelDaSaga } from './components/PainelDaSaga';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { DeviceSettings } from './components/DeviceSettings';
@@ -43,6 +44,7 @@ export function App() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
   const [pedido, setPedido] = useState<AcaoDeSala | null>(null);
+  const [painelDaSaga, setPainelDaSaga] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
@@ -368,6 +370,8 @@ export function App() {
         pessoas={pessoas}
         onPessoa={abrirMenu}
         onPainel={() => setPainel(true)}
+        donoDaSaga={!!eu.donoDaSaga}
+        onPainelDaSaga={() => setPainelDaSaga(true)}
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
       />
@@ -468,6 +472,7 @@ export function App() {
           onClose={() => setPerfilAberto(null)}
         />
       )}
+      {painelDaSaga && <PainelDaSaga meuId={eu.id} onClose={() => setPainelDaSaga(false)} />}
       {menuDeSalas && (
         <MenuDeSalas
           em={menuDeSalas.em}

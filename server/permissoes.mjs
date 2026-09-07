@@ -17,10 +17,14 @@ export const PERMISSOES = {
   gerirSalas: 'Criar, renomear e apagar salas',
   gerirSons: 'Subir e apagar sons do soundboard',
   gerirServidor: 'Mudar nome e imagens do servidor',
-  concederTurbo: 'Dar e tirar o Berserk',
   definirId: 'Definir o identificador de alguém',
 };
 
+// `concederTurbo` viveu aqui e saiu: o Berserk é da conta, e vale na Saga inteira. Quem
+// concede tem de estar no mesmo plano do que concede — senão o dono de um servidor
+// qualquer distribuiria distinção que aparece em todos os outros. Hoje é do dono da Saga,
+// em `plataforma.mjs`. Cargo antigo que ainda a tenha guardada perde na leitura, pela
+// regra de sempre: permissão que não existe é descartada.
 export const TODAS = Object.keys(PERMISSOES);
 
 /** Ações que recaem sobre outra pessoa. Só estas passam pela regra de hierarquia. */
