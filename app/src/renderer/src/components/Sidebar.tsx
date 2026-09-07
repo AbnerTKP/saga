@@ -12,7 +12,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, donoDaSaga, onPainelDaSaga, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
@@ -26,8 +26,6 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
   onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
-  donoDaSaga: boolean;
-  onPainelDaSaga: () => void;
   statusEscolhido: Status;
   onStatus: (s: Status) => void;
 }) {
@@ -262,17 +260,10 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
               </button>
             ))}
             <div className="menu-risco" />
-            {/* Estes dois vivem aqui porque são "sobre você", e porque cada botão a mais
-                na linha de baixo rouba o espaço do seu nome — foi o que o atropelou. */}
-            {donoDaSaga && (
-              <button onClick={() => { onPainelDaSaga(); setEscolhendoStatus(false); }}>
-                <span className="presenca" style={{ background: 'transparent' }} />
-                <span className="quem">
-                  <span className="strong">Painel da Saga</span>
-                  <span className="muted small">Berserk e o que vale em todos os servidores.</span>
-                </span>
-              </button>
-            )}
+            {/* Sair vive aqui porque é sobre você, e porque cada botão a mais na linha
+                de baixo rouba o espaço do seu nome — foi o que o atropelou. O painel da
+                Saga morava aqui junto e foi para a engrenagem: menu de status não é
+                lugar de painel de administração, e ele ficou impossível de achar. */}
             <button onClick={onLogout}>
               <span className="quem"><span className="strong">Sair da conta</span></span>
             </button>

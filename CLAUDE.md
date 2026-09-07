@@ -467,6 +467,22 @@ a gente não conhece.
   legenda e nada se destacava.
 - **A pessoa se abre pelo mesmo gesto em todo lugar** — na lista de salas, na call, na
   lista de pessoas e no chat. Era diferente em cada um, e no chat não abria nada.
+- **Esquerdo abre o perfil; direito, as ações.** Era tudo no mesmo popover: retrato
+  minúsculo no topo e, logo abaixo, banir e expulsar. Ver quem é a pessoa é o que mais se
+  faz e era o que menos aparecia, enquanto o que quase nunca se usa — e que não se quer
+  errar — ficava a um clique. O menu de ações guarda um cabeçalho de uma linha só, para
+  não errar de pessoa.
+- **O que é seu fica na engrenagem; o que é do servidor, no servidor.** A sua foto e o seu
+  nome moravam dentro das configurações do SERVIDOR, junto de salas e cargos — e a conta é
+  global: a foto vai com você para todos eles. Trocar de cara pelo painel de UM servidor
+  era o único caminho que existia. Hoje a engrenagem abre "Sua conta" (perfil, qualidade,
+  microfone, câmera, registro de erros) e o servidor se configura pelo nome dele, no topo,
+  ou pelo botão direito no quadrado à direita. Botão direito noutro servidor troca ANTES
+  de abrir: o painel lê o servidor da sessão ao montar.
+- **O painel da Saga é um bloco de "Sua conta", não uma janela.** Morava numa janela
+  própria escondida no menu de status, e o dono teve de perguntar onde ficava. Menu de
+  status não é lugar de painel de administração; a engrenagem é o que existe acima dos
+  servidores, que é exatamente o que o Berserk é.
 - **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas
   fontes têm relógios diferentes — a busca anda de 4 em 4 segundos e ainda espera o
   LiveKit esquecer quem saiu —, e trocar de sala me punha nas DUAS até ela alcançar. Sobre

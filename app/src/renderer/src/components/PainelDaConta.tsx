@@ -7,6 +7,7 @@ import { lerQualidadeGuardada, guardarQualidade } from '../useRoom';
 import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from '../qualidades';
 import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
+import { BlocosDaSaga } from './PainelDaSaga';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const APARELHOS: Record<Kind, string> = {
@@ -22,11 +23,13 @@ const APARELHOS: Record<Kind, string> = {
  * único caminho que existia. A engrenagem já era "as suas coisas" (microfone, câmera);
  * agora é isso e o resto de você.
  */
-export function PainelDaConta({ eu, room, souBerserk, onEu, onRegistro, onClose }: {
+export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegistro, onClose }: {
   eu: Membro;
   room: Room;
   /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
   souBerserk: boolean;
+  /** Só o dono da Saga vê o que vale em todos os servidores. */
+  donoDaSaga: boolean;
   onEu: (m: Membro) => void;
   onRegistro: () => void;
   onClose: () => void;
@@ -150,6 +153,8 @@ export function PainelDaConta({ eu, room, souBerserk, onEu, onRegistro, onClose 
               <p className="muted small">Cancelamento de eco e supressão de ruído ficam sempre ligados.</p>
             </div>
           </section>
+
+          {donoDaSaga && <BlocosDaSaga meuId={eu.id} />}
 
           <section className="painel-bloco">
             <h3>Quando alguma coisa der errado</h3>
