@@ -14,7 +14,7 @@
   /* Para texto e ícone sobre fundo escuro, onde o acento cheio fica pesado. */
   --accent-claro: #6ba3f5;
   /* Fundo tingido: o estado "aqui" sem virar um bloco cinza. */
-  --accent-tenue: rgba(63, 127, 224, .16);
+  --falando:#6ba3f5; --accent-tenue: rgba(63, 127, 224, .16);
   --ok: #2ea36a; --warn: #e0a233; --danger: #e04852;
 
   /* Escada de espaço. Antes era tudo 4 e 8, e por isso nada tinha grupo nem respiro. */
@@ -123,7 +123,9 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .people li { display: flex; align-items: center; gap: 9px; padding: 5px 6px;
   border-radius: 6px; color: var(--text2); font-size: 14.5px; font-weight: 500; }
 .people li:hover { background: var(--bg3); color: var(--text); }
-.people li.speaking .avatar { box-shadow: 0 0 0 2px var(--ok); }
+/* Falando é o azul da logo, não verde. O verde já quer dizer "deu certo" no resto do
+   app — o selo "no ar", a bolinha de online — e falar não é um resultado. */
+.people li.speaking .avatar { box-shadow: 0 0 0 2px var(--falando); }
 .people li.speaking { color: var(--white); }
 .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .pico { display: flex; align-items: center; gap: 2px; color: var(--text3); }
@@ -134,7 +136,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
 .avatar.big { width: 34px; height: 34px; font-size: 14px; }
 .avatar.huge { width: 80px; height: 80px; font-size: 32px; transition: box-shadow .15s; }
-.avatar.huge.speaking { box-shadow: 0 0 0 4px var(--ok); }
+.avatar.huge.speaking { box-shadow: 0 0 0 4px var(--falando); }
 
 .voice-panel { background: var(--bg1); border-top: 1px solid var(--line); padding: var(--e3) var(--e3) var(--e2); }
 .voice-status { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -231,7 +233,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 .tile { position: relative; background: var(--bg1); border-radius: 10px; overflow: hidden; min-height: 0; display: grid; place-items: center; cursor: pointer; border: 2px solid transparent; transition: border-color .12s; }
 .strip .tile:hover { border-color: var(--bg4); }
-.tile.speaking { border-color: var(--ok); }
+.tile.speaking { border-color: var(--falando); }
 .tile video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 /* Preencher corta as bordas em vez de deixar tarja preta: uma tela 16:9 numa janela 16:10
    sempre sobra faixa, e tem quem prefira perder um pedaço a ver a moldura. */

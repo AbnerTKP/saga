@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
+import { ocupantes } from '../ocupantes';
 import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
@@ -130,10 +131,11 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                     idExibido: pessoas.get(p.identity)?.idExibido ?? null,
                     speaking: p.isSpeaking, muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
                   }))
-                : r.participants.map((p) => ({
-                    ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
-                    idExibido: p.idExibido ?? null, speaking: false,
-                  }));
+                : ocupantes(r.participants, { euSou: `u${eu.id}`, estouNesta: false })
+                    .map((p) => ({
+                      ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
+                      idExibido: p.idExibido ?? null, speaking: false,
+                    }));
               return (
                 <li
                   key={r.id}

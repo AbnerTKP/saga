@@ -59,7 +59,10 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   meio — só acrescentar no fim. Inserir no meio já derrubou a produção; `banco.test.mjs`
   trava a ordem por impressão digital.
 - **O `Dockerfile` copia `*.mjs` e descarta os testes.** Listar arquivo por arquivo já
-  derrubou o servidor duas vezes.
+  derrubou o servidor duas vezes. **O `test` do app tinha o mesmo defeito** e por isso
+  também virou glob: ele listava os treze arquivos à mão, então um teste novo simplesmente
+  não rodava — e não rodar não dá erro nenhum. Ficaram cinco testes escritos, verdes na
+  minha mão e ausentes do `pnpm test` e do CI. Lista à mão de arquivo só falha em silêncio.
 - **Cargo, banimento e nome exibido pertencem ao vínculo pessoa↔servidor**, não à pessoa.
   A conta é global. É o que permitirá vários servidores sem migrar dados.
 - **O Berserk é da conta, e não do vínculo** — é a exceção da linha acima, e a diferença
@@ -464,6 +467,18 @@ a gente não conhece.
   legenda e nada se destacava.
 - **A pessoa se abre pelo mesmo gesto em todo lugar** — na lista de salas, na call, na
   lista de pessoas e no chat. Era diferente em cada um, e no chat não abria nada.
+- **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas
+  fontes têm relógios diferentes — a busca anda de 4 em 4 segundos e ainda espera o
+  LiveKit esquecer quem saiu —, e trocar de sala me punha nas DUAS até ela alcançar. Sobre
+  mim não é preciso perguntar: eu sei onde estou. A regra mora em `ocupantes.ts`, pura e
+  testada, e conserta junto o "saí da call e continuo aparecendo".
+- **Falando é o azul da logo, não verde.** O verde já quer dizer "deu certo" no resto do
+  app — o selo "no ar", a bolinha de online —, e falar não é um resultado.
+- **Quem decide "está falando" é o LiveKit, e o padrão dele demora meio segundo.** Medido
+  na produção com dois participantes reais: 305, 410, 487, 516 e 595 ms, mediana **487**.
+  O padrão mede de 400 em 400 ms e suaviza por 4 medições — é ajuste de sala de reunião
+  cheia. Está em `livekit.yaml` como 150 e 2. **Mexer nisso reinicia o LiveKit e derruba
+  quem estiver em call**, então não vai junto com o servidor de token.
 - **A bolinha de presença tem um anel da cor do fundo.** Sem ele encosta na foto e some
   em cima de imagem clara. E "offline" não é uma cor: é a ausência dela, senão um cinza
   cheio competiria com as três que significam algo.
