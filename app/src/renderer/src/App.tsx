@@ -458,6 +458,7 @@ export function App() {
         <PainelDoServidor
           eu={eu}
           servidor={servidor}
+          donoDaSaga={!!eu.donoDaSaga}
           onServidor={atualizarServidor}
           onClose={() => setPainel(false)}
         />

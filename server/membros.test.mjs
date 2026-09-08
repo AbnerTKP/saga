@@ -19,7 +19,10 @@ function cenario({ dono } = {}) {
     garantirMembro(db, servidor.id, u, { dono });
     return u;
   };
-  return { db, sid: servidor.id, cria, cargos };
+  // Marca alguém como dono da SAGA — outra coisa de criar o servidor. É o que destrava
+  // o identificador, que vale em todos os servidores.
+  const donoDaSaga = (u) => { db.prepare('UPDATE usuarios SET dono = 1 WHERE id = ?').run(u.id); return u; };
+  return { db, sid: servidor.id, cria, cargos, donoDaSaga };
 }
 
 test('o primeiro a entrar vira dono; os seguintes, membros', () => {
@@ -180,17 +183,17 @@ test('ninguém nasce Berserk', () => {
   assert.equal(buscarMembro(db, sid, a.id).turbo, 0);
 });
 
-test('o dono define e limpa o identificador', () => {
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner'), caio = cria('caio');
+test('o dono da Saga define e limpa o identificador', () => {
+  const { db, sid, cria, donoDaSaga } = cenario();
+  const dono = donoDaSaga(cria('abner')), caio = cria('caio');
   assert.equal(definirIdExibido(db, sid, dono.id, caio.id, '007').id_exibido, '007',
     'zero à esquerda tem de sobreviver');
   assert.equal(definirIdExibido(db, sid, dono.id, caio.id, '  ').id_exibido, null);
 });
 
 test('identificador aceita letra e símbolo curto, recusa o resto', () => {
-  const { db, sid, cria } = cenario();
-  const dono = cria('abner'), caio = cria('caio');
+  const { db, sid, cria, donoDaSaga } = cenario();
+  const dono = donoDaSaga(cria('abner')), caio = cria('caio');
   for (const bom of ['1', '42', 'A7', '#9', 'zé']) {
     assert.equal(definirIdExibido(db, sid, dono.id, caio.id, bom).id_exibido, bom, bom);
   }
@@ -199,9 +202,14 @@ test('identificador aceita letra e símbolo curto, recusa o resto', () => {
   }
 });
 
-test('moderador não define identificador', () => {
+test('nem moderador nem quem CRIOU o servidor define identificador', () => {
+  // O identificador aparece junto do nome em todo servidor: quem o define mexe em como a
+  // pessoa é vista na Saga inteira. Ter criado UM servidor não dá esse alcance — só o
+  // dono da Saga tem, que é a mesma regra do Berserk e pelo mesmo motivo.
   const { db, sid, cria, cargos } = cenario();
-  const dono = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
-  definirCargo(db, sid, dono.id, bruno.id, cargos.Moderador.id);
-  assert.throws(() => definirIdExibido(db, sid, bruno.id, caio.id, '1'), /permite/);
+  const criador = cria('abner'), bruno = cria('bruno'), caio = cria('caio');
+  definirCargo(db, sid, criador.id, bruno.id, cargos.Moderador.id);
+  assert.throws(() => definirIdExibido(db, sid, bruno.id, caio.id, '1'), /dono da Saga/);
+  assert.throws(() => definirIdExibido(db, sid, criador.id, caio.id, '1'), /dono da Saga/,
+    'criar o servidor não dá alcance sobre a Saga inteira');
 });

@@ -426,6 +426,12 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
   vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
+- **O identificador é do DONO DA SAGA, e de mais ninguém.** Ele aparece junto do nome em
+  TODO servidor: definir o de alguém é mexer em como a pessoa é vista na Saga inteira, e
+  isso não cabe ao cargo mais alto de UM servidor — nem a quem criou aquele servidor.
+  Mesma regra do Berserk e pelo mesmo motivo: quem concede tem de estar no plano do que
+  concede. `definirId` continua existindo como permissão de servidor e continua sendo o
+  dono de lá quem a desenha; ela é que não alcança isto.
 - **O soundboard é do cargo mais alto do servidor, e não de quem só tem a permissão.**
   `gerirSons` continua existindo e continua sendo do dono do servidor desenhar, mas ela
   só vale de fato no topo. Som é diferente de sala ou de castigo: toca para a call

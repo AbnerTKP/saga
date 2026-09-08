@@ -4,6 +4,7 @@
 import { podeAgir, podeDarCargo, temPermissao } from './permissoes.mjs';
 import { buscarCargo } from './cargos.mjs';
 import { ErroDeConta, derrubarSessoes } from './contas.mjs';
+import { ehDonoDaSaga } from './plataforma.mjs';
 
 /**
  * Vincula a pessoa ao servidor, se ainda não estiver.
@@ -119,9 +120,21 @@ export function mudarNomeExibido(db, servidorId, usuarioId, nome) {
 const ID_VALIDO = /^[\p{L}\p{N}._#-]{1,8}$/u;   // curto: fica antes do nome, não pode roubar a linha
 
 /** Identificador curto que aparece antes do nome. Vazio remove. */
+/**
+ * O identificador é do DONO DA SAGA, e de mais ninguém.
+ *
+ * `definirId` continua existindo como permissão de servidor e continua sendo o dono de lá
+ * quem a desenha — mas ela sozinha não basta. O identificador aparece junto do nome em
+ * todo servidor: quem o define está mexendo em como a pessoa é vista na Saga inteira, e
+ * isso não pode caber ao cargo mais alto de UM servidor. É a mesma regra do Berserk, e
+ * pelo mesmo motivo: quem concede tem de estar no plano do que concede.
+ *
+ * É regra do app, não mexida nos cargos de ninguém — os cargos ficam como o pessoal
+ * desenhou, e a permissão que eles têm simplesmente não alcança isto.
+ */
 export function definirIdExibido(db, servidorId, quemId, alvoId, id) {
-  if (!temPermissao(buscarMembro(db, servidorId, quemId)?.cargo, 'definirId')) {
-    throw new ErroDeConta('Seu cargo não permite definir o identificador.', 403);
+  if (!ehDonoDaSaga(db, quemId)) {
+    throw new ErroDeConta('O identificador é do dono da Saga.', 403);
   }
   const alvo = buscarMembro(db, servidorId, Number(alvoId));
   if (!alvo) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);

@@ -23,8 +23,14 @@ const posso = (eu: Membro, acao: AcaoDeModeracao, alvo: Membro) =>
 
 const emCastigo = (m: Membro) => !!m.castigoAte && m.castigoAte > Date.now();
 
-export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
+export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose }: {
   eu: Membro; servidor: Servidor;
+  /**
+   * O identificador aparece junto do nome em TODO servidor: definir o de alguém é mexer
+   * em como a pessoa é vista na Saga inteira, e isso não cabe ao cargo mais alto de um
+   * servidor. Mesma regra do Berserk, e pelo mesmo motivo.
+   */
+  donoDaSaga: boolean;
   onServidor: (s: Servidor) => void; onClose: () => void;
 }) {
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -391,7 +397,7 @@ export function PainelDoServidor({ eu, servidor, onServidor, onClose }: {
                     ? <button title="Desbanir" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
                     : <button className="danger" title="Banir para sempre" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
                   )}
-                  {pode(eu.cargo, 'definirId') && (
+                  {donoDaSaga && (
                     <input
                       className="campo-id"
                       defaultValue={m.idExibido ?? ''}
