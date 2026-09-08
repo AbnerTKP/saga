@@ -269,6 +269,11 @@ export type Mensagem = {
   texto: string;
   /** Nome do arquivo, quando a mensagem é uma imagem (um GIF do Giphy). */
   imagem: string | null;
+  /**
+   * Anexo. `url` é o nome NO DISCO (hash + .bin, servido como octet-stream); `nome` é o
+   * que a pessoa escolheu, e é só isso que se mostra e se sugere ao salvar.
+   */
+  arquivo: { url: string; nome: string; bytes: number } | null;
   criadoEm: number;
   autorId: number | null;
   nome: string;
@@ -291,6 +296,32 @@ export const lerMensagens = async (sala: number, depoisDe?: number) =>
 
 export const enviarMensagem = async (sala: number, texto: string) =>
   (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
+
+/**
+ * Manda um arquivo qualquer. O corpo é o arquivo cru — o nome vai na URL, porque não há
+ * espaço para campos ao lado dos bytes.
+ */
+export async function enviarArquivoNoChat(sala: number, arquivo: File): Promise<Mensagem> {
+  const token = lerToken();
+  const q = new URLSearchParams({ sala: String(sala), nome: arquivo.name });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/mensagens/arquivo?${q}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        ...(token ? { 'x-sessao': token } : {}),
+        ...(lerServidorAtual() ? { 'x-servidor': String(lerServidorAtual()) } : {}),
+      },
+      body: await arquivo.arrayBuffer(),
+    });
+  } catch {
+    throw new ErroDoServidor('O arquivo é grande demais ou a conexão caiu no meio.', 413);
+  }
+  const dados = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
+  return (dados as { mensagem: Mensagem }).mensagem;
+}
 
 /** O servidor baixa o GIF, guarda como qualquer imagem e publica a mensagem. */
 export const enviarGifNoChat = async (sala: number, url: string) =>

@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor, dialog } from 'electron';
 import { join, dirname } from 'node:path';
-import { cpSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 
@@ -188,6 +188,29 @@ app.whenReady().then(async () => {
    */
   ipcMain.handle('presenca:ociosidade', () => {
     try { return powerMonitor.getSystemIdleTime(); } catch { return 0; }
+  });
+
+  /**
+   * Salva um anexo do chat, com o diálogo do sistema.
+   *
+   * Baixar tem de acontecer AQUI e não na tela: no renderer o `<a download>` e o
+   * `showSaveFilePicker` não têm para onde escrever, e a alternativa seria abrir o
+   * arquivo no navegador — que é justamente o que não se quer com arquivo que veio de
+   * fora. Aqui a pessoa escolhe onde põe, e nada é aberto nem executado.
+   */
+  ipcMain.handle('arquivo:salvar', async (_e, url: string, nome: string) => {
+    const janela = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const escolha = await dialog.showSaveDialog(janela, { defaultPath: nome });
+    if (escolha.canceled || !escolha.filePath) return { ok: false };
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`o servidor respondeu ${r.status}`);
+      writeFileSync(escolha.filePath, Buffer.from(await r.arrayBuffer()));
+      return { ok: true, caminho: escolha.filePath };
+    } catch (e) {
+      registrar('erro', 'arquivo', `salvar "${nome}": ${(e as Error).message}`);
+      return { ok: false, erro: (e as Error).message };
+    }
   });
 
   ipcMain.handle('sources:list', async () => {

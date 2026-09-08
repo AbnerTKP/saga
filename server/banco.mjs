@@ -185,6 +185,13 @@ export const MIGRACOES = [
   // Uma sala pode ter um PAPEL: hoje só 'notas', a das novidades de cada versão. Ela é
   // do app e não do servidor — por isso não se renomeia, não se apaga e fica no topo.
   `ALTER TABLE salas ADD COLUMN papel TEXT`,
+
+  // Arquivo no chat. Três colunas porque são três coisas diferentes: o nome NO DISCO (o
+  // hash, que é o que se serve), o nome que a pessoa escolheu (que é o que se mostra e o
+  // que se sugere ao salvar) e o tamanho (para dizer o peso sem abrir o arquivo).
+  `ALTER TABLE mensagens ADD COLUMN arquivo TEXT`,
+  `ALTER TABLE mensagens ADD COLUMN arquivo_nome TEXT`,
+  `ALTER TABLE mensagens ADD COLUMN arquivo_bytes INTEGER`,
 ];
 
 export function abrirBanco(caminho) {

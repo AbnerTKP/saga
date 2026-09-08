@@ -297,6 +297,18 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   do sumiço não via nem foto nem letra. Guarda-se a URL que falhou, não um sim/não, para
   que trocar de foto tente de novo sozinho.
 - **Imagem e som são validados pela assinatura dos bytes**, nunca pelo `content-type`.
+- **Arquivo no chat é guardado INERTE, e o nome da pessoa nunca vai para o disco.** Aqui
+  não se reconhece tipo nenhum de propósito — é para mandar o que quiser. O que protege é
+  o arquivo virar `<hash>.bin` no disco e ser servido como `application/octet-stream` com
+  `content-disposition: attachment`; o nome escolhido fica na MENSAGEM, e serve só para
+  mostrar e para sugerir ao salvar. Sem isso, um `.html` subiria e o servidor o serviria
+  como página, com script dentro. Conferido contra a produção: `../../perigo.html` com
+  `<script>` virou `9b503f….bin`, o nome virou `.._.._perigo.html`, e a resposta veio
+  como anexo — com o conteúdo idêntico byte a byte.
+- **Salvar o anexo acontece no processo PRINCIPAL, com o diálogo do sistema.** Dentro da
+  tela não há para onde escrever, e a alternativa seria abrir no navegador — que é
+  exatamente o que não se quer com arquivo que veio de fora. Nada é aberto nem executado:
+  a pessoa escolhe onde põe.
 - **A tela vai sem simulcast.** Com ele, o `adaptiveStream` de quem assiste escolhia a
   versão menor sempre que a janela era menor que a tela transmitida — era a imagem borrada.
   Com uma faixa só, `adaptiveStream` não tira nada: medido, quem assiste num `<video>` de

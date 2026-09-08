@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos } from './arquivos.mjs';
+import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos, salvarArquivo, nomeDeArquivoLimpo } from './arquivos.mjs';
 
 const pasta = () => mkdtempSync(join(tmpdir(), 'img-'));
 const comCabecalho = (bytes, tamanho = 64) =>
@@ -163,4 +163,30 @@ test('as imagens moram ao lado do banco — apontar um sem o outro não é poss�
 
 test('o banco na pasta atual não joga as imagens para fora dela', () => {
   assert.equal(pastaDosArquivos('cantinho.db'), 'arquivos');
+});
+
+test('arquivo qualquer é guardado INERTE, com o nome do conteúdo', () => {
+  // O que protege não é adivinhar o tipo — é o arquivo perder a extensão original ao ir
+  // para o disco. Um `.html` guardado como `.html` seria servido como página.
+  const pasta = mkdtempSync(join(tmpdir(), 'arq-'));
+  const html = Buffer.from('<script>roubar()</script>');
+  const nome = salvarArquivo(pasta, html);
+  assert.match(nome, /^[0-9a-f]{32}\.bin$/, 'devia virar hash + .bin');
+  assert.equal(nomeValido(nome).tipo, 'application/octet-stream');
+  // Mesmo conteúdo, mesmo nome: dedução de repetidos, como o resto.
+  assert.equal(salvarArquivo(pasta, html), nome);
+});
+
+test('o nome que a pessoa escolheu não vira caminho nem linha nova', () => {
+  assert.equal(nomeDeArquivoLimpo('../../etc/passwd'), '.._.._etc_passwd');
+  assert.equal(nomeDeArquivoLimpo('nota\nfalsa.txt'), 'notafalsa.txt');
+  assert.equal(nomeDeArquivoLimpo('   '), 'arquivo');
+  assert.equal(nomeDeArquivoLimpo(null), 'arquivo');
+  assert.equal(nomeDeArquivoLimpo('x'.repeat(300)).length, 120);
+});
+
+test('arquivo vazio e arquivo grande demais são recusados', () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'arq-'));
+  assert.throws(() => salvarArquivo(pasta, Buffer.alloc(0)), /Nenhum arquivo/);
+  assert.throws(() => salvarArquivo(pasta, Buffer.alloc(LIMITES.arquivo + 1)), /passa de/);
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { lerMensagens, enviarMensagem, enviarGifNoChat, type Mensagem } from './api';
+import { lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, type Mensagem } from './api';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
 // e para cinco amigos, dois segundos passam por instantâneo.
@@ -59,5 +59,13 @@ export function useChat(salaId: number | null) {
     mostrarJa(await enviarGifNoChat(salaId, url));
   }, [salaId, mostrarJa]);
 
-  return { mensagens, erro, enviar, enviarGif };
+  const enviarArquivo = useCallback(async (arquivo: File) => {
+    if (!salaId) return;
+    // Aqui o erro fica na tarja do chat, e não sobe: quem clicou no clipe está olhando
+    // para a conversa, não para um seletor aberto.
+    try { mostrarJa(await enviarArquivoNoChat(salaId, arquivo)); }
+    catch (e) { setErro((e as Error).message); }
+  }, [salaId, mostrarJa]);
+
+  return { mensagens, erro, enviar, enviarGif, enviarArquivo };
 }

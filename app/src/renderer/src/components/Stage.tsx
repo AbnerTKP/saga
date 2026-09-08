@@ -93,6 +93,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     erro: string | null;
     enviar: (t: string) => Promise<void>;
     enviarGif: (url: string) => Promise<void>;
+    enviarArquivo: (arquivo: File) => Promise<void>;
   };
   meuId: number;
   /** Volta para a sala de voz em que você está, a partir do chat. */
@@ -205,6 +206,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             erro={chat.erro}
             onEnviar={chat.enviar}
             onEnviarGif={chat.enviarGif}
+            onEnviarArquivo={chat.enviarArquivo}
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}

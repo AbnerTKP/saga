@@ -8,7 +8,7 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
-import { salvarImagem, salvarSom, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import { salvarImagem, salvarSom, salvarArquivo, nomeDeArquivoLimpo, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
@@ -541,6 +541,25 @@ const ROTAS = {
     return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, '', nome) };
   },
 
+  // O nome vem na URL porque o corpo é o arquivo cru, sem espaço para campos — igual ao
+  // som. E o nome que a pessoa escolheu NÃO vai para o disco: lá ele é o hash com `.bin`,
+  // e é por isso que nada aqui pode ser servido como página nem como script.
+  'POST /mensagens/arquivo': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const q = new URL(req.url, 'http://x').searchParams;
+    const bruto = await lerBinario(req, LIMITES.arquivo + 1024);
+    const noDisco = salvarArquivo(ARQUIVOS, bruto);
+    return {
+      mensagem: mensagens.enviarMensagem(db, sid, eu, q.get('sala'), q.get('texto') ?? '', null, {
+        nomeNoDisco: noDisco,
+        nome: nomeDeArquivoLimpo(q.get('nome')),
+        bytes: bruto.length,
+      }),
+    };
+  },
+
   'POST /token': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
@@ -730,6 +749,10 @@ const servidor = http.createServer(async (req, res) => {
       'content-type': arquivo.tipo,
       // O nome muda quando a imagem muda, então o cache pode ser eterno.
       'cache-control': 'public, max-age=31536000, immutable',
+      // Cinto e suspensório no arquivo qualquer: além de ir como octet-stream, ele vai
+      // marcado como anexo. Nem que um dia alguém afrouxe o tipo, o navegador não passa
+      // a renderizar o que veio de fora.
+      ...(arquivo.tipo === 'application/octet-stream' ? { 'content-disposition': 'attachment' } : {}),
       ...CORS,
     });
     return createReadStream(join(ARQUIVOS, arquivo.nome))

@@ -36,6 +36,8 @@ declare global {
       updateAtual: () => Promise<UpdateState | null>;
       installUpdate: () => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+      /** Salva um anexo do chat com o diálogo do sistema. Nada é aberto nem executado. */
+      salvarArquivo: (url: string, nome: string) => Promise<{ ok: boolean; caminho?: string; erro?: string }>;
   /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
   ociosidade: () => Promise<number>;
     };

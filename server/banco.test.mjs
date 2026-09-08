@@ -44,6 +44,9 @@ const IMPRESSOES = [
   '97d33f11bb13',  // 31 e passa para o cargo mais alto que sobra
   '23b2a587c3d1',  // 32 o cargo de dono chumbado some
   '9b6bdf868462',  // 33 coluna papel em salas (a sala de notas)
+  'a6bfb898802f',  // 34 coluna arquivo em mensagens
+  '5efe47c844b8',  // 35 coluna arquivo_nome em mensagens
+  '4d5b7607bb97',  // 36 coluna arquivo_bytes em mensagens
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

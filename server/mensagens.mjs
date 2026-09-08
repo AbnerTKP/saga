@@ -12,7 +12,7 @@ const TAMANHO_MAXIMO = 2000;
 export const QUANTAS = 100;
 
 const SELECT = `
-  SELECT m.id, m.texto, m.imagem, m.criado_em, m.usuario_id,
+  SELECT m.id, m.texto, m.imagem, m.arquivo, m.arquivo_nome, m.arquivo_bytes, m.criado_em, m.usuario_id,
          COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
          u.foto, u.enquadramento, u.turbo, mem.id_exibido
     FROM mensagens m
@@ -35,6 +35,9 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
     id: m.id,
     texto: m.texto,
     imagem: m.imagem ?? null,
+    // O que vai para a tela é o nome que a pessoa escolheu; `arquivo` é o do disco, que
+    // é o hash e não diz nada a ninguém.
+    arquivo: m.arquivo ? { url: m.arquivo, nome: m.arquivo_nome ?? 'arquivo', bytes: m.arquivo_bytes ?? 0 } : null,
     criadoEm: m.criado_em,
     autorId: m.usuario_id,
     // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não. Já na sala de
@@ -48,20 +51,23 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
 }
 
 /** `imagem` é o nome do arquivo já guardado — um GIF do Giphy, por exemplo. */
-export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = null) {
+export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = null, arquivo = null) {
   const sala = buscarSala(db, servidorId, salaId);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
 
   const limpo = String(texto ?? '').trim();
-  // Mensagem só de imagem é o caso normal do GIF: o texto vazio ali não é engano.
-  if (!limpo && !imagem) throw new ErroDeConta('Mensagem vazia.');
+  // Mensagem só de imagem é o caso normal do GIF, e só de arquivo é o de mandar algo sem
+  // ter o que dizer: o texto vazio nesses dois não é engano.
+  if (!limpo && !imagem && !arquivo) throw new ErroDeConta('Mensagem vazia.');
   if (limpo.length > TAMANHO_MAXIMO) {
     throw new ErroDeConta(`A mensagem passa de ${TAMANHO_MAXIMO} caracteres.`);
   }
 
   const info = db.prepare(
-    'INSERT INTO mensagens (sala_id, usuario_id, texto, imagem, criado_em) VALUES (?, ?, ?, ?, ?)',
-  ).run(sala.id, quem.id, limpo, imagem, Date.now());
+    `INSERT INTO mensagens (sala_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(sala.id, quem.id, limpo, imagem,
+        arquivo?.nomeNoDisco ?? null, arquivo?.nome ?? null, arquivo?.bytes ?? null, Date.now());
 
   const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: Number(info.lastInsertRowid) - 1 });
   return nova;

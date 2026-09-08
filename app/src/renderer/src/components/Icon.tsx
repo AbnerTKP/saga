@@ -14,6 +14,8 @@ const paths: Record<string, string> = {
   // as duas mordidas e a inclinação são as de lá, não uma imitação de olho. Cheio e sem
   // detalhe: ele vive a 13 px ao lado do nome, e ali só sobrevive silhueta densa.
   berserk: 'M13.7 1 L20.7 4.7 L12.2 8.8 L21.2 16.1 L12.7 23 L8.8 23 L12.2 15.2 L2.9 7.9 Z',
+  // Clipe de papel: é o que se reconhece como anexo em qualquer lugar.
+  anexo: 'M16.5 6.5v8.75a4.25 4.25 0 0 1-8.5 0V5.75a2.75 2.75 0 0 1 5.5 0v9a1.25 1.25 0 0 1-2.5 0V6.5H9.5v8.25a2.75 2.75 0 0 0 5.5 0v-9a4.25 4.25 0 0 0-8.5 0v9.5a5.75 5.75 0 0 0 11.5 0V6.5h-1.5z',
   texto: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 9h10v2H7V9zm6 5H7v-2h6v2zm4-6H7V6h10v2z',
   close: 'M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z',
   send: 'M2 21l21-9L2 3v7l15 2-15 2z',

@@ -23,6 +23,7 @@ export const LIMITES = {
   banner: 8 * 1024 * 1024,   // 8 MB — banner é maior, e GIF pesa
   som: 2 * 1024 * 1024,      // 2 MB — soundboard é efeito curto, não música
   chat: 5 * 1024 * 1024,     // 5 MB — GIF de chat é maior que avatar e menor que banner
+  arquivo: 25 * 1024 * 1024, // 25 MB — arquivo qualquer no chat; o disco da VPS aguenta
 };
 
 // Assinaturas de verdade, lidas do começo do arquivo. O content-type que o app manda é
@@ -86,6 +87,36 @@ export function salvarSom(pasta, buf) {
     'Nenhum som foi enviado.', 'Só aceito MP3, WAV, OGG, M4A ou FLAC.', 'O som');
 }
 
+/**
+ * Um arquivo qualquer, guardado INERTE.
+ *
+ * Aqui não se reconhece tipo nenhum de propósito: é para mandar o que quiser. O que
+ * protege é o arquivo ir para o disco como `.bin` e ser servido como
+ * `application/octet-stream` — o nome que a pessoa escolheu fica na MENSAGEM, não no
+ * disco. Assim ninguém consegue subir um `.html` e fazer o servidor servi-lo como página,
+ * nem um `.svg` que o navegador renderize com script dentro.
+ *
+ * O nome continua sendo o hash do conteúdo, como todo o resto: cache eterno, dedução de
+ * repetidos, e ninguém escolhe o nome — o que elimina escrita fora da pasta.
+ */
+export function salvarArquivo(pasta, buf) {
+  if (!buf?.length) throw new ErroDeArquivo('Nenhum arquivo foi enviado.');
+  if (buf.length > LIMITES.arquivo) {
+    throw new ErroDeArquivo(`O arquivo passa de ${Math.round(LIMITES.arquivo / 1024 / 1024)} MB.`, 413);
+  }
+  const nome = `${createHash('sha256').update(buf).digest('hex').slice(0, 32)}.bin`;
+  mkdirSync(pasta, { recursive: true });
+  const destino = join(pasta, nome);
+  if (!existsSync(destino)) writeFileSync(destino, buf);
+  return nome;
+}
+
+/** O nome que a pessoa escolheu, limpo do que poderia virar caminho ou linha nova. */
+export function nomeDeArquivoLimpo(nome) {
+  const cru = String(nome ?? '').replace(/[\\/]/g, '_').replace(/[\x00-\x1f]/g, '').trim();
+  return cru.slice(0, 120) || 'arquivo';
+}
+
 function guardar(pasta, buf, limite, reconhecer, semNada, tipoRuim, oQue) {
   if (!buf?.length) throw new ErroDeArquivo(semNada);
   if (buf.length > limite) {
@@ -104,6 +135,9 @@ function guardar(pasta, buf, limite, reconhecer, semNada, tipoRuim, oQue) {
 const TIPOS = {
   png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
   mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac',
+  // Arquivo qualquer. `octet-stream` é o ponto: o navegador não renderiza nem executa —
+  // baixa. É por isso que o que vai para o disco perde a extensão original.
+  bin: 'application/octet-stream',
 };
 
 /** Só nomes que nós mesmos geramos passam: 32 hex, ponto, extensão conhecida. */

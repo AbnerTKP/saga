@@ -29,10 +29,54 @@ function comLinks(texto: string) {
   ));
 }
 
-export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala, meuId, grande, onPessoa }: {
+const PESO = ['B', 'KB', 'MB', 'GB'];
+function peso(bytes: number) {
+  let n = bytes, i = 0;
+  while (n >= 1024 && i < PESO.length - 1) { n /= 1024; i += 1; }
+  return `${i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)} ${PESO[i]}`;
+}
+
+/**
+ * O anexo é um cartão, e salvar é escolha de quem lê.
+ *
+ * Nada é aberto nem executado: o arquivo veio de fora e vai para o disco no lugar que a
+ * pessoa escolher, pelo diálogo do sistema. É o processo principal que baixa — dentro da
+ * tela não há para onde escrever, e a alternativa seria abrir no navegador, que é
+ * exatamente o que não se quer.
+ */
+function Anexo({ arquivo }: { arquivo: NonNullable<Mensagem['arquivo']> }) {
+  const [salvando, setSalvando] = useState(false);
+  const [feito, setFeito] = useState<string | null>(null);
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      const r = await window.desktop.salvarArquivo(urlDoArquivo(arquivo.url)!, arquivo.nome);
+      if (r.ok) setFeito('salvo');
+      else if (r.erro) setFeito('não deu');
+    } finally { setSalvando(false); }
+  };
+
+  return (
+    <button className="msg-anexo" onClick={salvar} disabled={salvando} title={`Salvar ${arquivo.nome}`}>
+      <span className="anexo-icone"><Icon name="anexo" size={18} /></span>
+      <span className="anexo-quem">
+        <span className="strong">{arquivo.nome}</span>
+        <span className="muted small">
+          {peso(arquivo.bytes)}
+          {salvando ? ' · salvando…' : feito ? ` · ${feito}` : ' · clique para salvar'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, onVerImagem, sala, meuId, grande, onPessoa }: {
   mensagens: Mensagem[];
   erro: string | null;
   onEnviar: (texto: string) => Promise<void>;
+  /** Manda um arquivo qualquer. O chat mostra um cartão; salvar é escolha de quem lê. */
+  onEnviarArquivo: (arquivo: File) => Promise<void>;
   onEnviarGif: (url: string) => Promise<void>;
   onVerImagem: (url: string) => void;
   sala: string | null;
@@ -44,6 +88,8 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
 }) {
   const [texto, setTexto] = useState('');
   const [gifAberto, setGifAberto] = useState(false);
+  const [mandando, setMandando] = useState(false);
+  const campoDeArquivo = useRef<HTMLInputElement>(null);
   const fim = useRef<HTMLDivElement>(null);
 
   // Rola para o fim quando chega mensagem — é onde a conversa está.
@@ -90,6 +136,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
                 <img src={urlDoArquivo(m.imagem)!} alt="GIF" draggable={false} />
               </button>
             )}
+            {m.arquivo && <Anexo arquivo={m.arquivo} />}
           </div>
         ))}
       </div>
@@ -103,6 +150,29 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onVerImagem, sala
           onClick={() => setGifAberto(true)}
         >
           <Icon name="gif" size={18} />
+        </button>
+        {/* O input fica escondido e o botão é que aparece: o seletor de arquivo do
+            navegador não combina com nada em volta, e não dá para estilizá-lo. */}
+        <input
+          ref={campoDeArquivo}
+          type="file"
+          hidden
+          onChange={async (e) => {
+            const a = e.target.files?.[0];
+            e.target.value = '';   // escolher o MESMO arquivo de novo tem de disparar
+            if (!a) return;
+            setMandando(true);
+            try { await onEnviarArquivo(a); } finally { setMandando(false); }
+          }}
+        />
+        <button
+          type="button"
+          className="icon"
+          title="Mandar um arquivo"
+          disabled={semSala || mandando}
+          onClick={() => campoDeArquivo.current?.click()}
+        >
+          <Icon name="anexo" size={18} />
         </button>
         <input
           value={texto}
