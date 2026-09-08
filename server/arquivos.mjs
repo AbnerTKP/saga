@@ -4,8 +4,9 @@
 // que subirem a mesma imagem ocupam um arquivo só, o navegador pode guardar em cache
 // para sempre (o nome muda quando a imagem muda), e ninguém escolhe o nome do arquivo —
 // o que elimina de saída qualquer travessia de diretório.
-import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdirSync, writeFileSync, existsSync, createWriteStream, renameSync, rmSync } from 'node:fs';
+import { once } from 'node:events';
 import { join, dirname } from 'node:path';
 
 /**
@@ -23,7 +24,10 @@ export const LIMITES = {
   banner: 8 * 1024 * 1024,   // 8 MB — banner é maior, e GIF pesa
   som: 2 * 1024 * 1024,      // 2 MB — soundboard é efeito curto, não música
   chat: 5 * 1024 * 1024,     // 5 MB — GIF de chat é maior que avatar e menor que banner
-  arquivo: 25 * 1024 * 1024, // 25 MB — arquivo qualquer no chat; o disco da VPS aguenta
+  // Arquivo qualquer no chat. Só é grande assim porque ele vai para o disco EM FLUXO:
+  // juntar na memória, como os outros fazem, estouraria o teto de 512 MB do contêiner —
+  // e foi falta de memória que já derrubou a máquina inteira uma vez.
+  arquivo: 200 * 1024 * 1024,
 };
 
 // Assinaturas de verdade, lidas do começo do arquivo. O content-type que o app manda é
@@ -99,6 +103,49 @@ export function salvarSom(pasta, buf) {
  * O nome continua sendo o hash do conteúdo, como todo o resto: cache eterno, dedução de
  * repetidos, e ninguém escolhe o nome — o que elimina escrita fora da pasta.
  */
+/**
+ * Grava um arquivo grande EM FLUXO, sem nunca tê-lo inteiro na memória.
+ *
+ * O caminho normal daqui junta os pedaços num Buffer e só então grava — cabe para uma
+ * foto de 3 MB, não para um arquivo de 200. Com o contêiner limitado a 512 MB, um envio
+ * grande derrubaria o servidor, e falta de memória já derrubou a máquina inteira uma vez.
+ *
+ * O nome continua sendo o hash do CONTEÚDO, o que obriga a gravar antes de saber o nome:
+ * grava-se num temporário, calculando o hash no caminho, e no fim ele é renomeado. Se o
+ * conteúdo já existir, o temporário é descartado — é a mesma dedução de repetidos.
+ */
+export async function salvarArquivoEmFluxo(pasta, fonte, limite = LIMITES.arquivo, oQue = 'O arquivo') {
+  mkdirSync(pasta, { recursive: true });
+  const temporario = join(pasta, `.parcial-${randomUUID()}`);
+  const hash = createHash('sha256');
+  let total = 0;
+
+  const saida = createWriteStream(temporario);
+  try {
+    for await (const pedaco of fonte) {
+      total += pedaco.length;
+      if (total > limite) {
+        throw new ErroDeArquivo(`${oQue} passa de ${Math.round(limite / 1024 / 1024)} MB.`, 413);
+      }
+      hash.update(pedaco);
+      if (!saida.write(pedaco)) await once(saida, 'drain');
+    }
+    await new Promise((ok, falha) => saida.end((e) => (e ? falha(e) : ok())));
+  } catch (e) {
+    saida.destroy();
+    rmSync(temporario, { force: true });
+    throw e;
+  }
+
+  if (total === 0) { rmSync(temporario, { force: true }); throw new ErroDeArquivo('Nenhum arquivo foi enviado.'); }
+
+  const nome = `${hash.digest('hex').slice(0, 32)}.bin`;
+  const destino = join(pasta, nome);
+  if (existsSync(destino)) rmSync(temporario, { force: true });   // mesmo conteúdo, já temos
+  else renameSync(temporario, destino);
+  return { nome, bytes: total };
+}
+
 export function salvarArquivo(pasta, buf) {
   if (!buf?.length) throw new ErroDeArquivo('Nenhum arquivo foi enviado.');
   if (buf.length > LIMITES.arquivo) {

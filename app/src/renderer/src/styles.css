@@ -795,6 +795,27 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .linha-de-sala.chumbada::after { content: ''; display: block; height: 1px;
   margin: 8px 10px 6px; background: var(--line); }
 
+/* Arrastar arquivo para dentro da conversa. O aviso cobre a área toda de propósito: o
+   alvo é "a conversa", não um retângulo pequeno que se erra. */
+.chat { position: relative; }
+.chat.recebendo-arquivo::after { content: ''; position: absolute; inset: 6px; z-index: 4;
+  border: 2px dashed var(--accent); border-radius: 12px; background: var(--accent-tenue);
+  pointer-events: none; }
+.solte-aqui { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center;
+  justify-content: center; gap: 9px; font-weight: 600; color: var(--accent-claro);
+  pointer-events: none; }
+
+/* O arquivo escolhido, esperando confirmação. Ia direto ao clicar, e engano não tem
+   volta: aqui dá para ver o que é, escrever algo junto, ou desistir. */
+.anexo-pendente { position: relative; display: flex; align-items: center; gap: 10px;
+  margin: 0 12px 8px; padding: 9px 8px 9px 10px; overflow: hidden;
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 10px; }
+.anexo-pendente.com-erro { border-color: var(--danger); }
+.anexo-pendente.com-erro .anexo-quem .small { color: #ff8a90; }
+.anexo-pendente .anexo-quem { flex: 1; }
+.anexo-barra { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--bg3); }
+.anexo-barra span { display: block; height: 100%; background: var(--accent); transition: width .15s; }
+
 /* O anexo é um cartão, e não um link: link parece coisa para abrir, e arquivo que veio
    de fora não se abre — se salva, no lugar que a pessoa escolher. */
 .msg-anexo { display: inline-flex; align-items: center; gap: 10px; margin-top: 6px;

@@ -866,3 +866,36 @@ test('salas de servidores diferentes não se misturam na voz', async () => {
   const salaDe = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).video.room;
   assert.notEqual(salaDe(naCasa.corpo.token), salaDe(noDele.corpo.token), 'as duas "Geral" caíram na mesma sala');
 });
+
+
+test('arquivo grande demais responde 413 com motivo, e nao derruba a conexao', async () => {
+  // O amigo do dono perdeu um zip por causa disso: o servidor fazia `req.destroy()` e o
+  // app nao recebia resposta nenhuma — o botao ficava apagado e nada aparecia. No
+  // registro sobrava so "Error: aborted". Um NAO precisa chegar.
+  const { token } = await sessaoDe('abner');
+  const sala = (await chamar('GET', '/rooms', { sessao: token })).corpo.rooms.find((r) => r.tipo === 'texto');
+  const gigante = Buffer.alloc(201 * 1024 * 1024, 7);   // acima dos 200 MB
+
+  const r = await fetch(`${base}/mensagens/arquivo?sala=${sala.id}&nome=gigante.zip`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', 'x-sessao': token },
+    body: gigante,
+  });
+  assert.equal(r.status, 413, 'devia ser um 413, nao uma conexao morta');
+  const corpo = await r.json();
+  assert.match(corpo.error, /passa de 200 MB/, 'a mensagem precisa dizer o tamanho');
+});
+
+test('arquivo dentro do limite entra, com o nome que a pessoa deu', async () => {
+  const { token } = await sessaoDe('abner');
+  const sala = (await chamar('GET', '/rooms', { sessao: token })).corpo.rooms.find((r) => r.tipo === 'texto');
+  const r = await fetch(`${base}/mensagens/arquivo?sala=${sala.id}&nome=${encodeURIComponent('coisas.zip')}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', 'x-sessao': token },
+    body: Buffer.from('PK isto eh um zip de mentira'),
+  });
+  assert.equal(r.status, 200);
+  const { mensagem } = await r.json();
+  assert.equal(mensagem.arquivo.nome, 'coisas.zip');
+  assert.match(mensagem.arquivo.url, /^[0-9a-f]{32}\.bin$/, 'no disco vira hash inerte');
+});

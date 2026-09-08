@@ -301,26 +301,46 @@ export const enviarMensagem = async (sala: number, texto: string) =>
  * Manda um arquivo qualquer. O corpo é o arquivo cru — o nome vai na URL, porque não há
  * espaço para campos ao lado dos bytes.
  */
-export async function enviarArquivoNoChat(sala: number, arquivo: File): Promise<Mensagem> {
+/**
+ * Manda um arquivo qualquer, avisando o quanto já subiu.
+ *
+ * Usa `XMLHttpRequest` e não `fetch` por um motivo só: o `fetch` não conta o que já
+ * SUBIU. Sem isso, mandar um zip de 20 MB era um botão apagado e nada mais acontecendo
+ * na tela — foi o que aconteceu com um amigo do dono, e ele não tinha como saber se
+ * estava subindo, se tinha travado ou se tinha dado errado.
+ */
+export function enviarArquivoNoChat(
+  sala: number,
+  arquivo: File,
+  texto = '',
+  aoProgredir?: (fracao: number) => void,
+): Promise<Mensagem> {
+  const q = new URLSearchParams({ sala: String(sala), nome: arquivo.name, texto });
+  const servidor = lerServidorAtual();
   const token = lerToken();
-  const q = new URLSearchParams({ sala: String(sala), nome: arquivo.name });
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}/mensagens/arquivo?${q}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/octet-stream',
-        ...(token ? { 'x-sessao': token } : {}),
-        ...(lerServidorAtual() ? { 'x-servidor': String(lerServidorAtual()) } : {}),
-      },
-      body: await arquivo.arrayBuffer(),
-    });
-  } catch {
-    throw new ErroDoServidor('O arquivo é grande demais ou a conexão caiu no meio.', 413);
-  }
-  const dados = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
-  return (dados as { mensagem: Mensagem }).mensagem;
+
+  return new Promise((ok, falha) => {
+    const req = new XMLHttpRequest();
+    req.open('POST', `${BASE}/mensagens/arquivo?${q}`);
+    req.setRequestHeader('content-type', 'application/octet-stream');
+    if (token) req.setRequestHeader('x-sessao', token);
+    if (servidor) req.setRequestHeader('x-servidor', String(servidor));
+
+    req.upload.onprogress = (e) => {
+      if (e.lengthComputable && aoProgredir) aoProgredir(e.loaded / e.total);
+    };
+    req.onload = () => {
+      let dados: { mensagem?: Mensagem; error?: string } = {};
+      try { dados = JSON.parse(req.responseText); } catch { /* resposta sem corpo */ }
+      if (req.status >= 200 && req.status < 300 && dados.mensagem) ok(dados.mensagem);
+      else falha(new ErroDoServidor(dados.error ?? `erro ${req.status}`, req.status));
+    };
+    // Aqui cai o que nem chegou a virar resposta: rede fora, ou o servidor fechando a
+    // conexão no meio — que é como o limite de tamanho se comportava antes.
+    req.onerror = () => falha(new ErroDoServidor('A conexão caiu no meio do envio.', 0));
+    req.onabort = () => falha(new ErroDoServidor('Envio cancelado.', 0));
+    req.send(arquivo);
+  });
 }
 
 /** O servidor baixa o GIF, guarda como qualquer imagem e publica a mensagem. */

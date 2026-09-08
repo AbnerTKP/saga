@@ -305,6 +305,25 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   como página, com script dentro. Conferido contra a produção: `../../perigo.html` com
   `<script>` virou `9b503f….bin`, o nome virou `.._.._perigo.html`, e a resposta veio
   como anexo — com o conteúdo idêntico byte a byte.
+- **Passar do tamanho é um NÃO com motivo, e um não precisa chegar.** `lerBinario` fazia
+  `req.destroy()` ao estourar o limite: o servidor derrubava o socket no meio do envio, o
+  app não recebia resposta nenhuma, e a tela ficava com o botão apagado e mais nada. Um
+  amigo do dono perdeu um zip assim, e no registro sobrava só `Error: aborted`. Parar de
+  ler é `pause()`, não `destroy()` — pausado, o socket vive e o 413 ainda sai; quem fecha
+  é o `connection: close` da resposta, depois de escrita.
+- **Arquivo grande vai para o disco EM FLUXO.** O caminho normal junta os pedaços num
+  Buffer e só então grava — cabe para uma foto de 3 MB, não para 200. Com o contêiner
+  limitado a 512 MB, um envio grande derrubaria o servidor, e falta de memória já derrubou
+  a máquina inteira uma vez. Como o nome é o hash do CONTEÚDO, grava-se num temporário
+  calculando o hash no caminho, e no fim ele é renomeado; conteúdo repetido descarta o
+  temporário. Recusa no meio apaga o parcial, senão cada envio negado deixaria lixo.
+- **Escolher o arquivo não é mandá-lo.** Ia direto no clique, e engano não tem volta — não
+  há como apagar mensagem. Hoje ele vira uma ficha ao lado do campo, com nome e peso, dá
+  para escrever algo junto, desistir, e sai no mesmo botão de enviar de sempre. Arrastar
+  para qualquer lugar da conversa também escolhe.
+- **O envio mostra o quanto já subiu, e por isso usa `XMLHttpRequest`.** O `fetch` não
+  conta o que SUBIU — só o que desce. Sem a barra, mandar 20 MB era um botão apagado e
+  nada acontecendo: não dava para saber se estava indo, se travou ou se deu errado.
 - **Salvar o anexo acontece no processo PRINCIPAL, com o diálogo do sistema.** Dentro da
   tela não há para onde escrever, e a alternativa seria abrir no navegador — que é
   exatamente o que não se quer com arquivo que veio de fora. Nada é aberto nem executado:

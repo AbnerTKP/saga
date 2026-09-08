@@ -59,12 +59,15 @@ export function useChat(salaId: number | null) {
     mostrarJa(await enviarGifNoChat(salaId, url));
   }, [salaId, mostrarJa]);
 
-  const enviarArquivo = useCallback(async (arquivo: File) => {
+  const enviarArquivo = useCallback(async (
+    arquivo: File,
+    texto = '',
+    aoProgredir?: (fracao: number) => void,
+  ) => {
     if (!salaId) return;
-    // Aqui o erro fica na tarja do chat, e não sobe: quem clicou no clipe está olhando
-    // para a conversa, não para um seletor aberto.
-    try { mostrarJa(await enviarArquivoNoChat(salaId, arquivo)); }
-    catch (e) { setErro((e as Error).message); }
+    // O erro sobe para quem chamou: é lá, ao lado do arquivo escolhido, que ele precisa
+    // aparecer — e não numa tarja no alto, longe do que a pessoa estava fazendo.
+    mostrarJa(await enviarArquivoNoChat(salaId, arquivo, texto, aoProgredir));
   }, [salaId, mostrarJa]);
 
   return { mensagens, erro, enviar, enviarGif, enviarArquivo };

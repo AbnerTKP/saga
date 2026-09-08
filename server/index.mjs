@@ -8,7 +8,7 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
-import { salvarImagem, salvarSom, salvarArquivo, nomeDeArquivoLimpo, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import { salvarImagem, salvarSom, salvarArquivoEmFluxo, nomeDeArquivoLimpo, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
@@ -77,7 +77,13 @@ const CORS = {
 };
 
 function json(res, status, body) {
-  res.writeHead(status, { 'content-type': 'application/json', ...CORS });
+  res.writeHead(status, {
+    'content-type': 'application/json',
+    // 413 responde SEM ter lido o corpo todo: o que sobrou no cano não interessa a
+    // ninguém, e sem isto o Node ficaria esperando o resto de um envio já recusado.
+    ...(status === 413 ? { connection: 'close' } : {}),
+    ...CORS,
+  });
   res.end(JSON.stringify(body));
 }
 
@@ -91,17 +97,37 @@ function lerCorpo(req) {
 }
 
 /** Corpo cru, para upload de imagem. Corta na hora se passar do teto, sem juntar tudo antes. */
-function lerBinario(req, limite) {
+/**
+ * Lê o corpo cru, com teto — e RESPONDE quando estoura, em vez de matar a conexão.
+ *
+ * Isto fazia `req.destroy()`, e o amigo do dono perdeu um zip por causa disso: o servidor
+ * derrubava o socket no meio do envio, o app não recebia resposta nenhuma, e a tela ficava
+ * com o botão apagado e mais nada. No registro do servidor sobrava só `Error: aborted`.
+ * Passar do tamanho é um NÃO com motivo, e um não precisa chegar.
+ *
+ * Parar de ler é o certo — ninguém vai receber 200 MB à toa —, mas parar de ler é
+ * `pause()`, não `destroy()`: pausado, o socket continua vivo e a resposta 413 ainda sai.
+ * Quem fecha é o `connection: close` da resposta, depois de ela ter sido escrita.
+ */
+function lerBinario(req, limite, oQue = 'O arquivo') {
   return new Promise((resolve, reject) => {
     const pedacos = [];
     let total = 0;
+    let estourou = false;
     req.on('data', (c) => {
+      if (estourou) return;
       total += c.length;
-      if (total > limite) { req.destroy(); reject(new ErroDeArquivo('A imagem é grande demais.', 413)); return; }
+      if (total > limite) {
+        estourou = true;
+        req.pause();
+        const mb = Math.round(limite / 1024 / 1024);
+        reject(new ErroDeArquivo(`${oQue} passa de ${mb} MB.`, 413));
+        return;
+      }
       pedacos.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(pedacos)));
-    req.on('error', reject);
+    req.on('end', () => { if (!estourou) resolve(Buffer.concat(pedacos)); });
+    req.on('error', (e) => { if (!estourou) reject(e); });
   });
 }
 
@@ -314,7 +340,7 @@ async function trocarImagem(req, de, papel) {
   if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
     throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
   }
-  const bruto = await lerBinario(req, LIMITES[papel] + 1024);
+  const bruto = await lerBinario(req, LIMITES[papel], 'A imagem');
   // Corpo vazio significa "tirar a imagem": é como o app pede a remoção.
   const nome = bruto.length ? guardarComRegraDoTurbo(eu, bruto, papel, de) : null;
 
@@ -549,13 +575,14 @@ const ROTAS = {
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
     const q = new URL(req.url, 'http://x').searchParams;
-    const bruto = await lerBinario(req, LIMITES.arquivo + 1024);
-    const noDisco = salvarArquivo(ARQUIVOS, bruto);
+    // Em FLUXO, direto para o disco: um arquivo de 200 MB juntado na memória estouraria o
+    // teto do contêiner, e falta de memória já derrubou a máquina inteira uma vez.
+    const guardado = await salvarArquivoEmFluxo(ARQUIVOS, req, LIMITES.arquivo, 'O arquivo');
     return {
       mensagem: mensagens.enviarMensagem(db, sid, eu, q.get('sala'), q.get('texto') ?? '', null, {
-        nomeNoDisco: noDisco,
+        nomeNoDisco: guardado.nome,
         nome: nomeDeArquivoLimpo(q.get('nome')),
-        bytes: bruto.length,
+        bytes: guardado.bytes,
       }),
     };
   },
@@ -589,7 +616,7 @@ const ROTAS = {
   'POST /sons': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const nome = new URL(req.url, 'http://x').searchParams.get('nome');
-    const bruto = await lerBinario(req, LIMITES.som + 1024);
+    const bruto = await lerBinario(req, LIMITES.som, 'O som');
     const arquivo = salvarSom(ARQUIVOS, bruto);
     return { som: sons.adicionarSom(db, sid, eu, { nome, arquivo }) };
   },

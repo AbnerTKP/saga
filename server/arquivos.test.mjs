@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos, salvarArquivo, nomeDeArquivoLimpo } from './arquivos.mjs';
+import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos, salvarArquivo, nomeDeArquivoLimpo, salvarArquivoEmFluxo } from './arquivos.mjs';
 
 const pasta = () => mkdtempSync(join(tmpdir(), 'img-'));
 const comCabecalho = (bytes, tamanho = 64) =>
@@ -189,4 +189,32 @@ test('arquivo vazio e arquivo grande demais são recusados', () => {
   const pasta = mkdtempSync(join(tmpdir(), 'arq-'));
   assert.throws(() => salvarArquivo(pasta, Buffer.alloc(0)), /Nenhum arquivo/);
   assert.throws(() => salvarArquivo(pasta, Buffer.alloc(LIMITES.arquivo + 1)), /passa de/);
+});
+
+
+test('arquivo em fluxo: mesmo hash do caminho normal, sem juntar na memoria', async () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'fluxo-'));
+  const conteudo = Buffer.from('um zip de mentira, mas com bytes de verdade');
+  const pedacos = [conteudo.subarray(0, 10), conteudo.subarray(10, 25), conteudo.subarray(25)];
+
+  const r = await salvarArquivoEmFluxo(pasta, pedacos);
+  assert.equal(r.bytes, conteudo.length);
+  // O nome tem de ser o MESMO do caminho que junta tudo: é o hash do conteudo, e os dois
+  // caminhos convivem — se divergissem, o mesmo arquivo ocuparia dois lugares.
+  assert.equal(r.nome, salvarArquivo(pasta, conteudo));
+  assert.deepEqual(readFileSync(join(pasta, r.nome)), conteudo);
+});
+
+test('em fluxo, passar do limite nao deixa lixo para tras', async () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'fluxo-'));
+  const grande = [Buffer.alloc(600), Buffer.alloc(600)];
+  await assert.rejects(() => salvarArquivoEmFluxo(pasta, grande, 1000, 'O arquivo'), /passa de 0 MB/);
+  // O parcial tem de sumir: senao cada envio recusado deixaria um arquivo orfao no disco.
+  assert.deepEqual(readdirSync(pasta), [], 'sobrou arquivo parcial');
+});
+
+test('em fluxo, arquivo vazio e recusado', async () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'fluxo-'));
+  await assert.rejects(() => salvarArquivoEmFluxo(pasta, []), /Nenhum arquivo/);
+  assert.deepEqual(readdirSync(pasta), []);
 });

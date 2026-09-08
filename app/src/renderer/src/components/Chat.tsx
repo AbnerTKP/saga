@@ -76,7 +76,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
   erro: string | null;
   onEnviar: (texto: string) => Promise<void>;
   /** Manda um arquivo qualquer. O chat mostra um cartão; salvar é escolha de quem lê. */
-  onEnviarArquivo: (arquivo: File) => Promise<void>;
+  onEnviarArquivo: (arquivo: File, texto: string, aoProgredir: (f: number) => void) => Promise<void>;
   onEnviarGif: (url: string) => Promise<void>;
   onVerImagem: (url: string) => void;
   sala: string | null;
@@ -88,24 +88,66 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
 }) {
   const [texto, setTexto] = useState('');
   const [gifAberto, setGifAberto] = useState(false);
-  const [mandando, setMandando] = useState(false);
+  /**
+   * O arquivo escolhido espera aqui até a pessoa confirmar.
+   *
+   * Ia direto ao clicar, e isso é errado por dois motivos: engano não tem volta — não há
+   * como apagar mensagem — e não dava para escrever nada junto. Agora ele vira uma ficha
+   * ao lado do campo, com nome e peso, e sai no mesmo botão de sempre.
+   */
+  const [anexo, setAnexo] = useState<File | null>(null);
+  const [progresso, setProgresso] = useState<number | null>(null);
+  const [arrastando, setArrastando] = useState(false);
+  const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
   const fim = useRef<HTMLDivElement>(null);
 
   // Rola para o fim quando chega mensagem — é onde a conversa está.
   useEffect(() => { fim.current?.scrollTo({ top: fim.current.scrollHeight }); }, [mensagens.length]);
 
+  const semSala = !sala;
+
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
+    if (anexo) {
+      const arquivo = anexo, t = texto;
+      setErroDoAnexo(null);
+      setProgresso(0);
+      try {
+        await onEnviarArquivo(arquivo, t, setProgresso);
+        setAnexo(null);
+        setTexto('');
+      } catch (err) {
+        // Fica com o arquivo na mão: quem tentou mandar 300 MB quer trocar o arquivo, não
+        // recomeçar do zero sem saber o que aconteceu.
+        setErroDoAnexo((err as Error).message);
+      } finally {
+        setProgresso(null);
+      }
+      return;
+    }
     const t = texto;
     setTexto('');
     await onEnviar(t);
   };
 
-  const semSala = !sala;
+  /** Soltar arquivo em qualquer lugar da conversa escolhe — não manda. */
+  const soltar = (e: React.DragEvent) => {
+    e.preventDefault();
+    setArrastando(false);
+    if (semSala) return;
+    const a = e.dataTransfer.files?.[0];
+    if (a) { setAnexo(a); setErroDoAnexo(null); }
+  };
 
   return (
-    <div className={`chat ${grande ? 'chat-grande' : ''}`}>
+    <div
+      className={`chat ${grande ? 'chat-grande' : ''} ${arrastando ? 'recebendo-arquivo' : ''}`}
+      onDragOver={(e) => { if (!semSala) { e.preventDefault(); setArrastando(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setArrastando(false); }}
+      onDrop={soltar}
+    >
+      {arrastando && <div className="solte-aqui"><Icon name="anexo" size={22} /> Solte para anexar</div>}
       {!grande && <div className="chat-head">{sala ? `Chat de ${sala}` : 'Chat'}</div>}
 
       <div className="chat-log" ref={fim}>
@@ -141,6 +183,32 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
         ))}
       </div>
 
+      {anexo && (
+        <div className={`anexo-pendente ${erroDoAnexo ? 'com-erro' : ''}`}>
+          <span className="anexo-icone"><Icon name="anexo" size={18} /></span>
+          <span className="anexo-quem">
+            <span className="strong">{anexo.name}</span>
+            <span className="muted small">
+              {erroDoAnexo ?? (progresso === null
+                ? `${peso(anexo.size)} · escreva algo se quiser e clique em enviar`
+                : `${peso(anexo.size)} · enviando ${Math.round(progresso * 100)}%`)}
+            </span>
+          </span>
+          {progresso !== null && (
+            <span className="anexo-barra"><span style={{ width: `${Math.round(progresso * 100)}%` }} /></span>
+          )}
+          <button
+            type="button"
+            className="icon"
+            title="Tirar o arquivo"
+            disabled={progresso !== null}
+            onClick={() => { setAnexo(null); setErroDoAnexo(null); }}
+          >
+            <Icon name="close" size={15} />
+          </button>
+        </div>
+      )}
+
       <form className="chat-input" onSubmit={enviar}>
         <button
           type="button"
@@ -157,19 +225,17 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
           ref={campoDeArquivo}
           type="file"
           hidden
-          onChange={async (e) => {
+          onChange={(e) => {
             const a = e.target.files?.[0];
             e.target.value = '';   // escolher o MESMO arquivo de novo tem de disparar
-            if (!a) return;
-            setMandando(true);
-            try { await onEnviarArquivo(a); } finally { setMandando(false); }
+            if (a) { setAnexo(a); setErroDoAnexo(null); }
           }}
         />
         <button
           type="button"
           className="icon"
-          title="Mandar um arquivo"
-          disabled={semSala || mandando}
+          title="Anexar um arquivo (ou arraste para cá)"
+          disabled={semSala || progresso !== null}
           onClick={() => campoDeArquivo.current?.click()}
         >
           <Icon name="anexo" size={18} />
@@ -177,11 +243,16 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder={semSala ? 'Escolha uma sala' : `Mensagem em ${sala}`}
-          disabled={semSala}
+          placeholder={semSala ? 'Escolha uma sala' : anexo ? 'Escreva algo junto, se quiser' : `Mensagem em ${sala}`}
+          disabled={semSala || progresso !== null}
           maxLength={2000}
         />
-        <button disabled={semSala || !texto.trim()} title="Enviar"><Icon name="send" size={18} /></button>
+        <button
+          disabled={semSala || progresso !== null || (!texto.trim() && !anexo)}
+          title={anexo ? 'Enviar o arquivo' : 'Enviar'}
+        >
+          <Icon name="send" size={18} />
+        </button>
       </form>
 
       {gifAberto && (
