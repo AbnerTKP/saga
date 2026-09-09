@@ -138,6 +138,16 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Ninguém age sobre alguém de cargo igual ou superior** — é o que sustenta toda a
   moderação. A regra vive em `permissoes.mjs`, puro e testado à exaustão, e só vale para
   ações que recaem sobre alguém: criar sala não pergunta "acima de quem?".
+- **Cargo novo nasce ACIMA do mais alto, não sempre no 20.** O formulário abria fixo em
+  20, então criar dois cargos sem tocar no número punha os dois no mesmo nível — e nível
+  igual é EMPATE: a ordem passa a ser a de criação, que ninguém vê. Aconteceu no CORNUME,
+  com "BEN 10" (todas as permissões) embaixo de "Peixe Souris" (nenhuma), os dois no 20,
+  só porque o outro foi criado antes. A ordem da lista é o NÍVEL, nunca o poder: cargo sem
+  permissão nenhuma pode estar em cima, e é isso que confunde quando o empate é acidental.
+  Empate continua permitido — quem quiser dois cargos lado a lado põe o número na mão, e o
+  app não desempata cargo que alguém igualou de propósito —, e por isso o editor agora
+  DIZ com quem o nível empata e o que isso significa (um não age sobre o outro). A conta
+  do nível de nascença mora em `cargos.ts`, pura e testada, e respeita o teto de quem cria.
 - **O dono tem todas as permissões por ser dono**, não por constar numa lista: editar o
   cargo dele no banco não pode deixar o servidor sem conserto.
 - **Dono da Saga e quem manda num servidor são coisas diferentes**, e confundi-las fazia
@@ -802,7 +812,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (237) + app (115), segundos, sem nada externo
+pnpm test        # servidor (237) + app (121), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

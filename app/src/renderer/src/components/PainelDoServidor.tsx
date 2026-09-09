@@ -7,6 +7,7 @@ import {
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
   type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
+import { empatadosCom, nivelParaCargoNovo } from '../cargos';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
@@ -305,6 +306,17 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
                   />
                 </div>
 
+                {/* Empate é permitido, e às vezes é o que se quer — mas a consequência
+                    dele é invisível: quem está num cargo não age sobre quem está no
+                    outro, e na lista quem decide quem vem primeiro é a ordem de criação. */}
+                {empatadosCom(editando.nivel, cargos, editando.id).length > 0 && (
+                  <p className="muted small">
+                    Nível {editando.nivel} é o mesmo de{' '}
+                    <b>{empatadosCom(editando.nivel, cargos, editando.id).join(', ')}</b> — empatados,
+                    um não age sobre o outro, e na lista fica em cima quem foi criado antes.
+                  </p>
+                )}
+
                 <div className="permissoes">
                   {Object.entries(permissoes).map(([chave, descricao]) => (
                     <label key={chave} className="check">
@@ -348,7 +360,13 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
             ) : (
               <button
                 style={{ marginTop: 10 }}
-                onClick={() => setEditando({ nome: '', cor: '#99aab5', nivel: 20, permissoes: [] })}
+                onClick={() => setEditando({
+                  nome: '', cor: '#99aab5', permissoes: [],
+                  // Acima do mais alto que existe, em vez de sempre no 20: dois cargos
+                  // criados sem tocar no número caíam no mesmo nível, e nível igual é
+                  // empate — a ordem virava a de criação, que ninguém vê. Ver cargos.ts.
+                  nivel: nivelParaCargoNovo(cargos.map((c) => c.nivel), eu.cargo?.nivel ?? 0, !!eu.cargo?.dono),
+                })}
               >
                 Criar cargo
               </button>
