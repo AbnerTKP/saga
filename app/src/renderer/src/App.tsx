@@ -449,6 +449,8 @@ export function App() {
           room={rm.room}
           souBerserk={eu.turbo}
           donoDaSaga={!!eu.donoDaSaga}
+          volumeDoSoundboard={rm.volumeDoSoundboard}
+          onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
           onEu={atualizarEu}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onClose={() => setDevices(false)}

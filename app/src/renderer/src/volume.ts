@@ -9,3 +9,16 @@
  */
 export const VOLUME = (v: number): number =>
   Math.min(1, Math.max(0, Number.isFinite(v) ? v : 1));
+
+/**
+ * O volume que estava guardado. Nada, texto vazio ou lixo viram 100%.
+ *
+ * O cuidado tem nome: `Number('')` é ZERO, e zero aqui é silêncio. Chave vazia no
+ * localStorage acontece, e ela calaria o soundboard inteiro sem erro nenhum — do tipo de
+ * defeito que ninguém liga à causa. O padrão seguro é ouvir, não emudecer.
+ */
+export const volumeGuardado = (bruto: string | null): number => {
+  if (bruto === null || bruto.trim() === '') return 1;
+  const n = Number(bruto);
+  return Number.isFinite(n) ? VOLUME(n) : 1;
+};

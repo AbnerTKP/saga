@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
 import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros';
-import { VOLUME } from './volume';
+import { VOLUME, volumeGuardado } from './volume';
 import { qualidadeValida, prioridadeDe, type Qualidade } from './qualidades';
 import { criarAvisos } from './avisos';
 import { mudo } from './audivel';
@@ -42,6 +42,14 @@ export type Live = { identity: string; nome: string; local: boolean; assistindo:
 /** Vídeo e som da live são publicações separadas; cortar uma sem a outra deixa som órfão. */
 const ehDaLive = (fonte: Track.Source) =>
   fonte === Track.Source.ScreenShare || fonte === Track.Source.ScreenShareAudio;
+
+/**
+ * A fonte com que o soundboard é publicado — ver `tocarSom`. É por ela que o som do
+ * soundboard é reconhecido do outro lado, para ter volume próprio: ele não é voz, e a
+ * faixa é própria justamente para não andar junto do microfone de ninguém.
+ */
+const FONTE_DO_SOUNDBOARD = Track.Source.Unknown;
+
 export type Status = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 
 /**
@@ -81,6 +89,18 @@ export function lerQualidadeGuardada(): unknown {
 
 export function guardarQualidade(q: Qualidade) {
   try { localStorage.setItem(CHAVE_QUALIDADE, q); } catch { /* sem storage */ }
+}
+
+// O prefixo antigo fica: renomear chave desloga e zera ajuste de todo mundo de uma vez.
+const CHAVE_VOLUME_DO_SOUNDBOARD = 'cantinho.volumeSoundboard';
+
+/** Quanto ALTO os sons chegam para você. É seu e deste computador, como a qualidade. */
+export function lerVolumeDoSoundboard(): number {
+  try { return volumeGuardado(localStorage.getItem(CHAVE_VOLUME_DO_SOUNDBOARD)); } catch { return 1; }
+}
+
+function guardarVolumeDoSoundboard(v: number) {
+  try { localStorage.setItem(CHAVE_VOLUME_DO_SOUNDBOARD, String(v)); } catch { /* sem storage */ }
 }
 
 // Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
@@ -138,6 +158,20 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const faixaDoSom = useRef<MediaStreamTrack | null>(null);
   const buffers = useRef(new Map<string, AudioBuffer>());
 
+  /**
+   * O volume com que os sons chegam AQUI — os dos outros e os seus.
+   *
+   * É um só, e não um por pessoa: som de soundboard não é voz, é efeito, e o que incomoda
+   * é o tranco do som em cima da conversa, venha de quem vier.
+   *
+   * O ganho vale só para quem ouve: o que sai para a sala é pego ANTES dele, em
+   * `destinoDoSom` — baixar o seu volume não pode baixar o som dos outros, senão a chave
+   * mexeria na call inteira sem ninguém ter pedido.
+   */
+  const [volumeDoSoundboard, setVolumeDoSoundboardState] = useState(lerVolumeDoSoundboard);
+  const volumeDoSoundboardRef = useRef(volumeDoSoundboard);
+  const ganhoDoSoundboard = useRef<GainNode | null>(null);
+
   // Volume por pessoa. Aplicado nos elementos de áudio que nós mesmos criamos, e não pelo
   // setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e deixaria o
   // soundboard de fora, que anda numa faixa própria.
@@ -183,7 +217,11 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       try {
         const identity = el.dataset.identity ?? '';
         const ehLive = el.dataset.source === Track.Source.ScreenShareAudio;
-        const guardado = (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
+        // O soundboard tem volume próprio, e global: não é a voz da pessoa, e abaixar o
+        // efeito não pode abaixar quem está falando junto dele.
+        const guardado = el.dataset.source === FONTE_DO_SOUNDBOARD
+          ? volumeDoSoundboardRef.current
+          : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
         el.volume = VOLUME(guardado);
         el.muted = mudo({ ehLive, identity }, {
           surdo: deafenedRef.current,
@@ -669,8 +707,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
       const fonte = audio.current.createBufferSource();
       fonte.buffer = buffer;
+      if (!ganhoDoSoundboard.current) {
+        ganhoDoSoundboard.current = audio.current.createGain();
+        ganhoDoSoundboard.current.connect(audio.current.destination);
+      }
+      ganhoDoSoundboard.current.gain.value = VOLUME(volumeDoSoundboardRef.current);
+      // A sala recebe o som inteiro, tirado ANTES do ganho: o volume é de quem ouve.
       fonte.connect(destinoDoSom.current);       // para a sala
-      fonte.connect(audio.current.destination);  // e para quem tocou
+      fonte.connect(ganhoDoSoundboard.current);  // e para quem tocou, no volume dele
       fonte.onended = () => {
         // Vale para os dois fins: o natural e o `stop()`.
         if (fonteDoSom.current === fonte) { fonteDoSom.current = null; setSomTocando(null); }
@@ -720,6 +764,16 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     volumes.current.set(identity, VOLUME(valor));
     aplicarAudio();
     bump();
+  }, [aplicarAudio]);
+
+  /** Vale na hora, inclusive no som que já está tocando: é ajustar ouvindo. */
+  const definirVolumeDoSoundboard = useCallback((valor: number) => {
+    const v = VOLUME(valor);
+    volumeDoSoundboardRef.current = v;
+    setVolumeDoSoundboardState(v);
+    guardarVolumeDoSoundboard(v);
+    if (ganhoDoSoundboard.current) ganhoDoSoundboard.current.gain.value = v;
+    aplicarAudio();
   }, [aplicarAudio]);
 
   const volumeDaTelaDe = useCallback((identity: string) => volumesDaTela.current.get(identity) ?? 1, []);
@@ -862,7 +916,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
-    tocarSom, pararSom, somTocando,
+    tocarSom, pararSom, somTocando, volumeDoSoundboard, definirVolumeDoSoundboard,
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
     lives, assistir, assistindo, espectadores,
     volumeDaTelaDe, definirVolumeDaTela,

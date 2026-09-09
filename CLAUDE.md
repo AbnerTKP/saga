@@ -545,6 +545,19 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   outro lado: dá para passar meses sem notar.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
+- **O volume do soundboard é um só, de quem OUVE, e mora nas configurações.** Um só porque
+  som de soundboard não é voz: é efeito, e o que incomoda é o tranco em cima da conversa,
+  venha de quem vier — abaixar isso não pode abaixar quem está falando junto. E de quem
+  ouve porque o que sai para a sala é tirado ANTES do ganho, em `destinoDoSom`: a chave
+  mexe no seu alto-falante, não na call inteira. Vale para os sons dos outros e para os
+  seus, na hora, inclusive com um som já tocando — é ajustar ouvindo. O som é reconhecido
+  pela FONTE da faixa: medido com o `livekit-client` deste projeto contra um LiveKit de
+  verdade, o que é publicado como `Track.Source.Unknown` chega do outro lado como
+  `unknown`, com o nome `soundboard` junto.
+- **`Number('')` é ZERO, e zero é silêncio.** O volume guardado passa por `volumeGuardado`:
+  chave vazia, lixo ou nada voltam a 100%. Ler direto do `localStorage` calaria o
+  soundboard inteiro por causa de uma chave vazia — sem erro nenhum, e sem ninguém ligar
+  uma coisa à outra.
 - **O som da live também anda em faixa própria** (`ScreenShareAudio`), separada do vídeo.
   Quem corta a live tem de cortar as duas: "não assistir" desinscrevia só o vídeo, e o som
   de todas as lives continuava entrando e tocando com a tela apagada. Medido: cortando só
@@ -779,7 +792,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (237) + app (108), segundos, sem nada externo
+pnpm test        # servidor (237) + app (110), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -823,6 +836,9 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   captura exige duas pessoas numa call de verdade — e no Windows nada disso foi exercido.
 - **Por que a faixa de áudio da tela vem silenciosa neste Mac** nos dois modos, com a
   chave de permissão presente no Info.plist. Não foi explicado.
+- **O volume do soundboard mexendo no som de verdade.** Está medido que o som do
+  soundboard chega reconhecível (a fonte `unknown`, com o nome junto) e que o desenho da
+  chave fecha; ouvir o som de outra pessoa mais baixo, numa call, não foi exercido.
 - **A lista de quem está assistindo, numa call de verdade.** O que está medido é o
   mecanismo — o atributo indo e voltando por um LiveKit de verdade, com o mesmo
   `livekit-client` do app, e o desenho conferido em imagem. Duas pessoas numa call, uma

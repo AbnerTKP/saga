@@ -32,13 +32,18 @@ const OUTRO_SISTEMA = { nome: 'o sistema', encolhida: '' };
  * único caminho que existia. A engrenagem já era "as suas coisas" (microfone, câmera);
  * agora é isso e o resto de você.
  */
-export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegistro, onClose }: {
+export function PainelDaConta({
+  eu, room, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
+}: {
   eu: Membro;
   room: Room;
   /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
   souBerserk: boolean;
   /** Só o dono da Saga vê o que vale em todos os servidores. */
   donoDaSaga: boolean;
+  /** Quanto alto os sons do soundboard chegam AQUI — os seus e os dos outros. */
+  volumeDoSoundboard: number;
+  onVolumeDoSoundboard: (v: number) => void;
   onEu: (m: Membro) => void;
   onRegistro: () => void;
   onClose: () => void;
@@ -173,6 +178,24 @@ export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegist
                 </label>
               ))}
               <p className="muted small">Cancelamento de eco e supressão de ruído ficam sempre ligados.</p>
+            </div>
+          </section>
+
+          <section className="painel-bloco">
+            <h3>Soundboard</h3>
+            <div className="form">
+              <label>
+                Volume dos sons · {Math.round(volumeDoSoundboard * 100)}%
+                <input
+                  type="range" min={0} max={100} value={Math.round(volumeDoSoundboard * 100)}
+                  onChange={(e) => onVolumeDoSoundboard(Number(e.target.value) / 100)}
+                />
+                <small className="muted">
+                  Vale para os sons que você OUVE — os seus e os dos outros — e já na hora:
+                  dá para acertar com um som tocando. Não muda o volume com que eles chegam
+                  para os outros. A voz de cada pessoa é à parte, no botão direito sobre ela.
+                </small>
+              </label>
             </div>
           </section>
 
