@@ -8,7 +8,7 @@ import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
-import { porTransmissao, ASSISTINDO } from './espectadores';
+import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -251,19 +251,26 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const jaContei = useRef(false);
 
   /**
-   * Conta à sala qual transmissão estou assistindo — ou nenhuma.
+   * Conta à sala o que só este app sabe de mim: que transmissão estou assistindo e se
+   * desliguei o fone.
    *
-   * É a única forma de quem transmite saber quem está vendo: o LiveKit não diz a ninguém
-   * quem se inscreveu na faixa dele. O atributo é do participante, então o servidor
-   * guarda e entrega até para quem chegar depois.
+   * Nenhuma das duas dá para deduzir de fora. O LiveKit não conta a quem publica quem se
+   * inscreveu na faixa dele, e surdez não é faixa nenhuma — é decisão local. O atributo é
+   * do participante, então o servidor guarda e entrega até para quem chegar depois.
    *
-   * Falhar aqui não pode atrapalhar quem só quer assistir: crachá velho, emitido antes de
-   * o servidor passar a permitir o anúncio, faz o pedido ser recusado — e o que se perde
-   * é a lista de espectadores, mais nada.
+   * Manda sempre os DOIS, mesmo quando só um mudou: assim nada depende de o servidor
+   * juntar o que veio agora com o que veio antes.
+   *
+   * Falhar aqui não pode atrapalhar quem só quer conversar: crachá velho, emitido antes
+   * de o servidor passar a permitir o anúncio, faz o pedido ser recusado — e o que se
+   * perde são as duas marcas, mais nada.
    */
-  const contarOQueAssisto = useCallback((identity: string | null) => {
+  const anunciar = useCallback(() => {
     if (room.state !== 'connected') return;
-    room.localParticipant.setAttributes({ [ASSISTINDO]: identity ?? '' }).catch((e: Error) => {
+    room.localParticipant.setAttributes({
+      [ASSISTINDO]: assistindoRef.current ?? '',
+      [SURDO]: deafenedRef.current ? '1' : '',
+    }).catch((e: Error) => {
       if (jaContei.current) return;
       jaContei.current = true;
       anotar('aviso', 'live', `não deu para contar o que estou assistindo: ${e.message}`);
@@ -329,7 +336,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         setStatus('connected');
         // Reconectar é sessão nova para o servidor; o anúncio vai de novo em vez de
         // torcer para ter sobrevivido.
-        contarOQueAssisto(assistindoRef.current);
+        anunciar();
       })
       // Alguém trocou o que está assistindo: a lista de espectadores é redesenhada.
       .on(RoomEvent.ParticipantAttributesChanged, bump)
@@ -358,7 +365,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, contarOQueAssisto]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar]);
 
   const join = useCallback(async (url: string, token: string, sala: SalaDaVoz) => {
     setError(null);
@@ -377,6 +384,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
       tocarAviso('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
+      // Quem entra na sala já de fone desligado precisa aparecer assim desde o começo: o
+      // anúncio nasce vazio a cada sala nova, e sem isto a marca só apareceria se a
+      // pessoa mexesse no fone de novo.
+      anunciar();
       if (!deafenedRef.current) {
         await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
       }
@@ -388,7 +399,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room, tocarAviso]);
+  }, [room, tocarAviso, anunciar]);
 
   const leave = useCallback(async () => {
     tocarAviso('saiu', deafenedRef.current);
@@ -642,9 +653,12 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       } else if (micBeforeDeafen.current) {
         await lp().setMicrophoneEnabled(true);
       }
+      // Sem isto, de fora só se vê o microfone mudo — que é consequência, e diz a coisa
+      // errada: "ele não fala", quando o que aconteceu é "ele não te ouve".
+      anunciar();
     }
     bump();
-  }, [room, aplicarAudio]);
+  }, [room, aplicarAudio, anunciar]);
 
   /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
   /**
@@ -745,7 +759,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const assistir = useCallback((identity: string | null) => {
     assistindoRef.current = identity;
     setAssistindoState(identity);
-    contarOQueAssisto(identity);
+    anunciar();
     for (const p of room.remoteParticipants.values()) {
       const querVer = p.identity === identity;
       for (const pub of p.trackPublications.values()) {
@@ -756,7 +770,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     }
     aplicarAudio();
     bump();
-  }, [room, aplicarAudio, contarOQueAssisto]);
+  }, [room, aplicarAudio, anunciar]);
 
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
@@ -803,7 +817,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     if (status === 'idle') return;
     const id = setInterval(() => {
       const agora = [...room.remoteParticipants.values()]
-        .map((p) => `${p.identity}:${p.attributes?.[ASSISTINDO] ?? ''}`)
+        .map((p) => `${p.identity}:${JSON.stringify(p.attributes ?? {})}`)
         .sort()
         .join('|');
       if (agora === comoEstavamOsEspectadores.current) return;
@@ -909,8 +923,18 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     assistindo: p === room.localParticipant ? assistindo : (p.attributes?.[ASSISTINDO] || null),
   })));
 
+  /**
+   * Quem está sem ouvir ninguém. O meu sai do estado daqui — eu sei se desliguei o fone —,
+   * e o dos outros, do que eles anunciaram.
+   */
+  const surdos = new Set<string>();
+  for (const p of participants) {
+    const ehSurdo = p === room.localParticipant ? deafened : p.attributes?.[SURDO] === '1';
+    if (ehSurdo) surdos.add(p.identity);
+  }
+
   return {
-    room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
+    room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened, surdos,
     falando: falandoAgora,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,

@@ -495,12 +495,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Quem olha a própria transmissão não é plateia.** Dá para pôr a sua live no palco (é a
   prévia do que você manda), e contar isso diria "1 assistindo" para quem está sozinho. A
   regra vive em `espectadores.ts`, pura e testada.
-- **Onde cabe, vão nomes; onde não cabe, o número.** No quadro grande, três nomes; no seu
-  quadro pequeno, um nome e o resto contado, porque na SUA transmissão saber QUEM é o
-  ponto; nos outros, só quantos, e a lista inteira parando o mouse em cima. No cartão de
-  quem está no ar a contagem entra na MESMA linha do "assistir": aquele cartão tem 110 px e
-  uma quarta linha ali já saiu por cima do retrato uma vez. E na sua transmissão o zero
-  aparece — "ninguém ainda" é a informação, não a ausência dela.
+- **Dois nomes e a conta fora do corte: "Juninho, Junio +5".** Os NOMES encolhem quando
+  não cabem; a conta, não. Com os dois no mesmo texto, "Juninho, Junio e mais 5" virava
+  "Juninho, Junio e mai…" num quadro de 180 px — comia justamente o número, que é o que
+  não se sabe de outro jeito. A lista inteira vem parando o mouse em cima, e isso só
+  funciona porque a etiqueta RECEBE o mouse: ela chegou a ter `pointer-events: none` para
+  não roubar o clique do quadro, e junto foi embora o passar o mouse. Não precisava: a
+  etiqueta é filha do quadro, então o clique sobe sozinho. Na transmissão dos OUTROS
+  continua só o número — ali importa se tem gente, não quem. No cartão de quem está no ar
+  a contagem entra na MESMA linha do "assistir": aquele cartão tem 110 px e uma quarta
+  linha ali já saiu por cima do retrato uma vez. E na sua transmissão o zero aparece —
+  "ninguém ainda" é a informação, não a ausência dela.
 - **Os cartões saem da PUBLICAÇÃO, não da faixa.** Uma faixa só existe se estiver
   inscrita, então listar lives por faixa mostraria exatamente a única que já se está
   vendo. `rm.lives` vem das publicações de tela dos participantes.
@@ -553,6 +558,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   dele — largas e brancas — no meio de um app escuro, e é a única coisa na tela que não é
   do app. No Mac elas são flutuantes e quase não aparecem, então o estrago só se vê do
   outro lado: dá para passar meses sem notar.
+- **Fone desligado tem marca própria, e ela entra NO LUGAR da do microfone.** Surdez é
+  decisão local: não é faixa nenhuma, e o LiveKit não conta a ninguém. De fora só se via o
+  microfone mudo — que é a consequência (desligar o fone muta o microfone junto) e diz a
+  coisa errada: "ele não fala", quando o que houve foi "ele não te ouve". Agora o app
+  anuncia `surdo` junto do `assistindo`, no mesmo atributo de participante, e manda os
+  DOIS a cada vez — assim nada depende de o servidor juntar o que veio agora com o que
+  veio antes. Na linha da call vai o fone cortado, e não os dois ícones: a linha é a mais
+  estreita do app, e repetir a consequência esconderia a causa. Medido contra um LiveKit
+  de verdade: os dois atributos viajam juntos, o outro app lê os dois, e o SERVIDOR também
+  os enxerga no `listParticipants` — que é o que faz a marca valer também nas salas em que
+  você não está (`verParticipante`, testado).
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
 - **O volume do soundboard é um só, de quem OUVE, e mora nas configurações.** Um só porque
@@ -812,7 +828,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (237) + app (121), segundos, sem nada externo
+pnpm test        # servidor (239) + app (120), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

@@ -129,11 +129,12 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                     turbo: pessoas.get(p.identity)?.turbo ?? false,
                     idExibido: pessoas.get(p.identity)?.idExibido ?? null,
                     speaking: rm.falando.has(p.identity), muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
+                    surdo: rm.surdos.has(p.identity),
                   }))
                 : ocupantes(r.participants, { euSou: `u${eu.id}`, estouNesta: false })
                     .map((p) => ({
                       ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
-                      idExibido: p.idExibido ?? null, speaking: false,
+                      idExibido: p.idExibido ?? null, speaking: false, surdo: !!p.surdo,
                     }));
               return (
                 <li
@@ -183,7 +184,13 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                               Nos outros lugares ele continua. */}
                           {p.screen && <span className="transmitindo" title="Transmitindo agora"><Icon name="screen" /></span>}
                           {p.camera && <Icon name="camera" />}
-                          {p.muted && <Icon name="micOff" />}
+                          {/* Fone desligado no lugar do microfone mudo, e não os dois: a
+                              linha é estreita, e desligar o fone JÁ muta o microfone —
+                              a marca do microfone repetiria a consequência e esconderia
+                              a causa. "Ele não te ouve" diz mais que "ele não fala". */}
+                          {p.surdo
+                            ? <span title="Desligou o fone: não ouve ninguém"><Icon name="headOff" /></span>
+                            : p.muted && <Icon name="micOff" />}
                         </span>
                       </li>
                     ))}

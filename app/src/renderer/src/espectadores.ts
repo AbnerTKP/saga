@@ -11,11 +11,20 @@
  */
 
 /**
- * O nome do atributo que viaja entre os apps. É protocolo, não texto de tela: app e
- * servidor sobem separados, e um amigo com a versão velha continua na mesma sala — ele
- * não anuncia nada e não aparece na lista, mas nada quebra.
+ * Os nomes dos atributos que viajam entre os apps. São protocolo, não texto de tela: app
+ * e servidor sobem separados, e um amigo com a versão velha continua na mesma sala — ele
+ * não anuncia nada e não aparece nas listas, mas nada quebra.
  */
 export const ASSISTINDO = 'assistindo';
+
+/**
+ * Que a pessoa desligou o fone — ela não ouve NINGUÉM.
+ *
+ * Não dá para deduzir isso do LiveKit: surdez é decisão local, não é faixa. O que se via
+ * de fora era só o microfone mudo, que é consequência (desligar o fone muta o microfone
+ * junto) e diz a coisa errada: "ele não fala" em vez de "ele não te ouve".
+ */
+export const SURDO = 'surdo';
 
 export type NaCall = { identity: string; nome: string; assistindo: string | null };
 export type Espectador = { identity: string; nome: string };
@@ -36,18 +45,4 @@ export function porTransmissao(pessoas: NaCall[]): Map<string, Espectador[]> {
   // reembaralhar cada vez que alguém entra, sai ou troca de transmissão.
   for (const lista of mapa.values()) lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   return mapa;
-}
-
-/**
- * "Fulano", "Fulano e Beltrano", "Fulano, Beltrano e mais 2".
- *
- * O corte existe porque o lugar é apertado — a faixa de baixo tem 110 px de altura e o
- * quadro pequeno, 180 px de largura. Quem quiser a lista inteira passa o mouse: lá vai
- * com um limite bem maior.
- */
-export function comoSeLe(nomes: string[], limite = 3): string {
-  if (nomes.length === 0) return '';
-  if (nomes.length === 1) return nomes[0];
-  if (nomes.length > limite) return `${nomes.slice(0, limite).join(', ')} e mais ${nomes.length - limite}`;
-  return `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
 }

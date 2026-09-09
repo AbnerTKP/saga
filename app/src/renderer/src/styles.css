@@ -210,15 +210,19 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-weight: 600; color: var(--accent-claro); }
 
 /* Quem está assistindo à transmissão. Dentro do quadro ela fica no ALTO: embaixo já moram
-   o nome, à esquerda, e o botão de tela cheia, à direita. `pointer-events: none` porque o
-   quadro inteiro é um botão — escolher a transmissão não pode falhar por causa de onde a
-   etiqueta calhou de ficar. */
+   o nome, à esquerda, e o botão de tela cheia, à direita.
+   
+   Ela RECEBE o mouse, e isso é o ponto: é parando em cima dela que vem a lista inteira de
+   quem está vendo. Chegou a ter `pointer-events: none` para não roubar o clique do quadro,
+   e não roubava mesmo — mas junto ia embora o passar o mouse, e com ele a única forma de
+   ver os nomes que não couberam. O clique continua chegando ao quadro sozinho: a etiqueta
+   é filha dele, então o clique sobe. */
 .quem-assiste { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
   font-weight: 600; color: inherit; min-width: 0; }
 .quem-assiste span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quem-assiste .assiste-resto { flex: none; opacity: .85; }
 .quem-assiste.no-quadro { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px);
-  background: rgba(0,0,0,.66); color: #fff; padding: 3px 7px; border-radius: 6px;
-  pointer-events: none; }
+  background: rgba(0,0,0,.66); color: #fff; padding: 3px 7px; border-radius: 6px; }
 
 /* O selo do que está no ar. Vermelho é a convenção, e o ponto pisca devagar: é para
    avisar, não para puxar o olho o tempo todo. */

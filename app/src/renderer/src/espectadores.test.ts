@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { comoSeLe, porTransmissao, type NaCall } from './espectadores.ts';
+import { porTransmissao, type NaCall } from './espectadores.ts';
 
 const gente = (...linhas: [string, string, string | null][]): NaCall[] =>
   linhas.map(([identity, nome, assistindo]) => ({ identity, nome, assistindo }));
@@ -32,13 +32,4 @@ test('a ordem é por nome, e não a de chegada', () => {
     ['u9', 'Zé', 'u1'], ['u2', 'Ana', 'u1'], ['u7', 'Ávila', 'u1'],
   ));
   assert.deepEqual(mapa.get('u1')?.map((e) => e.nome), ['Ana', 'Ávila', 'Zé']);
-});
-
-test('o texto da lista cabe no lugar apertado', () => {
-  assert.equal(comoSeLe([]), '');
-  assert.equal(comoSeLe(['Ana']), 'Ana');
-  assert.equal(comoSeLe(['Ana', 'Bruno']), 'Ana e Bruno');
-  assert.equal(comoSeLe(['Ana', 'Bruno', 'Carla']), 'Ana, Bruno e Carla');
-  assert.equal(comoSeLe(['Ana', 'Bruno', 'Carla', 'Dani']), 'Ana, Bruno, Carla e mais 1');
-  assert.equal(comoSeLe(['Ana', 'Bruno', 'Carla', 'Dani'], 2), 'Ana, Bruno e mais 2');
 });

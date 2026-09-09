@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verParticipante, FONTE } from './participantes.mjs';
+import { verParticipante, FONTE, ATRIBUTO_SURDO } from './participantes.mjs';
 
 // Monta um participante como o LiveKit devolve, só com o que a função lê.
 const pessoa = (nome, faixas) => ({ identity: `${nome}#a1b2`, name: nome, tracks: faixas });
@@ -64,4 +64,18 @@ test('sem nome definido, cai para o identity', () => {
 
 test('participante sem lista de faixas não quebra', () => {
   assert.equal(verParticipante({ identity: 'x#1', name: 'x' }).muted, true);
+});
+
+test('fone desligado vem do atributo, não de faixa nenhuma', () => {
+  // Surdez é decisão do app de quem desligou: não existe faixa para ela, e de fora só se
+  // via o microfone mudo — que é consequência e diz a coisa errada.
+  const surdo = { ...pessoa('Abner', [faixa(FONTE.MICROFONE, true)]), attributes: { [ATRIBUTO_SURDO]: '1' } };
+  assert.equal(verParticipante(surdo).surdo, true);
+  assert.equal(verParticipante(surdo).muted, true, 'desligar o fone muta o microfone junto');
+});
+
+test('quem não anuncia nada não está surdo', () => {
+  assert.equal(verParticipante(pessoa('Abner', [faixa(FONTE.MICROFONE)])).surdo, false);
+  const outro = { ...pessoa('Bruno', []), attributes: { assistindo: 'u1' } };
+  assert.equal(verParticipante(outro).surdo, false, 'atributo de outro assunto não conta');
 });

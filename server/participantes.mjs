@@ -16,6 +16,14 @@ export const FONTE = {
 // "desligou a câmera" e "parou de compartilhar" sem derrubar a publicação.
 const ativa = (t) => !t.muted;
 
+/**
+ * Fone desligado não é faixa nenhuma: é decisão do app de quem desligou, e chega aqui
+ * como ATRIBUTO do participante. O nome é protocolo, o mesmo do app (espectadores.ts) —
+ * app e servidor sobem separados, então renomear aqui faz a marca sumir para quem estiver
+ * com a versão de ontem, sem erro nenhum aparecer.
+ */
+export const ATRIBUTO_SURDO = 'surdo';
+
 export function verParticipante(p) {
   const faixas = p.tracks ?? [];
   const microfones = faixas.filter((t) => t.source === FONTE.MICROFONE);
@@ -26,5 +34,7 @@ export function verParticipante(p) {
     screen: faixas.some((t) => t.source === FONTE.TELA && ativa(t)),
     // Sem microfone publicado a pessoa também não está falando: conta como mudo.
     muted: microfones.length === 0 || microfones.every((t) => t.muted),
+    // Quem não anuncia nada — versão velha do app — simplesmente não está surdo.
+    surdo: p.attributes?.[ATRIBUTO_SURDO] === '1',
   };
 }

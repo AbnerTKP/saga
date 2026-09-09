@@ -8,7 +8,7 @@ import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import type { Mensagem, RoomInfo } from '../api';
 import type { PessoaNaCall } from './MenuDaPessoa';
-import { comoSeLe, type Espectador } from '../espectadores';
+import type { Espectador } from '../espectadores';
 import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
@@ -31,14 +31,26 @@ function QuemAssiste({ espectadores, nomes = 0, mostrarVazio, extra }: {
 }) {
   const quem = espectadores.map((e) => e.nome);
   if (quem.length === 0 && !mostrarVazio) return null;
+  const cabem = quem.slice(0, nomes);
+  const resto = quem.length - cabem.length;
   return (
     <span
       className={`quem-assiste ${extra ?? ''}`}
-      // O corte é do lugar apertado, não do dado: parando o mouse em cima vem a lista.
-      title={quem.length ? `Assistindo: ${comoSeLe(quem, 8)}` : 'Ninguém está assistindo'}
+      // O corte é do lugar apertado, não do dado: parando o mouse em cima vem a lista
+      // INTEIRA, sem corte nenhum — é para isso que se passa o mouse.
+      title={quem.length ? `Assistindo: ${quem.join(', ')}` : 'Ninguém está assistindo'}
     >
       <Icon name="olho" size={13} />
-      <span>{quem.length === 0 ? 'ninguém ainda' : nomes > 0 ? comoSeLe(quem, nomes) : quem.length}</span>
+      {quem.length === 0 ? <span>ninguém ainda</span> : nomes === 0 ? <span>{quem.length}</span> : (
+        <>
+          {/* Os NOMES é que encolhem; a conta fica fora do corte. Com os dois no mesmo
+              texto, "Juninho, Junio e mais 5" virava "Juninho, Junio e mai…" num quadro
+              de 180 px — comia justamente o número, que é o que não se sabe de outro
+              jeito. */}
+          <span className="assiste-nomes">{cabem.join(', ')}</span>
+          {resto > 0 && <span className="assiste-resto">+{resto}</span>}
+        </>
+      )}
     </span>
   );
 }
@@ -94,9 +106,11 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
       {isScreen && (
         <QuemAssiste
           espectadores={espectadores ?? []}
-          // No quadro grande cabem três nomes; no seu, pequeno, um nome e o resto contado
-          // — é a sua transmissão, saber QUEM é o ponto. Na dos outros, só quantos.
-          nomes={big ? 3 : tile.local ? 1 : 0}
+          // Dois nomes e o resto contado — "Juninho, Junio e mais 5" —, que é o formato
+          // que se lê de relance. A lista inteira vem parando o mouse em cima. Na
+          // transmissão dos OUTROS continua só o número: ali o que importa é se tem
+          // gente, não quem.
+          nomes={big || tile.local ? 2 : 0}
           mostrarVazio={tile.local}
           extra="no-quadro"
         />

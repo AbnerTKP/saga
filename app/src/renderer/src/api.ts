@@ -87,6 +87,8 @@ export type Servidor = { id: number; nome: string; foto: string | null; banner: 
 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
+  /** Fone desligado: a pessoa não ouve ninguém. Vem do que o app dela anuncia. */
+  surdo?: boolean;
   usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
   banner?: string | null; enquadramento?: Enquadramentos; entrouEm?: number | null;
   turbo?: boolean; idExibido?: string | null;
