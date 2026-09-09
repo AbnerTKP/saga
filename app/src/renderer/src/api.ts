@@ -6,6 +6,7 @@
 // Em desenvolvimento aponta para a máquina local, senão testar qualquer mudança
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
 import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
+import { lerResposta } from './resposta';
 
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
@@ -181,14 +182,17 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<
     anotarFalha(`${metodo} ${rota}`, falha);
     throw falha;
   }
-  const dados = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const corpo = dados as { error?: string; tipo?: string };
-    const falha = new ErroDoServidor(corpo.error ?? `erro ${res.status}`, res.status, corpo.tipo ?? 'erro');
+  // Corpo que não é JSON vira `null` aqui, e quem decide o que isso significa é
+  // `lerResposta` — inclusive que um 200 pela metade é FALHA, e não objeto vazio. Ver o
+  // comentário de lá: foi assim que a lista de pessoas derrubou a janela.
+  const dados = await res.json().catch(() => null);
+  const leitura = lerResposta(res.ok, res.status, dados);
+  if (!leitura.ok) {
+    const falha = new ErroDoServidor(leitura.mensagem, leitura.status, leitura.tipo);
     anotarFalha(`${metodo} ${rota}`, falha);
     throw falha;
   }
-  return dados as T;
+  return leitura.dados as T;
 }
 
 export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string }) =>
@@ -383,9 +387,10 @@ async function enviarImagem<T>(rota: string, arquivo: File | null): Promise<T> {
     // Quando o servidor corta um envio grande demais, a conexão morre antes da resposta.
     throw new ErroDoServidor('A imagem é grande demais ou a conexão caiu no meio.', 413);
   }
-  const dados = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
-  return dados as T;
+  // Mesma regra do `pedir`: corpo pela metade é falha, não `{}` — ver resposta.ts.
+  const leitura = lerResposta(res.ok, res.status, await res.json().catch(() => null));
+  if (!leitura.ok) throw new ErroDoServidor(leitura.mensagem, leitura.status, leitura.tipo);
+  return leitura.dados as T;
 }
 
 export const minhaFoto = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/foto', a);
@@ -434,9 +439,9 @@ export async function subirSom(nome: string, arquivo: File): Promise<Som> {
   } catch {
     throw new ErroDoServidor('O som é grande demais ou a conexão caiu no meio.', 413);
   }
-  const dados = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ErroDoServidor((dados as { error?: string }).error ?? `erro ${res.status}`, res.status);
-  return (dados as { som: Som }).som;
+  const leitura = lerResposta(res.ok, res.status, await res.json().catch(() => null));
+  if (!leitura.ok) throw new ErroDoServidor(leitura.mensagem, leitura.status, leitura.tipo);
+  return (leitura.dados as { som: Som }).som;
 }
 
 /**

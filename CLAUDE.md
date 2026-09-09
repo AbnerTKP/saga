@@ -590,6 +590,16 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   pela prévia do editor e por todo lugar que desenha — é isso que faz o resultado ser o
   que a pessoa viu ao ajustar. O servidor tem a mesma régua, porque o que vem do app
   nunca é palavra final.
+- **Resposta 200 pela metade é FALHA, não objeto vazio.** O `pedir` fazia
+  `res.json().catch(() => ({}))`: corpo truncado — rede piscando, conexão morta no meio —
+  virava `{}` e passava como SUCESSO. Aí `cargos` chegava `undefined` na lista de pessoas
+  e o `cargos.slice()` estourava DENTRO do render: janela cinza, e no registro do dono só
+  "Cannot read properties of undefined (reading 'slice')", sem dizer de onde vinha.
+  Aconteceu com ele em 08/09/2026, minutos depois de uma sequência de `→ 0` no registro.
+  Toda rota do servidor responde um OBJETO em JSON, sempre, então corpo que não é objeto
+  não tem outra leitura possível. A regra mora em `resposta.ts`, pura e testada, e vale
+  para os três caminhos (o `pedir`, o envio de imagem e o de som) — o erro passa a chegar
+  como erro, com status 0, e quem já trata queda de rede trata isto junto.
 - **Falhar em carregar não é o mesmo que não ter nada.** O painel do servidor pedia a
   configuração ao abrir e, se a busca caísse, ficava com as listas como nasceram: vazias.
   A tela então afirmava que o servidor não tinha cargo, nem sala, nem gente — e o dono
@@ -792,7 +802,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (237) + app (110), segundos, sem nada externo
+pnpm test        # servidor (237) + app (115), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
