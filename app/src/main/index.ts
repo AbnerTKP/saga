@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
+import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu } from './inicio';
 
 /**
  * O app se chamava "Cantinho do Vorcaro" e passou a se chamar "Saga".
@@ -40,7 +41,32 @@ function herdarDoNomeAntigo() {
   }
 }
 
-herdarDoNomeAntigo();
+/**
+ * Uma Saga por computador.
+ *
+ * Abrindo junto com o sistema, "o app já está aberto quando eu clico no ícone" vira o caso
+ * NORMAL — e sem trava o clique abria uma SEGUNDA Saga: duas conexões, dois sinais de
+ * presença, dois avisos de quem chegou e a pessoa aparecendo duas vezes na lista. Quem não
+ * pega a trava sai na hora; quem a tem recebe o `second-instance` e traz a janela para a
+ * frente, que é o que a pessoa queria ao clicar. Medido com o Electron deste projeto: a
+ * segunda instância recebe `false` e sai, e a primeira recebe o evento com os argumentos
+ * com que a segunda foi aberta.
+ */
+const ehAPrimeira = app.requestSingleInstanceLock();
+
+if (ehAPrimeira) {
+  herdarDoNomeAntigo();
+} else {
+  app.quit();
+}
+
+// Definida pela janela, logo abaixo: é o que o clique no ícone faz com a Saga já aberta.
+let trazerParaAFrente: () => void = () => {};
+
+app.on('second-instance', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  trazerParaAFrente();
+});
 
 /**
  * Como o áudio do sistema é capturado. Os modos falham por motivos diferentes, e por isso
@@ -80,7 +106,59 @@ let pendingSource: { id: string; audio: ModoDeAudio } | null = null;
 // o sistema devolver, ou não, a lista de telas.
 const SELETOR_DO_SISTEMA = false;
 
+/**
+ * O nome da entrada no arranque do Windows. Sem passar `name`, a Electron usa o
+ * AppUserModelId — que não é escolha nossa e não é o que a pessoa reconhece na lista de
+ * programas que abrem sozinhos.
+ */
+const NOME_NO_ARRANQUE = 'Saga';
+
+/**
+ * Se o app abre junto com o sistema — o que o SISTEMA responde, não o que pedimos.
+ *
+ * No Windows a leitura COMPARA: `openAtLogin` só volta verdadeiro se os argumentos batem
+ * com os que foram gravados, e por isso a pergunta leva os mesmos `args` da escrita. E a
+ * pessoa ainda pode ter desligado a entrada pelo Gerenciador de Tarefas sem apagá-la —
+ * `executableWillLaunchAtLogin` é o campo que responde o que interessa: vai abrir mesmo?
+ */
+function abreComOSistema(): boolean {
+  const s = app.getLoginItemSettings({ path: process.execPath, args: [AO_INICIAR] });
+  return process.platform === 'win32' ? s.executableWillLaunchAtLogin : s.openAtLogin;
+}
+
+/** Devolve como FICOU, não o que foi pedido: assim a chave da tela não tem como mentir. */
+function definirAberturaComOSistema(ligado: boolean): boolean {
+  app.setLoginItemSettings(
+    ligado
+      ? { openAtLogin: true, enabled: true, name: NOME_NO_ARRANQUE, path: process.execPath, args: [AO_INICIAR] }
+      : { openAtLogin: false, name: NOME_NO_ARRANQUE },
+  );
+  const ficou = abreComOSistema();
+  registrar(ficou === ligado ? 'info' : 'aviso', 'inicio',
+    `abrir junto com o sistema: pedido ${ligado}, ficou ${ficou}`);
+  return ficou;
+}
+
+/** Liga sozinho na primeira abertura no Windows, e nunca mais. A regra está em `inicio.ts`. */
+function ligarNaPrimeiraVez() {
+  try {
+    const pasta = app.getPath('userData');
+    if (!deveLigarSozinho({ plataforma: process.platform, empacotado: app.isPackaged, jaDecidiu: jaDecidiu(pasta) })) return;
+    // Anotar primeiro: só se liga o que se consegue lembrar de ter ligado.
+    if (!anotarDecisao(pasta, true)) return;
+    definirAberturaComOSistema(true);
+  } catch (e) {
+    registrar('erro', 'inicio', `não deu para ligar a abertura automática: ${(e as Error).message}`);
+  }
+}
+
 function createWindow() {
+  // Quem abriu a Saga: a pessoa, ou o arranque do sistema? No Windows a resposta vem no
+  // argumento gravado na entrada de arranque; no Mac, do próprio sistema.
+  let porLogin = false;
+  try { porLogin = app.getLoginItemSettings().wasOpenedAtLogin; } catch { /* não é motivo para não abrir */ }
+  const aoIniciar = abriuComOSistema(process.argv, porLogin);
+
   const win = new BrowserWindow({
     width: 1200,
     height: 760,
@@ -108,7 +186,23 @@ function createWindow() {
   const mostrar = () => {
     if (jaApareceu || win.isDestroyed()) return;
     jaApareceu = true;
+    // Aberta pelo arranque, a janela não toma a tela: quem ligou o computador ia fazer
+    // outra coisa. Ela vai encolhida para a barra de tarefas, o que já basta para você
+    // entrar online — e continua à vista ali, que é o que um app sem ícone ao lado do
+    // relógio precisa: escondido de vez, não há como trazê-lo de volta.
+    if (aoIniciar) { win.showInactive(); win.minimize(); return; }
     win.show();
+  };
+
+  // O clique no ícone com a Saga já aberta chega aqui, pelo `second-instance`. Marcar
+  // `jaApareceu` é o que impede a consulta de atualização de "mostrar" depois uma janela
+  // que a pessoa já está olhando.
+  trazerParaAFrente = () => {
+    if (win.isDestroyed()) return;
+    jaApareceu = true;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
   };
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -138,6 +232,9 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // A segunda Saga já pediu para sair lá em cima; daqui para baixo é coisa de app que fica.
+  if (!ehAPrimeira) return;
+
   // Antes de qualquer coisa: se algo falhar na preparação, tem de ficar registrado.
   iniciarRegistro();
 
@@ -264,6 +361,22 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
+
+  // Abrir junto com o sistema. `disponivel` é falso em desenvolvimento: ali o executável é
+  // o Electron, e o que se gravaria no arranque não é a Saga de ninguém.
+  ipcMain.handle('inicio:estado', () => ({
+    disponivel: app.isPackaged,
+    ligado: app.isPackaged && abreComOSistema(),
+  }));
+
+  ipcMain.handle('inicio:definir', (_e, ligado: boolean) => {
+    if (!app.isPackaged) return { disponivel: false, ligado: false };
+    const ficou = definirAberturaComOSistema(!!ligado);
+    anotarDecisao(app.getPath('userData'), ficou);
+    return { disponivel: true, ligado: ficou };
+  });
+
+  ligarNaPrimeiraVez();
 
   createWindow();
 

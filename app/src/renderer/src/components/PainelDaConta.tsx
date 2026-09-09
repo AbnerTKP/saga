@@ -8,11 +8,20 @@ import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from
 import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocosDaSaga } from './PainelDaSaga';
+import type { AberturaComOSistema } from '../desktop';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const APARELHOS: Record<Kind, string> = {
   audioinput: 'Microfone', audiooutput: 'Saída de som', videoinput: 'Câmera',
 };
+
+// Pelo nome que a pessoa usa — e "encolhida" fica num lugar diferente em cada sistema.
+const SISTEMAS: Record<string, { nome: string; encolhida: string }> = {
+  win32: { nome: 'o Windows', encolhida: ' na barra de tarefas' },
+  darwin: { nome: 'o macOS', encolhida: ' no Dock' },
+};
+// Sem inventar para o que não conhecemos.
+const OUTRO_SISTEMA = { nome: 'o sistema', encolhida: '' };
 
 /**
  * Tudo que é seu, num lugar só, atrás da engrenagem.
@@ -38,6 +47,13 @@ export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegist
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  // 'erro' e null são coisas diferentes: null é "ainda perguntando", 'erro' é "perguntei e
+  // não soube". Nenhum dos dois pode virar uma chave desligada na tela, que seria afirmar
+  // que não abre com o sistema sem ter como saber.
+  const [respostaDoInicio, setRespostaDoInicio] = useState<AberturaComOSistema | 'erro' | null>(null);
+  const abertura = respostaDoInicio && respostaDoInicio !== 'erro' ? respostaDoInicio : null;
+  const sistema = SISTEMAS[window.desktop.platform] ?? OUTRO_SISTEMA;
+
   const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souBerserk));
   const permitidas = qualidadesDe(souBerserk);
   const [aparelhos, setAparelhos] = useState<Record<Kind, MediaDeviceInfo[]>>({ audioinput: [], audiooutput: [], videoinput: [] });
@@ -46,6 +62,12 @@ export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegist
     audiooutput: room.getActiveDevice('audiooutput') ?? '',
     videoinput: room.getActiveDevice('videoinput') ?? '',
   });
+
+  useEffect(() => {
+    window.desktop.aberturaComOSistema()
+      .then(setRespostaDoInicio)
+      .catch(() => setRespostaDoInicio('erro'));
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -152,6 +174,32 @@ export function PainelDaConta({ eu, room, souBerserk, donoDaSaga, onEu, onRegist
               ))}
               <p className="muted small">Cancelamento de eco e supressão de ruído ficam sempre ligados.</p>
             </div>
+          </section>
+
+          <section className="painel-bloco">
+            <h3>Ao ligar o computador</h3>
+            <label className="check">
+              <input
+                type="checkbox"
+                disabled={!abertura?.disponivel}
+                checked={!!abertura?.ligado}
+                onChange={async (e) => {
+                  setErro(null);
+                  // O que fica marcado é o que o SISTEMA respondeu, não o que foi clicado:
+                  // recusando, a chave volta sozinha em vez de mentir.
+                  try { setRespostaDoInicio(await window.desktop.definirAberturaComOSistema(e.target.checked)); }
+                  catch (err) { setRespostaDoInicio('erro'); setErro((err as Error).message); }
+                }}
+              />
+              Abrir a Saga junto com {sistema.nome}
+            </label>
+            <p className="muted small">
+              Aberta pelo sistema, ela vem encolhida{sistema.encolhida} — você já entra
+              online para o pessoal sem uma janela na cara, e é só clicar no ícone para
+              trazê-la à frente.
+              {respostaDoInicio === 'erro' && ' Não deu para saber como está agora.'}
+              {abertura && !abertura.disponivel && ' Só vale no app instalado.'}
+            </p>
           </section>
 
           {donoDaSaga && <BlocosDaSaga meuId={eu.id} />}

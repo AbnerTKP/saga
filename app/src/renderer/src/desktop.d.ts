@@ -6,6 +6,9 @@ export type SourceInfo = {
   icon: string | null;
 };
 
+/** Se a Saga abre junto com o sistema. Fora do app instalado, `disponivel` é falso. */
+export type AberturaComOSistema = { disponivel: boolean; ligado: boolean };
+
 /** Espelha o UpdateState do processo principal (src/main/update.ts). */
 export type UpdateState = {
   fase: 'procurando' | 'baixando' | 'pronto' | 'nenhuma' | 'aviso' | 'erro';
@@ -38,8 +41,12 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       /** Salva um anexo do chat com o diálogo do sistema. Nada é aberto nem executado. */
       salvarArquivo: (url: string, nome: string) => Promise<{ ok: boolean; caminho?: string; erro?: string }>;
-  /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
-  ociosidade: () => Promise<number>;
+      /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
+      ociosidade: () => Promise<number>;
+      /** Se a Saga abre junto com o sistema. */
+      aberturaComOSistema: () => Promise<AberturaComOSistema>;
+      /** Liga ou desliga, e devolve como FICOU no sistema — não o que foi pedido. */
+      definirAberturaComOSistema: (ligado: boolean) => Promise<AberturaComOSistema>;
     };
   }
 }

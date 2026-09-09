@@ -271,6 +271,40 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   descobrir os 960x540 exigiu montar uma sala de medição no servidor de produção.
 - **A janela nasce escondida** e só aparece quando a consulta de atualização resolve — ou
   já com a barra de progresso. Quem clica no ícone espera um app já atualizado.
+- **Abrir junto com o Windows nasce ligado, e é uma chave que a pessoa desliga.** O app
+  existe para você estar lá, então o padrão é abrir; quem não quiser desliga em "Sua
+  conta". Mas ligar sozinho acontece UMA vez, na primeira abertura do app instalado no
+  Windows, e fica anotado em `inicio-automatico.txt` na pasta de dados — sem essa
+  anotação, quem desligasse veria a Saga voltar sozinha na abertura seguinte, e ajuste que
+  não obedece é pior que ajuste nenhum. **Só se liga o que se consegue anotar**: a
+  anotação vem antes de mexer no arranque. No Mac a chave existe e começa DESLIGADA: não
+  foi o que se pediu, e o caminho de lá (SMAppService, com o app auto-assinado) não foi
+  exercido. A regra mora em `inicio.ts`, sem `electron` dentro, e é testada; quem fala com
+  o registro do Windows é o `index.ts`.
+- **A chave "abrir junto com o sistema" mostra o que o SISTEMA respondeu**, não o que foi
+  clicado: escreve, lê de volta, e é a leitura que vai para a tela — recusando, a chave
+  volta sozinha em vez de mentir. A leitura no Windows COMPARA: `openAtLogin` só volta
+  verdadeiro se os `args` da pergunta forem os mesmos que foram gravados, por isso a
+  pergunta carrega o `--ao-iniciar` junto. E quem responde de verdade é
+  `executableWillLaunchAtLogin`, que conta também a entrada desligada à mão no Gerenciador
+  de Tarefas: é a diferença entre "está escrito" e "vai abrir".
+- **A entrada continua no registro depois de desinstalar, e mexer nisso é pior.** O
+  desinstalador do `nsis` não sabe dela, e apagá-la de lá parece trivial — só que com
+  `oneClick` cada ATUALIZAÇÃO passa pelo desinstalador: um macro sem cuidado tiraria a
+  abertura automática de todo mundo na primeira versão nova, calado.
+- **Aberta pelo arranque, a janela vem encolhida.** Quem ligou o computador ia fazer outra
+  coisa — a Saga só precisa estar online. Encolhida, e não invisível: sem ícone ao lado do
+  relógio, app escondido é app que não se acha de volta. Quem separa "o sistema me abriu"
+  de "alguém me abriu" é o `--ao-iniciar` que a entrada de arranque carrega; no Mac não há
+  argumento nenhum e quem responde é `wasOpenedAtLogin`. Medido no processo principal de
+  verdade, com `show`, `showInactive` e `minimize` interceptados para nada aparecer na
+  tela: sem o argumento, `show()`; com ele, `showInactive()` + `minimize()`.
+- **Uma Saga por computador.** Abrindo junto com o sistema, "o app já está aberto quando eu
+  clico no ícone" vira o caso NORMAL — e sem trava o clique abria uma SEGUNDA Saga: duas
+  conexões, dois sinais de presença, dois avisos de quem chegou e a pessoa duas vezes na
+  lista. Hoje quem não pega a trava sai na hora, e quem a tem traz a janela para a frente.
+  Medido com o Electron do projeto: a segunda instância recebe `false` e sai; a primeira
+  recebe o `second-instance` com os argumentos dela e chama `show()` + `focus()`.
 - **`volume` de elemento de áudio só aceita de 0 a 1.** Passar disso lança exceção, e
   dentro de um efeito do React isso derruba a tela inteira. Tudo passa por `volume.ts`.
 - **Banir e dar castigo também tiram da call.** Sem isso a punição parece não funcionar.
@@ -716,7 +750,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (213) + app (85), segundos, sem nada externo
+pnpm test        # servidor (236) + app (103), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -760,3 +794,9 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   captura exige duas pessoas numa call de verdade — e no Windows nada disso foi exercido.
 - **Por que a faixa de áudio da tela vem silenciosa neste Mac** nos dois modos, com a
   chave de permissão presente no Info.plist. Não foi explicado.
+- **Abrir junto com o Windows, inteiro.** Nada disso foi exercido em Windows nenhum: a
+  entrada aparecer no registro e na lista de programas que abrem sozinhos, o
+  `--ao-iniciar` chegando de verdade ao app, a janela vindo encolhida na barra de tarefas
+  em vez de tomar a tela, e o clique no ícone trazendo de volta a Saga que já estava
+  aberta. O que está medido é o comportamento do processo principal aqui no Mac, com as
+  chamadas de janela interceptadas.

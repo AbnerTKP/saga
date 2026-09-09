@@ -23,6 +23,12 @@ const desktop = {
   /** Segundos que a MÁQUINA está parada. É a única forma de saber que a pessoa saiu de
       perto: dentro da janela, ninguém vê teclado nem mouse fora do app. */
   ociosidade: (): Promise<number> => ipcRenderer.invoke('presenca:ociosidade'),
+  /** Se a Saga abre junto com o sistema. `disponivel` é falso em desenvolvimento. */
+  aberturaComOSistema: (): Promise<{ disponivel: boolean; ligado: boolean }> =>
+    ipcRenderer.invoke('inicio:estado'),
+  /** Devolve como FICOU no sistema, que pode não ser o que foi pedido. */
+  definirAberturaComOSistema: (ligado: boolean): Promise<{ disponivel: boolean; ligado: boolean }> =>
+    ipcRenderer.invoke('inicio:definir', ligado),
 };
 
 contextBridge.exposeInMainWorld('desktop', desktop);
