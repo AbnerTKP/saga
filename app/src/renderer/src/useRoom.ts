@@ -8,6 +8,7 @@ import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
+import { porTransmissao, ASSISTINDO } from './espectadores';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -208,6 +209,29 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
   const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS), []);
 
+  // Uma vez no registro basta: sem o crachá novo isso falharia a cada clique.
+  const jaContei = useRef(false);
+
+  /**
+   * Conta à sala qual transmissão estou assistindo — ou nenhuma.
+   *
+   * É a única forma de quem transmite saber quem está vendo: o LiveKit não diz a ninguém
+   * quem se inscreveu na faixa dele. O atributo é do participante, então o servidor
+   * guarda e entrega até para quem chegar depois.
+   *
+   * Falhar aqui não pode atrapalhar quem só quer assistir: crachá velho, emitido antes de
+   * o servidor passar a permitir o anúncio, faz o pedido ser recusado — e o que se perde
+   * é a lista de espectadores, mais nada.
+   */
+  const contarOQueAssisto = useCallback((identity: string | null) => {
+    if (room.state !== 'connected') return;
+    room.localParticipant.setAttributes({ [ASSISTINDO]: identity ?? '' }).catch((e: Error) => {
+      if (jaContei.current) return;
+      jaContei.current = true;
+      anotar('aviso', 'live', `não deu para contar o que estou assistindo: ${e.message}`);
+    });
+  }, [room]);
+
   useEffect(() => {
     const onSubscribed = (track: Track, pub: RemoteTrackPublication, participante: Participant) => {
       // Entrar numa sala onde alguém JÁ estava transmitindo inscrevia a transmissão
@@ -263,7 +287,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       .on(RoomEvent.TrackUnsubscribed, onUnsubscribed)
       .on(RoomEvent.Disconnected, onDisconnected)
       .on(RoomEvent.Reconnecting, () => setStatus('reconnecting'))
-      .on(RoomEvent.Reconnected, () => setStatus('connected'))
+      .on(RoomEvent.Reconnected, () => {
+        setStatus('connected');
+        // Reconectar é sessão nova para o servidor; o anúncio vai de novo em vez de
+        // torcer para ter sobrevivido.
+        contarOQueAssisto(assistindoRef.current);
+      })
+      // Alguém trocou o que está assistindo: a lista de espectadores é redesenhada.
+      .on(RoomEvent.ParticipantAttributesChanged, bump)
       .on(RoomEvent.ParticipantConnected, (p: Participant) => {
         tocarAviso('entrou', deafenedRef.current);
         aoChegarAlguem?.(p.name || p.identity);
@@ -289,7 +320,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, contarOQueAssisto]);
 
   const join = useCallback(async (url: string, token: string, sala: SalaDaVoz) => {
     setError(null);
@@ -670,6 +701,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const assistir = useCallback((identity: string | null) => {
     assistindoRef.current = identity;
     setAssistindoState(identity);
+    contarOQueAssisto(identity);
     for (const p of room.remoteParticipants.values()) {
       const querVer = p.identity === identity;
       for (const pub of p.trackPublications.values()) {
@@ -680,7 +712,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     }
     aplicarAudio();
     bump();
-  }, [room, aplicarAudio]);
+  }, [room, aplicarAudio, contarOQueAssisto]);
 
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 
@@ -699,6 +731,33 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   }, [aplicarAudio]);
 
   const participants: Participant[] = status === 'idle' ? [] : [room.localParticipant, ...room.remoteParticipants.values()];
+
+  /**
+   * A lista de quem assiste se conserta sozinha a cada volta.
+   *
+   * O evento não basta, e isso é medido: com o livekit-client deste projeto contra um
+   * LiveKit de verdade, LIGAR o `assistindo` não emitiu `ParticipantAttributesChanged`
+   * em quem já estava na sala — duas mudanças renderam um evento só. O evento continua
+   * ligado, porque quando ele vem é imediato; mas quem garante é a volta, como no medidor
+   * de quem está falando: comparar o que existe com o que está desenhado é barato e não
+   * tem ordem de evento para errar.
+   *
+   * Só o dos outros: o meu sai do estado daqui e já redesenha sozinho.
+   */
+  const comoEstavamOsEspectadores = useRef('');
+  useEffect(() => {
+    if (status === 'idle') return;
+    const id = setInterval(() => {
+      const agora = [...room.remoteParticipants.values()]
+        .map((p) => `${p.identity}:${p.attributes?.[ASSISTINDO] ?? ''}`)
+        .sort()
+        .join('|');
+      if (agora === comoEstavamOsEspectadores.current) return;
+      comoEstavamOsEspectadores.current = agora;
+      bump();
+    }, 1500);
+    return () => clearInterval(id);
+  }, [room, status]);
 
   // Quem está falando sai do SOM, não do servidor. Medido: 30 ms para mim e 178 ms para
   // o outro, contra 294 ms esperando o LiveKit avisar — ver niveis.ts.
@@ -783,6 +842,19 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     });
   }
 
+  /**
+   * Quem assiste a quem, para cada transmissão da sala.
+   *
+   * O meu sai do estado daqui, e não do atributo: eu sei o que escolhi, e não faz sentido
+   * a minha própria tela depender de um anúncio que pode ter sido recusado. O dos outros
+   * vem do que eles anunciaram.
+   */
+  const espectadores = porTransmissao(participants.map((p) => ({
+    identity: p.identity,
+    nome: p.name || p.identity,
+    assistindo: p === room.localParticipant ? assistindo : (p.attributes?.[ASSISTINDO] || null),
+  })));
+
   return {
     room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened,
     falando: falandoAgora,
@@ -792,7 +864,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
     tocarSom, pararSom, somTocando,
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
-    lives, assistir, assistindo,
+    lives, assistir, assistindo, espectadores,
     volumeDaTelaDe, definirVolumeDaTela,
   };
 }

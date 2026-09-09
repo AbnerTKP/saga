@@ -598,7 +598,11 @@ const ROTAS = {
 
     const nome = salaNoLiveKit(sala);
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '12h' });
-    at.addGrant({ room: nome, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true });
+    // `canUpdateOwnMetadata` é o que deixa o app CONTAR à sala qual transmissão ele está
+    // assistindo (o atributo `assistindo`, em espectadores.ts). Sem isso quem transmite não
+    // teria como saber quem está vendo: o LiveKit não conta a ninguém quem se inscreveu na
+    // faixa dele. É permissão de mexer nos PRÓPRIOS atributos, não nos de outra pessoa.
+    at.addGrant({ room: nome, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true });
     return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 

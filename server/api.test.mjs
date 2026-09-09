@@ -165,6 +165,16 @@ test('o token da sala é emitido para quem tem sessão, e recusa sala inexistent
   assert.equal(nao.status, 400);
 });
 
+test('o crachá da sala deixa o app contar a quem ele assiste', async () => {
+  const { token } = await sessaoDe('abner');
+  const r = await chamar('POST', '/token', { sessao: token, corpo: { room: 'Geral' } });
+  const grant = JSON.parse(Buffer.from(r.corpo.token.split('.')[1], 'base64url')).video;
+  // Sem `canUpdateOwnMetadata`, o LiveKit recusa o atributo `assistindo` e quem transmite
+  // deixa de saber quem está vendo — sem erro nenhum aparecer para ninguém. É o tipo de
+  // coisa que só se descobre em call, então fica travado aqui.
+  assert.equal(grant.canUpdateOwnMetadata, true);
+});
+
 test('membro não modera; o dono modera', async () => {
   const dono = await sessaoDe('abner');
   const bruno = await sessaoDe('bruno');

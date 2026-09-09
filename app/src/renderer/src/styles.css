@@ -209,6 +209,17 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .live-chamada { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
   font-weight: 600; color: var(--accent-claro); }
 
+/* Quem está assistindo à transmissão. Dentro do quadro ela fica no ALTO: embaixo já moram
+   o nome, à esquerda, e o botão de tela cheia, à direita. `pointer-events: none` porque o
+   quadro inteiro é um botão — escolher a transmissão não pode falhar por causa de onde a
+   etiqueta calhou de ficar. */
+.quem-assiste { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+  font-weight: 600; color: inherit; min-width: 0; }
+.quem-assiste span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quem-assiste.no-quadro { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px);
+  background: rgba(0,0,0,.66); color: #fff; padding: 3px 7px; border-radius: 6px;
+  pointer-events: none; }
+
 /* O selo do que está no ar. Vermelho é a convenção, e o ponto pisca devagar: é para
    avisar, não para puxar o olho o tempo todo. */
 .selo-ao-vivo { display: inline-flex; align-items: center;

@@ -462,6 +462,35 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   selo "AO VIVO" piscando, retrato grande e nome — dá para escolher entre pessoas, que é
   o que se escolhe, e não entre nomes soltos. Medido, inscrita contra não inscrita:
   229.809 bytes contra 0.
+- **Quem transmite vê quem está assistindo, e isso não vem do LiveKit.** Não existe essa
+  pergunta na API dele — nem no cliente nem no servidor: ninguém conta a quem publica quem
+  se inscreveu na faixa. Então cada app ANUNCIA o que escolheu assistir, num atributo de
+  participante (`assistindo`), e todo mundo lê o de todo mundo. Medido contra um LiveKit de
+  verdade: quem já está na sala passa a ler o atributo, e **quem chega depois já o recebe
+  sem ninguém repetir nada** — que é o que descarta mandar recado por dados, onde o
+  retardatário ficaria sem saber. O nome do atributo é protocolo entre versões do app, como
+  o `turbo`: amigo com versão velha não anuncia, não aparece na lista, e nada quebra.
+- **O crachá da sala precisa de `canUpdateOwnMetadata`, senão o anúncio não sai.** Medido
+  nos dois lados, e eles falham diferente: com o crachá antigo o `livekit-client` recusa na
+  hora — *"does not have permission to update own metadata"* — e o `catch` registra; pelo
+  `rtc-node` a mesma chamada RESOLVE e o atributo é descartado em silêncio (quem lê vê
+  `{}`). Como app e servidor sobem separados, **app novo com servidor antigo não mostra
+  espectador nenhum**: o servidor tem de ser publicado junto. `api.test.mjs` abre o crachá
+  e trava a permissão, porque tirá-la de volta não dá erro em lugar nenhum.
+- **A lista de espectadores se conserta sozinha a cada 1,5 s**, e não confia no evento.
+  Medido com o `livekit-client` deste projeto: LIGAR o `assistindo` não emitiu
+  `ParticipantAttributesChanged` em quem já estava na sala; duas mudanças renderam um
+  evento só. O evento continua ligado, porque quando vem é imediato — quem garante é a
+  volta, igual ao medidor de quem está falando.
+- **Quem olha a própria transmissão não é plateia.** Dá para pôr a sua live no palco (é a
+  prévia do que você manda), e contar isso diria "1 assistindo" para quem está sozinho. A
+  regra vive em `espectadores.ts`, pura e testada.
+- **Onde cabe, vão nomes; onde não cabe, o número.** No quadro grande, três nomes; no seu
+  quadro pequeno, um nome e o resto contado, porque na SUA transmissão saber QUEM é o
+  ponto; nos outros, só quantos, e a lista inteira parando o mouse em cima. No cartão de
+  quem está no ar a contagem entra na MESMA linha do "assistir": aquele cartão tem 110 px e
+  uma quarta linha ali já saiu por cima do retrato uma vez. E na sua transmissão o zero
+  aparece — "ninguém ainda" é a informação, não a ausência dela.
 - **Os cartões saem da PUBLICAÇÃO, não da faixa.** Uma faixa só existe se estiver
   inscrita, então listar lives por faixa mostraria exatamente a única que já se está
   vendo. `rm.lives` vem das publicações de tela dos participantes.
@@ -750,7 +779,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (236) + app (103), segundos, sem nada externo
+pnpm test        # servidor (237) + app (108), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -794,6 +823,10 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   captura exige duas pessoas numa call de verdade — e no Windows nada disso foi exercido.
 - **Por que a faixa de áudio da tela vem silenciosa neste Mac** nos dois modos, com a
   chave de permissão presente no Info.plist. Não foi explicado.
+- **A lista de quem está assistindo, numa call de verdade.** O que está medido é o
+  mecanismo — o atributo indo e voltando por um LiveKit de verdade, com o mesmo
+  `livekit-client` do app, e o desenho conferido em imagem. Duas pessoas numa call, uma
+  transmitindo e a outra escolhendo e largando a transmissão, não foi exercido.
 - **Abrir junto com o Windows, inteiro.** Nada disso foi exercido em Windows nenhum: a
   entrada aparecer no registro e na lista de programas que abrem sozinhos, o
   `--ao-iniciar` chegando de verdade ao app, a janela vindo encolhida na barra de tarefas
