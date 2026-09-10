@@ -56,3 +56,31 @@ export function empatadosCom(
 ): string[] {
   return cargos.filter((c) => c.nivel === nivel && c.id !== exceto).map((c) => c.nome);
 }
+
+/**
+ * Quem hoje é o cargo mais alto e deixaria de ser, se este nível valesse.
+ *
+ * Existe porque **o soundboard é do cargo mais alto do servidor**, e não de quem tem a
+ * permissão: criar um cargo acima de todos — inclusive um cargo enfeite, sem ninguém
+ * dentro — tira de outra pessoa o direito de subir e apagar sons, sem erro e sem aviso.
+ * Quem perde não é quem agiu, e é isso que torna a consequência invisível.
+ *
+ * Ficou mais provável quando o cargo novo passou a nascer acima do topo (ver
+ * `nivelParaCargoNovo`): antes o padrão era 20 fixo, que quase nunca passava do mais
+ * alto. O app não impede — a escolha continua sendo da pessoa —, ele conta antes.
+ */
+export function destronados(
+  nivel: number,
+  cargos: { id: number; nome: string; nivel: number }[],
+  exceto?: number,
+): string[] {
+  if (cargos.length === 0) return [];
+  // O topo sai da lista INTEIRA, inclusive do cargo que está sendo editado. Tirá-lo antes
+  // de achar o topo foi o meu primeiro erro aqui, e o teste pegou: subir de 60 o cargo que
+  // já era o mais alto passava a acusar o cargo de baixo como destronado, sendo que ele
+  // nunca esteve no topo. Quem não pode aparecer é o próprio cargo editado — ninguém
+  // destrona a si mesmo.
+  const topo = Math.max(...cargos.map((c) => c.nivel));
+  if (nivel <= topo) return [];
+  return cargos.filter((c) => c.nivel === topo && c.id !== exceto).map((c) => c.nome);
+}

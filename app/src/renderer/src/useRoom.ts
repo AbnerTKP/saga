@@ -647,15 +647,22 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     setDeafenedState(next);
     aplicarAudio();
     if (room.state === 'connected') {
+      // O anúncio vem ANTES do microfone, e não depende dele. Sem a marca, de fora só se
+      // via o microfone mudo — que é consequência, e diz a coisa errada: "ele não fala",
+      // quando o que houve foi "ele não te ouve".
+      //
+      // A ordem importa porque religar o fone pode falhar ao readquirir o microfone:
+      // headset ocupado (o caso Logitech), permissão negada, dispositivo sumido. Com o
+      // anúncio depois de um `await` que lança, a sua tela dizia que você voltou e todo
+      // mundo continuava te vendo de fone desligado. E o `catch` é o mesmo que `join` e
+      // `toggleMic` já usam: falhar o microfone avisa, não derruba.
+      anunciar();
       if (next) {
         micBeforeDeafen.current = lp().isMicrophoneEnabled;
-        await lp().setMicrophoneEnabled(false);
+        await lp().setMicrophoneEnabled(false).catch((e: Error) => setError(`Microfone: ${e.message}`));
       } else if (micBeforeDeafen.current) {
-        await lp().setMicrophoneEnabled(true);
+        await lp().setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
       }
-      // Sem isto, de fora só se vê o microfone mudo — que é consequência, e diz a coisa
-      // errada: "ele não fala", quando o que aconteceu é "ele não te ouve".
-      anunciar();
     }
     bump();
   }, [room, aplicarAudio, anunciar]);

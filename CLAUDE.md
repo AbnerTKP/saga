@@ -148,6 +148,15 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   app não desempata cargo que alguém igualou de propósito —, e por isso o editor agora
   DIZ com quem o nível empata e o que isso significa (um não age sobre o outro). A conta
   do nível de nascença mora em `cargos.ts`, pura e testada, e respeita o teto de quem cria.
+- **Cargo novo nasce no topo, e o topo é dono do soundboard — o editor avisa.** As duas
+  regras são boas sozinhas e se mordem juntas: o soundboard é do CARGO MAIS ALTO (não de
+  quem tem `gerirSons`), e o teto sai da tabela de cargos inteira, com gente dentro ou não.
+  Então criar um cargo enfeite aceitando o número sugerido tira de OUTRA pessoa o direito
+  de subir e apagar sons — sem erro, sem aviso, e quem perde não é quem agiu. O servidor já
+  nasce assim: o Moderador semeado é nível 50 e já vem com `gerirSons`. Não se mudou regra
+  nenhuma — mudou o que a tela conta antes (`destronados`, puro e testado), pelo mesmo
+  motivo do aviso de empate. Tocar som continua sendo de todo mundo; o que sai é subir e
+  apagar.
 - **O dono tem todas as permissões por ser dono**, não por constar numa lista: editar o
   cargo dele no banco não pode deixar o servidor sem conserto.
 - **Dono da Saga e quem manda num servidor são coisas diferentes**, e confundi-las fazia
@@ -558,6 +567,13 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   dele — largas e brancas — no meio de um app escuro, e é a única coisa na tela que não é
   do app. No Mac elas são flutuantes e quase não aparecem, então o estrago só se vê do
   outro lado: dá para passar meses sem notar.
+- **O anúncio do fone vai ANTES do microfone, e não depende dele.** Religar o fone
+  readquire o microfone, e isso pode falhar — headset ocupado (o caso Logitech), permissão
+  negada, dispositivo que sumiu. Com o `anunciar()` depois de um `await` sem `catch`, a
+  falha pulava o anúncio: a sua tela dizia que você voltou e todo mundo continuava te vendo
+  de fone desligado. A marca conta quem não ouve; isso já foi decidido três linhas acima, e
+  o microfone é consequência. O `catch` é o mesmo de `join` e `toggleMic`: falhar o
+  microfone avisa, não derruba.
 - **Fone desligado tem marca própria, e ela entra NO LUGAR da do microfone.** Surdez é
   decisão local: não é faixa nenhuma, e o LiveKit não conta a ninguém. De fora só se via o
   microfone mudo — que é a consequência (desligar o fone muta o microfone junto) e diz a
@@ -828,7 +844,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (239) + app (120), segundos, sem nada externo
+pnpm test        # servidor (239) + app (125), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

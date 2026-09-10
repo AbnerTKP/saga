@@ -7,7 +7,7 @@ import {
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
   type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
-import { empatadosCom, nivelParaCargoNovo } from '../cargos';
+import { destronados, empatadosCom, nivelParaCargoNovo } from '../cargos';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
@@ -314,6 +314,21 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
                     Nível {editando.nivel} é o mesmo de{' '}
                     <b>{empatadosCom(editando.nivel, cargos, editando.id).join(', ')}</b> — empatados,
                     um não age sobre o outro, e na lista fica em cima quem foi criado antes.
+                  </p>
+                )}
+
+                {/* O soundboard é do cargo mais alto do servidor, e não de quem tem a
+                    permissão. Então pôr um cargo acima de todos — inclusive um cargo
+                    enfeite, sem ninguém dentro — tira de OUTRA pessoa o direito de subir
+                    e apagar sons, sem erro e sem aviso. Quem perde não é quem agiu: é
+                    exatamente o tipo de consequência que este editor existe para contar
+                    antes, do mesmo jeito que conta o empate. */}
+                {destronados(editando.nivel, cargos, editando.id).length > 0 && (
+                  <p className="muted small">
+                    Isto passa a ser o cargo mais alto do servidor — e o soundboard é sempre
+                    do mais alto. Quem está em{' '}
+                    <b>{destronados(editando.nivel, cargos, editando.id).join(', ')}</b> deixa
+                    de poder subir e apagar sons. Tocar continua sendo de todo mundo.
                   </p>
                 )}
 

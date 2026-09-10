@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { empatadosCom, nivelParaCargoNovo } from './cargos.ts';
+import { destronados, empatadosCom, nivelParaCargoNovo } from './cargos.ts';
 
 const DONO = { nivel: 1000, dono: true };
 
@@ -36,4 +36,33 @@ test('empate é visto antes de acontecer', () => {
   assert.deepEqual(empatadosCom(20, cargos), ['Peixe Souris', 'BEN 10']);
   assert.deepEqual(empatadosCom(20, cargos, 9), ['Peixe Souris'], 'o cargo que se edita não empata consigo');
   assert.deepEqual(empatadosCom(21, cargos), []);
+});
+
+test('nascer acima do topo tira o soundboard de quem estava lá', () => {
+  // O servidor nasce com Moderador 50 (que já vem com gerirSons) e Membro 10. Criar um
+  // cargo aceitando o número sugerido põe 51 — e o Moderador perde subir e apagar som.
+  const semeado = [{ id: 1, nome: 'Moderador', nivel: 50 }, { id: 2, nome: 'Membro', nivel: 10 }];
+  assert.equal(nivelParaCargoNovo(semeado.map((c) => c.nivel), 1000, true), 51);
+  assert.deepEqual(destronados(51, semeado), ['Moderador']);
+});
+
+test('empatar com o topo não destrona ninguém — empate no topo vale para os dois', () => {
+  const cargos = [{ id: 1, nome: 'Moderador', nivel: 50 }, { id: 2, nome: 'Membro', nivel: 10 }];
+  assert.deepEqual(destronados(50, cargos), []);
+  assert.deepEqual(destronados(49, cargos), []);
+});
+
+test('dois cargos no topo perdem juntos', () => {
+  const cargos = [{ id: 1, nome: 'Moderador', nivel: 50 }, { id: 2, nome: 'Ajudante', nivel: 50 }];
+  assert.deepEqual(destronados(51, cargos), ['Moderador', 'Ajudante']);
+});
+
+test('subir o próprio cargo que já é o topo não avisa nada', () => {
+  const cargos = [{ id: 1, nome: 'Moderador', nivel: 50 }, { id: 2, nome: 'Membro', nivel: 10 }];
+  assert.deepEqual(destronados(60, cargos, 1), [], 'ele já era o topo: nada muda de dono');
+  assert.deepEqual(destronados(60, cargos, 2), ['Moderador'], 'mas subir o Membro por cima, sim');
+});
+
+test('primeiro cargo do servidor não destrona ninguém', () => {
+  assert.deepEqual(destronados(20, []), []);
 });
