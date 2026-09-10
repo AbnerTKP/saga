@@ -397,9 +397,13 @@ export function Chat({
           disabled={semSala || progresso !== null}
           maxLength={2000}
         />
+        {/* `rotulo-gif`, e não `gif`: `gif` já era a classe do QUADRADINHO da busca, com
+            fundo preto e proporção 1:1 — e ela caiu inteira neste botão, que virou uma
+            caixa preta quadrada com a palavra torta dentro. Nome de classe curto e
+            genérico é uma variável global com outro nome. */}
         <button
           type="button"
-          className="gif"
+          className="rotulo-gif"
           title="Mandar um GIF"
           disabled={semSala}
           onClick={() => setGifAberto(true)}

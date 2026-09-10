@@ -497,6 +497,26 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   com ela, `promessa resolveu`. A tela cheia da v0.18.0 nunca funcionou em versão nenhuma.
 - **Região de arraste engole clique de tudo que é desenhado por cima.** Qualquer coisa
   flutuante precisa de `-webkit-app-region: no-drag`.
+- **A escada das camadas mora num lugar só, comentada em `.modal-back`.** O painel estava
+  em `z-index: 10`, ABAIXO de tudo que flutua — o quadro da live (15), o aviso de versão
+  (20), a pilha de avisos (21). Com uma live no canto ou um aviso na tela, pedaços do
+  painel viravam decoração: o clique ia para a camada de cima e o botão "simplesmente não
+  funcionava", sem erro nenhum em lugar nenhum. Hoje: live 15, aviso de versão 20, painéis
+  25, ver imagem 30, menus 35, avisos 40, marca de versão 50 (esta com
+  `pointer-events: none`). Camada nova entra na escada, não em cima dela.
+- **Esc fecha, e é a segunda porta de todo painel** (`useFechar.ts`). A saída era o X, um
+  quadrado de 28 px: qualquer coisa por cima dele e o painel deixava de ter saída. Uma
+  porta que não depende de acertar pixel é o conserto barato disso. Com dois painéis
+  abertos (a busca de GIF por cima do editor de imagem), Esc fecha só o de cima — daí a
+  pilha, e daí a ação viver numa referência: dependendo de `onClose`, que nasce de novo a
+  cada desenho, o painel de baixo subiria para o topo da pilha sozinho.
+- **Nome de classe curto é variável global.** `.gif` estilizava o QUADRADINHO da busca de
+  GIF — fundo preto, proporção 1:1 — e um botão novo na barra de escrever, chamado `gif`
+  pelo mesmo motivo óbvio, herdou tudo: virou uma caixa preta quadrada com a palavra
+  torta dentro. A regra do quadradinho agora vive presa à grade (`.grade-gifs .gif`), e o
+  botão chama-se `rotulo-gif`. A varredura do resto do CSS não achou outra colisão: o que
+  aparece em vários componentes (`.menu-pessoa`, `.selo-berserk`) é compartilhado de
+  propósito.
 - **Contêiner de canto não recebe clique — só os cartões dentro dele.** A pilha de avisos
   é larga e quase toda vazia, e fica por cima do quadro flutuante da live: sem
   `pointer-events: none` no contêiner e `auto` nos cartões, o vão entre um aviso e outro
@@ -839,6 +859,15 @@ a gente não conhece.
   legenda e nada se destacava.
 - **A pessoa se abre pelo mesmo gesto em todo lugar** — na lista de salas, na call, na
   lista de pessoas e no chat. Era diferente em cada um, e no chat não abria nada.
+- **Quem é a pessoa se pergunta a UM lugar** (`pessoas.ts`, puro e testado). O cartão saía
+  do mapa de quem está na CALL, e quem não estivesse numa sala de voz naquele instante
+  caía num objeto pelado: sem foto, sem cargo, sem identificador, sem "no servidor desde".
+  Do chat esse era o caso NORMAL — quase ninguém está em call ao mesmo tempo —, então a
+  mesma pessoa aparecia inteira pela lista da direita e vazia pelo chat. O conserto não é
+  copiar mais campos em cada lugar que abre o cartão: é `acharPessoa` olhar as duas fontes
+  que o app já tem (a call, e a lista de membros do servidor) e todo mundo perguntar a
+  ela. A lista de pessoas montava o objeto dela à mão, e era assim que as duas versões
+  nasciam; hoje ela chama o mesmo caminho.
 - **Esquerdo abre o perfil; direito, as ações.** Era tudo no mesmo popover: retrato
   minúsculo no topo e, logo abaixo, banir e expulsar. Ver quem é a pessoa é o que mais se
   faz e era o que menos aparecia, enquanto o que quase nunca se usa — e que não se quer
@@ -908,6 +937,11 @@ a gente não conhece.
   `salas.papel = 'notas'`, e não pelo nome: renomear à mão no banco não faz nascer uma
   segunda. Reordenar simplesmente a ignora, sem erro — arrastar a lista não pode falhar
   só porque ela estava no caminho.
+- **A nota da versão nova cai na sala em até dez minutos, não em até uma hora.** O
+  servidor sobe ANTES de o Release existir — essa ordem é a certa, senão o app novo chega
+  antes do servidor que o atende —, e a busca de notas acontece no arranque, quando ainda
+  não há release nenhum. Resultado: a nota da v0.41.0 não apareceu, e o dono teve de
+  cobrar. Dez minutos são seis idas ao GitHub por hora, contra uma cota de sessenta.
 - **É o servidor que vai buscar as notas, não o CI que empurra.** Ele lê os Releases do
   GitHub no arranque e de hora em hora, e publica o que faltar. Empurrar do CI pediria um
   segredo e daria um jeito novo de a coisa parar em silêncio; puxar não precisa de nada e
@@ -990,12 +1024,14 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   difícil (na cena realista foram 30 quadros cheios, imediatos), mas jogo pesado a 30
   quadros é justamente o caso que não foi exercido. Se travar, o caminho é escolher 60
   quadros, que segue protegendo a fluidez como antes.
-- **Se o certificado próprio realmente segura a permissão no macOS 26.** O que está medido
-  é o requisito ficar idêntico entre builds; que o TCC case a permissão por ele é
-  comportamento documentado da Apple, não coisa medida aqui — o `TCC.db` não abre sem
-  Acesso Total ao Disco. O teste é: assinar, conceder a tela, subir a versão, reassinar com
-  o mesmo certificado, reinstalar e ver se o `Failed to match existing code requirement`
-  some do `log show`.
+- ~~**Se o certificado próprio realmente segura a permissão no macOS 26.**~~ **Segura —
+  medido em 10/09/2026, na máquina do dono.** O requisito designado da v0.40.0 instalada e
+  o da v0.41.0 são idênticos byte a byte (`identifier "br.com.vorcaro.cantinho" and
+  certificate leaf = H"9134fc12…"`), em dois builds de execuções diferentes do CI. E, com
+  a v0.41.0 recém-instalada por cima, o registro dele mostra `capturando tela inteira` e
+  `1728x1080 a 45 quadros` sem nenhuma passagem por conceder permissão de novo. Era a
+  única coisa que o certificado prometia, e é a que ele entregou: o Gatekeeper continua
+  recusando igual.
 - **Se o DMG assinado com certificado próprio abre nos outros Macs** sem virar "está
   danificado". Ninguém testou, e é o risco que atinge os quatro de uma vez.
 - **Se o `loopbackWithoutChrome` de fato corta o retorno de voz.** O que está medido é o

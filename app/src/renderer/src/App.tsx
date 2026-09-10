@@ -34,6 +34,7 @@ import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
+import { acharPessoa, identidadeDe } from './pessoas';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -282,12 +283,16 @@ export function App() {
    * quase nunca se usa, e não se quer errar, ficava a um clique de distância.
    */
   const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes' = 'perfil') => {
-    const pessoa = pessoas.get(identity) ?? { identity, nome };
+    // UM lugar responde "quem é essa pessoa", para os quatro caminhos que abrem o cartão.
+    // Antes isto olhava só o mapa da CALL: quem não estivesse numa sala de voz naquele
+    // instante virava um objeto pelado, sem foto nem cargo — e do CHAT esse era o caso
+    // normal. A mesma pessoa aparecia inteira pela lista da direita e vazia pelo chat.
+    const pessoa = acharPessoa(identity, { naCall: pessoas, membros: membrosDoServidor, nome });
     if (tipo === 'perfil') { setPerfilAberto(pessoa); return; }
     setMenu({ pessoa, em });
   // pessoas é remontado a cada render; depender dele aqui só criaria a função à toa.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms]);
+  }, [rooms, membrosDoServidor]);
 
   const moderarPeloMenu = useCallback(async (alvo: number, acao: Acao, extra?: { minutos?: number; cargo?: number }) => {
     try { await moderar(acao, alvo, extra); } catch (e) { notas.mostrarFalha(e); }
@@ -576,14 +581,9 @@ export function App() {
         cargos={cargos}
         naVoz={naVoz}
         eu={eu}
-        onPessoa={(m, em, tipo) => {
-          const pessoa = {
-            identity: `u${m.id}`, nome: m.nome, usuarioId: m.id, cargo: m.cargo,
-            foto: m.foto, banner: m.banner, turbo: m.turbo, idExibido: m.idExibido, status: m.status,
-            entrouEm: m.entrouEm, enquadramento: m.enquadramento,
-          };
-          if (tipo === 'perfil') setPerfilAberto(pessoa); else setMenu({ pessoa, em });
-        }}
+        // Pelo mesmo caminho de todo mundo: a lista tem o membro na mão, mas montar o
+        // objeto aqui é como as duas versões do cartão nasceram.
+        onPessoa={(m, em, tipo) => abrirMenu(identidadeDe(m.id), m.nome, em, tipo)}
       />
 
       <TrilhaDeServidores

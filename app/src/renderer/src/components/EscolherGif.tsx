@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { buscarGifs, type Gif } from '../api';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 /** Busca no Giphy. A chave fica no servidor; daqui só sai o termo. */
 export function EscolherGif({ onEscolher, onClose }: {
   onEscolher: (url: string) => Promise<void>;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [termo, setTermo] = useState('');
   const [gifs, setGifs] = useState<Gif[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);

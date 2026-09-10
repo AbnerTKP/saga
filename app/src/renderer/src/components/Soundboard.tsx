@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { pode, listarSons, subirSom, apagarSom, urlDoArquivo, type Membro, type Som, podeMexerNosSons, type Cargo } from '../api';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 export function Soundboard({ eu, cargos, naSala, onTocar, onParar, tocando, restantes, onClose }: {
   eu: Membro;
@@ -16,6 +17,8 @@ export function Soundboard({ eu, cargos, naSala, onTocar, onParar, tocando, rest
   cargos: Cargo[];
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [sons, setSons] = useState<Som[] | null>(null);
   const [nome, setNome] = useState('');
   const [erro, setErro] = useState<string | null>(null);

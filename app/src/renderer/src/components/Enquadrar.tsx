@@ -4,6 +4,7 @@ import {
   arrastar, estilo, limpar, PADRAO, ZOOM_MAXIMO,
   type Enquadramento, type Papel,
 } from '../enquadramento';
+import { useFecharComEsc } from '../useFechar';
 
 /**
  * Ajusta como a imagem aparece — arrastando e aproximando.
@@ -19,6 +20,8 @@ export function Enquadrar({ url, papel, inicial, onSalvar, onClose }: {
   onSalvar: (valor: Enquadramento) => Promise<void>;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [valor, setValor] = useState<Enquadramento>(() => limpar(inicial ?? PADRAO));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);

@@ -12,6 +12,7 @@ import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherImagem } from './EscolherImagem';
+import { useFecharComEsc } from '../useFechar';
 
 // Espelho da regra do servidor, só para não mostrar botão que será recusado. Quem decide
 // de verdade é o servidor: aqui é conveniência, não segurança.
@@ -37,6 +38,8 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
   onSaiu: () => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);

@@ -3,6 +3,7 @@ import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } f
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { type Enquadramentos } from '../enquadramento';
+import { useFecharComEsc } from '../useFechar';
 
 export type PessoaNaCall = {
   identity: string;
@@ -34,6 +35,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
   onVerPerfil: () => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const caixa = useRef<HTMLDivElement>(null);
   const [ocupado, setOcupado] = useState(false);
   const souEu = pessoa.usuarioId === eu.id;

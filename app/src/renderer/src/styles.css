@@ -396,7 +396,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .chat-input button:disabled { opacity: .4; }
 /* O GIF é palavra e não desenho: "GIF" é o nome da coisa, e um ícone aqui precisaria de
    legenda. Ele fica antes de uma divisória, que separa o acessório da ação. */
-.chat-input .gif { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
+.chat-input .rotulo-gif { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
   letter-spacing: .04em; }
 .chat-input .enviar { margin-left: var(--e1); position: relative; }
 .chat-input .enviar::before { content: ''; position: absolute; left: -5px; top: 7px;
@@ -447,7 +447,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .msg-imagem:hover img { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Visualizador: a imagem inteira, sem corte, com o fundo bem escuro para ela mandar. */
-.ver-imagem { background: rgba(0,0,0,.85); z-index: 30; }
+.ver-imagem { background: rgba(0,0,0,.85); z-index: 30; }   /* ver a escada em .modal-back */
 .ver-imagem img { max-width: 92vw; max-height: 88vh; border-radius: 8px; box-shadow: 0 12px 48px rgba(0,0,0,.6); }
 .ver-imagem-fechar { position: fixed; top: 16px; right: 16px; width: 36px; height: 36px;
   display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,.5); color: var(--white); }
@@ -458,7 +458,19 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 /* Uma região de arraste engole o clique de tudo que é desenhado por cima dela, mesmo do
    que está visualmente na frente. Como o topo da barra lateral e do palco são arrastáveis,
    qualquer coisa flutuante precisa se declarar "não-arraste" para voltar a ser clicável. */
-.modal-back { -webkit-app-region: no-drag; position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 10; }
+/* A escada das camadas, num lugar só — cada uma existe porque a de baixo não pode comer
+   o clique da de cima:
+     15  quadro flutuante da live   (decoração; some atrás de qualquer painel)
+     20  aviso de versão nova       (canto, e um painel aberto pode cobri-lo)
+     25  painéis (modal-back)       (o que você abriu e está usando AGORA)
+     30  ver imagem grande          (abre de dentro de um painel, então fica acima dele)
+     35  menus de clique-direito    (abrem de dentro de painéis, então acima de tudo)
+     40  avisos                     (erro tem de aparecer com painel aberto; não pega clique)
+     50  marca de versão            (`pointer-events: none`, não pega clique nenhum)
+   O painel estava em 10, abaixo de TUDO: com uma live no quadro flutuante ou um aviso de
+   versão no canto, pedaços do painel viravam decoração — o clique ia para a camada de
+   cima e o botão "simplesmente não funcionava". */
+.modal-back { -webkit-app-region: no-drag; position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 25; }
 .modal { width: 720px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); background: var(--bg2); border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 .modal.small { width: 440px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; font-size: 17px; }
@@ -494,7 +506,7 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
    outro, e toda a área vazia à esquerda deles, comem o clique do que está por baixo.
    Foi assim que o botão de expandir da live ficava inclicável enquanto houvesse aviso. */
 .avisos { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: 72px;
-  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 21; max-width: min(420px, calc(100vw - 32px));
+  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 40; max-width: min(420px, calc(100vw - 32px));
   pointer-events: none; }
 .aviso { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
   background: var(--bg1); border: 1px solid var(--line); border-left: 3px solid var(--text3);
@@ -630,7 +642,8 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 .menu-pessoa {
   -webkit-app-region: no-drag;
-  position: fixed; z-index: 30;
+  /* Acima dos painéis: o menu de uma pessoa abre de dentro do painel do servidor. */
+  position: fixed; z-index: 35;
   background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,.5);
   padding: 10px; display: flex; flex-direction: column; gap: 10px;
@@ -761,10 +774,12 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 .grade-gifs-area { flex: 1; min-height: 0; overflow-y: auto; }
 .grade-gifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-.gif { padding: 0; border-radius: 6px; overflow: hidden; background: var(--bg0); aspect-ratio: 1; }
-.gif img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gif:hover:not(:disabled) { outline: 2px solid var(--accent); }
-.gif.enviando { opacity: .4; }
+/* Presa à grade de propósito: solta, `.gif` pegava qualquer botão que se chamasse assim
+   noutro canto do app — foi o que desfigurou o botão GIF da barra de escrever. */
+.grade-gifs .gif { padding: 0; border-radius: 6px; overflow: hidden; background: var(--bg0); aspect-ratio: 1; }
+.grade-gifs .gif img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.grade-gifs .gif:hover:not(:disabled) { outline: 2px solid var(--accent); }
+.grade-gifs .gif.enviando { opacity: .4; }
 
 /* ---- chat ---- */
 

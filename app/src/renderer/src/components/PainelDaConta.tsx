@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocosDaSaga } from './PainelDaSaga';
 import type { AberturaComOSistema } from '../desktop';
+import { useFecharComEsc } from '../useFechar';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const APARELHOS: Record<Kind, string> = {
@@ -57,6 +58,8 @@ export function PainelDaConta({
   onRegistro: () => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [meuNome, setMeuNome] = useState(eu.nome);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);

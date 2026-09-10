@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 /**
  * Uma caixinha para digitar um nome e confirmar.
@@ -17,6 +18,8 @@ export function PedirNome({ titulo, rotulo, exemplo, inicial = '', confirmar = '
   onPronto: (nome: string) => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [nome, setNome] = useState(inicial);
   const vazio = !nome.trim();
 

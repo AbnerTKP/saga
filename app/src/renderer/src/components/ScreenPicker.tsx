@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { SourceInfo } from '../desktop';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 export function ScreenPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: string, audio: boolean) => void }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [sources, setSources] = useState<SourceInfo[] | null>(null);
   const [tab, setTab] = useState<'screen' | 'window'>('screen');
   const [sel, setSel] = useState<string | null>(null);

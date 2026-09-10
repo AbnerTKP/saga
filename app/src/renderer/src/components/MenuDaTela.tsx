@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useFecharComEsc } from '../useFechar';
 
 /** Volume de uma transmissão específica, aberto com o botão direito sobre ela. */
 export function MenuDaTela({ nome, em, volume, onVolume, preencher, onPreencher, onClose }: {
@@ -10,6 +11,8 @@ export function MenuDaTela({ nome, em, volume, onVolume, preencher, onPreencher,
   onPreencher: (v: boolean) => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const caixa = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

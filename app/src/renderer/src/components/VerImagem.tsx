@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 /**
  * Abre uma imagem em tamanho grande por cima de tudo. Serve ao GIF do chat e à foto de
@@ -12,6 +13,8 @@ export function VerImagem({ url, legenda, onClose }: {
   legenda?: string;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', tecla);

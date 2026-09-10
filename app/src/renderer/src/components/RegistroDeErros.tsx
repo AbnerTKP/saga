@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 /**
  * Mostra o registro para a pessoa poder copiar e mandar a quem vai ajudar. Existe
@@ -7,6 +8,8 @@ import { Icon } from './Icon';
  * impede de entrar, e aí não daria para chegar até aqui de dentro do app.
  */
 export function RegistroDeErros({ onClose }: { onClose: () => void }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [texto, setTexto] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 

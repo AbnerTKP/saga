@@ -5,6 +5,7 @@ import { Icon } from './Icon';
 import { Nome } from './Nome';
 import { VerImagem } from './VerImagem';
 import type { PessoaNaCall } from './MenuDaPessoa';
+import { useFecharComEsc } from '../useFechar';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -31,6 +32,8 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, volume, onVolume, onClose
   onVolume: (v: number) => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
   const bannerNoBanco = urlDoArquivo(pessoa.banner);
   // Mesma história da foto: banner que não carrega vira o banner vazio, não um rasgo.

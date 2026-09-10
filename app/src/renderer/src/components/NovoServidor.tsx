@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { criarServidor, entrarComConvite } from '../api';
 import { Icon } from './Icon';
+import { useFecharComEsc } from '../useFechar';
 
 /** Criar um servidor ou entrar num com código de convite. */
 export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
@@ -9,6 +10,8 @@ export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
   onPronto: (id: number) => void;
   onClose: () => void;
 }) {
+  // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
+  useFecharComEsc(onClose);
   const [aba, setAba] = useState<'criar' | 'entrar'>(inicial);
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
