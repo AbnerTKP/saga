@@ -18,9 +18,10 @@ import * as plataforma from './plataforma.mjs';
 import * as notas from './notas.mjs';
 import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
+import { criarRegistroDeDigitacao } from './digitando.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
-import { ErroDeConta, criarConta, entrar, usuarioDaSessao, sair } from './contas.mjs';
+import { ErroDeConta, criarConta, entrar, usuarioDaSessao, buscarPorId, sair } from './contas.mjs';
 import { temPermissao, PERMISSOES } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
@@ -57,6 +58,8 @@ if (!KEY || !SECRET) {
 
 const svc = new RoomServiceClient(HOST, KEY, SECRET);
 const db = abrirBanco(BANCO);
+// Quem está escrevendo agora. Mora na memória do processo de propósito — ver digitando.mjs.
+const digitando = criarRegistroDeDigitacao();
 // O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
 // só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
@@ -163,7 +166,76 @@ const verServidor = (sid) => {
 };
 
 const salasDoServidor = (sid) => salasM.listarSalas(db, sid);
+/** Mandou: some da lista de quem está escrevendo, sem esperar o aviso vencer. */
+const pararDeDigitar = (sid, usuarioId, sala) =>
+  digitando.parou(salasM.buscarSala(db, sid, sala)?.id, usuarioId);
 const salasDeVoz = (sid) => salasDoServidor(sid).filter((s) => s.tipo === 'voz');
+
+/**
+ * A pessoa vista sem servidor nenhum: só a conta.
+ *
+ * Existe porque agora dá para estar na Saga sem estar em servidor algum — quem acaba de
+ * se cadastrar cai numa tela vazia, e essa tela precisa saber quem é você para mostrar
+ * sua foto, seu nome e o caminho de sair. Cargo, nome exibido e identificador ficam
+ * nulos, e é honesto: eles pertencem ao vínculo com um servidor, que ainda não existe.
+ */
+const verConta = (u) => u && ({
+  id: u.id,
+  apelido: u.apelido,
+  nome: u.apelido,
+  cargo: null,
+  cargoNome: 'Sem cargo',
+  foto: u.foto ?? null,
+  banner: u.banner ?? null,
+  enquadramento: enquadramento.ler(u.enquadramento),
+  turbo: !!u.turbo,
+  donoDaSaga: !!u.dono,
+  status: presenca.statusDeVerdade(u.status, u.visto_em),
+  idExibido: null,
+  banido: false,
+  banidoPor: null,
+  castigoAte: null,
+  entrouEm: null,
+});
+
+/**
+ * O servidor de casa é do dono, e de mais ninguém automaticamente.
+ *
+ * Antes, QUEM se cadastrasse caía nele: era o único servidor que existia e a senha do
+ * grupo era a porta. Hoje a conta nova nasce sem servidor nenhum — como no Discord — e
+ * quem abre a porta é o convite. O que sobra aqui é uma instalação NOVA: o servidor
+ * semeado pelo `.env` sobe sem dono, e sem esta linha ficaria de pé sem ninguém capaz de
+ * entrar nele. Vale uma vez só, para o apelido que o `.env` chama de DONO.
+ */
+function garantirCasaDoDono(usuario) {
+  if (!DONO || DONO.trim().toLowerCase() !== usuario.apelido_chave) return;
+  const casa = db.prepare('SELECT criado_por FROM servidores WHERE id = ?').get(SERVIDOR.id);
+  if (casa?.criado_por) return;
+  membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
+}
+
+/**
+ * O que o app recebe quando a conta não está em servidor nenhum.
+ *
+ * São dois casos e uma tela só: quem acabou de se cadastrar e ainda não entrou em lugar
+ * nenhum, e quem foi banido de todos. O segundo entra na conta do mesmo jeito, porque
+ * precisa ver o motivo em vez de bater numa tela que não explica nada.
+ */
+function semServidor(usuario) {
+  const qualquer = db.prepare('SELECT servidor_id FROM membros WHERE usuario_id = ? LIMIT 1').get(usuario.id);
+  const membro = qualquer ? membros.buscarMembro(db, qualquer.servidor_id, usuario.id) : null;
+  return {
+    eu: membro ? verMembro(membro) : verConta(usuario),
+    servidor: null,
+    servidores: [],
+    salas: [],
+    // Só quem TEM vínculo em algum lugar tem impedimento a explicar. Quem acabou de se
+    // cadastrar não está impedido de nada — ele só ainda não entrou em lugar nenhum, e
+    // dizer "você não faz parte deste servidor" na primeira tela é responder a uma
+    // pergunta que ninguém fez.
+    impedimento: membro ? membros.impedimento(membro) : null,
+  };
+}
 
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
@@ -171,26 +243,10 @@ function sessaoCompleta(usuario, token) {
   // dono, mas a conta dele ainda não existe quando o processo sobe. Semear só lá deixava
   // a Saga sem dono para sempre. É idempotente — ver garantirDonoDaSaga.
   plataforma.garantirDonoDaSaga(db, DONO);
-
-  // Quem chega sem vínculo nenhum entra no semeado pelo .env — é o servidor de casa.
-  const temVinculo = db.prepare('SELECT count(*) c FROM membros WHERE usuario_id = ?').get(usuario.id).c > 0;
-  if (!temVinculo) membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
+  garantirCasaDoDono(usuario);
 
   const meus = servidoresM.meusServidores(db, usuario.id);
-  if (meus.length === 0) {
-    // Banido de todos os servidores em que estava. Ainda assim entra na conta: precisa
-    // ver o motivo, em vez de bater numa tela que não explica nada.
-    const qualquer = db.prepare('SELECT servidor_id FROM membros WHERE usuario_id = ? LIMIT 1').get(usuario.id);
-    const membro = qualquer ? membros.buscarMembro(db, qualquer.servidor_id, usuario.id) : null;
-    return {
-      token,
-      eu: membro ? verMembro(membro) : null,
-      servidor: null,
-      servidores: [],
-      salas: [],
-      impedimento: membros.impedimento(membro),
-    };
-  }
+  if (meus.length === 0) return { token, ...semServidor(usuario) };
 
   const sid = meus[0].id;
   return {
@@ -334,9 +390,18 @@ function guardarComRegraDoTurbo(eu, bruto, papel, de) {
   return nome;
 }
 
-/** Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor. */
+/**
+ * Sobe (ou remove, se vier vazio) a foto/banner de quem pediu ou do servidor.
+ *
+ * A imagem da PESSOA é da conta, não do vínculo: mora em `usuarios` e vai com ela para
+ * todo servidor. Por isso só exige servidor quem está mexendo na imagem do servidor —
+ * senão quem ainda não entrou em nenhum não conseguiria nem pôr uma foto.
+ */
 async function trocarImagem(req, de, papel) {
-  const { sid, membro: eu } = exigirMembro(req);
+  const usuario = exigirConta(req);
+  const sid = de === 'servidor' || servidoresM.meusServidores(db, usuario.id).length
+    ? exigirMembro(req).sid : null;
+  const eu = sid ? membros.buscarMembro(db, sid, usuario.id) : verConta(usuario);
   if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
     throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
   }
@@ -362,8 +427,12 @@ async function trocarImagem(req, de, papel) {
   const semOEnquadramentoAntigo = enquadramento.guardar(atual?.enquadramento, papel, null);
   db.prepare(`UPDATE usuarios SET ${papel} = ?, enquadramento = ? WHERE id = ?`)
     .run(nome, semOEnquadramentoAntigo, eu.id);
-  return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
+  return { eu: euDepois(usuario, sid) };
 }
+
+/** A pessoa como ela é agora: pelo vínculo, se houver servidor; pela conta, se não. */
+const euDepois = (usuario, sid) =>
+  (sid ? verMembro(membros.buscarMembro(db, sid, usuario.id)) : verConta(buscarPorId(db, usuario.id)));
 
 const ROTAS = {
   'POST /cadastrar': async (req) => {
@@ -395,8 +464,22 @@ const ROTAS = {
   },
 
   'GET /eu': async (req) => {
+    const usuario = exigirConta(req);
+    // Sem servidor nenhum não é erro: é a tela inicial vazia. Respondendo 404 aqui, o app
+    // entendia "essa sessão não vale mais" e deslogava quem tinha acabado de se cadastrar.
+    const meus = servidoresM.meusServidores(db, usuario.id);
+    if (meus.length === 0) return semServidor(usuario);
+
     const { sid, membro: eu } = exigirMembro(req);
-    return { eu: verMembro(eu), servidor: verServidor(sid), salas: salasDoServidor(sid), impedimento: membros.impedimento(eu) };
+    return {
+      eu: verMembro(eu),
+      servidor: verServidor(sid),
+      // A lista vai junto porque a barra de servidores se desenha com ela, e este é o
+      // pedido que o app faz ao abrir e a cada troca de servidor.
+      servidores: meus,
+      salas: salasDoServidor(sid),
+      impedimento: membros.impedimento(eu),
+    };
   },
 
   'PATCH /eu': async (req) => {
@@ -523,14 +606,34 @@ const ROTAS = {
   },
 
   'GET /mensagens': async (req) => {
-    const { sid } = exigirMembro(req);
+    const { sid, membro: eu } = exigirMembro(req);
     const q = new URL(req.url, 'http://x').searchParams;
     const depoisDe = q.get('depoisDe');
+    const sala = salasM.buscarSala(db, sid, q.get('sala'));
     return {
       mensagens: mensagens.listarMensagens(db, sid, q.get('sala'), {
         depoisDe: depoisDe ? Number(depoisDe) : undefined,
       }),
+      // Quem está escrevendo vai de carona na busca que já acontece de 2 em 2 segundos.
+      // Não há empurrão no servidor, e uma segunda pergunta só para isto seria dobrar o
+      // trânsito da rota mais chamada do app.
+      digitando: sala ? digitando.quemEsta(sala.id, { exceto: eu.id }) : [],
     };
+  },
+
+  /**
+   * "Estou escrevendo." O app avisa a cada 3 s enquanto alguém digita — nunca a cada
+   * tecla, que é o que faria disto o novo `vista_em`. Nada é gravado: ver digitando.mjs.
+   */
+  'POST /digitando': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { sala } = await lerCorpo(req);
+    const daqui = salasM.buscarSala(db, sid, sala);
+    if (!daqui || daqui.tipo !== 'texto') throw new ErroDeConta('Essa sala não existe, ou é de voz.', 400);
+    // Quem está de castigo não vai conseguir mandar: anunciar que está escrevendo
+    // prometeria uma mensagem que não vem.
+    if (!membros.impedimento(eu)) digitando.avisar(daqui.id, { id: eu.id, nome: eu.nome });
+    return { ok: true };
   },
 
   'POST /mensagens': async (req) => {
@@ -538,7 +641,11 @@ const ROTAS = {
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
     const { sala, texto } = await lerCorpo(req);
-    return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, texto) };
+    const mensagem = mensagens.enviarMensagem(db, sid, eu, sala, texto);
+    // A frase sai na hora: "Fulano está digitando" logo abaixo da mensagem que o Fulano
+    // acabou de mandar é o pior momento possível para ela ainda estar na tela.
+    pararDeDigitar(sid, eu.id, sala);
+    return { mensagem };
   },
 
   // O GIF do chat também é baixado e guardado aqui, pelo mesmo motivo do GIF de perfil:
@@ -546,15 +653,17 @@ const ROTAS = {
   // Não é do Turbo: o que o Turbo destrava é a imagem animada NO PERFIL.
   // Enquadrar não muda o arquivo: grava só onde a imagem ficou e o quanto foi aproximada.
   'PATCH /eu/enquadramento': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
+    // Como a foto: é da conta, então não depende de estar em servidor nenhum.
+    const usuario = exigirConta(req);
+    const sid = servidoresM.meusServidores(db, usuario.id).length ? exigirMembro(req).sid : null;
     const { papel, valor } = await lerCorpo(req);
     if (!['foto', 'banner'].includes(papel)) {
       throw new ErroDeConta('Só dá para enquadrar a foto ou o banner.', 400);
     }
-    const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(eu.id);
+    const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(usuario.id);
     const novo = enquadramento.guardar(atual?.enquadramento, papel, valor);
-    db.prepare('UPDATE usuarios SET enquadramento = ? WHERE id = ?').run(novo, eu.id);
-    return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
+    db.prepare('UPDATE usuarios SET enquadramento = ? WHERE id = ?').run(novo, usuario.id);
+    return { eu: euDepois(usuario, sid) };
   },
 
   'POST /mensagens/gif': async (req) => {
@@ -564,7 +673,9 @@ const ROTAS = {
     const { sala, url } = await lerCorpo(req);
     const bruto = await baixarGif(url, LIMITES.chat);
     const nome = salvarImagem(ARQUIVOS, bruto, 'chat');
-    return { mensagem: mensagens.enviarMensagem(db, sid, eu, sala, '', nome) };
+    const mensagem = mensagens.enviarMensagem(db, sid, eu, sala, '', nome);
+    pararDeDigitar(sid, eu.id, sala);
+    return { mensagem };
   },
 
   // O nome vem na URL porque o corpo é o arquivo cru, sem espaço para campos — igual ao
@@ -578,13 +689,13 @@ const ROTAS = {
     // Em FLUXO, direto para o disco: um arquivo de 200 MB juntado na memória estouraria o
     // teto do contêiner, e falta de memória já derrubou a máquina inteira uma vez.
     const guardado = await salvarArquivoEmFluxo(ARQUIVOS, req, LIMITES.arquivo, 'O arquivo');
-    return {
-      mensagem: mensagens.enviarMensagem(db, sid, eu, q.get('sala'), q.get('texto') ?? '', null, {
-        nomeNoDisco: guardado.nome,
-        nome: nomeDeArquivoLimpo(q.get('nome')),
-        bytes: guardado.bytes,
-      }),
-    };
+    const mensagem = mensagens.enviarMensagem(db, sid, eu, q.get('sala'), q.get('texto') ?? '', null, {
+      nomeNoDisco: guardado.nome,
+      nome: nomeDeArquivoLimpo(q.get('nome')),
+      bytes: guardado.bytes,
+    });
+    pararDeDigitar(sid, eu.id, q.get('sala'));
+    return { mensagem };
   },
 
   'POST /token': async (req) => {
@@ -683,7 +794,7 @@ const ROTAS = {
   },
 
   'GET /giphy': async (req) => {
-    const { sid } = exigirMembro(req);
+    exigirConta(req);
     const q = new URL(req.url, 'http://x').searchParams;
     return { gifs: await buscarGifs({ chave: GIPHY, termo: q.get('q'), limite: q.get('limite') }) };
   },
@@ -691,12 +802,15 @@ const ROTAS = {
   // O GIF escolhido é baixado e guardado aqui: assim continua funcionando se sumir do
   // Giphy, e passa pelas mesmas conferências de qualquer imagem enviada.
   'POST /giphy/usar': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
+    const usuario = exigirConta(req);
     const { onde, url } = await lerCorpo(req);
     const [de, papel] = String(onde ?? '').split('.');
     if (!['usuario', 'servidor'].includes(de) || !['foto', 'banner'].includes(papel)) {
       throw new ErroDeConta('Não sei onde pôr essa imagem.', 400);
     }
+    const sid = de === 'servidor' || servidoresM.meusServidores(db, usuario.id).length
+      ? exigirMembro(req).sid : null;
+    const eu = sid ? membros.buscarMembro(db, sid, usuario.id) : verConta(usuario);
     if (de === 'servidor' && !temPermissao(eu.cargo, 'gerirServidor')) {
       throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
     }
@@ -707,8 +821,8 @@ const ROTAS = {
       db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
       return { servidor: verServidor(sid) };
     }
-    db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, eu.id);
-    return { eu: verMembro(membros.buscarMembro(db, sid, eu.id)) };
+    db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, usuario.id);
+    return { eu: euDepois(usuario, sid) };
   },
 
   'POST /moderar': async (req) => {

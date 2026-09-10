@@ -24,6 +24,14 @@ const ativa = (t) => !t.muted;
  */
 export const ATRIBUTO_SURDO = 'surdo';
 
+/**
+ * A transmissão que a pessoa escolheu assistir — o mesmo atributo que os apps trocam
+ * entre si (espectadores.ts). Vale aqui porque quem lê o CHAT de uma sala de texto
+ * precisa saber quantos estão vendo a live da sala de voz sem estar dentro dela: de
+ * fora da call não há LiveKit para perguntar, só esta lista.
+ */
+export const ATRIBUTO_ASSISTINDO = 'assistindo';
+
 export function verParticipante(p) {
   const faixas = p.tracks ?? [];
   const microfones = faixas.filter((t) => t.source === FONTE.MICROFONE);
@@ -36,5 +44,8 @@ export function verParticipante(p) {
     muted: microfones.length === 0 || microfones.every((t) => t.muted),
     // Quem não anuncia nada — versão velha do app — simplesmente não está surdo.
     surdo: p.attributes?.[ATRIBUTO_SURDO] === '1',
+    // A quem esta pessoa está assistindo, ou null. Vazio e ausente são a mesma coisa:
+    // "ninguém".
+    assistindo: p.attributes?.[ATRIBUTO_ASSISTINDO] || null,
   };
 }

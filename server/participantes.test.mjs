@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verParticipante, FONTE, ATRIBUTO_SURDO } from './participantes.mjs';
+import { verParticipante, FONTE, ATRIBUTO_SURDO, ATRIBUTO_ASSISTINDO } from './participantes.mjs';
 
 // Monta um participante como o LiveKit devolve, só com o que a função lê.
 const pessoa = (nome, faixas) => ({ identity: `${nome}#a1b2`, name: nome, tracks: faixas });
@@ -78,4 +78,17 @@ test('quem não anuncia nada não está surdo', () => {
   assert.equal(verParticipante(pessoa('Abner', [faixa(FONTE.MICROFONE)])).surdo, false);
   const outro = { ...pessoa('Bruno', []), attributes: { assistindo: 'u1' } };
   assert.equal(verParticipante(outro).surdo, false, 'atributo de outro assunto não conta');
+});
+
+test('a quem a pessoa assiste também vem do atributo', () => {
+  // É o que deixa o chat contar quantos estão vendo a live sem estar dentro da call:
+  // de fora não há LiveKit a que perguntar, só esta lista.
+  const vendo = { ...pessoa('Bruno', []), attributes: { [ATRIBUTO_ASSISTINDO]: 'u7' } };
+  assert.equal(verParticipante(vendo).assistindo, 'u7');
+});
+
+test('quem não escolheu transmissão nenhuma vem como null, e não como texto vazio', () => {
+  assert.equal(verParticipante(pessoa('Abner', [])).assistindo, null);
+  const largou = { ...pessoa('Bruno', []), attributes: { [ATRIBUTO_ASSISTINDO]: '' } };
+  assert.equal(verParticipante(largou).assistindo, null, 'largar de assistir vira vazio, não sumiço');
 });

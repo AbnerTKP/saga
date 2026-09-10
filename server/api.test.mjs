@@ -70,8 +70,45 @@ async function sessaoDe(apelido, senha = 'segredo123') {
   return sessoes.get(apelido);
 }
 
-const cadastrar = (apelido, senha = 'segredo123') =>
+const criarConta = (apelido, senha = 'segredo123') =>
   chamar('POST', '/cadastrar', { corpo: { apelido, senha, senhaRepetida: senha } });
+
+/**
+ * O convite do servidor de casa, gerado uma vez e reusado.
+ *
+ * Sem `maxUsos` ele vale por uma semana e por quantas pessoas quiserem, que é o que os
+ * testes precisam — e é a mesma porta que um amigo de verdade atravessa.
+ */
+let conviteDeCasa = null;
+async function convite() {
+  if (!conviteDeCasa) {
+    const dono = await sessaoDe('abner');
+    const r = await chamar('POST', '/servidores/convite', { sessao: dono.token, corpo: {} });
+    assert.equal(r.status, 200, `não saiu convite: ${JSON.stringify(r.corpo)}`);
+    conviteDeCasa = r.corpo.convite.codigo;
+  }
+  return conviteDeCasa;
+}
+
+/**
+ * Cria a conta e entra no servidor de casa, que é o caminho de quem chega.
+ *
+ * A conta nova não cai mais em servidor nenhum — ela nasce numa tela vazia, como no
+ * Discord, e a porta é o convite. Os testes daqui para baixo falam de gente que já está
+ * DENTRO do servidor de casa, então o helper faz as duas coisas; quem quiser exercitar
+ * só o cadastro usa `criarConta`.
+ */
+async function cadastrar(apelido, senha = 'segredo123') {
+  const r = await criarConta(apelido, senha);
+  // O dono do `.env` já nasce no servidor de casa: é dele.
+  if (r.status !== 200 || r.corpo.servidor) return r;
+  const entrou = await chamar('POST', '/servidores/entrar', {
+    sessao: r.corpo.token, corpo: { codigo: await convite() },
+  });
+  assert.equal(entrou.status, 200, `não entrei com o convite: ${JSON.stringify(entrou.corpo)}`);
+  const eu = await chamar('GET', '/eu', { sessao: r.corpo.token });
+  return { status: r.status, corpo: { ...r.corpo, ...eu.corpo } };
+}
 
 test('cadastrar não pede mais senha de grupo', async () => {
   // Ela saiu por pedido do dono. Este teste existe para que voltar a exigi-la seja uma
@@ -81,6 +118,50 @@ test('cadastrar não pede mais senha de grupo', async () => {
   });
   assert.equal(r.status, 200);
   assert.ok(r.corpo.token);
+});
+
+test('conta nova não cai em servidor nenhum: a primeira tela é vazia', async () => {
+  // Era o contrário: quem se cadastrava caía no servidor de casa, porque ele era o único
+  // que existia e a senha do grupo fazia as vezes de porta. Hoje a porta é o convite POR
+  // SERVIDOR, e este teste existe para que voltar a jogar todo mundo lá dentro seja uma
+  // decisão, e não o efeito de alguém mexer no cadastro sem saber que isso saiu.
+  const r = await criarConta('recemchegado');
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.servidor, null, 'a conta nova entrou num servidor sozinha');
+  assert.deepEqual(r.corpo.servidores, []);
+  assert.deepEqual(r.corpo.salas, []);
+  // Mas a tela vazia precisa saber QUEM é você — foto, nome e o caminho de sair.
+  assert.equal(r.corpo.eu.apelido, 'recemchegado');
+  assert.equal(r.corpo.eu.cargo, null, 'cargo é do vínculo, e não há vínculo nenhum');
+  // Quem acabou de chegar não está IMPEDIDO de nada: a tela inicial não pode acusar
+  // "você não faz parte deste servidor" de um servidor que ninguém mencionou.
+  assert.equal(r.corpo.impedimento, null);
+});
+
+test('sem servidor, /eu responde quem você é em vez de 404', async () => {
+  // O app pergunta isto ao abrir e, tomando erro, entende "essa sessão não vale mais" e
+  // apaga o crachá: quem tinha acabado de se cadastrar era deslogado na primeira volta.
+  const { corpo } = await criarConta('sozinho');
+  const r = await chamar('GET', '/eu', { sessao: corpo.token });
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.eu.apelido, 'sozinho');
+  assert.equal(r.corpo.servidor, null);
+});
+
+test('sem servidor ainda dá para pôr uma foto: ela é da conta', async () => {
+  const { corpo } = await criarConta('fotogenico');
+  // `subir` e `PNG` moram na seção de imagens, mais abaixo: o caso roda depois de o
+  // arquivo inteiro ter sido lido, então declará-los lá não é problema.
+  const r = await subir('/eu/foto', corpo.token, PNG);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.ok(r.corpo.eu.foto, 'a foto não voltou');
+});
+
+test('código inventado não abre porta nenhuma', async () => {
+  const { corpo } = await criarConta('chutador');
+  const r = await chamar('POST', '/servidores/entrar', { sessao: corpo.token, corpo: { codigo: 'ABCD2345' } });
+  assert.equal(r.status, 404);
+  assert.equal((await chamar('GET', '/eu', { sessao: corpo.token })).corpo.servidor, null);
 });
 
 test('cadastro devolve sessão, servidor e salas de uma vez', async () => {
@@ -110,6 +191,18 @@ test('a senha nunca volta na resposta', async () => {
 test('quem chega depois entra como membro', async () => {
   const r = await cadastrar('bruno');
   assert.equal(r.corpo.eu.cargoNome, 'Membro');
+});
+
+test('o convite é a porta: com o código, a conta nova entra no servidor de casa', async () => {
+  const { corpo } = await criarConta('convidado');
+  const codigo = await convite();
+  const entrou = await chamar('POST', '/servidores/entrar', { sessao: corpo.token, corpo: { codigo } });
+  assert.equal(entrou.status, 200);
+
+  const eu = await chamar('GET', '/eu', { sessao: corpo.token });
+  assert.equal(eu.corpo.servidor.id, entrou.corpo.servidor.id);
+  assert.equal(eu.corpo.eu.cargoNome, 'Membro', 'quem entra por convite cai no cargo mais baixo');
+  assert.equal(eu.corpo.servidores.length, 1, 'a barra de servidores se desenha com esta lista');
 });
 
 test('a sessão continua valendo: o app abre logado', async () => {
@@ -546,6 +639,41 @@ test('quem está de castigo não escreve', async () => {
   assert.equal(r.status, 403);
   assert.match(r.corpo.error, /castigo/);
   await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'tirarTimeout', alvo: bruno.eu.id } });
+});
+
+test('quem está digitando vai de carona na busca de mensagens', async () => {
+  // Não existe empurrão no servidor, e uma segunda rota polada só para isto dobraria o
+  // trânsito do chat. O aviso mora na memória do processo — nada é gravado.
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const avisos = salas.find((s) => s.name === 'Avisos');
+
+  assert.equal((await chamar('POST', '/digitando', { sessao: bruno.token, corpo: { sala: avisos.id } })).status, 200);
+
+  const paraODono = await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: dono.token });
+  assert.deepEqual(paraODono.corpo.digitando.map((q) => q.id), [bruno.eu.id]);
+  // O nome vai junto porque é ele que a frase mostra — e é o nome DESTE servidor, que
+  // pode não ser o apelido de entrada.
+  assert.ok(paraODono.corpo.digitando[0].nome, 'veio sem nome nenhum');
+
+  const paraOBruno = await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: bruno.token });
+  assert.deepEqual(paraOBruno.corpo.digitando, [], 'ninguém precisa ser avisado de que está digitando');
+
+  // Mandar a mensagem tira a frase na hora: ela embaixo da mensagem recém-chegada é o
+  // pior momento possível para ainda estar lá.
+  await chamar('POST', '/mensagens', { sessao: bruno.token, corpo: { sala: avisos.id, texto: 'pronto' } });
+  const depois = await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: dono.token });
+  assert.deepEqual(depois.corpo.digitando, []);
+});
+
+test('não se avisa que está digitando em sala de voz nem em sala de outro servidor', async () => {
+  const dono = await sessaoDe('abner');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const voz = salas.find((s) => s.tipo === 'voz');
+  assert.equal((await chamar('POST', '/digitando', { sessao: dono.token, corpo: { sala: voz.id } })).status, 400);
+  assert.equal((await chamar('POST', '/digitando', { sessao: dono.token, corpo: { sala: 99999 } })).status, 400);
+  assert.equal((await chamar('POST', '/digitando', { corpo: { sala: voz.id } })).status, 401);
 });
 
 test('sem sessão não se lê nem se escreve no chat', async () => {
