@@ -382,6 +382,19 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   Medido no app de verdade contra um LiveKit local: tirando a pessoa pelo `removeParticipant`,
   ela continua fora nove segundos depois. E a volta é **com o microfone como estava** —
   reaparecer falando para quem tinha se mutado seria pior que não voltar.
+- **Efeito de reconexão não pode depender do que muda a cada busca.** O efeito que traz
+  a call de volta dependia de `rooms` e de `entrarNaVoz` — e as duas nascem de novo a cada
+  busca de salas, de 4 em 4 segundos. O efeito era refeito junto e disparava uma tentativa
+  nova por cima da anterior, cada uma derrubando a que estava no meio da conexão. Medido
+  com o LiveKit local: o app ficava em "Conectando…" de 50 s a 100 s e terminava fora da
+  call, com o servidor de voz já de pé. Hoje ele depende só de `caiuDaCall` (a sala de que
+  se caiu vem dentro dele, então nem se procura na lista) e uma trava impede empilhar
+  tentativas — entrar tem tempo limite de dezenas de segundos, e bater de novo antes disso
+  garante que nenhuma termine.
+- **Queda curta o LiveKit resolve sozinho; a longa é que precisava de conserto.** Medido:
+  matando o servidor de voz, o app passa a "Reconectando…" e o próprio cliente refaz a
+  conexão se ela voltar em ~40 s. Passado isso ele DESISTE, e era aí que a call morria de
+  vez e ninguém voltava. É essa a queda que o app agora cobre.
 - **Banir e dar castigo também tiram da call.** Sem isso a punição parece não funcionar.
   A remoção é consequência: se o LiveKit estiver fora, o registro vale do mesmo jeito.
 - **Nome de arquivo é o hash do conteúdo.** Dá cache eterno, deduplicação, e ninguém

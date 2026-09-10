@@ -9,6 +9,7 @@ import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
+import { deveVoltarParaACall } from './queda';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -130,6 +131,19 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const ctxDosNiveis = useRef<AudioContext | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [salaDaVoz, setSalaDaVoz] = useState<SalaDaVoz | null>(null);
+  /**
+   * A call que caiu sem eu ter desligado, para o app poder voltar sozinho.
+   *
+   * Desligar é decisão; cair é acidente, e a diferença tem de ficar guardada em algum
+   * lugar — senão o app volta a pôr a pessoa numa sala de que ela acabou de sair. Quem
+   * sabe voltar é o App, que é quem pede o passe; aqui só se anota o que caiu e como
+   * estava o microfone, para voltar do mesmo jeito e não com o microfone aberto.
+   */
+  const [caiuDaCall, setCaiuDaCall] = useState<{ sala: SalaDaVoz; comMicrofone: boolean } | null>(null);
+  const desligueiDeProposito = useRef(false);
+  // O handler do LiveKit é registrado uma vez: sem a referência ele leria a sala de quando
+  // foi criado, que é `null`, e nunca saberia de onde a pessoa caiu.
+  const salaDaVozRef = useRef<SalaDaVoz | null>(null);
   const [deafened, setDeafenedState] = useState(false);
   const [error, setErrorCru] = useState<string | null>(null);
   // Nem tudo que a sala tem a dizer é falha: "compartilhando sem o áudio do sistema" é
@@ -310,7 +324,19 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       }
       bump();
     };
-    const onDisconnected = () => {
+    const onDisconnected = (motivo?: number) => {
+      /*
+       * Caiu, ou foi TIRADO? O LiveKit avisa a saída com um evento só, e o motivo é o que
+       * separa uma coisa da outra: voltar sozinho depois de um moderador te desconectar
+       * desfaria a moderação em segundos. A lista está em `queda.ts`, testada.
+       *
+       * O LiveKit só chega aqui depois de tentar reconectar por conta dele — então isto
+       * já é "a tentativa dele desistiu", e não o primeiro soluço da rede.
+       */
+      if (!desligueiDeProposito.current && salaDaVozRef.current && deveVoltarParaACall(motivo)) {
+        setCaiuDaCall({ sala: salaDaVozRef.current, comMicrofone: room.localParticipant.isMicrophoneEnabled });
+      }
+      desligueiDeProposito.current = false;
       // A publicação morre junto com a sala; a próxima entrada publica de novo.
       try { fonteDoSom.current?.stop(); } catch { /* já tinha acabado */ }
       fonteDoSom.current = null;
@@ -323,6 +349,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       getAudioRoot().innerHTML = '';
       setStatus('idle');
       setSalaDaVoz(null);
+      salaDaVozRef.current = null;
       bump();
     };
     const onError = (e: Error) => setError(e.message);
@@ -367,7 +394,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     };
   }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar]);
 
-  const join = useCallback(async (url: string, token: string, sala: SalaDaVoz) => {
+  const join = useCallback(async (url: string, token: string, sala: SalaDaVoz, comMicrofone = true) => {
     setError(null);
     if (room.state !== 'disconnected') await room.disconnect();
     setStatus('connecting');
@@ -379,6 +406,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           'A rede pode estar bloqueando essa porta — tente por outra rede, por exemplo o 4G do celular.',
       );
       setSalaDaVoz(sala);
+      salaDaVozRef.current = sala;
+      setCaiuDaCall(null);
       setStatus('connected');
       sonsTocados.current = 0;   // a conta do soundboard é por entrada na sala
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
@@ -388,7 +417,9 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // anúncio nasce vazio a cada sala nova, e sem isto a marca só apareceria se a
       // pessoa mexesse no fone de novo.
       anunciar();
-      if (!deafenedRef.current) {
+      // `comMicrofone` só vem quando é uma VOLTA depois de queda: aí o microfone volta
+      // como estava, e quem tinha se mutado não reaparece falando sem saber.
+      if (!deafenedRef.current && comMicrofone) {
         await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
       }
     } catch (e) {
@@ -402,6 +433,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   }, [room, tocarAviso, anunciar]);
 
   const leave = useCallback(async () => {
+    desligueiDeProposito.current = true;
+    setCaiuDaCall(null);
     tocarAviso('saiu', deafenedRef.current);
     await room.disconnect();
   }, [room, tocarAviso]);
@@ -949,7 +982,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
     tocarSom, pararSom, somTocando, volumeDoSoundboard, definirVolumeDoSoundboard,
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
-    lives, assistir, assistindo, espectadores,
+    lives, assistir, assistindo, espectadores, caiuDaCall,
     volumeDaTelaDe, definirVolumeDaTela,
   };
 }

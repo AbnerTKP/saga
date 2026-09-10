@@ -229,7 +229,7 @@ export function App() {
    * chat, e nesse caso quem estava lendo a conversa continua nela — a live vai para o
    * quadro flutuante do canto, que existe exatamente para isso.
    */
-  const entrarNaVoz = useCallback(async (sala: RoomInfo) => {
+  const entrarNaVoz = useCallback(async (sala: RoomInfo, comMicrofone = true) => {
     // Pelo id, não pelo nome: clicar em "Geral" de outro servidor tem de levar você para
     // lá, e comparando nome o app achava que você já estava e não fazia nada.
     if (rm.salaDaVoz?.id === sala.id) return;
@@ -237,8 +237,56 @@ export function App() {
     await rm.join(url, token, {
       id: sala.id, nome: sala.name,
       servidorId: sessao?.servidor?.id ?? 0, servidorNome: sessao?.servidor?.nome ?? '',
-    });
+    }, comMicrofone);
   }, [rm, sessao?.servidor?.id, sessao?.servidor?.nome]);
+
+  /**
+   * A call que caiu volta sozinha, do jeito que estava.
+   *
+   * Cair não é desligar: quem desligou não é trazido de volta, quem foi TIRADO também
+   * não (`queda.ts` separa os dois pelo motivo), e quem caiu volta para a mesma sala com
+   * o microfone como estava — reaparecer falando para quem tinha se mutado seria pior que
+   * não voltar.
+   *
+   * As duas coisas que este efeito tem de não fazer, e que ele fazia:
+   *
+   * - **Depender de `rooms` ou de `entrarNaVoz`.** As duas mudam a cada busca de salas, de
+   *   4 em 4 segundos; o efeito era refeito junto e disparava uma tentativa nova por cima
+   *   da anterior, cada uma derrubando a que estava no meio da conexão. Medido: o app
+   *   ficava em "Conectando…" para sempre e nunca voltava. A sala de que se caiu já vem
+   *   dentro de `caiuDaCall`, então nem é preciso procurá-la na lista.
+   * - **Empilhar tentativas.** `tentando` segura a próxima enquanto uma está em curso:
+   *   entrar tem tempo limite de dezenas de segundos, e bater de novo antes disso é
+   *   garantir que nenhuma termine.
+   */
+  const entrarNaVozRef = useRef(entrarNaVoz);
+  entrarNaVozRef.current = entrarNaVoz;
+  const avisarRef = useRef(notas.mostrar);
+  avisarRef.current = notas.mostrar;
+
+  useEffect(() => {
+    const caiu = rm.caiuDaCall;
+    if (!caiu) return;
+    let vivo = true;
+    let tentando = false;
+    const voltar = async () => {
+      if (!vivo || tentando || !navigator.onLine) return;
+      tentando = true;
+      try {
+        await entrarNaVozRef.current({ id: caiu.sala.id, name: caiu.sala.nome } as RoomInfo, caiu.comMicrofone);
+        avisarRef.current('info', `A conexão caiu e você voltou para ${caiu.sala.nome}.`);
+      } catch {
+        // Ainda fora. A próxima volta tenta de novo; insistir mais rápido não traz
+        // ninguém de volta mais cedo.
+      } finally {
+        tentando = false;
+      }
+    };
+    voltar();
+    const pararDeDespertar = aoDespertar(voltar);
+    const id = setInterval(voltar, 30_000);
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
+  }, [rm.caiuDaCall]);
 
   /**
    * Clicar numa sala. Entrar na voz e trocar o que está na tela são duas coisas, e nem
