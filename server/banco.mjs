@@ -192,6 +192,23 @@ export const MIGRACOES = [
   `ALTER TABLE mensagens ADD COLUMN arquivo TEXT`,
   `ALTER TABLE mensagens ADD COLUMN arquivo_nome TEXT`,
   `ALTER TABLE mensagens ADD COLUMN arquivo_bytes INTEGER`,
+
+  // Sala privada: quem vê é decidido por CARGO, e não por pessoa.
+  //
+  // Privada aqui quer dizer INVISÍVEL para quem não pode: uma sala trancada que aparece
+  // na lista é um convite a perguntar "por que eu não entro aí?", e o assunto que fez
+  // alguém criar a sala é justamente o que não se quer anunciar. Quem criou o servidor
+  // enxerga todas — é a saída para uma sala que ficou sem nenhum cargo por engano.
+  //
+  // Por cargo e não por pessoa porque é assim que o resto do servidor pensa: cargo novo,
+  // pessoa que muda de cargo e pessoa que chega herdam o acesso sem ninguém refazer lista.
+  `ALTER TABLE salas ADD COLUMN privada INTEGER NOT NULL DEFAULT 0`,
+  `CREATE TABLE sala_cargos (
+     sala_id INTEGER NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
+     cargo_id INTEGER NOT NULL REFERENCES cargos(id) ON DELETE CASCADE,
+     PRIMARY KEY (sala_id, cargo_id)
+   )`,
+  `CREATE INDEX sala_cargos_sala ON sala_cargos(sala_id)`,
 ];
 
 export function abrirBanco(caminho) {

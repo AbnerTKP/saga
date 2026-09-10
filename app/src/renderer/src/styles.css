@@ -881,6 +881,33 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   .lista-membros { display: none; }
 }
 
+/* A lista de cargos de "quem pode ver": caixas empilhadas, com o nome na cor do cargo —
+   é como o cargo aparece em todo o resto do app. */
+/* `.form label` é grid, versalete e negrito — é o rótulo de um campo. Uma caixinha de
+   marcar não é rótulo de campo: ela é uma linha, com a caixa ao LADO do nome. Sem esta
+   regra mais específica, o `.check` perdia e as caixas ficavam empilhadas acima dos
+   nomes, tudo em maiúsculas. Mesma família da colisão do `.gif`. */
+.form label.check { display: flex; align-items: center; gap: var(--e2);
+  font-size: 14px; font-weight: 500; text-transform: none; color: var(--text); }
+.form label.check input { flex: none; }
+
+.lista-de-cargos { display: grid; gap: 2px; padding: 10px 12px; background: var(--bg1);
+  border: 1px solid var(--line); border-radius: 10px; max-height: 240px; overflow-y: auto; }
+.lista-de-cargos .check { padding: 5px 4px; border-radius: 6px; }
+.lista-de-cargos .check:hover { background: var(--bg3); }
+.lista-de-cargos .check span:first-of-type { flex: 1; }
+.lista-de-cargos p { margin: 6px 2px 0; }
+
+/* Aviso dentro de um painel: não é erro, é uma consequência que a pessoa precisa ver
+   ANTES de confirmar — trancar a sala e ela sumir da sua própria lista, por exemplo. */
+.aviso-inline { padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
+  color: var(--warn); background: rgba(224,162,51,.1); border: 1px solid rgba(224,162,51,.32); }
+
+/* Sala que só alguns veem: o cadeado fica DEPOIS do nome, pequeno, e some no aperto —
+   o nome da sala é o que se procura na lista, e ele não pode ceder espaço. */
+.room .tranca { margin-left: auto; color: var(--text3); display: flex; flex: none; }
+.room.active .tranca, .room:hover .tranca { color: var(--text2); }
+
 .codigo-convite {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .16em; text-align: center; font-weight: 700;

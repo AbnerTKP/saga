@@ -11,7 +11,7 @@
 
 export const listar = (db, servidorId) =>
   db.prepare(`
-    SELECT s.id, s.nome, s.tipo, s.ordem, s.papel, s.categoria_id AS categoriaId
+    SELECT s.id, s.nome, s.tipo, s.ordem, s.papel, s.privada, s.categoria_id AS categoriaId
       FROM salas s
       LEFT JOIN categorias c ON c.id = s.categoria_id
      WHERE s.servidor_id = ?
@@ -20,7 +20,7 @@ export const listar = (db, servidorId) =>
     .all(servidorId);
 
 export const buscar = (db, servidorId, id) =>
-  db.prepare('SELECT id, nome, tipo, ordem, papel, categoria_id AS categoriaId FROM salas WHERE servidor_id = ? AND id = ?')
+  db.prepare('SELECT id, nome, tipo, ordem, papel, privada, categoria_id AS categoriaId FROM salas WHERE servidor_id = ? AND id = ?')
     .get(servidorId, Number(id)) ?? null;
 
 export const comONome = (db, servidorId, nome) =>
@@ -73,3 +73,9 @@ export const porId = (db, id) =>
 export const virarSalaDeNotas = (db, id, papel) =>
   db.prepare('UPDATE salas SET papel = ?, tipo = ?, ordem = -1, categoria_id = NULL WHERE id = ?')
     .run(papel, 'texto', id);
+
+// --- sala privada: quem vê é por CARGO -------------------------------------
+
+export const definirPrivada = (db, id, privada) =>
+  db.prepare('UPDATE salas SET privada = ? WHERE id = ?').run(privada ? 1 : 0, id);
+

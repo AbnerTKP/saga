@@ -3,6 +3,7 @@ import logo from './marca.png';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar, baterPresenca,
   pode, criarSala, reordenarSalas, criarCategoria, renomearCategoria, apagarCategoria,
+  renomearSala, apagarSala,
   guardarServidorAtual, lerServidorAtual, meusServidores,
   type Acao,
   verServidor,
@@ -17,6 +18,8 @@ import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
+import { MenuDaSala, type AcaoNaSala } from './components/MenuDaSala';
+import { QuemPodeVer } from './components/QuemPodeVer';
 import { PedirNome } from './components/PedirNome';
 import { statusParaMandar, type Status } from './presenca';
 import { Stage } from './components/Stage';
@@ -49,6 +52,9 @@ export function App() {
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
+  const [menuDaSala, setMenuDaSala] = useState<{ sala: RoomInfo; em: { x: number; y: number } } | null>(null);
+  // A sala cujo "quem pode ver" está aberto.
+  const [trancando, setTrancando] = useState<RoomInfo | null>(null);
   const [pedido, setPedido] = useState<AcaoDeSala | null>(null);
   // O que a pessoa escolheu. O que vai para o servidor pode ser outro: ver statusParaMandar.
   const [statusEscolhido, setStatusEscolhido] = useState<Status>(() => {
@@ -404,12 +410,23 @@ export function App() {
     } catch (e) { notas.mostrar('erro', (e as Error).message); }
   }, [notas]);
 
+  /** O que o botão direito EM CIMA de uma sala faz. */
+  const fazerNaSala = useCallback(async (a: AcaoNaSala) => {
+    if (a.tipo === 'quemVe') { setTrancando(a.sala); return; }
+    if (a.tipo === 'renomear') { setPedido({ tipo: 'renomearSala', id: a.sala.id, nome: a.sala.name }); return; }
+    // Apagar leva as mensagens junto: por isso pergunta, e diz o nome de quem vai sumir.
+    if (!window.confirm(`Apagar a sala “${a.sala.name}”? As mensagens dela vão junto.`)) return;
+    try { await apagarSala(a.sala.id); }
+    catch (e) { notas.mostrar('erro', (e as Error).message); }
+  }, [notas]);
+
   const comONome = useCallback(async (nome: string) => {
     if (!pedido) return;
     try {
       if (pedido.tipo === 'criar') await criarSala(nome, pedido.sala);
       else if (pedido.tipo === 'categoria') await criarCategoria(nome);
       else if (pedido.tipo === 'renomearCategoria') await renomearCategoria(pedido.id, nome);
+      else if (pedido.tipo === 'renomearSala') await renomearSala(pedido.id, nome);
     } catch (e) { notas.mostrar('erro', (e as Error).message); }
     finally { setPedido(null); }
   }, [pedido, notas]);
@@ -557,6 +574,7 @@ export function App() {
         podeGerirSalas={pode(eu.cargo, 'gerirSalas')}
         onReordenar={reordenar}
         onMenuDeSalas={(em, categoria) => setMenuDeSalas({ em, categoria })}
+        onMenuDaSala={(sala, em) => setMenuDaSala({ sala, em })}
         pollError={pollError}
         eu={eu}
         servidor={servidor}
@@ -681,6 +699,23 @@ export function App() {
           onClose={() => setPerfilAberto(null)}
         />
       )}
+      {menuDaSala && (
+        <MenuDaSala
+          sala={menuDaSala.sala}
+          em={menuDaSala.em}
+          onAcao={fazerNaSala}
+          onClose={() => setMenuDaSala(null)}
+        />
+      )}
+      {trancando && (
+        <QuemPodeVer
+          sala={trancando}
+          cargos={cargos}
+          eu={eu}
+          onPronto={() => setTrancando(null)}
+          onClose={() => setTrancando(null)}
+        />
+      )}
       {menuDeSalas && (
         <MenuDeSalas
           em={menuDeSalas.em}
@@ -693,12 +728,13 @@ export function App() {
         <PedirNome
           titulo={
             pedido.tipo === 'criar' ? (pedido.sala === 'voz' ? 'Nova sala de voz' : 'Nova sala de chat')
-            : pedido.tipo === 'categoria' ? 'Nova categoria' : 'Renomear categoria'
+            : pedido.tipo === 'categoria' ? 'Nova categoria'
+            : pedido.tipo === 'renomearSala' ? 'Renomear sala' : 'Renomear categoria'
           }
           rotulo={pedido.tipo === 'categoria' || pedido.tipo === 'renomearCategoria' ? 'Nome da categoria' : 'Nome da sala'}
           exemplo={pedido.tipo === 'criar' ? (pedido.sala === 'voz' ? 'Bancada' : 'recados') : 'Jogos'}
-          inicial={pedido.tipo === 'renomearCategoria' ? pedido.nome : ''}
-          confirmar={pedido.tipo === 'renomearCategoria' ? 'Renomear' : 'Criar'}
+          inicial={pedido.tipo === 'renomearCategoria' || pedido.tipo === 'renomearSala' ? pedido.nome : ''}
+          confirmar={pedido.tipo === 'criar' || pedido.tipo === 'categoria' ? 'Criar' : 'Renomear'}
           onPronto={comONome}
           onClose={() => setPedido(null)}
         />

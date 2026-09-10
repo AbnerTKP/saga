@@ -109,7 +109,7 @@ test('a mensagem sobrevive a todo mundo sair', () => {
   enviarMensagem(db, sid, dono, sala.id, 'olha esse link');
 
   // "Todo mundo saiu" não é evento nenhum para o banco: a mensagem continua lá.
-  const msgs = listarMensagens(db, sid, sala.id);
+  const msgs = listarMensagens(db, sid, dono, sala.id);
   assert.equal(msgs.length, 1);
   assert.equal(msgs[0].texto, 'olha esse link');
   assert.equal(msgs[0].nome, 'abner');
@@ -128,7 +128,7 @@ test('as mensagens saem da mais antiga para a mais nova', () => {
   const dono = cria('abner');
   const sala = listarSalas(db, sid)[0];
   for (const t of ['um', 'dois', 'três']) enviarMensagem(db, sid, dono, sala.id, t);
-  assert.deepEqual(listarMensagens(db, sid, sala.id).map((m) => m.texto), ['um', 'dois', 'três']);
+  assert.deepEqual(listarMensagens(db, sid, dono, sala.id).map((m) => m.texto), ['um', 'dois', 'três']);
 });
 
 test('só as últimas são carregadas, mas as mais recentes', () => {
@@ -137,7 +137,7 @@ test('só as últimas são carregadas, mas as mais recentes', () => {
   const sala = listarSalas(db, sid)[0];
   for (let i = 1; i <= QUANTAS + 20; i++) enviarMensagem(db, sid, dono, sala.id, `n${i}`);
 
-  const msgs = listarMensagens(db, sid, sala.id);
+  const msgs = listarMensagens(db, sid, dono, sala.id);
   assert.equal(msgs.length, QUANTAS);
   assert.equal(msgs.at(-1).texto, `n${QUANTAS + 20}`, 'faltou a mais recente');
 });
@@ -149,7 +149,7 @@ test('"depoisDe" traz só o que chegou desde a última olhada', () => {
   const primeira = enviarMensagem(db, sid, dono, sala.id, 'oi');
   enviarMensagem(db, sid, dono, sala.id, 'tudo bem?');
 
-  const novas = listarMensagens(db, sid, sala.id, { depoisDe: primeira.id });
+  const novas = listarMensagens(db, sid, dono, sala.id, { depoisDe: primeira.id });
   assert.deepEqual(novas.map((m) => m.texto), ['tudo bem?']);
 });
 
@@ -157,7 +157,7 @@ test('mensagem em sala que não existe dá erro claro', () => {
   const { db, sid, cria } = cenario();
   const dono = cria('abner');
   assert.throws(() => enviarMensagem(db, sid, dono, 9999, 'oi'), /não existe/);
-  assert.throws(() => listarMensagens(db, sid, 9999), /não existe/);
+  assert.throws(() => listarMensagens(db, sid, dono, 9999), /não existe/);
 });
 
 test('a mensagem carrega quem escreveu, para a tela não precisar buscar', () => {
@@ -179,7 +179,7 @@ test('mensagem só de imagem vale — é o caso do GIF', () => {
   const m = enviarMensagem(db, sid, dono, sala.id, '', 'abc123.gif');
   assert.equal(m.texto, '');
   assert.equal(m.imagem, 'abc123.gif');
-  assert.equal(listarMensagens(db, sid, sala.id)[0].imagem, 'abc123.gif');
+  assert.equal(listarMensagens(db, sid, dono, sala.id)[0].imagem, 'abc123.gif');
 });
 
 test('sem texto e sem imagem continua sendo mensagem vazia', () => {

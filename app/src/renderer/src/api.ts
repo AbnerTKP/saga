@@ -104,12 +104,22 @@ export type RoomInfo = {
   id: number; name: string; tipo: TipoDeSala; participants: RoomParticipant[];
   /** 'notas' na sala de novidades, que é do app: não se renomeia, apaga nem move. */
   papel?: string | null;
+  /**
+   * Sala privada: só alguns cargos a enxergam. Se ela chegou até aqui, é porque você é
+   * um deles — quem não pode simplesmente não a recebe.
+   */
+  privada?: boolean;
+  /** Os cargos que a veem. Só vem preenchido no painel de quem administra. */
+  cargos?: number[];
   /** Quantas mensagens chegaram depois da última que eu li. Sala de voz é sempre 0. */
   naoLidas: number;
   /** A gaveta em que a sala está, ou null quando está solta no topo. */
   categoriaId: number | null;
 };
-export type Sala = { id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null; papel?: string | null };
+export type Sala = {
+  id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null;
+  papel?: string | null; privada?: boolean; cargos?: number[];
+};
 /** A gaveta onde as salas ficam guardadas. Não guarda conversa: só agrupa. */
 export type Categoria = { id: number; nome: string; ordem: number };
 
@@ -265,6 +275,16 @@ export const criarSala = (nome: string, tipo: TipoDeSala) =>
 
 export const renomearSala = (id: number, nome: string) =>
   pedir<{ sala: Sala }>('POST', '/salas/renomear', { id, nome });
+
+/**
+ * Muda nome, privacidade e quem vê numa decisão só.
+ *
+ * `cargos` é a lista INTEIRA, não um acréscimo: é o estado da tela, e tirar um cargo é
+ * mandar a lista sem ele. Servidor antigo não conhece esta rota e responde 404 — quem
+ * chama mostra o erro, porque aqui a pessoa está esperando uma mudança acontecer.
+ */
+export const editarSala = (id: number, o: { nome?: string; privada?: boolean; cargos?: number[] }) =>
+  pedir<{ sala: Sala }>('POST', '/salas/editar', { id, ...o });
 
 export const apagarSala = (id: number) => pedir<{ ok: true }>('POST', '/salas/apagar', { id });
 

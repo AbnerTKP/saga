@@ -13,13 +13,15 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
   podeGerirSalas: boolean;
   onReordenar: (salas: { id: number; categoriaId: number | null }[]) => void;
   onMenuDeSalas: (em: { x: number; y: number }, categoria: Categoria | null) => void;
+  /** Botão direito EM CIMA de uma sala: as opções daquela sala, não as de criar. */
+  onMenuDaSala: (sala: RoomInfo, em: { x: number; y: number }) => void;
   onAbrir: (sala: RoomInfo) => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
@@ -151,10 +153,20 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
                   <button
                     className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
                     onClick={() => onAbrir(r)}
+                    /* Sem parar aqui, o clique sobe até a lista e abre o menu DELA — o de
+                       criar sala. Quem aponta para uma sala quer mexer naquela sala. */
+                    onContextMenu={(e) => {
+                      if (!podeGerirSalas) return;
+                      e.preventDefault(); e.stopPropagation();
+                      onMenuDaSala(r, { x: e.clientX, y: e.clientY });
+                    }}
                     disabled={rm.status === 'connecting'}
                   >
                     {/* A sala de notas é do app, e o ícone diz isso antes de qualquer texto. */}
                     <Icon name={r.papel === 'notas' ? 'berserk' : r.tipo === 'texto' ? 'texto' : 'speaker'} /> <span>{r.name}</span>
+                    {/* Se a sala chegou até aqui, você é um dos que a veem: o cadeado não
+                        avisa que ela é proibida, avisa que ela não é de todo mundo. */}
+                    {r.privada && <span className="tranca" title="Só alguns cargos veem esta sala"><Icon name="cadeado" size={13} /></span>}
                     {/* Sem isto a sala de texto só era vista por quem lembrava de abrir. */}
                     {r.naoLidas > 0 && (
                       <span className="nao-lidas" title={`${r.naoLidas} ${r.naoLidas === 1 ? 'mensagem nova' : 'mensagens novas'}`}>

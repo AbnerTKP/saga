@@ -2,7 +2,7 @@
 // sala, porque não havia banco — quem chegasse depois não via nada, e um link mandado
 // virava pó quando a sala esvaziava.
 import { ErroDeConta } from './contas.mjs';
-import { buscarSala } from './salas.mjs';
+import { salaVisivel } from './salas.mjs';
 import { ler as lerEnquadramento } from './enquadramento.mjs';
 import * as tabela from './repositorios/mensagens.mjs';
 
@@ -13,8 +13,10 @@ const TAMANHO_MAXIMO = 2000;
 export const QUANTAS = 100;
 
 /** Da mais antiga para a mais nova, que é a ordem em que se lê. */
-export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
-  const sala = buscarSala(db, servidorId, salaId);
+export function listarMensagens(db, servidorId, quem, salaId, { depoisDe } = {}) {
+  // Sala que a pessoa não vê responde igual a sala que não existe: um 403 numa sala
+  // privada ensina que ela existe, que é justamente o que privada evita.
+  const sala = salaVisivel(db, servidorId, quem, salaId);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
 
   // Com "depoisDe", a tela pede só o que chegou desde a última vez.
@@ -43,7 +45,7 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
 
 /** `imagem` é o nome do arquivo já guardado — um GIF do Giphy, por exemplo. */
 export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = null, arquivo = null) {
-  const sala = buscarSala(db, servidorId, salaId);
+  const sala = salaVisivel(db, servidorId, quem, salaId);
   if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
 
   const limpo = String(texto ?? '').trim();
@@ -58,7 +60,7 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
     salaId: sala.id, usuarioId: quem.id, texto: limpo, imagem, arquivo, criadoEm: Date.now(),
   });
 
-  const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: id - 1 });
+  const [nova] = listarMensagens(db, servidorId, quem, sala.id, { depoisDe: id - 1 });
   return nova;
 }
 

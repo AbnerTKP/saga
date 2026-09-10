@@ -4,6 +4,7 @@ import { useFecharComEsc } from '../useFechar';
 
 export type AcaoDeSala =
   | { tipo: 'criar'; sala: 'voz' | 'texto' }
+  | { tipo: 'renomearSala'; id: number; nome: string }
   | { tipo: 'categoria' }
   | { tipo: 'renomearCategoria'; id: number; nome: string }
   | { tipo: 'apagarCategoria'; id: number; nome: string };

@@ -691,6 +691,106 @@ test('apagar sala leva as mensagens junto', async () => {
   assert.equal(r.status, 404, 'a sala apagada ainda respondia');
 });
 
+// --- sala privada ---------------------------------------------------------------
+
+test('sala privada some da lista de quem não pode, e continua para quem pode', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const alto = cargos.reduce((a, b) => (a.nivel >= b.nivel ? a : b));
+
+  const sala = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Reservada', tipo: 'texto' } })).corpo.sala;
+  const r = await chamar('POST', '/salas/editar', {
+    sessao: dono.token, corpo: { id: sala.id, privada: true, cargos: [alto.id] },
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.equal(r.corpo.sala.privada, true);
+  assert.deepEqual(r.corpo.sala.cargos, [alto.id]);
+
+  const doDono = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  assert.ok(doDono.some((s) => s.id === sala.id), 'quem criou o servidor devia ver');
+
+  const doBruno = (await chamar('GET', '/rooms', { sessao: bruno.token })).corpo.rooms;
+  assert.ok(!doBruno.some((s) => s.id === sala.id), 'a sala privada VAZOU na lista');
+  const salasDele = (await chamar('GET', '/eu', { sessao: bruno.token })).corpo.salas;
+  assert.ok(!salasDele.some((s) => s.id === sala.id), 'vazou no /eu');
+});
+
+test('sem poder ver, o chat da sala privada responde como sala inexistente', async () => {
+  // 403 numa sala que não se vê ensina que ela existe — que é o que privada evita.
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const sala = salas.find((s) => s.name === 'Reservada');
+
+  const lendo = await chamar('GET', `/mensagens?sala=${sala.id}`, { sessao: bruno.token });
+  assert.equal(lendo.status, 404);
+  assert.match(lendo.corpo.error, /não existe/);
+
+  const escrevendo = await chamar('POST', '/mensagens', { sessao: bruno.token, corpo: { sala: sala.id, texto: 'oi' } });
+  assert.equal(escrevendo.status, 404);
+
+  const digitando = await chamar('POST', '/digitando', { sessao: bruno.token, corpo: { sala: sala.id } });
+  assert.equal(digitando.status, 400, 'nem o aviso de digitando pode confirmar que a sala existe');
+
+  // E o dono lê e escreve normalmente.
+  assert.equal((await chamar('POST', '/mensagens', { sessao: dono.token, corpo: { sala: sala.id, texto: 'só nós' } })).status, 200);
+  assert.equal((await chamar('GET', `/mensagens?sala=${sala.id}`, { sessao: dono.token })).corpo.mensagens.at(-1).texto, 'só nós');
+});
+
+test('a voz de uma sala privada não emite passe para quem não a vê', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const voz = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Bunker', tipo: 'voz' } })).corpo.sala;
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const alto = cargos.reduce((a, b) => (a.nivel >= b.nivel ? a : b));
+  await chamar('POST', '/salas/editar', { sessao: dono.token, corpo: { id: voz.id, privada: true, cargos: [alto.id] } });
+
+  const dele = await chamar('POST', '/token', { sessao: bruno.token, corpo: { sala: voz.id } });
+  assert.equal(dele.status, 400, 'saiu passe de voz para sala que ele não vê');
+  assert.equal((await chamar('POST', '/token', { sessao: dono.token, corpo: { sala: voz.id } })).status, 200);
+});
+
+test('quem não vê a sala privada ainda consegue arrastar as que vê', async () => {
+  // A ordem exige "todas as salas, uma vez cada" — e a tela de quem não vê a privada
+  // manda a lista sem ela. Exigir a lista inteira tornaria a barra inarrastável.
+  const bruno = await sessaoDe('bruno');
+  const minhas = (await chamar('GET', '/rooms', { sessao: bruno.token })).corpo.rooms.filter((s) => !s.papel);
+  const r = await chamar('POST', '/salas/ordem', {
+    sessao: bruno.token,
+    corpo: { salas: minhas.reverse().map((s) => ({ id: s.id, categoriaId: s.categoriaId })) },
+  });
+  // Bruno é membro comum: recusa por PERMISSÃO, não por contagem de salas.
+  assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /cargo/);
+});
+
+test('dar acesso a um cargo faz a sala aparecer para quem o veste', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const sala = salas.find((s) => s.name === 'Reservada');
+  const meu = (await chamar('GET', '/eu', { sessao: bruno.token })).corpo.eu;
+
+  await chamar('POST', '/salas/editar', { sessao: dono.token, corpo: { id: sala.id, cargos: [meu.cargo.id] } });
+  const agora = (await chamar('GET', '/rooms', { sessao: bruno.token })).corpo.rooms;
+  assert.ok(agora.some((s) => s.id === sala.id), 'o cargo ganhou acesso e a sala não apareceu');
+
+  // E voltando a ser pública, todo mundo vê de novo.
+  await chamar('POST', '/salas/editar', { sessao: dono.token, corpo: { id: sala.id, privada: false, cargos: [] } });
+  const publica = (await chamar('GET', '/rooms', { sessao: bruno.token })).corpo.rooms;
+  assert.ok(publica.some((s) => s.id === sala.id));
+});
+
+test('membro comum não edita sala nenhuma', async () => {
+  const bruno = await sessaoDe('bruno');
+  const salas = (await chamar('GET', '/rooms', { sessao: bruno.token })).corpo.rooms;
+  const r = await chamar('POST', '/salas/editar', {
+    sessao: bruno.token, corpo: { id: salas[1].id, privada: true, cargos: [] },
+  });
+  assert.equal(r.status, 403);
+});
+
 // --- cargos configuráveis -----------------------------------------------------
 
 test('o servidor traz os cargos e a lista de permissões que existem', async () => {

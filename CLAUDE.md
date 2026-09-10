@@ -286,6 +286,24 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **A conta de arrastar mora em `ordenacao.ts`, longe da tela.** É onde esse tipo de código
   erra: tirar da posição velha desloca a nova, e aparar o índice antes de descontar a
   própria sala fazia "soltar no fim" parar em penúltimo — o teste pegou.
+- **Sala privada quer dizer INVISÍVEL, e quem vê é decidido por CARGO.** Uma sala que
+  aparece na lista e recusa a entrada é um convite a perguntar "por que eu não entro aí?"
+  — e o assunto que fez alguém criar a sala é justamente o que não se quer anunciar. Por
+  isso ela some inteira para quem não pode: da barra, do `/eu`, do chat, do passe de voz e
+  até do aviso de "está digitando", que de outro modo confirmaria que ela existe. **Sala
+  que você não vê responde igual a sala que não existe** (404, "essa sala não existe"): um
+  403 ensinaria que ela está lá. Por cargo e não por pessoa porque é assim que o resto do
+  servidor pensa — cargo novo, quem muda de cargo e quem chega herdam o acesso sem ninguém
+  refazer lista. **Quem criou o servidor vê todas**, e isso não é privilégio: é a saída
+  para a sala que ficou sem cargo nenhum por engano, que de outro modo ninguém consertaria.
+  A regra é pura e testada (`visibilidade.mjs`), e `api.test.mjs` tranca cada porta uma
+  por uma — foi assim que apareceram as duas que eu tinha esquecido: a moderação, que
+  precisa achar quem está numa sala privada para poder desconectá-lo, e a reordenação, que
+  exigia "todas as salas" e travava a barra de quem não vê uma delas.
+- **Botão direito EM CIMA de uma sala é sobre AQUELA sala.** O clique subia para a lista e
+  abria o menu dela — o de CRIAR sala: apontar para uma coisa e receber as opções de outra.
+  Hoje o menu da sala traz renomear, "quem pode ver" e apagar; o da lista continua sendo
+  o de criar, e o da categoria, o dela. A sala de notas é da Saga e por isso ali só se lê.
 - **Categoria é gaveta, não dono da conversa.** Apagá-la devolve as salas para o topo em
   vez de levá-las junto; perder conversa é outra decisão, com outra pergunta. As salas sem
   gaveta vêm primeiro na lista, porque são as que ninguém guardou ainda.
@@ -568,7 +586,10 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   torta dentro. A regra do quadradinho agora vive presa à grade (`.grade-gifs .gif`), e o
   botão chama-se `rotulo-gif`. A varredura do resto do CSS não achou outra colisão: o que
   aparece em vários componentes (`.menu-pessoa`, `.selo-berserk`) é compartilhado de
-  propósito.
+  propósito. A mesma família tem outra forma, por ESPECIFICIDADE e não por nome: `.form
+  label` é grid, versalete e negrito — o rótulo de um campo — e vencia `.check`, deixando
+  as caixinhas de marcar empilhadas ACIMA dos nomes, tudo em maiúsculas. Quem escreve uma
+  regra larga para "todo label do formulário" precisa deixar a exceção escrita junto.
 - **Contêiner de canto não recebe clique — só os cartões dentro dele.** A pilha de avisos
   é larga e quase toda vazia, e fica por cima do quadro flutuante da live: sem
   `pointer-events: none` no contêiner e `auto` nos cartões, o vão entre um aviso e outro
@@ -1066,7 +1087,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (257) + app (165), segundos, sem nada externo
+pnpm test        # servidor (267) + app (165), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

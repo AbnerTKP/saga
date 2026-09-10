@@ -168,11 +168,16 @@ const verServidor = (sid) => {
   return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null };
 };
 
-const salasDoServidor = (sid) => salasM.listarSalas(db, sid);
+/**
+ * As salas que ESTA pessoa vê. Sala privada é invisível para quem não pode — por isso
+ * toda lista que vai para a tela passa por aqui, e nunca por `listarSalas`, que é a lista
+ * crua de quem administra.
+ */
+const salasDoServidor = (sid, quem) => salasM.salasDe(db, sid, quem);
 /** Mandou: some da lista de quem está escrevendo, sem esperar o aviso vencer. */
 const pararDeDigitar = (sid, usuarioId, sala) =>
   digitando.parou(salasM.buscarSala(db, sid, sala)?.id, usuarioId);
-const salasDeVoz = (sid) => salasDoServidor(sid).filter((s) => s.tipo === 'voz');
+const salasDeVoz = (sid, quem) => salasDoServidor(sid, quem).filter((s) => s.tipo === 'voz');
 
 /**
  * A pessoa vista sem servidor nenhum: só a conta.
@@ -256,7 +261,7 @@ function sessaoCompleta(usuario, token) {
     eu: verMembro(membros.buscarMembro(db, sid, usuario.id)),
     servidor: verServidor(sid),
     servidores: meus,
-    salas: salasDoServidor(sid),
+    salas: salasDoServidor(sid, membros.buscarMembro(db, sid, usuario.id)),
     categorias: categoriasM.listarCategorias(db, sid),
   };
 }
@@ -368,7 +373,10 @@ async function tirarDaSala(sid, usuarioId) {
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
 async function ondeEsta(sid, usuarioId) {
   const alvo = identidadeDe(usuarioId);
-  for (const sala of salasDeVoz(sid)) {
+  // TODAS as salas de voz, inclusive as privadas que quem modera não enxerga: expulsar,
+  // mutar e desconectar precisam achar a pessoa onde ela estiver. Aqui não se está
+  // mostrando sala nenhuma a ninguém — se está procurando alguém.
+  for (const sala of salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz')) {
     const nome = salaNoLiveKit(sala);
     const ps = await svc.listParticipants(nome).catch(() => []);
     const p = ps.find((x) => x.identity === alvo);
@@ -478,7 +486,7 @@ const ROTAS = {
       // A lista vai junto porque a barra de servidores se desenha com ela, e este é o
       // pedido que o app faz ao abrir e a cada troca de servidor.
       servidores: meus,
-      salas: salasDoServidor(sid),
+      salas: salasDoServidor(sid, eu),
       impedimento: membros.impedimento(eu),
     };
   },
@@ -493,7 +501,7 @@ const ROTAS = {
     const { sid } = exigirMembro(req);
     return {
       servidor: verServidor(sid),
-      salas: salasDoServidor(sid),
+      salas: salasM.listarSalas(db, sid).map((s) => salasM.verSala(db, sid, s.id)),
       membros: membros.listarMembros(db, sid).map(verMembro),
       cargos: cargosM.listarCargos(db, sid),
       servidores: servidoresM.meusServidores(db, exigirConta(req).id),
@@ -523,11 +531,18 @@ const ROTAS = {
     // em fila. E o que sobra — a gente de cada sala ocupada — vai em paralelo, porque uma
     // não depende da outra.
     const vivas = await salasVivas();
-    const salas = await Promise.all(salasDoServidor(sid).map(async (s) => ({
+    const acessos = salasM.acessosDoServidor(db, sid);
+    const salas = await Promise.all(salasDoServidor(sid, eu).map(async (s) => ({
       id: s.id,
       name: s.nome,
       tipo: s.tipo,
       papel: s.papel ?? null,
+      categoriaId: s.categoriaId ?? null,
+      privada: !!s.privada,
+      // Quais cargos veem, só nas privadas: quem recebeu a sala é alguém que já a vê, e
+      // é isso que faz a tela de "quem pode ver" abrir com o que está valendo em vez de
+      // com a lista vazia — que, salva sem querer, trancaria a sala para todo mundo.
+      ...(s.privada ? { cargos: acessos.get(s.id) ?? [] } : {}),
       // Sala de texto não tem gente "dentro": ninguém entra nela, se lê e se escreve.
       participants: s.tipo === 'voz' ? await participantesDaSala(sid, s, vivas) : [],
       naoLidas: s.tipo === 'texto'
@@ -549,6 +564,18 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const { id, nome } = await lerCorpo(req);
     return { sala: salasM.renomearSala(db, sid, eu, id, nome) };
+  },
+
+  /**
+   * Edita a sala: nome, privacidade e quem vê, numa decisão só.
+   *
+   * `renomear` continua existindo porque o app antigo a chama — app e servidor sobem
+   * separados, e tirar uma rota que a versão de ontem usa quebra quem ainda não atualizou.
+   */
+  'POST /salas/editar': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const c = await lerCorpo(req);
+    return { sala: salasM.editarSala(db, sid, eu, c) };
   },
 
   'POST /salas/apagar': async (req) => {
@@ -612,7 +639,7 @@ const ROTAS = {
     const depoisDe = q.get('depoisDe');
     const sala = salasM.buscarSala(db, sid, q.get('sala'));
     return {
-      mensagens: mensagens.listarMensagens(db, sid, q.get('sala'), {
+      mensagens: mensagens.listarMensagens(db, sid, eu, q.get('sala'), {
         depoisDe: depoisDe ? Number(depoisDe) : undefined,
       }),
       // Quem está escrevendo vai de carona na busca que já acontece de 2 em 2 segundos.
@@ -629,7 +656,7 @@ const ROTAS = {
   'POST /digitando': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const { sala } = await lerCorpo(req);
-    const daqui = salasM.buscarSala(db, sid, sala);
+    const daqui = salasM.salaVisivel(db, sid, eu, sala);
     if (!daqui || daqui.tipo !== 'texto') throw new ErroDeConta('Essa sala não existe, ou é de voz.', 400);
     // Quem está de castigo não vai conseguir mandar: anunciar que está escrevendo
     // prometeria uma mensagem que não vem.
@@ -705,7 +732,7 @@ const ROTAS = {
     if (barrado) throw new ErroDeConta(barrado, 403);
     const { room, sala: salaId } = await lerCorpo(req);
     // Aceita o id (novo) ou o nome (como o app antigo pedia).
-    const sala = salasDeVoz(sid).find((s) => (salaId ? s.id === Number(salaId) : s.nome === room));
+    const sala = salasDeVoz(sid, eu).find((s) => (salaId ? s.id === Number(salaId) : s.nome === room));
     if (!sala) throw new ErroDeConta('Essa sala não existe, ou é de texto.', 400);
 
     const nome = salaNoLiveKit(sala);
@@ -973,7 +1000,7 @@ servidor.headersTimeout = 65_000;
 servidor.listen(PORT, () => {
   console.log(
     `Saga em http://0.0.0.0:${PORT} — ${tabelaDeServidores.quantos(db)} servidor(es), `
-    + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
+    + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasM.listarSalas(db, SERVIDOR.id).length} salas`,
   );
   // Dito em voz alta de propósito: as fotos já sumiram uma vez indo parar dentro do
   // contêiner, e o silêncio foi metade do problema. "0 arquivos" depois de um deploy é

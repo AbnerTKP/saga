@@ -26,6 +26,9 @@ const paths: Record<string, string> = {
   // Olho: quem está ASSISTINDO. O mesmo desenho que todo mundo usa para "ver" — aqui não
   // é hora de inventar símbolo, ele aparece a 13 px ao lado de um nome.
   olho: 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z',
+  // Cadeado fechado: a sala que só alguns cargos veem. Pequeno e cheio, porque vive a
+  // 13 px no fim da linha da sala.
+  cadeado: 'M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v3H9V7a3 3 0 0 1 3-3zm0 11a1.5 1.5 0 0 1 .5 2.9V19h-1v-1.1A1.5 1.5 0 0 1 12 15z',
   // Seta para baixo sobre uma linha: SALVAR no disco. O anexo do chat não abre — ele vai
   // para onde a pessoa escolher, pelo diálogo do sistema.
   baixar: 'M11 3h2v9.2l3.6-3.6L18 10l-6 6-6-6 1.4-1.4L11 12.2V3zM5 19h14v2H5z',
