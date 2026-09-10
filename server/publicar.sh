@@ -25,7 +25,10 @@ echo "=== 2. O que vai subir ==="
 # 07/09/2026: mandei o `livekit.yaml` do repositório junto do compose. Ele é MODELO, com
 # chave `APIxxxxxxxx`, e sobrescreveu a configuração de produção. O LiveKit continuou de
 # pé com a antiga na memória e só recusou a chave HORAS depois, no primeiro reinício.
-ENVIAR=(*.mjs Dockerfile)
+# A pasta `repositorios/` entra inteira: `*.mjs` não pega subpasta, e foi assim que o
+# servidor subiu sem ela e ficou em loop de `ERR_MODULE_NOT_FOUND`. O que confere de
+# verdade é a lista de md5 dos dois lados, no passo 6.
+ENVIAR=(*.mjs Dockerfile .dockerignore repositorios)
 for f in "${ENVIAR[@]}"; do
   case "$f" in
     *.yaml|*.yml|.env|*.env) erro "$f NÃO pode subir: configuração de produção mora só na VPS"; ;;
@@ -98,12 +101,22 @@ echo "=== 6. Publicando ==="
 # piscou) e AINDA ASSIM saiu com status 0. O contêiner nunca foi reconstruído, e o script
 # terminou como se tivesse publicado. Mandar não é ter chegado: quem responde isso é o
 # md5 dos dois lados, não o código de saída do scp.
-scp -q "${ENVIAR[@]}" "$VPS:$REMOTO/" || erro "o scp falhou"
+scp -qr "${ENVIAR[@]}" "$VPS:$REMOTO/" || erro "o scp falhou"
 
 # Mandar não é ter chegado. As duas listas são "md5 nome", uma de cada lado, e comparar
 # texto evita depender de md5 (macOS) e md5sum (Linux) escreverem igual.
-AQUI=$(for f in "${ENVIAR[@]}"; do printf '%s %s\n' "$(md5 -q "$f")" "$f"; done | sort)
-LA=$(ssh -o ConnectTimeout=20 "$VPS" "cd $REMOTO && for f in ${ENVIAR[*]}; do printf '%s %s\n' \"\$(md5sum \$f | cut -d' ' -f1)\" \"\$f\"; done | sort")
+# `find` e não a lista crua: com uma PASTA em `ENVIAR`, comparar só o nome dela não diria
+# nada sobre o que tem dentro — que é exatamente o que faltou chegar da última vez. As
+# duas listas saem no MESMO formato ("md5 caminho"), montadas do mesmo jeito nos dois
+# lados: `md5 -q` no macOS e `md5sum` no Linux escrevem diferente, e comparar a saída crua
+# de cada um recusa transferência boa (recusou uma, com a produção fora do ar).
+lista_daqui() {
+  find "${ENVIAR[@]}" -type f ! -name '*.test.mjs' | sort | while read -r f; do
+    printf '%s %s\n' "$(md5 -q "$f")" "$f"
+  done
+}
+AQUI=$(lista_daqui)
+LA=$(ssh -o ConnectTimeout=20 "$VPS" "cd $REMOTO && find ${ENVIAR[*]} -type f ! -name '*.test.mjs' 2>/dev/null | sort | while read -r f; do printf '%s %s\n' \"\$(md5sum \"\$f\" | cut -d' ' -f1)\" \"\$f\"; done")
 if [ "$AQUI" = "$LA" ]; then
   ok "o que chegou é o que saiu ($(printf '%s\n' "${ENVIAR[@]}" | wc -l | tr -d ' ') arquivos)"
 else

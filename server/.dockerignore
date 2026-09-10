@@ -1,0 +1,16 @@
+# O que NÃO entra na imagem. O Dockerfile leva o resto — o contrário (listar o que entra)
+# já derrubou o servidor três vezes, sempre porque alguém criou um arquivo ou uma pasta
+# nova e a lista não sabia dela.
+node_modules
+dados
+dados-dev
+*.test.mjs
+*.log
+# A configuração de produção mora só na VPS: o daqui é modelo, e um deles já sobrescreveu
+# a de verdade uma vez.
+livekit*.yaml
+docker-compose*.yml
+.env*
+publicar.sh
+instalar.sh
+Caddyfile.template

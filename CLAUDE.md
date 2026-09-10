@@ -119,8 +119,24 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Migrações são registradas pela posição na lista.** Nunca editar, remover ou inserir no
   meio — só acrescentar no fim. Inserir no meio já derrubou a produção; `banco.test.mjs`
   trava a ordem por impressão digital.
-- **O `Dockerfile` copia `*.mjs` e descarta os testes.** Listar arquivo por arquivo já
-  derrubou o servidor duas vezes. **O `test` do app tinha o mesmo defeito** e por isso
+- **O `Dockerfile` leva TUDO e o `.dockerignore` diz o que fica; `*.mjs` não pega
+  subpasta.** Listar arquivo por arquivo já derrubou o servidor duas vezes; o glob
+  consertou aquilo e derrubou uma TERCEIRA, do jeito novo: nasceu a pasta `repositorios/`,
+  os 257 testes passaram aqui, o `scp` mandou 37 arquivos, o md5 dos dois lados bateu — e
+  o contêiner subiu sem a pasta, em loop de `ERR_MODULE_NOT_FOUND`, com a produção fora do
+  ar por sete minutos. Tudo conferia porque tudo conferia a MESMA lista incompleta:
+  `*.mjs` no `Dockerfile`, `*.mjs` no `publicar.sh`, `*.mjs` na conferência. Hoje o
+  `Dockerfile` é `COPY . ./` com `.dockerignore`, e a conferência do `publicar.sh` compara
+  `find` de verdade, arquivo a arquivo, dentro das pastas. **A lição é a inversão:**
+  enquanto o padrão for "levar o que está na lista", a lista vai esquecer o que nasceu
+  depois — e vai esquecer em silêncio, porque quem escreve a lista é quem esqueceu.
+  Levando tudo, o que fica de fora está escrito num lugar só e é visível.
+- **Uma conferência que compara duas coisas montadas de jeitos diferentes não confere
+  nada.** A primeira versão do "chegou o que saiu" usava `md5 -q` aqui e `md5sum` lá, cada
+  um com o seu formato: a comparação nunca dava igual. Ela recusou uma transferência boa
+  com a produção fora do ar — verificação errada custa duas vezes, uma por não pegar o que
+  devia e outra por barrar o que estava certo. As duas listas se montam agora do mesmo
+  jeito, `"md5 caminho"`, nos dois lados. **O `test` do app tinha o mesmo defeito** e por isso
   também virou glob: ele listava os treze arquivos à mão, então um teste novo simplesmente
   não rodava — e não rodar não dá erro nenhum. Ficaram cinco testes escritos, verdes na
   minha mão e ausentes do `pnpm test` e do CI. **O do servidor tinha o mesmo defeito**, e
