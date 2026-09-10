@@ -935,7 +935,17 @@ plataforma.garantirDonoDaSaga(db, DONO);
  * daria um jeito novo de a coisa parar sem ninguém perceber. Falhar aqui não é motivo
  * para nada: na próxima volta tenta de novo.
  */
-const DE_QUANTO_EM_QUANTO = 60 * 60_000;
+/**
+ * De hora em hora era tarde demais na única hora que importa.
+ *
+ * O servidor sobe ANTES de o Release existir — é essa a ordem certa, senão o app novo
+ * chega antes do servidor que o atende. Só que a busca de notas acontece no arranque, e
+ * no arranque ainda não há release nenhum: a nota da versão que acabou de sair só caía na
+ * sala na volta seguinte, até uma hora depois. Aconteceu com a v0.41.0, e o dono teve de
+ * cobrar. Dez minutos são seis idas ao GitHub por hora — a cota é de sessenta — e limitam
+ * o atraso a dez minutos sem ninguém precisar lembrar de nada.
+ */
+const DE_QUANTO_EM_QUANTO = 10 * 60_000;
 
 // A sala existe sempre, mesmo sem internet: ela faz parte do formato do servidor, e o
 // teste não pode depender de o GitHub estar de pé para ela aparecer.
