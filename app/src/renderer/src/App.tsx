@@ -370,7 +370,7 @@ export function App() {
    * Sai da busca de salas, e não do LiveKit desta máquina: lendo uma sala de texto você
    * pode nem estar na call, e é justamente aí que não havia como saber. Ver lives.ts.
    */
-  const lives = livesNasSalas(rooms, sessao?.eu ? `u${sessao.eu.id}` : null);
+  const lives = livesNasSalas(rooms, sessao?.eu ? identidadeDe(sessao.eu.id) : null);
 
   const assistirLive = useCallback(async (live: LiveNoChat) => {
     const sala = rooms.find((s) => s.id === live.salaId);

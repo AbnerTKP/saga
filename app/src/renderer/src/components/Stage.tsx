@@ -9,6 +9,7 @@ import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
 import type { Digitando, Mensagem, RoomInfo } from '../api';
 import type { LiveNoChat } from '../lives';
+import { identidadeDe } from '../pessoas';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { Espectador } from '../espectadores';
 import { anotar } from '../registro';
@@ -283,7 +284,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
-            onPessoa={(id, nome, em, tipo) => onPessoa(`u${id}`, nome, em, tipo)}
+            onPessoa={(id, nome, em, tipo) => onPessoa(identidadeDe(id), nome, em, tipo)}
             lives={lives}
             assistindo={rm.assistindo}
             onAssistir={onAssistirLive}
