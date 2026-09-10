@@ -35,6 +35,7 @@ import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
 import { acharPessoa, identidadeDe } from './pessoas';
+import { oQueFazerAoClicar } from './navegacao';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -235,12 +236,18 @@ export function App() {
     });
   }, [rm, sessao?.servidor?.id, sessao?.servidor?.nome]);
 
+  /**
+   * Clicar numa sala. Entrar na voz e trocar o que está na tela são duas coisas, e nem
+   * todo clique quer as duas — quem está lendo uma conversa e entra noutra call continua
+   * lendo. A regra mora em `navegacao.ts`, pura e testada.
+   */
   const abrirSala = useCallback(async (sala: RoomInfo) => {
-    setSalaAbertaId(sala.id);
-    // Sala de texto não tem voz: abrir é só passar a ler e escrever nela.
-    if (sala.tipo !== 'voz') return;
+    const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
+    const { abrir, entrar } = oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null);
+    if (abrir) setSalaAbertaId(sala.id);
+    if (!entrar) return;
     try { await entrarNaVoz(sala); } catch (e) { rm.setError((e as Error).message); }
-  }, [rm, entrarNaVoz]);
+  }, [rm, entrarNaVoz, rooms, salaAbertaId]);
 
   const logout = useCallback(async () => {
     await rm.leave();

@@ -651,6 +651,16 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   versão: nota é um fato com data própria, mensagem é uma coisa que aconteceu no seu dia.
   E `agora` entra por parâmetro em vez de sair de `Date.now()` lá dentro, senão "Hoje"
   congelaria numa janela aberta desde ontem.
+- **Entrar numa call não troca o que você está lendo.** É "olhar não é sair" visto do
+  outro lado. Clicar numa sala fazia sempre as duas coisas — entrar na voz E trocar a
+  tela —, e isso passou a estar errado no dia em que o app deixou de precisar escolher:
+  dá para estar na voz de uma sala com os olhos numa conversa, com a faixa da call no
+  alto e a live no quadro flutuante. Nesse mundo, trocar de call arrastava a pessoa para
+  fora da conversa que ela estava lendo, no meio de uma frase. Hoje: lendo uma conversa,
+  entrar numa call só entra; olhando o palco, trocar de call troca o palco; e clicar na
+  sala de voz em que você JÁ está abre o palco — antes era um clique morto, porque não
+  havia o que entrar. A regra é pura e testada (`navegacao.ts`), e quem quiser ir ao
+  palco de propósito tem o "Abrir palco" na faixa.
 - **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
