@@ -7,6 +7,7 @@
 // Quem decide "ausente" é o app de quem está ausente, não o servidor: só ele sabe se a
 // pessoa largou a máquina. O servidor guarda o que recebe e cronometra o silêncio.
 import { ErroDeConta } from './contas.mjs';
+import * as usuarios from './repositorios/usuarios.mjs';
 
 export const STATUS = ['online', 'ausente', 'ocupado'];
 
@@ -35,13 +36,13 @@ export function bater(db, usuarioId, status) {
     throw new ErroDeConta('Status desconhecido.');
   }
   const agora = Date.now();
-  if (status === undefined) db.prepare('UPDATE usuarios SET visto_em = ? WHERE id = ?').run(agora, usuarioId);
-  else db.prepare('UPDATE usuarios SET status = ?, visto_em = ? WHERE id = ?').run(status, agora, usuarioId);
-  const u = db.prepare('SELECT status, visto_em FROM usuarios WHERE id = ?').get(usuarioId);
+  if (status === undefined) usuarios.anotarSinal(db, usuarioId, agora);
+  else usuarios.anotarStatus(db, usuarioId, status, agora);
+  const u = usuarios.lerPresenca(db, usuarioId);
   return statusDeVerdade(u?.status, u?.visto_em, agora);
 }
 
 /** Marca que a pessoa saiu — fechar o app não pode deixá-la online até o silêncio vencer. */
 export function saiu(db, usuarioId) {
-  db.prepare('UPDATE usuarios SET visto_em = NULL WHERE id = ?').run(usuarioId);
+  usuarios.apagarSinal(db, usuarioId);
 }

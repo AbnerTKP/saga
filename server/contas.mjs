@@ -3,6 +3,8 @@
 // A identidade é o apelido — escolhido uma vez e fixo. A coluna de e-mail existe no banco
 // mas ainda não é pedida a ninguém: fica reservada para quando fizer sentido atrelar.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
+import * as usuarios from './repositorios/usuarios.mjs';
+import * as sessoes from './repositorios/sessoes.mjs';
 
 export class ErroDeConta extends Error {
   /**
@@ -60,15 +62,15 @@ export function criarConta(db, { apelido, senha, senhaRepetida }) {
   }
 
   const chave = chaveDoApelido(nome);
-  if (db.prepare('SELECT 1 FROM usuarios WHERE apelido_chave = ?').get(chave)) {
+  if (usuarios.apelidoExiste(db, chave)) {
     throw new ErroDeConta('Esse apelido já está em uso.', 409);
   }
 
-  const info = db.prepare(
-    'INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES (?, ?, ?, ?)',
-  ).run(nome, chave, hashDaSenha(senha), Date.now());
+  const id = usuarios.inserir(db, {
+    apelido: nome, chave, senhaHash: hashDaSenha(senha), criadoEm: Date.now(),
+  });
 
-  return buscarPorId(db, Number(info.lastInsertRowid));
+  return buscarPorId(db, id);
 }
 
 /**
@@ -85,17 +87,15 @@ export function trocarSenha(db, usuarioId, senha) {
   if (String(senha ?? '').length < SENHA_MINIMA) {
     throw new ErroDeConta(`A senha precisa ter pelo menos ${SENHA_MINIMA} caracteres.`);
   }
-  const info = db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?')
-    .run(hashDaSenha(senha), Number(usuarioId));
-  if (info.changes === 0) throw new ErroDeConta('Essa conta não existe.', 404);
+  const mudou = usuarios.trocarSenha(db, usuarioId, hashDaSenha(senha));
+  if (mudou === 0) throw new ErroDeConta('Essa conta não existe.', 404);
   return buscarPorId(db, Number(usuarioId));
 }
 
-export const buscarPorId = (db, id) =>
-  db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id) ?? null;
+export const buscarPorId = (db, id) => usuarios.buscarPorId(db, id);
 
 export const buscarPorApelido = (db, apelido) =>
-  db.prepare('SELECT * FROM usuarios WHERE apelido_chave = ?').get(chaveDoApelido(String(apelido ?? ''))) ?? null;
+  usuarios.buscarPorApelidoChave(db, chaveDoApelido(String(apelido ?? '')));
 
 // --- sessões ----------------------------------------------------------------
 
@@ -110,8 +110,7 @@ export function entrar(db, { apelido, senha }) {
   }
   const token = randomBytes(32).toString('base64url');
   const agora = Date.now();
-  db.prepare('INSERT INTO sessoes (token_hash, usuario_id, criada_em, vista_em) VALUES (?, ?, ?, ?)')
-    .run(hashDoToken(token), usuario.id, agora, agora);
+  sessoes.inserir(db, { tokenHash: hashDoToken(token), usuarioId: usuario.id, agora });
   return { usuario, token };
 }
 
@@ -134,12 +133,12 @@ const anotadas = new Map();
 export function usuarioDaSessao(db, token) {
   if (!token) return null;
   const hash = hashDoToken(token);
-  const sessao = db.prepare('SELECT usuario_id FROM sessoes WHERE token_hash = ?').get(hash);
+  const sessao = sessoes.usuarioDoToken(db, hash);
   if (!sessao) return null;
 
   const agora = Date.now();
   if (agora - (anotadas.get(hash) ?? 0) >= ANOTAR_A_CADA) {
-    db.prepare('UPDATE sessoes SET vista_em = ? WHERE token_hash = ?').run(agora, hash);
+    sessoes.anotarVista(db, hash, agora);
     anotadas.set(hash, agora);
     if (anotadas.size > 500) {
       for (const [k, t] of anotadas) if (agora - t >= ANOTAR_A_CADA) anotadas.delete(k);
@@ -151,9 +150,7 @@ export function usuarioDaSessao(db, token) {
 /** Só para os testes: o intervalo mora em memória e sobrevive entre um caso e outro. */
 export const esquecerAnotacoes = () => anotadas.clear();
 
-export const sair = (db, token) =>
-  db.prepare('DELETE FROM sessoes WHERE token_hash = ?').run(hashDoToken(token ?? ''));
+export const sair = (db, token) => sessoes.apagar(db, hashDoToken(token ?? ''));
 
 /** Expulsar e banir derrubam todas as sessões: a pessoa não continua dentro com o app aberto. */
-export const derrubarSessoes = (db, usuarioId) =>
-  db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(usuarioId);
+export const derrubarSessoes = (db, usuarioId) => sessoes.apagarDaConta(db, usuarioId);

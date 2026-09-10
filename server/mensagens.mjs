@@ -4,20 +4,13 @@
 import { ErroDeConta } from './contas.mjs';
 import { buscarSala } from './salas.mjs';
 import { ler as lerEnquadramento } from './enquadramento.mjs';
+import * as tabela from './repositorios/mensagens.mjs';
 
 const TAMANHO_MAXIMO = 2000;
 
 // Quanto a tela carrega de uma vez. Chat de cinco amigos não precisa de mais que isso, e
 // mandar tudo tornaria a abertura lenta com o tempo.
 export const QUANTAS = 100;
-
-const SELECT = `
-  SELECT m.id, m.texto, m.imagem, m.arquivo, m.arquivo_nome, m.arquivo_bytes, m.criado_em, m.usuario_id,
-         COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
-         u.foto, u.enquadramento, u.turbo, mem.id_exibido
-    FROM mensagens m
-    LEFT JOIN usuarios u   ON u.id = m.usuario_id
-    LEFT JOIN membros  mem ON mem.usuario_id = m.usuario_id AND mem.servidor_id = ?`;
 
 /** Da mais antiga para a mais nova, que é a ordem em que se lê. */
 export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
@@ -26,10 +19,8 @@ export function listarMensagens(db, servidorId, salaId, { depoisDe } = {}) {
 
   // Com "depoisDe", a tela pede só o que chegou desde a última vez.
   const linhas = depoisDe
-    ? db.prepare(`${SELECT} WHERE m.sala_id = ? AND m.id > ? ORDER BY m.id LIMIT ?`)
-        .all(servidorId, sala.id, Number(depoisDe), QUANTAS)
-    : db.prepare(`${SELECT} WHERE m.sala_id = ? ORDER BY m.id DESC LIMIT ?`)
-        .all(servidorId, sala.id, QUANTAS).reverse();
+    ? tabela.depoisDe(db, servidorId, sala.id, depoisDe, QUANTAS)
+    : tabela.ultimas(db, servidorId, sala.id, QUANTAS);
 
   return linhas.map((m) => ({
     id: m.id,
@@ -63,13 +54,11 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
     throw new ErroDeConta(`A mensagem passa de ${TAMANHO_MAXIMO} caracteres.`);
   }
 
-  const info = db.prepare(
-    `INSERT INTO mensagens (sala_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, criado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(sala.id, quem.id, limpo, imagem,
-        arquivo?.nomeNoDisco ?? null, arquivo?.nome ?? null, arquivo?.bytes ?? null, Date.now());
+  const id = tabela.inserir(db, {
+    salaId: sala.id, usuarioId: quem.id, texto: limpo, imagem, arquivo, criadoEm: Date.now(),
+  });
 
-  const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: Number(info.lastInsertRowid) - 1 });
+  const [nova] = listarMensagens(db, servidorId, sala.id, { depoisDe: id - 1 });
   return nova;
 }
 
@@ -84,9 +73,7 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
  * escreveu é ruído, não aviso.
  */
 export function contarNaoLidas(db, salaId, desdeId, exceto) {
-  return db.prepare(
-    'SELECT count(*) c FROM mensagens WHERE sala_id = ? AND id > ? AND usuario_id IS NOT ?',
-  ).get(Number(salaId), Number(desdeId) || 0, exceto ?? null).c;
+  return tabela.contarDepoisDe(db, salaId, desdeId, exceto);
 }
 
 /**

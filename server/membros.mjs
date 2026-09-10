@@ -5,6 +5,9 @@ import { podeAgir, podeDarCargo, temPermissao } from './permissoes.mjs';
 import { buscarCargo } from './cargos.mjs';
 import { ErroDeConta, derrubarSessoes } from './contas.mjs';
 import { ehDonoDaSaga } from './plataforma.mjs';
+import * as tabela from './repositorios/membros.mjs';
+import * as tabelaDeCargos from './repositorios/cargos.mjs';
+import * as tabelaDeServidores from './repositorios/servidores.mjs';
 
 /**
  * Vincula a pessoa ao servidor, se ainda não estiver.
@@ -19,33 +22,21 @@ export function garantirMembro(db, servidorId, usuario, { dono } = {}) {
   const jaEsta = buscarMembro(db, servidorId, usuario.id);
   if (jaEsta) return jaEsta;
 
-  const cargos = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ?').all(servidorId);
+  const cargos = tabelaDeCargos.niveis(db, servidorId);
   const oMaisBaixo = cargos.slice().sort((a, b) => a.nivel - b.nivel)[0];
   const oMaisAlto = cargos.slice().sort((a, b) => b.nivel - a.nivel)[0];
 
-  const servidor = db.prepare('SELECT criado_por FROM servidores WHERE id = ?').get(servidorId);
-  const semDono = !servidor?.criado_por;
+  const semDono = !tabelaDeServidores.quemCriou(db, servidorId);
   const ehODono = semDono && (dono ? dono.trim().toLowerCase() === usuario.apelido_chave : true);
-  if (ehODono) db.prepare('UPDATE servidores SET criado_por = ? WHERE id = ?').run(usuario.id, servidorId);
+  if (ehODono) tabelaDeServidores.definirQuemCriou(db, servidorId, usuario.id);
 
   const escolhido = ehODono ? oMaisAlto : oMaisBaixo;
-  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
-    .run(servidorId, usuario.id, escolhido?.nivel ?? 10, escolhido?.id ?? null, Date.now());
+  tabela.inserir(db, {
+    servidorId, usuarioId: usuario.id, cargoId: escolhido?.id ?? null,
+    nivel: escolhido?.nivel ?? 10, entrouEm: Date.now(),
+  });
   return buscarMembro(db, servidorId, usuario.id);
 }
-
-// Junta conta e vínculo numa linha só, que é como o app quer ver a pessoa.
-const SELECT_MEMBRO = `
-  SELECT u.id, u.apelido, u.foto, u.banner, u.enquadramento, u.dono, u.status, u.visto_em,
-         m.servidor_id, m.entrou_em, m.banido_em, m.banido_por, m.silenciado_ate,
-         u.turbo, m.id_exibido, m.cargo_id,
-         c.nome AS cargo_nome, c.cor AS cargo_cor, c.nivel AS cargo_nivel,
-         c.permissoes AS cargo_permissoes, (s.criado_por = m.usuario_id) AS criou_o_servidor,
-         COALESCE(NULLIF(m.nome_exibido, ''), u.apelido) AS nome
-    FROM membros m
-    JOIN usuarios u ON u.id = m.usuario_id
-    JOIN servidores s ON s.id = m.servidor_id
-    LEFT JOIN cargos c ON c.id = m.cargo_id`;
 
 /**
  * Junta o cargo à pessoa: as regras de permissão trabalham com o par, não com um número.
@@ -86,12 +77,10 @@ const comCargo = (m) => {
 };
 
 export const buscarMembro = (db, servidorId, usuarioId) =>
-  comCargo(db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? AND m.usuario_id = ?`)
-    .get(servidorId, usuarioId)) ?? null;
+  comCargo(tabela.buscar(db, servidorId, usuarioId)) ?? null;
 
 export const listarMembros = (db, servidorId) =>
-  db.prepare(`${SELECT_MEMBRO} WHERE m.servidor_id = ? ORDER BY c.nivel DESC, nome COLLATE NOCASE`)
-    .all(servidorId).map(comCargo);
+  tabela.listar(db, servidorId).map(comCargo);
 
 /** Motivo pelo qual esta pessoa não pode entrar numa sala agora, ou null se pode. */
 export function impedimento(membro, agora = Date.now()) {
@@ -112,8 +101,7 @@ export function mudarNomeExibido(db, servidorId, usuarioId, nome) {
   if (limpo && !NOME_VALIDO.test(limpo)) {
     throw new ErroDeConta('O nome precisa ter de 2 a 32 caracteres.');
   }
-  db.prepare('UPDATE membros SET nome_exibido = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(limpo || null, servidorId, usuarioId);
+  tabela.mudarNomeExibido(db, servidorId, usuarioId, limpo || null);
   return buscarMembro(db, servidorId, usuarioId);
 }
 
@@ -143,8 +131,7 @@ export function definirIdExibido(db, servidorId, quemId, alvoId, id) {
   if (limpo && !ID_VALIDO.test(limpo)) {
     throw new ErroDeConta('O identificador precisa ter de 1 a 8 caracteres, sem espaços.');
   }
-  db.prepare('UPDATE membros SET id_exibido = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(limpo || null, servidorId, alvo.id);
+  tabela.definirIdExibido(db, servidorId, alvo.id, limpo || null);
   return buscarMembro(db, servidorId, alvo.id);
 }
 
@@ -161,31 +148,27 @@ export function exigirPermissao(db, servidorId, quemId, acao, alvoId) {
 
 export function banir(db, servidorId, quemId, alvoId) {
   const { quem, alvo } = exigirPermissao(db, servidorId, quemId, 'banir', alvoId);
-  db.prepare('UPDATE membros SET banido_em = ?, banido_por = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(Date.now(), quem.apelido, servidorId, alvo.id);
+  tabela.banir(db, servidorId, alvo.id, { quando: Date.now(), porQuem: quem.apelido });
   derrubarSessoes(db, alvo.id);   // não continua dentro com o app já aberto
   return buscarMembro(db, servidorId, alvo.id);
 }
 
 export function desbanir(db, servidorId, quemId, alvoId) {
   const { alvo } = exigirPermissao(db, servidorId, quemId, 'banir', alvoId);
-  db.prepare('UPDATE membros SET banido_em = NULL, banido_por = NULL WHERE servidor_id = ? AND usuario_id = ?')
-    .run(servidorId, alvo.id);
+  tabela.desbanir(db, servidorId, alvo.id);
   return buscarMembro(db, servidorId, alvo.id);
 }
 
 export function darTimeout(db, servidorId, quemId, alvoId, minutos) {
   const { alvo } = exigirPermissao(db, servidorId, quemId, 'timeout', alvoId);
   const m = Math.min(Math.max(1, Number(minutos) || 0), 60 * 24);   // de 1 minuto a 1 dia
-  db.prepare('UPDATE membros SET silenciado_ate = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(Date.now() + m * 60_000, servidorId, alvo.id);
+  tabela.silenciarAte(db, servidorId, alvo.id, Date.now() + m * 60_000);
   return buscarMembro(db, servidorId, alvo.id);
 }
 
 export function tirarTimeout(db, servidorId, quemId, alvoId) {
   const { alvo } = exigirPermissao(db, servidorId, quemId, 'timeout', alvoId);
-  db.prepare('UPDATE membros SET silenciado_ate = NULL WHERE servidor_id = ? AND usuario_id = ?')
-    .run(servidorId, alvo.id);
+  tabela.tirarSilencio(db, servidorId, alvo.id);
   return buscarMembro(db, servidorId, alvo.id);
 }
 
@@ -202,8 +185,6 @@ export function definirCargo(db, servidorId, quemId, alvoId, cargoId) {
   const r = podeDarCargo(quem, alvo, novo);
   if (!r.pode) throw new ErroDeConta(r.motivo, 403);
 
-  // A coluna antiga acompanha o nível: ela ainda é a fonte da migração de bancos velhos.
-  db.prepare('UPDATE membros SET cargo_id = ?, cargo = ? WHERE servidor_id = ? AND usuario_id = ?')
-    .run(novo.id, novo.nivel, servidorId, alvo.id);
+  tabela.definirCargo(db, servidorId, alvo.id, { cargoId: novo.id, nivel: novo.nivel });
   return buscarMembro(db, servidorId, alvo.id);
 }

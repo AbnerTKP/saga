@@ -21,6 +21,9 @@ import * as mensagens from './mensagens.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
+import * as tabelaDeServidores from './repositorios/servidores.mjs';
+import * as tabelaDeUsuarios from './repositorios/usuarios.mjs';
+import * as tabelaDeMembros from './repositorios/membros.mjs';
 import { ErroDeConta, criarConta, entrar, usuarioDaSessao, buscarPorId, sair } from './contas.mjs';
 import { temPermissao, PERMISSOES } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
@@ -161,7 +164,7 @@ const verMembro = (m) => m && ({
 });
 
 const verServidor = (sid) => {
-  const s = db.prepare('SELECT * FROM servidores WHERE id = ?').get(sid);
+  const s = tabelaDeServidores.buscar(db, sid);
   return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null };
 };
 
@@ -209,8 +212,7 @@ const verConta = (u) => u && ({
  */
 function garantirCasaDoDono(usuario) {
   if (!DONO || DONO.trim().toLowerCase() !== usuario.apelido_chave) return;
-  const casa = db.prepare('SELECT criado_por FROM servidores WHERE id = ?').get(SERVIDOR.id);
-  if (casa?.criado_por) return;
+  if (tabelaDeServidores.quemCriou(db, SERVIDOR.id)) return;
   membros.garantirMembro(db, SERVIDOR.id, usuario, { dono: DONO });
 }
 
@@ -222,8 +224,8 @@ function garantirCasaDoDono(usuario) {
  * precisa ver o motivo em vez de bater numa tela que não explica nada.
  */
 function semServidor(usuario) {
-  const qualquer = db.prepare('SELECT servidor_id FROM membros WHERE usuario_id = ? LIMIT 1').get(usuario.id);
-  const membro = qualquer ? membros.buscarMembro(db, qualquer.servidor_id, usuario.id) : null;
+  const ondeQuerQueSeja = tabelaDeMembros.qualquerServidor(db, usuario.id);
+  const membro = ondeQuerQueSeja ? membros.buscarMembro(db, ondeQuerQueSeja, usuario.id) : null;
   return {
     eu: membro ? verMembro(membro) : verConta(usuario),
     servidor: null,
@@ -410,7 +412,7 @@ async function trocarImagem(req, de, papel) {
   const nome = bruto.length ? guardarComRegraDoTurbo(eu, bruto, papel, de) : null;
 
   if (de === 'servidor') {
-    db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
+    tabelaDeServidores.trocarImagem(db, sid, papel, nome);
     return { servidor: verServidor(sid) };
   }
   /*
@@ -423,10 +425,9 @@ async function trocarImagem(req, de, papel) {
    *
    * O do outro papel não é tocado: trocar o banner não mexe em como a foto está posta.
    */
-  const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(eu.id);
-  const semOEnquadramentoAntigo = enquadramento.guardar(atual?.enquadramento, papel, null);
-  db.prepare(`UPDATE usuarios SET ${papel} = ?, enquadramento = ? WHERE id = ?`)
-    .run(nome, semOEnquadramentoAntigo, eu.id);
+  const atual = tabelaDeUsuarios.lerEnquadramento(db, eu.id);
+  const semOEnquadramentoAntigo = enquadramento.guardar(atual, papel, null);
+  tabelaDeUsuarios.trocarImagemEEnquadramento(db, eu.id, papel, nome, semOEnquadramentoAntigo);
   return { eu: euDepois(usuario, sid) };
 }
 
@@ -509,7 +510,7 @@ const ROTAS = {
     const { nome } = await lerCorpo(req);
     const limpo = String(nome ?? '').trim();
     if (limpo.length < 2 || limpo.length > 40) throw new ErroDeConta('O nome do servidor precisa ter de 2 a 40 caracteres.');
-    db.prepare('UPDATE servidores SET nome = ? WHERE id = ?').run(limpo, sid);
+    tabelaDeServidores.renomear(db, sid, limpo);
     return { servidor: verServidor(sid) };
   },
 
@@ -660,9 +661,9 @@ const ROTAS = {
     if (!['foto', 'banner'].includes(papel)) {
       throw new ErroDeConta('Só dá para enquadrar a foto ou o banner.', 400);
     }
-    const atual = db.prepare('SELECT enquadramento FROM usuarios WHERE id = ?').get(usuario.id);
-    const novo = enquadramento.guardar(atual?.enquadramento, papel, valor);
-    db.prepare('UPDATE usuarios SET enquadramento = ? WHERE id = ?').run(novo, usuario.id);
+    const atual = tabelaDeUsuarios.lerEnquadramento(db, usuario.id);
+    const novo = enquadramento.guardar(atual, papel, valor);
+    tabelaDeUsuarios.guardarEnquadramento(db, usuario.id, novo);
     return { eu: euDepois(usuario, sid) };
   },
 
@@ -818,10 +819,10 @@ const ROTAS = {
     const nome = guardarComRegraDoTurbo(eu, bruto, papel, de);
 
     if (de === 'servidor') {
-      db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, sid);
+      tabelaDeServidores.trocarImagem(db, sid, papel, nome);
       return { servidor: verServidor(sid) };
     }
-    db.prepare(`UPDATE usuarios SET ${papel} = ? WHERE id = ?`).run(nome, usuario.id);
+    tabelaDeUsuarios.trocarImagem(db, usuario.id, papel, nome);
     return { eu: euDepois(usuario, sid) };
   },
 
@@ -971,7 +972,7 @@ servidor.headersTimeout = 65_000;
 
 servidor.listen(PORT, () => {
   console.log(
-    `Saga em http://0.0.0.0:${PORT} — ${db.prepare('SELECT count(*) c FROM servidores').get().c} servidor(es), `
+    `Saga em http://0.0.0.0:${PORT} — ${tabelaDeServidores.quantos(db)} servidor(es), `
     + `o de casa é "${verServidor(SERVIDOR.id).nome}" com ${salasDoServidor(SERVIDOR.id).length} salas`,
   );
   // Dito em voz alta de propósito: as fotos já sumiram uma vez indo parar dentro do

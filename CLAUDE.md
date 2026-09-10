@@ -89,10 +89,22 @@ porque escrever log também precisa de memória.
 
 ## Como está montado
 
-**Servidor** — Node puro, sem framework. `index.mjs` é a tabela de rotas; a lógica mora em
-módulos que não sabem de HTTP: `permissoes.mjs` (regras puras de quem pode o quê),
-`cargos.mjs`, `membros.mjs`, `salas.mjs`, `mensagens.mjs`, `sons.mjs`, `servidores.mjs`,
-`arquivos.mjs`, `giphy.mjs`, `contas.mjs`, `banco.mjs`.
+**Servidor** — Node puro, sem framework, em três camadas:
+
+```
+index.mjs        tabela de rotas: lê o corpo, chama, responde. Não sabe SQL.
+*.mjs            a REGRA: permissoes, cargos, membros, salas, mensagens, sons,
+                 servidores, contas, notas, presenca, plataforma. Não sabem de HTTP.
+repositorios/    o SQL, um arquivo por TABELA. Não sabem de regra.
+banco.mjs        esquema e migrações — o único fora de repositorios/ que escreve SQL.
+```
+
+O SQL vivia espalhado por treze arquivos, inclusive dentro da tabela de rotas. Isso fazia
+a mesma consulta nascer duas vezes em lugares diferentes (o mesmo defeito que o cartão de
+perfil teve no app), misturava "quem pode" com `UPDATE` no mesmo parágrafo, e faria de uma
+troca por ORM uma reescrita do servidor inteiro — hoje é reescrever uma pasta, sem quem
+chama ficar sabendo. **`arquitetura.test.mjs` falha se o SQL vazar**: regra escrita num
+LEIA-ME dura até o primeiro dia corrido, regra que quebra o `pnpm test` dura.
 
 **App** — Electron + React. `useRoom.ts` cuida do LiveKit; `useChat.ts` do chat; a lógica
 que dá para testar sem tela fica em módulos puros: `permissoes` do lado do servidor tem
@@ -359,6 +371,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   recebe o `second-instance` com os argumentos dela e chama `show()` + `focus()`.
 - **`volume` de elemento de áudio só aceita de 0 a 1.** Passar disso lança exceção, e
   dentro de um efeito do React isso derruba a tela inteira. Tudo passa por `volume.ts`.
+- **A call que CAIU volta sozinha; a que foi TIRADA, não.** O LiveKit avisa a saída da
+  sala com um evento só, aconteça o que acontecer — internet piscou, servidor reiniciou,
+  você desligou, ou um moderador te desconectou. Tratar tudo como queda faz o app pôr a
+  pessoa de volta segundos depois de alguém a tirar: a moderação desfeita sozinha, e
+  parecendo defeito dos dois lados. Quem separa é o MOTIVO que vem no evento, e a lista
+  mora em `queda.ts`, pura e testada — voltam `CONEXAO_FECHOU`, `SERVIDOR_REINICIOU`,
+  `ESTADO_DIVERGENTE`, `MUDANCA_DE_SERVIDOR` e motivo nenhum; ficam de fora `ME_TIRARAM`,
+  `EU_DESLIGUEI`, `ENTREI_NOUTRO_LUGAR`, sala apagada ou fechada e `NAO_CONSEGUI_ENTRAR`.
+  Medido no app de verdade contra um LiveKit local: tirando a pessoa pelo `removeParticipant`,
+  ela continua fora nove segundos depois. E a volta é **com o microfone como estava** —
+  reaparecer falando para quem tinha se mutado seria pior que não voltar.
 - **Banir e dar castigo também tiram da call.** Sem isso a punição parece não funcionar.
   A remoção é consequência: se o LiveKit estiver fora, o registro vale do mesmo jeito.
 - **Nome de arquivo é o hash do conteúdo.** Dá cache eterno, deduplicação, e ninguém
@@ -1007,7 +1030,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (254) + app (149), segundos, sem nada externo
+pnpm test        # servidor (257) + app (165), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

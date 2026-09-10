@@ -4,6 +4,8 @@
 // mudou, gerado dos assuntos dos commits — e publica o que ainda não está lá. Não há
 // segredo envolvido e nada é empurrado de fora: é o servidor que vai buscar, então
 // ninguém precisa lembrar de anunciar nada quando publica uma versão.
+import * as tabelaDeSalas from './repositorios/salas.mjs';
+import * as tabelaDeMensagens from './repositorios/mensagens.mjs';
 
 const REPO = 'AbnerTKP/saga';
 const MARCAS = /<!--\s*mudancas\s*-->([\s\S]*?)<!--\s*\/mudancas\s*-->/;
@@ -29,28 +31,24 @@ export const PAPEL = 'notas';
  * pessoal, e `listarSalas` ainda a força para o topo por via das dúvidas.
  */
 export function garantirSalaDeNotas(db, servidorId) {
-  const existe = db.prepare('SELECT * FROM salas WHERE servidor_id = ? AND papel = ?')
-    .get(servidorId, PAPEL);
+  const existe = tabelaDeSalas.comOPapel(db, servidorId, PAPEL);
   if (existe) return existe;
 
   // Se já houver uma sala com este nome (criada à mão antes), adota-a em vez de brigar
   // com o UNIQUE(servidor_id, nome).
-  const homonima = db.prepare('SELECT * FROM salas WHERE servidor_id = ? AND nome = ?')
-    .get(servidorId, NOME_DA_SALA);
+  const homonima = tabelaDeSalas.porNome(db, servidorId, NOME_DA_SALA);
   if (homonima) {
-    db.prepare('UPDATE salas SET papel = ?, tipo = ?, ordem = -1, categoria_id = NULL WHERE id = ?')
-      .run(PAPEL, 'texto', homonima.id);
-    return db.prepare('SELECT * FROM salas WHERE id = ?').get(homonima.id);
+    tabelaDeSalas.virarSalaDeNotas(db, homonima.id, PAPEL);
+    return tabelaDeSalas.porId(db, homonima.id);
   }
 
-  const info = db.prepare(
-    'INSERT INTO salas (servidor_id, nome, tipo, ordem, papel) VALUES (?, ?, ?, ?, ?)',
-  ).run(servidorId, NOME_DA_SALA, 'texto', -1, PAPEL);
-  return db.prepare('SELECT * FROM salas WHERE id = ?').get(Number(info.lastInsertRowid));
+  const id = tabelaDeSalas.inserir(db, {
+    servidorId, nome: NOME_DA_SALA, tipo: 'texto', ordem: -1, papel: PAPEL,
+  });
+  return tabelaDeSalas.porId(db, id);
 }
 
-export const salaDeNotas = (db, servidorId) =>
-  db.prepare('SELECT * FROM salas WHERE servidor_id = ? AND papel = ?').get(servidorId, PAPEL) ?? null;
+export const salaDeNotas = (db, servidorId) => tabelaDeSalas.comOPapel(db, servidorId, PAPEL);
 
 const dia = (iso) => {
   const d = new Date(iso);
@@ -98,8 +96,8 @@ export function versoesQueFaltam(lancamentos, jaPublicadas) {
 /** As etiquetas que já têm mensagem na sala. A etiqueta é a primeira palavra do texto. */
 export function jaPublicadas(db, salaId) {
   return new Set(
-    db.prepare('SELECT texto FROM mensagens WHERE sala_id = ?').all(salaId)
-      .map((m) => String(m.texto).split(/[\s—\n]/)[0])
+    tabelaDeMensagens.textosDaSala(db, salaId)
+      .map((texto) => String(texto).split(/[\s—\n]/)[0])
       .filter((t) => /^v\d/.test(t)),
   );
 }
@@ -124,7 +122,10 @@ export async function publicarNotas(db, servidorId, { buscar } = {}) {
   const faltam = versoesQueFaltam(lancamentos, jaPublicadas(db, sala.id));
   if (faltam.length === 0) return 0;
 
-  const inserir = db.prepare('INSERT INTO mensagens (sala_id, usuario_id, texto, criado_em) VALUES (?, NULL, ?, ?)');
-  for (const v of faltam) inserir.run(sala.id, textoDaVersao(v), v.em ?? Date.now());
+  for (const v of faltam) {
+    tabelaDeMensagens.inserirDaSaga(db, {
+      salaId: sala.id, texto: textoDaVersao(v), criadoEm: v.em ?? Date.now(),
+    });
+  }
   return faltam.length;
 }

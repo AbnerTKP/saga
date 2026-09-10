@@ -4,6 +4,11 @@ import { randomBytes } from 'node:crypto';
 import { ErroDeConta } from './contas.mjs';
 import { garantirCargos } from './banco.mjs';
 import { temPermissao } from './permissoes.mjs';
+import * as tabela from './repositorios/servidores.mjs';
+import * as tabelaDeConvites from './repositorios/convites.mjs';
+import * as tabelaDeMembros from './repositorios/membros.mjs';
+import * as tabelaDeCargos from './repositorios/cargos.mjs';
+import * as tabelaDeSalas from './repositorios/salas.mjs';
 
 const NOME_VALIDO = /^[^\r\n]{2,40}$/;
 const DURACAO_DO_CONVITE = 7 * 24 * 60 * 60 * 1000;   // uma semana
@@ -11,15 +16,9 @@ const DURACAO_DO_CONVITE = 7 * 24 * 60 * 60 * 1000;   // uma semana
 const paraFora = (s) => s && ({ id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null });
 
 /** Os servidores de que a pessoa faz parte, sem os que a baniram. */
-export const meusServidores = (db, usuarioId) =>
-  db.prepare(`
-    SELECT s.* FROM servidores s
-      JOIN membros m ON m.servidor_id = s.id
-     WHERE m.usuario_id = ? AND m.banido_em IS NULL
-     ORDER BY m.entrou_em, s.id`).all(usuarioId).map(paraFora);
+export const meusServidores = (db, usuarioId) => tabela.doUsuario(db, usuarioId).map(paraFora);
 
-export const buscarServidor = (db, id) =>
-  paraFora(db.prepare('SELECT * FROM servidores WHERE id = ?').get(Number(id)));
+export const buscarServidor = (db, id) => paraFora(tabela.buscar(db, id));
 
 export function criarServidor(db, usuario, { nome }) {
   const limpo = String(nome ?? '').trim();
@@ -27,20 +26,20 @@ export function criarServidor(db, usuario, { nome }) {
     throw new ErroDeConta('O nome do servidor precisa ter de 2 a 40 caracteres, numa linha só.');
   }
 
-  const info = db.prepare('INSERT INTO servidores (nome, criado_em, criado_por) VALUES (?, ?, ?)')
-    .run(limpo, Date.now(), usuario.id);
-  const servidorId = Number(info.lastInsertRowid);
+  const servidorId = tabela.inserir(db, { nome: limpo, criadoEm: Date.now(), criadoPor: usuario.id });
 
   garantirCargos(db, servidorId);
   // Um servidor sem sala nenhuma abriria numa tela vazia; quem criou não saberia o que fazer.
-  db.prepare("INSERT INTO salas (servidor_id, nome, tipo, ordem) VALUES (?, 'Geral', 'voz', 0)").run(servidorId);
-  db.prepare("INSERT INTO salas (servidor_id, nome, tipo, ordem) VALUES (?, 'Avisos', 'texto', 1)").run(servidorId);
+  tabelaDeSalas.inserir(db, { servidorId, nome: 'Geral', tipo: 'voz', ordem: 0 });
+  tabelaDeSalas.inserir(db, { servidorId, nome: 'Avisos', tipo: 'texto', ordem: 1 });
 
   // Quem cria entra com o cargo mais alto que existe. O poder não vem daí — vem de
   // `criado_por` —, mas a pessoa precisa de um cargo como qualquer outra.
-  const oMaisAlto = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC, id LIMIT 1').get(servidorId);
-  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
-    .run(servidorId, usuario.id, oMaisAlto?.nivel ?? 10, oMaisAlto?.id ?? null, Date.now());
+  const oMaisAlto = tabelaDeCargos.oMaisAlto(db, servidorId);
+  tabelaDeMembros.inserir(db, {
+    servidorId, usuarioId: usuario.id, cargoId: oMaisAlto?.id ?? null,
+    nivel: oMaisAlto?.nivel ?? 10, entrouEm: Date.now(),
+  });
 
   return buscarServidor(db, servidorId);
 }
@@ -56,21 +55,21 @@ export function criarConvite(db, servidorId, quem, { maxUsos } = {}) {
     throw new ErroDeConta('Seu cargo não permite convidar.', 403);
   }
   const codigo = gerarCodigo();
-  db.prepare(
-    'INSERT INTO convites (codigo, servidor_id, criado_por, criado_em, expira_em, max_usos) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(codigo, servidorId, quem.id, Date.now(), Date.now() + DURACAO_DO_CONVITE,
-        maxUsos ? Math.max(1, Number(maxUsos)) : null);
+  tabelaDeConvites.inserir(db, {
+    codigo, servidorId, criadoPor: quem.id, criadoEm: Date.now(),
+    expiraEm: Date.now() + DURACAO_DO_CONVITE,
+    maxUsos: maxUsos ? Math.max(1, Number(maxUsos)) : null,
+  });
   return { codigo, expiraEm: Date.now() + DURACAO_DO_CONVITE, maxUsos: maxUsos ?? null };
 }
 
 export const listarConvites = (db, servidorId) =>
-  db.prepare('SELECT codigo, criado_em, expira_em, usos, max_usos FROM convites WHERE servidor_id = ? ORDER BY criado_em DESC')
-    .all(servidorId)
+  tabelaDeConvites.doServidor(db, servidorId)
     .map((c) => ({ codigo: c.codigo, criadoEm: c.criado_em, expiraEm: c.expira_em, usos: c.usos, maxUsos: c.max_usos }));
 
 export function usarConvite(db, usuario, codigo) {
   const limpo = String(codigo ?? '').trim().toUpperCase();
-  const convite = db.prepare('SELECT * FROM convites WHERE codigo = ?').get(limpo);
+  const convite = tabelaDeConvites.buscar(db, limpo);
   // A mesma mensagem para inexistente, vencido e esgotado: dizer qual é entregaria
   // quais códigos existem a quem estiver tentando adivinhar.
   const recusa = () => { throw new ErroDeConta('Convite inválido ou vencido.', 404); };
@@ -79,29 +78,30 @@ export function usarConvite(db, usuario, codigo) {
   if (convite.expira_em && convite.expira_em < Date.now()) recusa();
   if (convite.max_usos && convite.usos >= convite.max_usos) recusa();
 
-  const jaEsta = db.prepare('SELECT banido_em FROM membros WHERE servidor_id = ? AND usuario_id = ?')
-    .get(convite.servidor_id, usuario.id);
+  const jaEsta = tabelaDeMembros.situacao(db, convite.servidor_id, usuario.id);
   if (jaEsta?.banido_em) throw new ErroDeConta('Você foi banido deste servidor.', 403);
   if (jaEsta) return buscarServidor(db, convite.servidor_id);
 
-  const maisBaixo = db.prepare('SELECT id, nivel FROM cargos WHERE servidor_id = ? ORDER BY nivel LIMIT 1')
-    .get(convite.servidor_id);
-  db.prepare('INSERT INTO membros (servidor_id, usuario_id, cargo, cargo_id, entrou_em) VALUES (?, ?, ?, ?, ?)')
-    .run(convite.servidor_id, usuario.id, maisBaixo?.nivel ?? 10, maisBaixo?.id ?? null, Date.now());
-  db.prepare('UPDATE convites SET usos = usos + 1 WHERE codigo = ?').run(limpo);
+  const maisBaixo = tabelaDeCargos.oMaisBaixo(db, convite.servidor_id);
+  tabelaDeMembros.inserir(db, {
+    servidorId: convite.servidor_id, usuarioId: usuario.id, cargoId: maisBaixo?.id ?? null,
+    nivel: maisBaixo?.nivel ?? 10, entrouEm: Date.now(),
+  });
+  tabelaDeConvites.contarUso(db, limpo);
 
   return buscarServidor(db, convite.servidor_id);
 }
 
 export function sairDoServidor(db, servidorId, usuario) {
-  const meu = db.prepare(`
-    SELECT s.criado_por FROM membros m JOIN servidores s ON s.id = m.servidor_id
-     WHERE m.servidor_id = ? AND m.usuario_id = ?`).get(servidorId, usuario.id);
-  if (!meu) throw new ErroDeConta('Você não faz parte deste servidor.', 404);
+  if (!tabelaDeMembros.situacao(db, servidorId, usuario.id)) {
+    throw new ErroDeConta('Você não faz parte deste servidor.', 404);
+  }
   // Quem criou o servidor saindo deixaria ele sem ninguém capaz de administrá-lo, e sem
   // jeito de voltar. Mandar não é mais um cargo que se passe adiante: é ter criado.
-  if (meu.criado_por === usuario.id) throw new ErroDeConta('Quem criou o servidor não pode sair dele.', 409);
+  if (tabela.quemCriou(db, servidorId) === usuario.id) {
+    throw new ErroDeConta('Quem criou o servidor não pode sair dele.', 409);
+  }
 
-  db.prepare('DELETE FROM membros WHERE servidor_id = ? AND usuario_id = ?').run(servidorId, usuario.id);
+  tabelaDeMembros.apagar(db, servidorId, usuario.id);
   return { ok: true };
 }

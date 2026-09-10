@@ -2,6 +2,8 @@
 // aqui é só guardar, ler e alterar.
 import { ErroDeConta } from './contas.mjs';
 import { limparPermissoes, podeMexerNoCargo, temPermissao } from './permissoes.mjs';
+import * as tabela from './repositorios/cargos.mjs';
+import * as tabelaDeMembros from './repositorios/membros.mjs';
 
 const NOME_VALIDO = /^[^\r\n]{1,24}$/;
 const COR_VALIDA = /^#[0-9a-f]{6}$/i;
@@ -15,11 +17,10 @@ const paraFora = (c) => c && ({
 });
 
 export const listarCargos = (db, servidorId) =>
-  db.prepare('SELECT * FROM cargos WHERE servidor_id = ? ORDER BY nivel DESC, id')
-    .all(servidorId).map(paraFora);
+  tabela.listar(db, servidorId).map(paraFora);
 
 export const buscarCargo = (db, servidorId, id) =>
-  paraFora(db.prepare('SELECT * FROM cargos WHERE servidor_id = ? AND id = ?').get(servidorId, Number(id)));
+  paraFora(tabela.buscar(db, servidorId, id));
 
 function conferir(db, servidorId, { nome, cor, nivel }, exceto = null) {
   const limpo = String(nome ?? '').trim();
@@ -33,8 +34,7 @@ function conferir(db, servidorId, { nome, cor, nivel }, exceto = null) {
   if (!Number.isInteger(n) || n < 1 || n > 99) {
     throw new ErroDeConta('O nível precisa ser um número de 1 a 99.');
   }
-  const igual = db.prepare('SELECT id FROM cargos WHERE servidor_id = ? AND nome = ? COLLATE NOCASE')
-    .get(servidorId, limpo);
+  const igual = tabela.comONome(db, servidorId, limpo);
   if (igual && igual.id !== exceto) throw new ErroDeConta('Já existe um cargo com esse nome.', 409);
   return { nome: limpo, cor: cor || null, nivel: n };
 }
@@ -50,10 +50,10 @@ export function criarCargo(db, servidorId, quem, dados) {
     throw new ErroDeConta('Não dá para criar um cargo do seu nível ou acima.', 403);
   }
   const permissoes = limparPermissoes(dados.permissoes);
-  const info = db.prepare(
-    'INSERT INTO cargos (servidor_id, nome, cor, nivel, dono, permissoes, criado_em) VALUES (?, ?, ?, ?, 0, ?, ?)',
-  ).run(servidorId, nome, cor, nivel, JSON.stringify(permissoes), Date.now());
-  return buscarCargo(db, servidorId, Number(info.lastInsertRowid));
+  const id = tabela.inserir(db, servidorId, {
+    nome, cor, nivel, permissoes: JSON.stringify(permissoes), criadoEm: Date.now(),
+  });
+  return buscarCargo(db, servidorId, id);
 }
 
 export function editarCargo(db, servidorId, quem, id, dados) {
@@ -70,8 +70,7 @@ export function editarCargo(db, servidorId, quem, id, dados) {
   const pedidas = limparPermissoes(dados.permissoes);
   const permitidas = quem.cargo.dono ? pedidas : pedidas.filter((p) => temPermissao(quem.cargo, p));
 
-  db.prepare('UPDATE cargos SET nome = ?, cor = ?, nivel = ?, permissoes = ? WHERE id = ?')
-    .run(nome, cor, nivel, JSON.stringify(permitidas), cargo.id);
+  tabela.atualizar(db, cargo.id, { nome, cor, nivel, permissoes: JSON.stringify(permitidas) });
   return buscarCargo(db, servidorId, cargo.id);
 }
 
@@ -82,13 +81,12 @@ export function apagarCargo(db, servidorId, quem, id) {
 
   // Quem estava nele desce para o cargo mais baixo, senão ficaria sem cargo nenhum e
   // sem poder entrar em lugar algum.
-  const maisBaixo = db.prepare(
-    'SELECT id FROM cargos WHERE servidor_id = ? AND id != ? ORDER BY nivel LIMIT 1',
-  ).get(servidorId, cargo.id);
+  const maisBaixo = tabela.oMaisBaixoExceto(db, servidorId, cargo.id);
   if (!maisBaixo) throw new ErroDeConta('É o único cargo que sobrou.', 409);
 
-  db.prepare('UPDATE membros SET cargo_id = ? WHERE servidor_id = ? AND cargo_id = ?')
-    .run(maisBaixo.id, servidorId, cargo.id);
-  db.prepare('DELETE FROM cargos WHERE id = ?').run(cargo.id);
+  tabelaDeMembros.trocarCargoDeTodos(db, servidorId, cargo.id, {
+    cargoId: maisBaixo.id, nivel: maisBaixo.nivel,
+  });
+  tabela.apagar(db, cargo.id);
   return { ok: true, movidosPara: maisBaixo.id };
 }
