@@ -852,8 +852,11 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   font-size: 15px; font-weight: 500;
 }
 .membro-linha:hover { background: var(--bg3); color: var(--text); }
-/* Quem não está na voz aparece apagado, como no Discord: dá para ver quem está sem ler. */
-.membro-linha:not(.na-voz) { opacity: .45; }
+/* Apagado quer dizer AUSENTE DA SAGA, não ausente da call. Era `:not(.na-voz)`, e com
+   isso quem estava online lendo o chat aparecia tão apagado quanto quem fechou o app —
+   a lista dizia "não tem ninguém" com meia dúzia de pessoas acordadas. Ocupado e ausente
+   também acendem: são recados de quem está aí. */
+.membro-linha.offline { opacity: .45; }
 .membro-linha.banido { text-decoration: line-through; }
 .membro-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

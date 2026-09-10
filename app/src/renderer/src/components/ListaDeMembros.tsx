@@ -38,12 +38,17 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
             </div>
 
             {g.gente.map((m) => {
-              const online = naVoz.has(m.id);
+              const naCall = naVoz.has(m.id);
+              // Apagado é quem NÃO ESTÁ, e não quem está fora da call: quem está ausente
+              // ou ocupado está aí, e some da lista tanto quanto quem fechou o app. A
+              // variável aqui já se chamava `online` querendo dizer "na voz" — era essa a
+              // confusão.
+              const offline = m.status === 'offline';
               return (
                 <button
                   key={m.id}
-                  className={`membro-linha ${online ? 'na-voz' : ''} ${m.banido ? 'banido' : ''}`}
-                  title={`${m.nome} — ${m.cargoNome}${online ? ' · na voz agora' : ''}`}
+                  className={`membro-linha ${naCall ? 'na-voz' : ''} ${offline ? 'offline' : ''} ${m.banido ? 'banido' : ''}`}
+                  title={`${m.nome} — ${m.cargoNome}${naCall ? ' · na voz agora' : ''}`}
                   onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY }, 'perfil')}
                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(m, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                 >

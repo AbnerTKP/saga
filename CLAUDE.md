@@ -1003,6 +1003,13 @@ a gente não conhece.
   cheio competiria com as três que significam algo.
 - **Existe uma escada de espaço** (`--e1`..`--e5`, 4 a 24). Antes era tudo 4 e 8, e por
   isso nada tinha grupo nem respiro: a lista de salas era uma coluna contínua.
+- **Apagado na lista quer dizer FORA DA SAGA, não fora da call.** A regra era
+  `:not(.na-voz)`: quem estava online lendo o chat aparecia tão apagado quanto quem tinha
+  fechado o app, e a lista dizia "não tem ninguém" com meia dúzia de pessoas acordadas.
+  Ocupado e ausente também acendem — são recados de quem está aí. A variável no código já
+  se chamava `online` querendo dizer "na voz", e era essa a confusão. Medido com os quatro
+  casos na mesma tela: online fora da call, ocupado e o dono ficam em opacidade 1; só o
+  offline vai a 0,45.
 - **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).
   Sem ele, com duas salas cheias não se sabe quem está com quem.
 
