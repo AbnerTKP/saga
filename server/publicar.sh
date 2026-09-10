@@ -94,7 +94,24 @@ if [ "$falhou" != 0 ]; then echo "PAROU: conserte o que está marcado com ✗ an
 if [ "$SO_CONFERIR" = "--so-conferir" ]; then echo "Só conferi, como pedido. Nada foi enviado."; exit 0; fi
 
 echo "=== 6. Publicando ==="
-scp -q "${ENVIAR[@]}" "$VPS:$REMOTO/"
+# 10/09/2026: o scp morreu no meio ("Can't assign requested address" — a internet do dono
+# piscou) e AINDA ASSIM saiu com status 0. O contêiner nunca foi reconstruído, e o script
+# terminou como se tivesse publicado. Mandar não é ter chegado: quem responde isso é o
+# md5 dos dois lados, não o código de saída do scp.
+scp -q "${ENVIAR[@]}" "$VPS:$REMOTO/" || erro "o scp falhou"
+
+# Mandar não é ter chegado. As duas listas são "md5 nome", uma de cada lado, e comparar
+# texto evita depender de md5 (macOS) e md5sum (Linux) escreverem igual.
+AQUI=$(for f in "${ENVIAR[@]}"; do printf '%s %s\n' "$(md5 -q "$f")" "$f"; done | sort)
+LA=$(ssh -o ConnectTimeout=20 "$VPS" "cd $REMOTO && for f in ${ENVIAR[*]}; do printf '%s %s\n' \"\$(md5sum \$f | cut -d' ' -f1)\" \"\$f\"; done | sort")
+if [ "$AQUI" = "$LA" ]; then
+  ok "o que chegou é o que saiu ($(printf '%s\n' "${ENVIAR[@]}" | wc -l | tr -d ' ') arquivos)"
+else
+  erro "o que está na VPS não é o que foi enviado — a transferência caiu no meio"
+  echo "PAROU antes de reconstruir: a VPS continua com a versão anterior de pé."
+  exit 1
+fi
+
 ssh -o ConnectTimeout=30 "$VPS" "cd $REMOTO && docker compose -f docker-compose.ip.yml up -d --build token" 2>&1 | tail -2
 
 echo
