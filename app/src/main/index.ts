@@ -172,6 +172,15 @@ function createWindow() {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: true,
     webPreferences: {
+      /**
+       * A Saga não pode ser estrangulada por estar atrás de outra janela.
+       *
+       * O Chromium reduz os `setInterval` de janela escondida e, depois de alguns
+       * minutos, quase os congela. Aqui isso não é economia: as buscas do app SÃO
+       * relógios, e o sinal de vida também — a pessoa apareceria offline para os amigos
+       * só por estar com o app atrás do navegador.
+       */
+      backgroundThrottling: false,
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
@@ -208,6 +217,22 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  /**
+   * A máquina acordou: a tela vai buscar tudo de novo.
+   *
+   * Dormindo, os relógios do app param — e é neles que TODA busca se apoia. Quem voltou
+   * ao computador via o app do jeito que ficou, esperando a próxima volta de um relógio
+   * que acabou de descongelar. Só o processo principal sabe que a máquina dormiu; dentro
+   * da janela não existe esse aviso.
+   */
+  const acordou = () => { if (!win.isDestroyed()) win.webContents.send('app:acordou'); };
+  powerMonitor.on('resume', acordou);
+  powerMonitor.on('unlock-screen', acordou);
+  win.on('closed', () => {
+    powerMonitor.off('resume', acordou);
+    powerMonitor.off('unlock-screen', acordou);
   });
 
   // Carregar a tela é o essencial; atualização é acessório. Se algo falhar aqui, a janela

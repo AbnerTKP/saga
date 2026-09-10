@@ -3,6 +3,7 @@ import {
   lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, avisarQueDigito,
   type Digitando, type Mensagem,
 } from './api';
+import { aoDespertar } from './despertar';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
 // e para cinco amigos, dois segundos passam por instantâneo.
@@ -52,7 +53,10 @@ export function useChat(salaId: number | null) {
 
     buscar();
     const id = setInterval(buscar, INTERVALO);
-    return () => { vivo = false; clearInterval(id); };
+    // A internet voltou, a janela voltou a aparecer, a máquina acordou: busca AGORA, em
+    // vez de esperar a próxima volta de um relógio que pode ter passado minutos parado.
+    const pararDeDespertar = aoDespertar(buscar);
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
   }, [salaId]);
 
   // Quem acabou de escrever não pode esperar a próxima busca para se ver na tela.

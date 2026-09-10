@@ -41,6 +41,12 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       /** Salva um anexo do chat com o diálogo do sistema. Nada é aberto nem executado. */
       salvarArquivo: (url: string, nome: string) => Promise<{ ok: boolean; caminho?: string; erro?: string }>;
+      /**
+       * A máquina acordou de dormir (ou a tela foi destravada). Devolve como se
+       * desinscrever. Dentro da janela não há como saber disso, e é justamente quando
+       * tudo precisa ser buscado de novo — os relógios do app passaram o sono parados.
+       */
+      aoAcordar: (cb: () => void) => () => void;
       /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
       ociosidade: () => Promise<number>;
       /** Se a Saga abre junto com o sistema. */

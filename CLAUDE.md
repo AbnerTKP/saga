@@ -840,6 +840,19 @@ não estava em nenhuma opção nossa: estava num modo de captura que a gente nã
 Antes de encerrar um caso por esgotamento, vale perguntar que caminho o próprio motor tem e
 a gente não conhece.
 
+- **Relógio não é o único jeito de o app saber que precisa buscar de novo.** Toda busca
+  do app é `setInterval` — salas de 4 em 4 s, mensagens de 2 em 2 s, servidor de 10 em 10 s
+  —, e relógio é a primeira coisa que o sistema desliga: o Chromium estrangula os
+  intervalos de janela que está atrás de outra (e quase os congela depois de alguns
+  minutos), e a máquina dormindo simplesmente para todos. Medido: com os relógios da
+  página zerados, uma mensagem publicada nesse meio-tempo **nunca aparecia** — que foi o
+  que o dono viu ao voltar sem conexão. Hoje há quatro momentos que disparam a busca na
+  hora, e nenhum é relógio: a internet voltou (`online`), a janela voltou a ser vista, ela
+  ganhou o foco, e a máquina acordou (`powerMonitor`, que só o processo principal enxerga).
+  A regra mora em `despertar.ts`, e a janela ainda ganhou `backgroundThrottling: false` —
+  aqui isso não é economia de bateria, é o sinal de vida: a pessoa apareceria offline para
+  os amigos só por estar com o app atrás do navegador.
+
 ## Presença
 
 - **Status guardado sem sinal recente é lembrança, não presença.** Quem fechou o app no

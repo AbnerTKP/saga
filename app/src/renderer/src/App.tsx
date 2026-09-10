@@ -36,6 +36,7 @@ import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
 import { acharPessoa, identidadeDe } from './pessoas';
 import { oQueFazerAoClicar } from './navegacao';
+import { aoDespertar } from './despertar';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -180,7 +181,9 @@ export function App() {
     };
     bater();
     const id = setInterval(bater, 30_000);
-    return () => { vivo = false; clearInterval(id); };
+    // Voltar a aparecer online na hora, e não até 30 s depois de a máquina acordar.
+    const pararDeDespertar = aoDespertar(bater);
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
   }, [sessao?.eu?.id, statusEscolhido]);
 
   const escolherStatus = useCallback((s: Status) => {
@@ -214,7 +217,8 @@ export function App() {
     };
     tick();
     const id = setInterval(tick, 4000);
-    return () => { vivo = false; clearInterval(id); };
+    const pararDeDespertar = aoDespertar(tick);
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
   }, [sessao?.servidor?.id]);
 
   /**
@@ -328,7 +332,8 @@ export function App() {
       .catch(() => undefined);
     buscar();
     const id = setInterval(buscar, 10_000);
-    return () => { vivo = false; clearInterval(id); };
+    const pararDeDespertar = aoDespertar(buscar);
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
   }, [sessao]);
 
   /**

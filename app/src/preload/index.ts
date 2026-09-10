@@ -20,6 +20,15 @@ const desktop = {
   /** Salva um anexo do chat com o diálogo do sistema. Nada é aberto nem executado. */
   salvarArquivo: (url: string, nome: string): Promise<{ ok: boolean; caminho?: string; erro?: string }> =>
     ipcRenderer.invoke('arquivo:salvar', url, nome),
+  /**
+   * A máquina acordou de dormir (ou a tela foi destravada). Devolve como se desinscrever.
+   * Dentro da janela não há como saber disso, e é quando tudo precisa ser buscado de novo.
+   */
+  aoAcordar: (cb: () => void) => {
+    const ouvir = () => cb();
+    ipcRenderer.on('app:acordou', ouvir);
+    return () => { ipcRenderer.off('app:acordou', ouvir); };
+  },
   /** Segundos que a MÁQUINA está parada. É a única forma de saber que a pessoa saiu de
       perto: dentro da janela, ninguém vê teclado nem mouse fora do app. */
   ociosidade: (): Promise<number> => ipcRenderer.invoke('presenca:ociosidade'),
