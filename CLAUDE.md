@@ -148,6 +148,15 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   app não desempata cargo que alguém igualou de propósito —, e por isso o editor agora
   DIZ com quem o nível empata e o que isso significa (um não age sobre o outro). A conta
   do nível de nascença mora em `cargos.ts`, pura e testada, e respeita o teto de quem cria.
+- **Mexer no padrão do cargo NOVO não move o que já existe — e a lista tem de contar o
+  empate.** No CORNUME, "BEN 10" (todas as permissões) ficava embaixo de "Peixe Souris"
+  (nenhuma), os dois no nível 20. Consertei o nível com que um cargo novo nasce e dei o
+  caso por resolvido: os dois cargos já existiam, continuaram empatados, e o dono cobrou
+  de novo — com razão. Duas lições. A primeira: **conserto que depende de a pessoa ir
+  arrumar o dado à mão não é conserto**; o nível do BEN 10 foi para 21 na produção, e é
+  isso que fecha a queixa. A segunda: o editor avisava do empate, mas **a lista** — que é
+  o que se lê — não dizia nada, e empatados a ordem é a de criação. Hoje ela mostra
+  `nível 20 · empatado`, com quem, ao parar o mouse.
 - **Cargo novo nasce no topo, e o topo é dono do soundboard — o editor avisa.** As duas
   regras são boas sozinhas e se mordem juntas: o soundboard é do CARGO MAIS ALTO (não de
   quem tem `gerirSons`), e o teto sai da tabela de cargos inteira, com gente dentro ou não.

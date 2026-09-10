@@ -258,7 +258,21 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
                 <li key={c.id}>
                   <span className="bolinha-cargo" style={{ background: c.cor ?? 'var(--text3)' }} />
                   <span className="nome-cargo">{c.nome}</span>
-                  <span className="muted small">nível {c.nivel}</span>
+                  {/* O empate precisa ser visível AQUI, não só no editor. Empatados, a
+                      ordem da lista é a de criação — então um cargo com todas as
+                      permissões aparece embaixo de um cargo com nenhuma, e a lista parece
+                      estar mentindo. Aconteceu no CORNUME e o dono cobrou duas vezes: da
+                      primeira eu só consertei o nível com que cargo NOVO nasce, o que não
+                      move nada do que já existe. */}
+                  <span
+                    className="muted small"
+                    title={empatadosCom(c.nivel, cargos, c.id).length > 0
+                      ? `Empatado com ${empatadosCom(c.nivel, cargos, c.id).join(', ')} — um não age sobre o outro, e aqui na lista fica em cima quem foi criado antes. Edite o nível para desempatar.`
+                      : undefined}
+                  >
+                    nível {c.nivel}
+                    {empatadosCom(c.nivel, cargos, c.id).length > 0 && ' · empatado'}
+                  </span>
                   <span className="muted small">
                     {c.permissoes.length} permiss{c.permissoes.length === 1 ? 'ão' : 'ões'}
                   </span>
