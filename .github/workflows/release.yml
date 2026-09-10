@@ -1,6 +1,8 @@
 # Gera os instaladores de Windows e Mac e publica num GitHub Release.
 # Como usar: mude a versão em app/package.json, faça commit e crie a tag:
 #   git tag v0.2.0 && git push --tags
+# O que aparece no Release como "o que mudou" sai das linhas "Nota:" dos commits — ver
+# criar-release, abaixo. Sem nenhuma, o Release não é criado.
 # Em ~10 min o Release aparece com o .exe, o .dmg e o latest.yml (usado pela atualização automática).
 name: release
 on:
@@ -39,20 +41,35 @@ jobs:
       - run: |
           gh release view "$TAG" >/dev/null 2>&1 && exit 0
 
-          # O que mudou sai dos ASSUNTOS DOS COMMITS desde a tag anterior. Escrever a
-          # mesma coisa duas vezes — uma no commit, outra na nota — é escrever a segunda
-          # com pressa; e a nota que ninguém escreve é a que fica vazia para sempre.
-          # Os commits de versão ("v0.9.0") saem: eles não são mudança, são a etiqueta.
+          # O que mudou sai das linhas "Nota:" do CORPO dos commits desde a tag anterior.
+          #
+          # Saía dos assuntos, e a ideia por trás disso continua de pé: a nota escrita
+          # depois, num arquivo à parte, é escrita com pressa — ou não é escrita. O que
+          # estava errado era supor que todo commit é notícia. "A revisão antes de
+          # publicar achou duas coisas minhas" foi parar na nota da v0.40.0: trabalho de
+          # dentro, dito na primeira pessoa, para um amigo que só queria saber o que mudou
+          # no app. Assunto de commit é escrito para o repositório; nota é escrita para
+          # quem baixa.
+          #
+          # Então a nota continua nascendo junto do trabalho — no corpo do commit, uma
+          # linha "Nota: ..." — e commit sem ela é trabalho de dentro, que não aparece.
+          # Um commit pode ter várias, e o commit da versão também pode ter as suas: é
+          # onde se recolhe o que ficou para trás.
           ANTERIOR=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
-          if [ -n "$ANTERIOR" ]; then
-            FAIXA="$ANTERIOR..$TAG"
-          else
-            # A primeira versão não tem anterior: vale a história inteira até ela, senão
-            # ela nasceria com "Ajustes internos." — que é o contrário de uma nota.
-            FAIXA="$TAG"
+          # A primeira versão não tem anterior: vale a história inteira até ela.
+          FAIXA=${ANTERIOR:+$ANTERIOR..}$TAG
+          # Em ordem de acontecimento (--reverse): assim quem escreve o commit da versão
+          # sabe onde o que ele acrescentar vai cair — no fim da lista.
+          MUDANCAS=$(git log --no-merges --reverse --format='%B' "$FAIXA" \
+            | sed -nE 's/^[[:space:]]*Nota:[[:space:]]*(.+)$/- \1/p')
+
+          # Versão sem nota nenhuma não sobe. Cair nos assuntos quando falta nota
+          # devolveria em silêncio exatamente o que isto conserta; e "ter cuidado" não
+          # sobrevive a um dia corrido, uma conferência que roda sim.
+          if [ -z "$MUDANCAS" ]; then
+            echo "::error::Nenhuma linha 'Nota:' em $FAIXA. Escreva 'Nota: <uma frase que um amigo entenda>' no corpo de um commit dessa faixa (o da versão serve), mova a tag e empurre de novo."
+            exit 1
           fi
-          MUDANCAS=$(git log --no-merges --format='%s' "$FAIXA" | grep -vE '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -E 's/^v[0-9]+\.[0-9]+\.[0-9]+: //' | sed 's/^/- /')
-          [ -n "$MUDANCAS" ] || MUDANCAS="- Ajustes internos."
 
           # As marcas são para a página de download: é por elas que ela acha o trecho e
           # deixa de fora a instalação, que é igual em toda versão. O GitHub não mostra

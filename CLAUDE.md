@@ -16,6 +16,10 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
   teste, deixe commitado **sem tag**, e pergunte "é só isso?". Correção que quebra o uso
   fura a fila.
 - **Sem rodapé de atribuição em commits.** Nada de `Co-Authored-By` nem link de sessão.
+- **Commit semântico, e a nota do amigo à parte.** O assunto é do repositório
+  (`feat(chat): …`, `fix(servidor): …`); o que os amigos leem na versão sai da linha
+  `Nota:` no corpo do commit — ver "As notas de versão", mais abaixo. Commit sem `Nota:`
+  é trabalho de dentro e não vira notícia.
 - **Nada publica com teste falhando** — o CI roda testes e typecheck antes de gerar
   instalador.
 - **O que não foi testado, se diz.** Windows, som, câmera e microfone dependem de o dono
@@ -211,12 +215,32 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Pedir por um servidor de que não se faz parte cai no seu próprio**, sem erro e sem
   entrada: saber o número de um servidor alheio não abre porta.
 - **Quem foi banido de todos os servidores ainda entra na conta**, para ver o motivo.
-- **Cadastrar não pede convite nenhum**, por decisão do dono. Havia a senha do grupo, e ela
-  era a única porta: quem soubesse o endereço e não soubesse a senha não criava conta. Hoje
-  quem souber o endereço cria. O que ainda barra é o convite POR SERVIDOR: a conta nova cai
-  no servidor de casa e só entra noutro com o código dele. `api.test.mjs` trava isso, para
-  que voltar a exigir convite seja uma decisão e não o efeito de alguém mexer no cadastro
-  sem saber que ele tinha saído.
+- **Cadastrar não pede convite nenhum, e cadastrar não põe ninguém em servidor nenhum.**
+  Havia a senha do grupo, e ela era a única porta: quem soubesse o endereço e não soubesse
+  a senha não criava conta. Hoje quem souber o endereço cria — e cai numa TELA VAZIA, como
+  no Discord. Antes a conta nova era despejada no servidor de casa, porque ele era o único
+  que existia; com vários servidores isso passou a ser uma decisão tomada por ninguém.
+  Quem abre a porta é o convite POR SERVIDOR. `api.test.mjs` trava as duas pontas — que o
+  cadastro não peça convite, e que ele não entregue servidor —, para que voltar atrás em
+  qualquer das duas seja uma decisão e não o efeito de alguém mexer no cadastro.
+- **O servidor de casa é do dono, e a semeadura vale uma vez só.** Numa instalação NOVA o
+  `.env` semeia um servidor (`SERVER_NAME`, `ROOMS`) que sobe sem dono; sem uma exceção
+  ele ficaria de pé com ninguém capaz de entrar. Então o apelido do `DONO` — e só ele —
+  entra nele automaticamente, e só enquanto `criado_por` estiver vazio. Todo o resto do
+  mundo chega por convite.
+- **Sem servidor não é erro: é a primeira tela.** `GET /eu` respondia 404 para quem não
+  faz parte de nenhum, e o app lia isso como "essa sessão não vale mais" e apagava o
+  crachá — quem acabava de se cadastrar era deslogado na primeira volta. Hoje ele responde
+  200 dizendo quem você é, com `servidor: null`. E "quem você é" sem vínculo é a CONTA:
+  foto, banner e apelido, com cargo, nome exibido e identificador nulos, porque esses três
+  pertencem ao vínculo com um servidor. Pela mesma razão, o que é da conta funciona sem
+  servidor nenhum — foto, banner, enquadramento, GIF de perfil, presença —, e só o nome
+  exibido não aparece na tela de "Sua conta" enquanto não houver onde escrevê-lo.
+- **Sair de um servidor fica fora de toda permissão.** Entrar é decisão de quem chega e de
+  quem convida; sair é só de quem sai — não é moderação, e por isso não mora atrás de
+  `gerirServidor`, que é o que esconderia o botão justamente de quem mais precisa dele.
+  Quem CRIOU não sai (o servidor recusa com 409): ele ficaria sem ninguém capaz de
+  administrá-lo e sem caminho de volta.
 - **Não há freio de tentativas de senha, e a saída não é pôr de volta o que havia.** Havia
   um: 20 tentativas por IP a cada 10 minutos. Ele contava as tentativas CERTAS junto com
   as erradas e agrupava por IP — então o grupo todo atrás do mesmo roteador dividia um
@@ -560,7 +584,43 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Abriu a sala de texto, o cursor já está no campo.** Clicar na sala e depois clicar no
   campo é um clique que não decide nada. A dep do efeito é o NOME da sala, nunca a lista de
   mensagens — com a lista, cada mensagem que chega roubaria o cursor de volta no meio de
-  uma frase.
+  uma frase. Medido no app de verdade, numa janela escondida: clicando na sala, o
+  `activeElement` vira o campo e continua nele três segundos depois, com o laço de busca
+  rodando por baixo.
+- **A conversa tem duas colunas, e três linhas seguidas são uma fala só.** A foto fica numa
+  coluna e o que foi dito na outra, alinhado com o NOME — tudo colado à esquerda formava
+  degraus e não se via onde uma pessoa parava e a outra começava. E quem manda três linhas
+  seguidas mandou uma coisa só: da segunda em diante somem a foto e o nome, e a hora vai
+  para a margem, aparecendo só com o mouse. A regra do que continua o quê é pura e testada
+  (`agrupamento.ts`): mesma pessoa, menos de cinco minutos, e o mesmo dia — 23:59 e 00:01
+  têm um separador entre elas, e a de baixo precisa do próprio cabeçalho. Sem autor não
+  continua nada: é a Saga falando na sala de notas, e cada versão publicada é um recado
+  inteiro.
+- **"Está digitando" existe, e não precisou de empurrão nenhum.** Ficou anos na lista do
+  impossível — mas o que faltava era o empurrão, não o recado. Quem lê o chat já pergunta
+  de 2 em 2 segundos se chegou mensagem, e agora a resposta dessa pergunta carrega quem
+  está escrevendo; o app avisa a cada 3 s enquanto alguém digita, nunca a cada tecla. Nada
+  é gravado: um mapa na memória do processo (`digitando.mjs`), porque escrita no SQLite
+  nesse ritmo é exatamente o que o `vista_em` ensinou a não fazer. O aviso vale 7 s — mais
+  que o intervalo de quem avisa somado ao de quem pergunta, senão a frase pisca no meio de
+  alguém escrevendo — e **mandar a mensagem apaga a frase na hora**, que é o pior lugar
+  possível para ela sobreviver. A redação mora em `digitando.ts`, puro e testado: acima de
+  três nomes vira "várias pessoas", porque nome de gente não é curto. Como tudo o que
+  viaja entre app e servidor, isto tem versão dos dois lados: **app novo com servidor
+  antigo não mostra ninguém digitando** — o `POST /digitando` cai em 404, o app engole, e
+  a frase simplesmente não aparece. Publicar o servidor junto é o que liga a coisa.
+- **Quem começa a compartilhar a tela aparece NA CONVERSA.** Lendo uma sala de texto não
+  havia como saber que alguém abriu a tela na sala de voz — era preciso voltar lá e olhar.
+  A linha sai da busca de salas, do SERVIDOR, e não do LiveKit desta máquina: lendo o chat
+  você pode nem estar na call, e é justamente aí que não havia notícia. Ela mostra quantos
+  estão assistindo — o mesmo atributo `assistindo` que os apps trocam entre si, que o
+  servidor agora repassa em `/rooms` — e leva um "Entrar e assistir" que entra na voz sem
+  tirar você da conversa: a live vai para o quadro flutuante que já existia. **Ela não tem
+  hora e não fica no histórico**: é um acontecimento de agora, e some quando a transmissão
+  acaba. Hora ali prometeria um registro que não existe.
+- **O chat só te leva ao fim se você já estiver no fim.** Rolar para baixo a cada novidade
+  é o certo enquanto se lê o fim; quem subiu para procurar uma coisa de ontem não pode ser
+  puxado de volta porque alguém começou a digitar.
 - **A barra de escrever é UMA caixa**, com o anexar dentro à esquerda e o GIF e o enviar
   dentro à direita; quem acende ao receber o cursor é a caixa (`:focus-within`), não o
   campo. Eram quatro coisas soltas na mesma linha e nada dizia que formavam um lugar de
@@ -784,6 +844,10 @@ a gente não conhece.
   faz e era o que menos aparecia, enquanto o que quase nunca se usa — e que não se quer
   errar — ficava a um clique. O menu de ações guarda um cabeçalho de uma linha só, para
   não errar de pessoa.
+- **A foto é da conta; o nome que aparece é de cada servidor.** A tela de "Sua conta"
+  dizia que o nome valia "em todos os servidores", e nunca valeu: ele mora no vínculo
+  (`membros.nome_exibido`), e com um servidor só ninguém tinha como notar. Hoje o campo
+  diz de qual servidor está falando, e some quando não há nenhum — não há onde escrevê-lo.
 - **O que é seu fica na engrenagem; o que é do servidor, no servidor.** A sua foto e o seu
   nome moravam dentro das configurações do SERVIDOR, junto de salas e cargos — e a conta é
   global: a foto vai com você para todos eles. Trocar de cara pelo painel de UM servidor
@@ -854,17 +918,28 @@ a gente não conhece.
   perderia justamente o que ele conta. E a data é sempre a de **São Paulo**: o contêiner
   roda em UTC e o pessoal está no Brasil — uma versão publicada às 21h daqui cairia no
   dia seguinte para quem lê.
-- **Vários servidores estão GUARDADOS, não removidos** (`travas.ts`). Some a barra de
-  servidores e o caminho de entrar noutro; os servidores, os cargos e as configurações
-  continuam no banco, e a voz que atravessa servidor continua funcionando por baixo. As
-  configurações do servidor seguem no nome dele, no alto da lista — era o outro caminho,
-  virou o único.
-- **As notas de versão saem dos assuntos dos commits**, entre a tag anterior e a nova.
-  Escrever a mesma coisa duas vezes — uma no commit, outra na nota — é escrever a segunda
-  com pressa, e a nota que ninguém escreve é a que fica vazia para sempre. Isso obriga o
-  assunto do commit a ser uma frase que um amigo entenda, que é como já se escrevia aqui.
-  O `criar-release` precisa de `fetch-depth: 0`: o checkout padrão traz um commit só e
-  nenhuma tag.
+- **Vários servidores voltaram, e a trava saiu do código.** Eles ficaram guardados atrás
+  de duas constantes (`travas.ts`) por escolha do dono, com tudo inteiro por baixo — os
+  servidores, os cargos e as configurações nunca saíram do banco, e a voz que atravessa
+  servidor continuou funcionando o tempo todo. Foi essa aposta que se pagou: reabrir foi
+  apagar o arquivo, não reescrever a funcionalidade. A trava saiu de vez porque uma
+  constante que só vale `true` é peso morto — quem quiser fechar de novo fecha, e será
+  outra decisão, não a mesma esperando.
+- **As notas de versão saem das linhas `Nota:` dos commits — o assunto é do repositório,
+  a nota é de quem baixa.** Saíam dos assuntos, e metade daquela ideia continua de pé:
+  nota escrita depois, num arquivo à parte, é escrita com pressa — ou não é escrita. O
+  errado era supor que **todo commit é notícia**. "A revisão antes de publicar achou duas
+  coisas minhas, das últimas versões" foi parar na nota da v0.40.0: trabalho de dentro,
+  dito na primeira pessoa, para um amigo que só queria saber o que mudou no app. Hoje o
+  assunto é semântico (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`, com
+  escopo) e a nota é uma linha `Nota: <frase que um amigo entenda>` no corpo, escrita
+  junto com o trabalho. Commit sem ela é trabalho de dentro e não aparece; um commit pode
+  ter várias; o commit da versão também pode ter as suas, e é onde se recolhe o que ficou
+  para trás. A lista sai em ordem de acontecimento, então o que o commit da versão
+  acrescenta cai no fim. **Versão sem nota nenhuma não sobe**: o `criar-release` para com
+  erro em vez de cair nos assuntos, porque cair nos assuntos devolveria em silêncio
+  exatamente o que isto conserta. Ele precisa de `fetch-depth: 0`: o checkout padrão traz
+  um commit só e nenhuma tag.
 - **A página de download acha as notas por MARCA, não por posição.** O corpo do Release
   tem o que mudou e, depois, a instalação — igual em toda versão e notícia nenhuma. Ler
   "tudo até o primeiro `---`" seria palpite sobre como alguém escreveu; `<!-- mudancas -->`
@@ -875,7 +950,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (239) + app (131), segundos, sem nada externo
+pnpm test        # servidor (254) + app (149), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -892,15 +967,15 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
    `zip`; (c) a assinatura, que o certificado próprio resolve. Certificado sozinho não liga
    nada — esta linha já atribuiu tudo à assinatura, e estava errada.
 2. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
-3. **O resto do mock de chat que o dono mandou** (09/09/2026), com o preço de cada um:
+3. **O resto do mock de chat que o dono mandou** (09/09/2026), com o preço de cada um.
+   O que ENTROU na v0.41: o desenho da conversa, a faixa do palco, a linha de quem está
+   compartilhando a tela, "está digitando" e o cursor já no campo. O que ficou, e por quê:
    **reações** (tabela nova, migração, rota, e a contagem viajando no `/mensagens` que já
    é polado de 2 em 2 s); **prévia de link** (o servidor teria de buscar URL que veio de
    fora — é SSRF, precisa de lista de permissão, tempo limite e cache, e não é coisa de
-   fazer no susto); **"está digitando"** (não existe empurrão nenhum no servidor; sobre o
-   laço de 2 s chegaria tarde e piscando, e escrever a cada tecla é o oposto do que
-   `vista_em` ensinou); **fixar mensagem** e **buscar no chat** (tabela e consulta novas);
-   **emoji no campo** (some junto com as reações, se elas vierem). Nada disso entrou por
-   ser feature de verdade, não ajuste de tela.
+   fazer no susto); **fixar mensagem** e **buscar no chat** (tabela e consulta novas);
+   **emoji no campo** (some junto com as reações, se elas vierem). Nada disso é ajuste de
+   tela: são features de verdade, cada uma com o seu dia.
 3. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
 4. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
 
@@ -935,6 +1010,12 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   mecanismo — o atributo indo e voltando por um LiveKit de verdade, com o mesmo
   `livekit-client` do app, e o desenho conferido em imagem. Duas pessoas numa call, uma
   transmitindo e a outra escolhendo e largando a transmissão, não foi exercido.
+- **A linha de "fulano está compartilhando a tela", com uma tela de verdade no ar.** O que
+  está medido é a conta (`lives.ts`, pura e testada, inclusive a plateia sem contar quem
+  olha a própria live) e o desenho, renderizado com o `styles.css` de verdade. O caminho
+  inteiro — alguém abre a tela, a linha aparece na conversa em até 4 s, o "Entrar e
+  assistir" entra na voz e põe a live no quadro flutuante sem tirar você do chat — precisa
+  de LiveKit e de duas pessoas, e não foi exercido.
 - **Abrir junto com o Windows, inteiro.** Nada disso foi exercido em Windows nenhum: a
   entrada aparecer no registro e na lista de programas que abrem sozinhos, o
   `--ao-iniciar` chegando de verdade ao app, a janela vindo encolhida na barra de tarefas
