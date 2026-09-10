@@ -125,7 +125,38 @@ else
   exit 1
 fi
 
-ssh -o ConnectTimeout=30 "$VPS" "cd $REMOTO && docker compose -f docker-compose.ip.yml up -d --build token" 2>&1 | tail -2
+# Constrói ANTES de trocar o contêiner que está no ar, e confere o que entrou na imagem.
+#
+# 10/09/2026: a pasta `repositorios/` não foi para dentro da imagem (`COPY *.mjs` não pega
+# subpasta) e o servidor subiu em loop de ERR_MODULE_NOT_FOUND. O passo 7 pegou — mas
+# depois de o contêiner bom já ter sido substituído, com a produção fora do ar enquanto se
+# consertava. Construir e CONFERIR primeiro tira o "fora do ar" da conta.
+#
+# A conferência é estática (lista de arquivos), nunca subir o servidor para ver: subir para
+# ver é a verificação que trava justamente quando está tudo certo.
+ssh -o ConnectTimeout=120 "$VPS" "cd $REMOTO && docker compose -f docker-compose.ip.yml build token" 2>&1 | tail -2
+# O nome vem do compose (projeto-serviço), e não de `images -q`: aquilo devolve um id que
+# o `docker run` recusa, e a conferência morria por bug dela mesma — barrando publicação
+# boa, que é o segundo jeito de uma verificação custar caro.
+NA_IMAGEM=$(ssh -o ConnectTimeout=30 "$VPS" "docker run --rm --entrypoint sh server-token -c \"find /srv -name '*.mjs' -not -path '*/node_modules/*' | sed 's|/srv/||' | sort\"" 2>/dev/null || true)
+DAQUI=$(find . -name '*.mjs' -not -name '*.test.mjs' -not -path './node_modules/*' -not -path './dados*' | sed 's|^\./||' | sort)
+if [ -z "$NA_IMAGEM" ]; then
+  # A conferência não RODOU. Isso é diferente de ela ter achado problema: seguir em frente
+  # deixa o passo 7 como rede de proteção, e parar aqui seria uma publicação barrada por
+  # defeito do próprio conferidor — com a produção esperando por nada.
+  echo "  ! não consegui listar os módulos dentro da imagem; seguindo, o passo 7 confere depois"
+else
+  FALTANDO=$(comm -23 <(printf '%s\n' "$DAQUI") <(printf '%s\n' "$NA_IMAGEM"))
+  if [ -n "$FALTANDO" ]; then
+    erro "estes módulos não entraram na imagem — o servidor subiria em loop:"
+    printf '%s\n' "$FALTANDO" | sed 's/^/      /'
+    echo "PAROU antes de trocar: a VPS continua com a versão de pé."
+    exit 1
+  fi
+  ok "todos os módulos entraram na imagem ($(printf '%s\n' "$DAQUI" | wc -l | tr -d ' '))"
+fi
+
+ssh -o ConnectTimeout=30 "$VPS" "cd $REMOTO && docker compose -f docker-compose.ip.yml up -d token" 2>&1 | tail -2
 
 echo
 echo "=== 7. Conferindo depois ==="
