@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { MenuDaTela } from './MenuDaTela';
 import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
+import { FaixaDoPalco } from './FaixaDoPalco';
 import type { Mensagem, RoomInfo } from '../api';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { Espectador } from '../espectadores';
@@ -242,16 +243,22 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       <header className="stage-head">
         <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
         <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
-        {/* Estando na voz de uma sala e lendo outra, as duas aparecem: senão o topo diz
-            "papo" enquanto sua voz está em "Geral", e ninguém entende onde está falando.
-            Vale também entre servidores — e aí o nome da sala sozinho não resolve. */}
-        {!idle && rm.salaDaVoz && salaAberta && rm.salaDaVoz.id !== salaAberta.id && (
-          <span className="muted small na-voz-de">
-            <Icon name="speaker" size={13} /> voz em {rm.salaDaVoz.nome}
-            {rm.salaDaVoz.servidorId !== servidorId && ` · ${rm.salaDaVoz.servidorNome}`}
-          </span>
-        )}
       </header>
+
+      {/* Estando na voz de uma sala e lendo outra, a call fica à mostra aqui em cima: quem
+          está nela, quantas telas no ar, e o caminho de volta num clique. Era uma linha de
+          texto no cabeçalho ("voz em Geral") que não dizia nem quem estava lá. Não aparece
+          na própria sala de voz — ali o palco já está na tela. */}
+      {!idle && rm.salaDaVoz && salaAberta && rm.salaDaVoz.id !== salaAberta.id && (
+        <FaixaDoPalco
+          sala={rm.salaDaVoz}
+          participantes={rm.participants.map((p) => ({ identity: p.identity, nome: p.name || p.identity }))}
+          pessoas={pessoas}
+          transmitindo={rm.lives.length}
+          servidorAberto={servidorId}
+          onAbrir={onVoltarAVoz}
+        />
+      )}
 
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.

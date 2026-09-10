@@ -292,16 +292,58 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .msg .text a { color: var(--accent-claro); text-decoration: none; border-bottom: 1px solid rgba(107,163,245,.35); font-size: inherit; }
 .msg .text a:hover { border-bottom-color: var(--accent-claro); }
 .msg .text { word-break: break-word; white-space: pre-wrap; }
-.chat-input { display: flex; gap: var(--e2); padding: var(--e2) var(--e3) var(--e3); }
-.chat-input input { flex: 1; background: var(--bg3); border: 1px solid transparent; border-radius: 10px; padding: 12px 14px; }
-.chat-input input:focus { border-color: var(--accent); background: var(--bg0); }
-.chat-input button { width: 36px; display: grid; place-items: center; color: var(--text2); }
-.chat-input button:hover:not(:disabled) { color: var(--white); }
+/* A barra é UMA caixa, não quatro coisas soltas na mesma linha: o campo, o anexar, o GIF
+   e o enviar moram dentro dela, e é a caixa que acende ao receber o cursor. Antes nada
+   dizia que aquilo formava um lugar de escrever. */
+.chat-input { display: flex; align-items: center; gap: var(--e1);
+  margin: var(--e2) var(--e3) var(--e3); padding: var(--e1) var(--e1) var(--e1) 2px;
+  background: var(--bg3); border: 1px solid transparent; border-radius: 12px;
+  transition: border-color .12s, background .12s; }
+.chat-input:focus-within { border-color: var(--accent); background: var(--bg0); }
+.chat-input input { flex: 1; min-width: 0; background: none; border: none; padding: 11px 8px; }
+.chat-input input:focus { outline: none; }
+.chat-input button { width: 34px; height: 34px; display: grid; place-items: center;
+  color: var(--text2); border-radius: 8px; flex: none; }
+.chat-input button:hover:not(:disabled) { color: var(--white); background: var(--bg4); }
 .chat-input button:disabled { opacity: .4; }
+/* O enviar é o único com cor: é a ação, e as outras são acessórios dela. */
+.chat-input button.enviar { background: var(--accent); color: #fff; }
+.chat-input button.enviar:hover:not(:disabled) { background: var(--accent-h); }
+.chat-input button.enviar:disabled { background: var(--bg4); color: var(--text3); opacity: 1; }
 
-/* Voz numa sala, lendo outra: o topo precisa dizer as duas. */
-.na-voz-de { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-  border-radius: 10px; background: var(--bg1); color: var(--ok); }
+/* Onde a conversa vira outro dia. O risco atravessa a coluna inteira porque é disso que
+   ele vive: separar. O rótulo fica no meio, sobre o fundo, para o risco não passar por
+   baixo do texto. */
+.dia-separa { display: flex; align-items: center; gap: var(--e3); margin: var(--e4) var(--e5) var(--e2); }
+.dia-separa::before, .dia-separa::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.dia-separa span { font-size: 10.5px; font-weight: 800; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--text3); white-space: nowrap; }
+
+/* A faixa do palco: onde a sua voz está, no alto do chat. Ela é uma barra e não um
+   cartão — cartão diria "objeto à parte", e ela é a continuação do cabeçalho. */
+.faixa-palco { display: flex; align-items: center; gap: var(--e2);
+  margin: 0 var(--e4) var(--e2); padding: var(--e2) var(--e2) var(--e2) var(--e3);
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 10px;
+  -webkit-app-region: no-drag; }
+.faixa-palco .faixa-icone { color: var(--accent-claro); display: grid; place-items: center; }
+.faixa-palco .faixa-nome { font-size: 14px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.faixa-palco .spacer { flex: 1; }
+/* Rostos empilhados: cada um monta um pouco no anterior, e o anel da cor do fundo é o
+   que os separa — sem ele viram uma mancha só. */
+.faixa-rostos { display: flex; align-items: center; margin-left: var(--e1); flex: none; }
+.faixa-rostos .avatar { width: 22px; height: 22px; font-size: 9.5px;
+  margin-left: -6px; box-shadow: 0 0 0 2px var(--bg1); }
+.faixa-rostos .avatar:first-child { margin-left: 0; }
+.faixa-mais { margin-left: -6px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: var(--bg3); box-shadow: 0 0 0 2px var(--bg1); color: var(--text2);
+  font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
+.faixa-live { display: inline-flex; align-items: center; gap: 5px; flex: none;
+  color: var(--accent-claro); font-size: 12px; font-weight: 600; }
+.faixa-abrir { flex: none; padding: 6px 14px; border-radius: 8px; font-size: 12.5px;
+  font-weight: 600; color: var(--accent-claro); background: none;
+  border: 1px solid var(--accent); }
+.faixa-abrir:hover { background: var(--accent-tenue); }
 
 /* GIF na conversa. Altura limitada porque um GIF alto empurraria a conversa inteira para
    fora da tela; quem quiser ver maior clica e abre no visualizador. */

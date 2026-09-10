@@ -5,6 +5,7 @@ import { partirEmLinks } from '../links';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherGif } from './EscolherGif';
+import { mudouDeDia, rotuloDoDia } from '../dias';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -100,10 +101,21 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
   const [arrastando, setArrastando] = useState(false);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
+  const campo = useRef<HTMLInputElement>(null);
   const fim = useRef<HTMLDivElement>(null);
 
   // Rola para o fim quando chega mensagem — é onde a conversa está.
   useEffect(() => { fim.current?.scrollTo({ top: fim.current.scrollHeight }); }, [mensagens.length]);
+
+  /**
+   * Abriu a sala, já dá para digitar.
+   *
+   * Clicar na sala e depois ter de clicar no campo é um clique que não decide nada: quem
+   * abre uma sala de texto vai escrever ou vai ler, e em nenhum dos dois casos o cursor
+   * fazia falta noutro lugar. A dep é o NOME da sala, não a lista de mensagens — senão
+   * cada mensagem que chega roubaria o cursor de volta no meio de uma frase.
+   */
+  useEffect(() => { if (sala) campo.current?.focus(); }, [sala]);
 
   const semSala = !sala;
 
@@ -157,8 +169,16 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
             {semSala ? 'Escolha uma sala à esquerda.' : 'Ninguém falou nada aqui ainda.'}
           </div>
         )}
-        {mensagens.map((m) => (
-          <div key={m.id} className={`msg ${m.autorId === meuId ? 'mine' : ''}`}>
+        {mensagens.map((m, i) => (
+          <div key={m.id}>
+            {/* O separador nasce da comparação com a mensagem ANTERIOR, e por isso não
+                precisa de estado nenhum: a lista já vem em ordem. `agora` é lido na hora
+                de desenhar para que "Hoje" continue certo numa janela aberta desde
+                ontem. A conta está em dias.ts, testada. */}
+            {mudouDeDia(i === 0 ? null : mensagens[i - 1].criadoEm, m.criadoEm) && (
+              <div className="dia-separa"><span>{rotuloDoDia(m.criadoEm, Date.now())}</span></div>
+            )}
+          <div className={`msg ${m.autorId === meuId ? 'mine' : ''}`}>
             <div className="msg-topo">
               <button className="quem-falou" title={`${m.nome} — clique para o perfil`}
                 onClick={(e) => m.autorId && onPessoa?.(m.autorId, m.nome, { x: e.clientX, y: e.clientY }, 'perfil')}
@@ -179,6 +199,7 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
               </button>
             )}
             {m.arquivo && <Anexo arquivo={m.arquivo} />}
+          </div>
           </div>
         ))}
       </div>
@@ -209,16 +230,10 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
         </div>
       )}
 
+      {/* Uma caixa só, com o anexo à esquerda e o resto à direita — o campo é a caixa,
+          não um retângulo dentro dela. Antes eram quatro coisas soltas na mesma linha e
+          nada dizia que formavam um lugar de escrever. */}
       <form className="chat-input" onSubmit={enviar}>
-        <button
-          type="button"
-          className="icon"
-          title="Mandar um GIF"
-          disabled={semSala}
-          onClick={() => setGifAberto(true)}
-        >
-          <Icon name="gif" size={18} />
-        </button>
         {/* O input fica escondido e o botão é que aparece: o seletor de arquivo do
             navegador não combina com nada em volta, e não dá para estilizá-lo. */}
         <input
@@ -233,25 +248,36 @@ export function Chat({ mensagens, erro, onEnviar, onEnviarGif, onEnviarArquivo, 
         />
         <button
           type="button"
-          className="icon"
+          className="icon anexar"
           title="Anexar um arquivo (ou arraste para cá)"
           disabled={semSala || progresso !== null}
           onClick={() => campoDeArquivo.current?.click()}
         >
-          <Icon name="anexo" size={18} />
+          <Icon name="mais" size={20} />
         </button>
         <input
+          ref={campo}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder={semSala ? 'Escolha uma sala' : anexo ? 'Escreva algo junto, se quiser' : `Mensagem em ${sala}`}
+          placeholder={semSala ? 'Escolha uma sala' : anexo ? 'Escreva algo junto, se quiser' : `Mensagem em #${sala}`}
           disabled={semSala || progresso !== null}
           maxLength={2000}
         />
         <button
+          type="button"
+          className="icon"
+          title="Mandar um GIF"
+          disabled={semSala}
+          onClick={() => setGifAberto(true)}
+        >
+          <Icon name="gif" size={18} />
+        </button>
+        <button
+          className="enviar"
           disabled={semSala || progresso !== null || (!texto.trim() && !anexo)}
           title={anexo ? 'Enviar o arquivo' : 'Enviar'}
         >
-          <Icon name="send" size={18} />
+          <Icon name="send" size={17} />
         </button>
       </form>
 

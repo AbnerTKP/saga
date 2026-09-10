@@ -20,6 +20,9 @@ const paths: Record<string, string> = {
   close: 'M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z',
   send: 'M2 21l21-9L2 3v7l15 2-15 2z',
   expandir: 'M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z',
+  // Mais, dentro de um círculo: "juntar alguma coisa aqui". É o gesto que o pessoal já
+  // reconhece na esquerda de um campo de conversa — anexar, sem precisar da palavra.
+  mais: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 9h4v2h-4v4h-2v-4H7v-2h4V7h2z',
   // Olho: quem está ASSISTINDO. O mesmo desenho que todo mundo usa para "ver" — aqui não
   // é hora de inventar símbolo, ele aparece a 13 px ao lado de um nome.
   olho: 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z',

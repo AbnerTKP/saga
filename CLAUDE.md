@@ -549,6 +549,28 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   grande pulava de uma para a outra sozinho e não havia como dizer "quero esta". Sem
   clique, todas ficam do mesmo tamanho, esperando. A escolha vale para imagem **e** som:
   palco vazio é silêncio, que é o que `audivel.ts` já dizia.
+- **A faixa do palco fica no ALTO do chat, e não é um cartão.** Lendo uma sala de texto, a
+  call sumia da vista: sobrava a linha "voz em Geral" no cabeçalho, que não dizia quem
+  estava lá nem quantas telas no ar, e o caminho de volta era caçar a sala na barra da
+  esquerda. Hoje a faixa mostra a sala, os rostos empilhados (quatro e "+N"), quantos
+  compartilham e um "Abrir palco". Barra e não cartão porque cartão diz "objeto à parte", e
+  ela é a continuação do cabeçalho. **Só aparece quando a voz está NOUTRA sala** — na
+  própria sala de voz o palco já está na tela, e a faixa seria uma segunda cópia do que se
+  está vendo.
+- **Abriu a sala de texto, o cursor já está no campo.** Clicar na sala e depois clicar no
+  campo é um clique que não decide nada. A dep do efeito é o NOME da sala, nunca a lista de
+  mensagens — com a lista, cada mensagem que chega roubaria o cursor de volta no meio de
+  uma frase.
+- **A barra de escrever é UMA caixa**, com o anexar dentro à esquerda e o GIF e o enviar
+  dentro à direita; quem acende ao receber o cursor é a caixa (`:focus-within`), não o
+  campo. Eram quatro coisas soltas na mesma linha e nada dizia que formavam um lugar de
+  escrever. O enviar é o único com cor preenchida: é a ação, e o resto é acessório dela.
+- **O chat separa os dias** (`dias.ts`, puro e testado): "Hoje", "Ontem", ou a data por
+  extenso. A hora sozinha mente — "22:08" pode ser de hoje ou de três semanas atrás, e as
+  duas ficavam coladas. O fuso é o de QUEM LÊ, e não o de São Paulo como nas notas de
+  versão: nota é um fato com data própria, mensagem é uma coisa que aconteceu no seu dia.
+  E `agora` entra por parâmetro em vez de sair de `Date.now()` lá dentro, senão "Hoje"
+  congelaria numa janela aberta desde ontem.
 - **Uma coisa por vez no palco: vídeo OU chat.** O chat já morou como coluna dentro da
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
@@ -853,7 +875,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (239) + app (125), segundos, sem nada externo
+pnpm test        # servidor (239) + app (131), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -870,6 +892,15 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
    `zip`; (c) a assinatura, que o certificado próprio resolve. Certificado sozinho não liga
    nada — esta linha já atribuiu tudo à assinatura, e estava errada.
 2. **Atalhos de teclado no soundboard** — ficou planejado na v0.4.0 e não saiu.
+3. **O resto do mock de chat que o dono mandou** (09/09/2026), com o preço de cada um:
+   **reações** (tabela nova, migração, rota, e a contagem viajando no `/mensagens` que já
+   é polado de 2 em 2 s); **prévia de link** (o servidor teria de buscar URL que veio de
+   fora — é SSRF, precisa de lista de permissão, tempo limite e cache, e não é coisa de
+   fazer no susto); **"está digitando"** (não existe empurrão nenhum no servidor; sobre o
+   laço de 2 s chegaria tarde e piscando, e escrever a cada tecla é o oposto do que
+   `vista_em` ensinou); **fixar mensagem** e **buscar no chat** (tabela e consulta novas);
+   **emoji no campo** (some junto com as reações, se elas vierem). Nada disso entrou por
+   ser feature de verdade, não ajuste de tela.
 3. **Modo música** — desligar cancelamento de eco, ruído e ganho para quem toca instrumento.
 4. **Ícone do Mac** em retângulo arredondado, como manda o sistema.
 
