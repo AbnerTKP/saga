@@ -33,10 +33,19 @@ const OUTRO_SISTEMA = { nome: 'o sistema', encolhida: '' };
  * agora é isso e o resto de você.
  */
 export function PainelDaConta({
-  eu, room, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
+  eu, room, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
 }: {
   eu: Membro;
   room: Room;
+  /**
+   * O servidor aberto, ou null quando não há nenhum.
+   *
+   * O nome exibido é do VÍNCULO com um servidor, não da conta — dá para ser "Bagre" num
+   * e "Bagre TKP" noutro. Com os servidores de volta isso deixou de ser detalhe: sem
+   * dizer de qual servidor se está falando, o campo promete uma coisa e faz outra. E sem
+   * servidor nenhum ele não tem onde escrever, então não aparece.
+   */
+  servidorNome?: string | null;
   /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
   souBerserk: boolean;
   /** Só o dono da Saga vê o que vale em todos os servidores. */
@@ -127,14 +136,22 @@ export function PainelDaConta({
               />
             </div>
             <p className="muted small">
-              Seu nome aqui é o que os outros veem, em todos os servidores. O apelido de
-              entrada continua <b>{eu.apelido}</b> e não muda.
+              A foto e o banner são da conta: vão com você para todos os servidores. O
+              apelido de entrada continua <b>{eu.apelido}</b> e não muda.
               {!eu.turbo && ' Imagem animada é do Berserk; parada, todo mundo pode.'}
             </p>
-            <div className="linha-campo">
-              <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
-              <button onClick={salvarMeuNome} disabled={ocupado || meuNome === eu.nome}>Salvar</button>
-            </div>
+            {servidorNome && (
+              <>
+                <p className="muted small">
+                  Já o nome que aparece é de cada servidor. Este é o seu
+                  em <b>{servidorNome}</b>.
+                </p>
+                <div className="linha-campo">
+                  <input value={meuNome} onChange={(e) => setMeuNome(e.target.value)} maxLength={32} />
+                  <button onClick={salvarMeuNome} disabled={ocupado || meuNome === eu.nome}>Salvar</button>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="painel-bloco">

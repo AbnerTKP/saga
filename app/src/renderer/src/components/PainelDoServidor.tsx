@@ -3,7 +3,7 @@ import {
   pode, podeSobre, verServidor, renomearServidor, moderar,
   fotoDoServidor, bannerDoServidor, usarGif, salvarEnquadramento,
   criarSala, renomearSala, apagarSala,
-  criarCargo, editarCargo, apagarCargo, criarConvite, type Convite,
+  criarCargo, editarCargo, apagarCargo, criarConvite, sairDoServidor, type Convite,
   type Acao, type AcaoDeModeracao, type Cargo, type CargoNovo, type Membro,
   type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
@@ -24,7 +24,7 @@ const posso = (eu: Membro, acao: AcaoDeModeracao, alvo: Membro) =>
 
 const emCastigo = (m: Membro) => !!m.castigoAte && m.castigoAte > Date.now();
 
-export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose }: {
+export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu, onClose }: {
   eu: Membro; servidor: Servidor;
   /**
    * O identificador aparece junto do nome em TODO servidor: definir o de alguém é mexer
@@ -32,7 +32,10 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
    * servidor. Mesma regra do Berserk, e pelo mesmo motivo.
    */
   donoDaSaga: boolean;
-  onServidor: (s: Servidor) => void; onClose: () => void;
+  onServidor: (s: Servidor) => void;
+  /** Saiu deste servidor: quem recarrega a sessão é quem chamou. */
+  onSaiu: () => void;
+  onClose: () => void;
 }) {
   const [membros, setMembros] = useState<Membro[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -46,6 +49,9 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // Sair pede confirmação no próprio botão: uma janela a mais para uma decisão que se
+  // toma uma vez na vida é ruído, e um clique único num botão de sair é engano garantido.
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false);
 
   /**
    * Falhar em carregar NÃO é o mesmo que não ter nada.
@@ -475,6 +481,42 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onClose
             ))}
           </ul>
         </section>
+
+        {/* Sair fica fora de toda permissão: entrar num servidor é decisão de quem chega,
+            e sair também — não é moderação. Quem CRIOU não sai, e o servidor recusa: ele
+            ficaria sem ninguém capaz de administrá-lo e sem caminho de volta. */}
+        {!eu.cargo?.dono && (
+          <section className="painel-bloco">
+            <h3>Você aqui</h3>
+            <p className="muted small">
+              Sair devolve o cargo e o nome que você usa neste servidor. O que você
+              escreveu fica, e voltar depende de um convite novo.
+            </p>
+            <div className="linha-campo">
+              {confirmandoSaida ? (
+                <>
+                  <button
+                    className="perigo"
+                    disabled={ocupado}
+                    onClick={async () => {
+                      setErro(null); setOcupado(true);
+                      try { await sairDoServidor(); onSaiu(); }
+                      catch (e) { setErro((e as Error).message); setConfirmandoSaida(false); }
+                      finally { setOcupado(false); }
+                    }}
+                  >
+                    Sair mesmo de {servidor.nome}
+                  </button>
+                  <button onClick={() => setConfirmandoSaida(false)}>Deixa pra lá</button>
+                </>
+              ) : (
+                <button className="perigo" onClick={() => setConfirmandoSaida(true)}>
+                  Sair de {servidor.nome}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
         </>)}
         </div>
       </div>

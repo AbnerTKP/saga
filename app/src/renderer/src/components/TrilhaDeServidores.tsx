@@ -1,5 +1,4 @@
 import { urlDoArquivo, type Servidor } from '../api';
-import { PODE_CRIAR_SERVIDOR } from '../travas';
 
 /**
  * A barra dos servidores. Fica à direita e é quadrada — de propósito diferente do
@@ -31,7 +30,7 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
         );
       })}
 
-      <button className="quadro-servidor acao" title={PODE_CRIAR_SERVIDOR ? 'Criar servidor ou entrar com convite' : 'Entrar num servidor com convite'} onClick={onConfigurar}>+</button>
+      <button className="quadro-servidor acao" title="Entrar com um convite ou criar um servidor" onClick={onConfigurar}>+</button>
     </nav>
   );
 }

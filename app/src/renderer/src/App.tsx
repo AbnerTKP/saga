@@ -13,7 +13,6 @@ import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
 import { CartaoDoPerfil } from './components/CartaoDoPerfil';
-import { MOSTRAR_SERVIDORES } from './travas';
 import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
@@ -33,6 +32,8 @@ import { Versao } from './components/Versao';
 import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { NovoServidor } from './components/NovoServidor';
+import { TelaInicial } from './components/TelaInicial';
+import { livesNasSalas, type LiveNoChat } from './lives';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -56,7 +57,8 @@ export function App() {
   const [painel, setPainel] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [registro, setRegistro] = useState(false);
-  const [novoServidor, setNovoServidor] = useState(false);
+  // Qual aba abrir: quem clicou em "criar" não quer chegar na de convite.
+  const [novoServidor, setNovoServidor] = useState<'criar' | 'entrar' | null>(null);
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
@@ -103,7 +105,9 @@ export function App() {
       .then((r) => {
         if (!vivo) return;
         if (r.servidor) guardarServidorAtual(r.servidor.id);
-        setSessao({ token: lerToken()!, servidores: [], ...r });
+        // Sem servidor nenhum não é erro: é a tela inicial vazia, e o crachá continua
+        // valendo. Só o 401 abaixo derruba a sessão.
+        setSessao({ token: lerToken()!, ...r });
       })
       .catch(() => { guardarToken(null); })
       .finally(() => { if (vivo) setConferindo(false); });
@@ -125,16 +129,27 @@ export function App() {
    * LiveKit é identificada pelo id, então continuar falando em "Geral" de um servidor
    * enquanto se lê outro nunca foi um problema técnico: era só esta linha.
    */
-  const trocarDeServidor = useCallback(async (id: number) => {
-    guardarServidorAtual(id);
+  /**
+   * Relê quem sou e onde estou. É o que fecha toda mudança de vínculo: trocar de
+   * servidor, entrar num com convite, criar um, sair de um. O servidor é quem decide
+   * onde você cai — pedir por um de que não se faz parte devolve o seu, e sair do
+   * último devolve a tela inicial.
+   */
+  const recarregarSessao = useCallback(async () => {
     setSalaAbertaId(null);
     try {
       const r = await quemSou();
-      setSessao((atual) => (atual ? { ...atual, eu: r.eu, servidor: r.servidor, salas: r.salas } : atual));
+      guardarServidorAtual(r.servidor?.id ?? null);
+      setSessao((atual) => (atual ? { ...atual, ...r } : atual));
     } catch (e) {
       rm.setError((e as Error).message);
     }
   }, [rm]);
+
+  const trocarDeServidor = useCallback(async (id: number) => {
+    guardarServidorAtual(id);
+    await recarregarSessao();
+  }, [recarregarSessao]);
 
   // O que a sala de voz tem a dizer entra na mesma fila do resto: um lugar só para todo
   // aviso, em vez da tarja vermelha presa no topo do palco.
@@ -200,22 +215,31 @@ export function App() {
     return () => { vivo = false; clearInterval(id); };
   }, [sessao?.servidor?.id]);
 
+  /**
+   * Entra na voz de uma sala, sem mexer no que está sendo lido.
+   *
+   * Separado de `abrirSala` porque as duas coisas deixaram de andar sempre juntas: dá
+   * para entrar numa call a partir da linha de "fulano está compartilhando a tela" no
+   * chat, e nesse caso quem estava lendo a conversa continua nela — a live vai para o
+   * quadro flutuante do canto, que existe exatamente para isso.
+   */
+  const entrarNaVoz = useCallback(async (sala: RoomInfo) => {
+    // Pelo id, não pelo nome: clicar em "Geral" de outro servidor tem de levar você para
+    // lá, e comparando nome o app achava que você já estava e não fazia nada.
+    if (rm.salaDaVoz?.id === sala.id) return;
+    const { url, token } = await pedirTokenDaSala(sala.name);
+    await rm.join(url, token, {
+      id: sala.id, nome: sala.name,
+      servidorId: sessao?.servidor?.id ?? 0, servidorNome: sessao?.servidor?.nome ?? '',
+    });
+  }, [rm, sessao?.servidor?.id, sessao?.servidor?.nome]);
+
   const abrirSala = useCallback(async (sala: RoomInfo) => {
     setSalaAbertaId(sala.id);
     // Sala de texto não tem voz: abrir é só passar a ler e escrever nela.
-    // Pelo id, não pelo nome: clicar em "Geral" de outro servidor tem de levar você para
-    // lá, e comparando nome o app achava que você já estava e não fazia nada.
-    if (sala.tipo !== 'voz' || rm.salaDaVoz?.id === sala.id) return;
-    try {
-      const { url, token } = await pedirTokenDaSala(sala.name);
-      await rm.join(url, token, {
-        id: sala.id, nome: sala.name,
-        servidorId: sessao?.servidor?.id ?? 0, servidorNome: sessao?.servidor?.nome ?? '',
-      });
-    } catch (e) {
-      rm.setError((e as Error).message);
-    }
-  }, [rm]);
+    if (sala.tipo !== 'voz') return;
+    try { await entrarNaVoz(sala); } catch (e) { rm.setError((e as Error).message); }
+  }, [rm, entrarNaVoz]);
 
   const logout = useCallback(async () => {
     await rm.leave();
@@ -328,6 +352,27 @@ export function App() {
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   const chat = useChat(salaAberta?.id ?? null);
 
+  /**
+   * As telas no ar, para a conversa avisar quem começou a transmitir.
+   *
+   * Sai da busca de salas, e não do LiveKit desta máquina: lendo uma sala de texto você
+   * pode nem estar na call, e é justamente aí que não havia como saber. Ver lives.ts.
+   */
+  const lives = livesNasSalas(rooms, sessao?.eu ? `u${sessao.eu.id}` : null);
+
+  const assistirLive = useCallback(async (live: LiveNoChat) => {
+    const sala = rooms.find((s) => s.id === live.salaId);
+    if (!sala) return;
+    try {
+      // Entrar é preciso: a faixa da transmissão só chega para quem está na sala. O que
+      // não muda é o que você está lendo — a live vai para o quadro flutuante.
+      await entrarNaVoz(sala);
+      rm.assistir(live.identity);
+    } catch (e) {
+      rm.setError((e as Error).message);
+    }
+  }, [rooms, entrarNaVoz, rm]);
+
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
   const ultimaNaTela = chat.mensagens.at(-1)?.id ?? 0;
@@ -359,21 +404,66 @@ export function App() {
     );
   }
 
-  // Banido de todos os servidores em que estava: entra na conta, mas não há onde entrar.
-  if (!sessao.eu || !sessao.servidor) {
+  /**
+   * Sem servidor nenhum: a tela inicial.
+   *
+   * É onde toda conta nova começa — cadastrar deixou de jogar a pessoa dentro do
+   * servidor de casa, e quem abre a porta é o convite. É também onde fica quem foi
+   * banido de todos os servidores em que estava, para ler o motivo.
+   */
+  if (!sessao.servidor || !sessao.eu) {
     return (
-      <div className="connect">
-        <div className="connect-card">
-          <h1>Sem servidor</h1>
-          <p className="muted">
-            {sessao.impedimento ?? 'Você não faz parte de nenhum servidor agora.'}
-          </p>
-          <button className="primary" onClick={logout}>Sair da conta</button>
-          <div className="registro-link">
-            <button type="button" className="link" onClick={() => setRegistro(true)}>ver o registro</button>
+      <div className="app-raiz">
+        {window.desktop.platform === 'darwin' && (
+          <div className="faixa-da-janela">
+            <img src={logo} alt="" width={17} height={17} />
+            <span>Saga</span>
           </div>
-        </div>
+        )}
+        {sessao.eu ? (
+          <TelaInicial
+            eu={sessao.eu}
+            impedimento={sessao.impedimento}
+            onEntrar={() => setNovoServidor('entrar')}
+            onCriar={() => setNovoServidor('criar')}
+            onConta={() => setDevices(true)}
+            onRegistro={() => setRegistro(true)}
+            onSair={logout}
+          />
+        ) : (
+          // Só um servidor antigo responde sem dizer quem você é. Sem isso não há tela
+          // para desenhar: resta o caminho de volta.
+          <div className="connect">
+            <div className="connect-card">
+              <h1>Sem servidor</h1>
+              <p className="muted">{sessao.impedimento ?? 'Você não faz parte de nenhum servidor agora.'}</p>
+              <button className="primary" onClick={logout}>Sair da conta</button>
+            </div>
+          </div>
+        )}
+        {novoServidor && (
+          <NovoServidor
+            inicial={novoServidor}
+            onPronto={trocarDeServidor}
+            onClose={() => setNovoServidor(null)}
+          />
+        )}
+        {devices && sessao.eu && (
+          <PainelDaConta
+            eu={sessao.eu}
+            room={rm.room}
+            souBerserk={sessao.eu.turbo}
+            donoDaSaga={!!sessao.eu.donoDaSaga}
+            volumeDoSoundboard={rm.volumeDoSoundboard}
+            onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
+            onEu={atualizarEu}
+            onRegistro={() => { setDevices(false); setRegistro(true); }}
+            onClose={() => setDevices(false)}
+          />
+        )}
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
+        <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
+        <UpdateToast estado={atualizacao} />
         <Versao />
       </div>
     );
@@ -433,6 +523,8 @@ export function App() {
         }}
         chat={chat}
         meuId={eu.id}
+        lives={lives}
+        onAssistirLive={assistirLive}
       />
       {picker && (
         <ScreenPicker
@@ -447,6 +539,7 @@ export function App() {
         <PainelDaConta
           eu={eu}
           room={rm.room}
+          servidorNome={servidor.nome}
           souBerserk={eu.turbo}
           donoDaSaga={!!eu.donoDaSaga}
           volumeDoSoundboard={rm.volumeDoSoundboard}
@@ -462,6 +555,7 @@ export function App() {
           servidor={servidor}
           donoDaSaga={!!eu.donoDaSaga}
           onServidor={atualizarServidor}
+          onSaiu={() => { setPainel(false); recarregarSessao(); }}
           onClose={() => setPainel(false)}
         />
       )}
@@ -492,17 +586,15 @@ export function App() {
         }}
       />
 
-      {/* Guardada por escolha do dono — ver travas.ts. O que existe atrás dela continua
-          inteiro no banco e no código; some só o caminho de trocar de servidor. */}
-      {MOSTRAR_SERVIDORES && <TrilhaDeServidores
+      <TrilhaDeServidores
         servidores={sessao.servidores.length ? sessao.servidores : [servidor]}
         atual={servidor.id}
         onEscolher={trocarDeServidor}
         // Botão direito noutro servidor: troca primeiro e só então abre — o painel lê
         // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
         onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
-        onConfigurar={() => setNovoServidor(true)}
-      />}
+        onConfigurar={() => setNovoServidor('entrar')}
+      />
 
       {menu && (
         <MenuDaPessoa
@@ -553,8 +645,9 @@ export function App() {
       )}
       {novoServidor && (
         <NovoServidor
+          inicial={novoServidor}
           onPronto={trocarDeServidor}
-          onClose={() => setNovoServidor(false)}
+          onClose={() => setNovoServidor(null)}
         />
       )}
       {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}

@@ -61,6 +61,44 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .connect-card label { display: grid; gap: 7px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text3); letter-spacing: .07em; }
 .connect-card input { font-size: 15px; }
 
+/* A Saga sem servidor nenhum -------------------------------------------------
+   Onde toda conta nova começa. O mesmo fundo da tela de entrada, porque é a mesma
+   sensação de "ainda não comecei": o app se apresenta e oferece as duas portas. Quem
+   está aqui não tem sala, cargo nem lista de gente — então não há barra lateral nenhuma
+   para desenhar, e a tela é só a decisão. */
+.tela-inicial { flex: 1; min-height: 0; display: flex; flex-direction: column;
+  -webkit-app-region: drag;
+  background:
+    radial-gradient(60% 55% at 50% 0%, rgba(63,127,224,.18) 0%, transparent 65%),
+    linear-gradient(165deg, #1b1f28, #101218 70%); }
+.inicial-meio { flex: 1; display: grid; place-content: center; justify-items: center;
+  gap: var(--e3); padding: var(--e5); max-width: 540px; margin: 0 auto; text-align: center; }
+.inicial-marca { border-radius: 22px; margin-bottom: var(--e2); }
+.inicial-meio h1 { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.03em; color: var(--white); }
+.inicial-meio p { margin: 0; line-height: 1.55; }
+/* Banido de todos os servidores: o motivo é a informação da tela, e não um aviso que
+   passa. Amarelo e não vermelho — não foi você que quebrou nada. */
+.inicial-impedimento { color: var(--warn); background: rgba(224,162,51,.1);
+  border: 1px solid rgba(224,162,51,.32); border-radius: 10px; padding: 10px 14px; }
+.inicial-acoes { display: flex; gap: var(--e2); margin-top: var(--e2); -webkit-app-region: no-drag; }
+/* O convite é o caminho de quem chega chamado por alguém; criar é o de quem chega
+   sozinho. Só o primeiro leva cor: dois botões cheios não escolhem nada. */
+.secundario { background: var(--bg3); color: var(--white); border-radius: 8px;
+  padding: 11px 20px; font-weight: 650; letter-spacing: -.01em; }
+.secundario:hover { background: var(--bg4); }
+/* O que não tem volta fácil — sair de um servidor. Contorno e não bloco cheio: ele não é
+   a ação principal de tela nenhuma, e um botão vermelho sólido chama para si a mão. */
+.perigo { color: #ff8a90; border: 1px solid rgba(224,72,82,.5); border-radius: 8px;
+  padding: 9px 16px; font-weight: 600; }
+.perigo:hover:not(:disabled) { background: rgba(224,72,82,.14); }
+.inicial-conta { -webkit-app-region: no-drag; display: flex; align-items: center;
+  gap: var(--e3); padding: var(--e3) var(--e4);
+  background: var(--bg0); border-top: 1px solid var(--line); }
+.inicial-conta .uname { display: grid; flex: 1; min-width: 0; line-height: 1.2; }
+.inicial-conta .icon { width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 8px; color: var(--text); }
+.inicial-conta .icon:hover { background: var(--bg3); }
+
 /* Layout principal */
 .app { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
 .sidebar { background: var(--bg1); display: flex; flex-direction: column; min-height: 0; }
@@ -276,36 +314,93 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   display: flex; align-items: center; gap: 5px; backdrop-filter: blur(6px); }
 .tile.audio { cursor: default; }
 
-/* Chat */
-.chat { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); }
-.chat-head { height: 48px; display: flex; align-items: center; padding: 0 var(--e4);
-  font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--white); border-bottom: 1px solid var(--line); }
-.chat-log { flex: 1; overflow-y: auto; padding: var(--e3) 0; user-select: text; }
-/* Cada mensagem é um bloco com ar em volta: coladas, viram um parágrafo só de gente
-   diferente. O nome pesa, a hora recua — é o nome que se procura ao rolar. */
-.msg { padding: var(--e2) var(--e4); }
+/* Chat -----------------------------------------------------------------------
+   O chat é o palco inteiro de uma sala de texto. Ele já morou como coluna estreita ao
+   lado do vídeo — daí a borda à esquerda e o corpo de legenda que tinha aqui —, e chat
+   não é da sala de voz: é da sala de chat. Hoje é a tela, com corpo de texto. */
+.chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.chat-log { flex: 1; overflow-y: auto; padding: var(--e4) 0 var(--e2); user-select: text; }
+
+/* Uma mensagem tem duas colunas: a foto numa, o que foi dito na outra — e o texto
+   alinhado com o NOME, não com a margem da tela. Tudo colado à esquerda formava degraus,
+   e não se via onde uma pessoa parava e a outra começava. */
+.msg { display: grid; grid-template-columns: 40px 1fr; gap: var(--e3);
+  padding: 3px var(--e5); font-size: 15px; }
 .msg:hover { background: rgba(255,255,255,.025); }
-.msg .from { font-weight: 700; color: var(--white); margin-right: 7px; letter-spacing: -.01em; }
-.msg.mine .from { color: var(--accent-claro); }
-.msg .time { font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
-.msg .text { margin-top: 2px; line-height: 1.5; }
+/* Três linhas seguidas da mesma pessoa são uma fala só: sem foto e sem nome de novo.
+   O respiro fica ENTRE as falas, e não entre as linhas — é ele que faz a conversa ter
+   parágrafos em vez de virar uma coluna contínua. */
+.msg:not(.seguida) { margin-top: var(--e3); }
+.msg.seguida { padding-top: 1px; padding-bottom: 1px; }
+/* `flex-start` porque o botão do <button> centraliza o conteúdo dele na altura: sem
+   isto a foto descia para o meio do bloco e ficava ao lado do texto, não do nome. */
+.msg-lado { display: flex; justify-content: center; align-items: flex-start; }
+.msg-lado .avatar { width: 38px; height: 38px; font-size: 15px; }
+.quem-falou { border-radius: 50%; display: block; }
+/* A hora da continuação vive na margem e só aparece com o mouse: ela precisa existir —
+   é como se sabe quando aquela linha foi dita — sem custar uma coluna de tinta por linha. */
+.msg-hora-margem { font-size: 10px; line-height: 22px; color: var(--text3); opacity: 0;
+  font-variant-numeric: tabular-nums; }
+.msg:hover .msg-hora-margem { opacity: 1; }
+.msg-corpo { min-width: 0; }
+.msg-topo { display: flex; align-items: baseline; gap: var(--e2); }
+.msg-nome { font-size: 15px; font-weight: 700; color: var(--white); letter-spacing: -.01em;
+  padding: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-nome:hover { text-decoration: underline; }
+.msg.mine .msg-nome { color: var(--accent-claro); }
+.msg .time { font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; flex: none; }
+.msg .text { line-height: 1.45; word-break: break-word; white-space: pre-wrap; }
 .msg .text a { color: var(--accent-claro); text-decoration: none; border-bottom: 1px solid rgba(107,163,245,.35); font-size: inherit; }
 .msg .text a:hover { border-bottom-color: var(--accent-claro); }
-.msg .text { word-break: break-word; white-space: pre-wrap; }
+
+/* Alguém pôs a tela no ar enquanto você lia. É uma faixa no fim da conversa, não uma
+   mensagem: ela some quando a transmissão acaba, e por isso não leva hora nem fica no
+   histórico de ontem. */
+.live-no-chat { display: flex; align-items: center; gap: var(--e2);
+  margin: var(--e2) var(--e5); padding: var(--e2) var(--e2) var(--e2) var(--e3);
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+.live-no-chat.vendo { border-color: var(--accent); background: var(--accent-tenue); }
+.live-no-chat .live-icone { display: grid; place-items: center; color: var(--accent-claro); flex: none; }
+.live-no-chat .live-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-plateia { display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.live-assistir { flex: none; padding: 6px 14px; border-radius: 8px; font-size: 12.5px;
+  font-weight: 600; color: var(--accent-claro); border: 1px solid var(--accent); }
+.live-assistir:hover:not(:disabled) { background: var(--accent-tenue); }
+.live-assistir:disabled { color: var(--text3); border-color: var(--bg4); }
+
+/* Quem está escrevendo. Fica colado na barra de escrever, fora da conversa: não é uma
+   mensagem, é um estado — e some sozinho quando a pessoa para ou manda. */
+.digitando { display: flex; align-items: center; gap: var(--e2); height: 20px;
+  padding: 0 var(--e5) 2px; font-size: 12.5px; color: var(--text2); }
+.pontinhos { display: inline-flex; gap: 3px; }
+.pontinhos i { width: 4px; height: 4px; border-radius: 50%; background: var(--text3);
+  animation: pisca 1.2s infinite ease-in-out; }
+.pontinhos i:nth-child(2) { animation-delay: .18s; }
+.pontinhos i:nth-child(3) { animation-delay: .36s; }
+@keyframes pisca { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
 /* A barra é UMA caixa, não quatro coisas soltas na mesma linha: o campo, o anexar, o GIF
    e o enviar moram dentro dela, e é a caixa que acende ao receber o cursor. Antes nada
    dizia que aquilo formava um lugar de escrever. */
 .chat-input { display: flex; align-items: center; gap: var(--e1);
-  margin: var(--e2) var(--e3) var(--e3); padding: var(--e1) var(--e1) var(--e1) 2px;
-  background: var(--bg3); border: 1px solid transparent; border-radius: 12px;
+  margin: var(--e2) var(--e5) var(--e4); padding: 5px 5px 5px 6px;
+  background: var(--bg3); border: 1px solid transparent; border-radius: 14px;
   transition: border-color .12s, background .12s; }
 .chat-input:focus-within { border-color: var(--accent); background: var(--bg0); }
-.chat-input input { flex: 1; min-width: 0; background: none; border: none; padding: 11px 8px; }
+.chat-input input { flex: 1; min-width: 0; background: none; border: none; padding: 11px 10px; }
 .chat-input input:focus { outline: none; }
-.chat-input button { width: 34px; height: 34px; display: grid; place-items: center;
-  color: var(--text2); border-radius: 8px; flex: none; }
+.chat-input button { width: 36px; height: 36px; display: grid; place-items: center;
+  color: var(--text2); border-radius: 10px; flex: none; }
 .chat-input button:hover:not(:disabled) { color: var(--white); background: var(--bg4); }
 .chat-input button:disabled { opacity: .4; }
+/* O GIF é palavra e não desenho: "GIF" é o nome da coisa, e um ícone aqui precisaria de
+   legenda. Ele fica antes de uma divisória, que separa o acessório da ação. */
+.chat-input .gif { width: auto; padding: 0 10px; font-size: 12px; font-weight: 800;
+  letter-spacing: .04em; }
+.chat-input .enviar { margin-left: var(--e1); position: relative; }
+.chat-input .enviar::before { content: ''; position: absolute; left: -5px; top: 7px;
+  bottom: 7px; width: 1px; background: var(--bg4); }
 /* O enviar é o único com cor: é a ação, e as outras são acessórios dela. */
 .chat-input button.enviar { background: var(--accent); color: #fff; }
 .chat-input button.enviar:hover:not(:disabled) { background: var(--accent-h); }
@@ -673,20 +768,6 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* ---- chat ---- */
 
-/* Cada mensagem mostra quem escreveu, com foto: numa sala de texto que dura semanas,
-   "quem falou" importa tanto quanto o que foi dito. */
-.msg-topo { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.msg-topo .avatar { width: 18px; height: 18px; font-size: 9px; }
-.msg .text { padding-left: 24px; }
-
-/* Numa sala de texto o chat ocupa o palco inteiro, e o texto ganha respiro. */
-.chat-grande { border-left: none; flex: 1; min-height: 0; }
-.chat-grande .chat-log { padding: 16px 0; }
-.chat-grande .msg { padding: 5px 24px; font-size: 15px; }
-.chat-grande .msg-topo .avatar { width: 24px; height: 24px; font-size: 11px; }
-.chat-grande .msg .text { padding-left: 30px; }
-.chat-grande .chat-input { padding: 12px 24px 20px; }
-
 /* A sala aberta para leitura, que pode não ser a sala em que se está falando. */
 .room.aberta:not(.active) { background: var(--bg3); color: var(--white); }
 .stage-body.so-chat { grid-template-columns: 1fr; }
@@ -875,15 +956,18 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* O anexo é um cartão, e não um link: link parece coisa para abrir, e arquivo que veio
    de fora não se abre — se salva, no lugar que a pessoa escolher. */
-.msg-anexo { display: inline-flex; align-items: center; gap: 10px; margin-top: 6px;
-  padding: 9px 13px 9px 10px; max-width: 340px; text-align: left;
+.msg-anexo { display: flex; align-items: center; gap: 10px; margin-top: 6px;
+  padding: 9px 13px 9px 10px; width: 340px; max-width: 100%; text-align: left;
   background: var(--bg1); border: 1px solid var(--line); border-radius: 10px;
   color: inherit; transition: border-color .12s, background .12s; }
 .msg-anexo:hover:not(:disabled) { border-color: var(--accent); background: var(--bg3); }
 .msg-anexo:disabled { opacity: .6; }
 .anexo-icone { display: grid; place-items: center; width: 34px; height: 34px; flex: none;
   border-radius: 8px; background: var(--accent-tenue); color: var(--accent-claro); }
-.anexo-quem { display: grid; gap: 1px; min-width: 0; }
+.anexo-quem { display: grid; gap: 1px; min-width: 0; flex: 1; }
+/* A seta não é outro botão: o cartão inteiro salva, e ela é o que diz isso. */
+.anexo-baixar { display: grid; place-items: center; flex: none; color: var(--text3); }
+.msg-anexo:hover:not(:disabled) .anexo-baixar { color: var(--accent-claro); }
 .anexo-quem .strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .perfil-volume { display: grid; gap: 6px; margin-top: 4px; padding: 12px 14px;

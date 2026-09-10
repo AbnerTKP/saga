@@ -7,7 +7,8 @@ import { MenuDaTela } from './MenuDaTela';
 import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
-import type { Mensagem, RoomInfo } from '../api';
+import type { Digitando, Mensagem, RoomInfo } from '../api';
+import type { LiveNoChat } from '../lives';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { Espectador } from '../espectadores';
 import { anotar } from '../registro';
@@ -136,7 +137,7 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, onVoltarAVoz }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, lives, onAssistirLive, onVoltarAVoz }: {
   rm: RM;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -148,12 +149,18 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   servidorId: number;
   chat: {
     mensagens: Mensagem[];
+    digitando: Digitando[];
     erro: string | null;
     enviar: (t: string) => Promise<void>;
     enviarGif: (url: string) => Promise<void>;
     enviarArquivo: (arquivo: File, texto: string, aoProgredir: (f: number) => void) => Promise<void>;
+    contarQueDigito: () => void;
   };
   meuId: number;
+  /** As telas no ar agora, em qualquer sala de voz do servidor — ver lives.ts. */
+  lives: LiveNoChat[];
+  /** Assistir a uma live a partir do chat, entrando na sala de voz dela se preciso. */
+  onAssistirLive: (live: LiveNoChat) => void;
   /** Volta para a sala de voz em que você está, a partir do chat. */
   onVoltarAVoz?: () => void;
 }) {
@@ -267,15 +274,20 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
         <div className="stage-body so-chat">
           <Chat
             mensagens={chat.mensagens}
+            digitando={chat.digitando}
             erro={chat.erro}
             onEnviar={chat.enviar}
             onEnviarGif={chat.enviarGif}
             onEnviarArquivo={chat.enviarArquivo}
+            onDigitar={chat.contarQueDigito}
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
             onPessoa={(id, nome, em, tipo) => onPessoa(`u${id}`, nome, em, tipo)}
-            grande
+            lives={lives}
+            assistindo={rm.assistindo}
+            onAssistir={onAssistirLive}
+            salaDaVozId={rm.salaDaVoz?.id ?? null}
           />
         </div>
       ) : (

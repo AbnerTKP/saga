@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { criarServidor, entrarComConvite } from '../api';
-import { PODE_CRIAR_SERVIDOR } from '../travas';
 import { Icon } from './Icon';
 
 /** Criar um servidor ou entrar num com código de convite. */
-export function NovoServidor({ onPronto, onClose }: {
+export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
+  /** Com qual aba abrir. Quem clicou em "criar" não quer chegar na de convite. */
+  inicial?: 'criar' | 'entrar';
   onPronto: (id: number) => void;
   onClose: () => void;
 }) {
-  const [aba, setAba] = useState<'criar' | 'entrar'>(PODE_CRIAR_SERVIDOR ? 'criar' : 'entrar');
+  const [aba, setAba] = useState<'criar' | 'entrar'>(inicial);
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -28,23 +29,19 @@ export function NovoServidor({ onPronto, onClose }: {
     <div className="modal-back" onClick={onClose}>
       <div className="modal small" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="strong">{PODE_CRIAR_SERVIDOR ? 'Servidores' : 'Entrar num servidor'}</span>
+          <span className="strong">Servidores</span>
           <button className="icon" onClick={onClose}><Icon name="close" /></button>
         </div>
 
         <div className="pad form">
-          {/* Com a criação fechada, não sobra escolha para oferecer: uma aba sozinha é
-              só ruído. O caminho de criar continua inteiro atrás da trava. */}
-          {PODE_CRIAR_SERVIDOR && (
-            <div className="tabs">
-              <button className={criando ? 'active' : ''} onClick={() => { setAba('criar'); setErro(null); setTexto(''); }}>
-                Criar um
-              </button>
-              <button className={!criando ? 'active' : ''} onClick={() => { setAba('entrar'); setErro(null); setTexto(''); }}>
-                Entrar com convite
-              </button>
-            </div>
-          )}
+          <div className="tabs">
+            <button className={!criando ? 'active' : ''} onClick={() => { setAba('entrar'); setErro(null); setTexto(''); }}>
+              Entrar com convite
+            </button>
+            <button className={criando ? 'active' : ''} onClick={() => { setAba('criar'); setErro(null); setTexto(''); }}>
+              Criar um
+            </button>
+          </div>
 
           <label>
             {criando ? 'Nome do servidor' : 'Código do convite'}

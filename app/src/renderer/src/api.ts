@@ -89,6 +89,11 @@ export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
   /** Fone desligado: a pessoa não ouve ninguém. Vem do que o app dela anuncia. */
   surdo?: boolean;
+  /**
+   * A transmissão que esta pessoa escolheu assistir, ou null. Também vem do anúncio do
+   * app dela, e serve para contar a plateia de uma live sem estar dentro da call.
+   */
+  assistindo?: string | null;
   usuarioId?: number; cargo?: Cargo | null; foto?: string | null;
   banner?: string | null; enquadramento?: Enquadramentos; entrouEm?: number | null;
   turbo?: boolean; idExibido?: string | null;
@@ -205,8 +210,19 @@ export const entrar = (c: { apelido: string; senha: string }) =>
 
 export const sair = () => pedir<{ ok: true }>('POST', '/sair');
 
+/**
+ * Quem sou eu e onde estou.
+ *
+ * `servidor` vem nulo quando a conta não está em servidor nenhum — que é onde toda conta
+ * nova começa. Isso não é erro: é a tela inicial vazia. A LISTA vai junto porque a barra
+ * de servidores se desenha com ela, e este é o pedido que o app já faz ao abrir e a cada
+ * troca de servidor.
+ */
 export const quemSou = () =>
-  pedir<{ eu: Membro; servidor: Servidor; salas: Sala[]; impedimento: string | null }>('GET', '/eu');
+  pedir<{
+    eu: Membro; servidor: Servidor | null; servidores: Servidor[];
+    salas: Sala[]; impedimento: string | null;
+  }>('GET', '/eu');
 
 // --- servidores -------------------------------------------------------------
 
@@ -293,12 +309,29 @@ export type Mensagem = {
   idExibido: string | null;
 };
 
-/** Sem `depoisDe`, traz as últimas; com ele, só o que chegou desde então. */
-export const lerMensagens = async (sala: number, depoisDe?: number) =>
-  (await pedir<{ mensagens: Mensagem[] }>(
+/** Quem está escrevendo agora numa sala, fora você. */
+export type Digitando = { id: number; nome: string };
+
+/**
+ * Sem `depoisDe`, traz as últimas; com ele, só o que chegou desde então.
+ *
+ * Quem está digitando vem na MESMA resposta: não há empurrão no servidor, e uma segunda
+ * busca de 2 em 2 segundos só para isso dobraria o trânsito da rota mais chamada do app.
+ * Servidor antigo não manda o campo — aí não aparece ninguém digitando, e nada quebra.
+ */
+export const lerMensagens = (sala: number, depoisDe?: number) =>
+  pedir<{ mensagens: Mensagem[]; digitando?: Digitando[] }>(
     'GET',
     `/mensagens?sala=${sala}${depoisDe ? `&depoisDe=${depoisDe}` : ''}`,
-  )).mensagens;
+  );
+
+/**
+ * "Estou escrevendo." Vale por alguns segundos e o app repete enquanto a pessoa digita —
+ * nunca a cada tecla: escrever a cada tecla é exatamente o que `vista_em` ensinou a não
+ * fazer. Falhar aqui não é motivo para nada aparecer na tela.
+ */
+export const avisarQueDigito = (sala: number) =>
+  pedir<{ ok: true }>('POST', '/digitando', { sala });
 
 export const enviarMensagem = async (sala: number, texto: string) =>
   (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
