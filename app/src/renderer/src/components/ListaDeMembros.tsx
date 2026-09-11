@@ -1,4 +1,5 @@
 import type { Cargo, Membro } from '../api';
+import type { ResumoDaMesa } from '../jogos';
 import { agruparPessoas } from '../listaDePessoas';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
@@ -9,12 +10,17 @@ import { Icon } from './Icon';
  * agora e saber quem faz parte. Os cargos só com quem está aqui, e quem está offline num
  * grupo único no fim — ver listaDePessoas.ts.
  */
-export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
+export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJogador, onPartida, onPessoa }: {
   membros: Membro[];
   cargos: Cargo[];
   /** Ids de quem está em alguma sala de voz agora. */
   naVoz: Set<number>;
   eu: Membro;
+  /** Quem está numa partida de xadrez agora, e em qual mesa — ver jogos.ts. */
+  jogando: Map<number, ResumoDaMesa>;
+  nomeDoJogador: (id: number | null) => string;
+  /** Abrir a partida de alguém: aqui é o caminho de quem joga FORA da call. */
+  onPartida: (mesaId: number) => void;
   /** Esquerdo abre o perfil; direito, as ações. */
   onPessoa: (m: Membro, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
 }) {
@@ -43,6 +49,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
               // A cor é a do cargo DA PESSOA, não a do grupo: no grupo de offline é só por
               // ela que ainda se vê o cargo de cada um.
               const cor = m.cargo?.cor;
+              const mesa = jogando.get(m.id);
               return (
                 <button
                   key={m.id}
@@ -57,6 +64,20 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
                     <Nome membro={m} />
                   </span>
                   {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="berserk" size={13} /></span>}
+                  {/* O controle é o botão, como o selo AO VIVO na barra. Aqui ele é um span
+                      dentro do botão da linha: botão dentro de botão o navegador desfaz. */}
+                  {mesa && (
+                    <span
+                      className="selo-na-linha jogo"
+                      role="button"
+                      title={m.id === eu.id
+                        ? 'Voltar à sua partida'
+                        : `Assistir ${nomeDoJogador(mesa.brancas)} × ${nomeDoJogador(mesa.pretas)}`}
+                      onClick={(e) => { e.stopPropagation(); onPartida(mesa.id); }}
+                    >
+                      <Icon name="controle" size={13} />
+                    </span>
+                  )}
                   {m.id === eu.id && <span className="muted small">você</span>}
                 </button>
               );

@@ -23,7 +23,7 @@ test('passado o intervalo, o aviso volta a tocar', () => {
 
 test('cada aviso tem o próprio relógio: "entrou" não cala "live"', () => {
   const tocados: string[] = [];
-  const avisar = criarAvisos({ entrou: 'a', saiu: 'b', live: 'c' }, (url) => tocados.push(url));
+  const avisar = criarAvisos({ entrou: 'a', saiu: 'b', live: 'c', convite: 'd' }, (url) => tocados.push(url));
 
   assert.equal(avisar('entrou', false, 1000), true);
   assert.equal(avisar('entrou', false, 1100), false, 'repetido rápido demais');
@@ -33,7 +33,7 @@ test('cada aviso tem o próprio relógio: "entrou" não cala "live"', () => {
 
 test('ouvido desligado não toca e nem marca o relógio', () => {
   const tocados: string[] = [];
-  const avisar = criarAvisos({ entrou: 'a', saiu: 'b', live: 'c' }, (url) => tocados.push(url));
+  const avisar = criarAvisos({ entrou: 'a', saiu: 'b', live: 'c', convite: 'd' }, (url) => tocados.push(url));
 
   assert.equal(avisar('entrou', true, 1000), false);
   assert.equal(avisar('entrou', false, 1010), true, 'religou o ouvido e o próximo toca');

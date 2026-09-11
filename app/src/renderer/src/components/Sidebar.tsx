@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
-import { identidadeDe } from '../pessoas';
+import { contaDaIdentidade, identidadeDe } from '../pessoas';
 import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
 import type { LiveNoChat } from '../lives';
+import type { ResumoDaMesa } from '../jogos';
 import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
@@ -12,11 +13,12 @@ import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { Sinal } from './Sinal';
 import { CartaoDaLive } from './CartaoDaLive';
+import { MenuDeJogos } from './MenuDeJogos';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -38,6 +40,15 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   onAssistirLive: (sala: RoomInfo, identity: string) => void;
   /** Abre o palco da call em que você está — é lá que mora a live que você assiste. */
   onAbrirPalco: () => void;
+  /** Quem está numa partida de xadrez agora, e em qual mesa — ver jogos.ts. */
+  jogando: Map<number, ResumoDaMesa>;
+  nomeDoJogador: (id: number | null) => string;
+  /** A sua mesa, se você tem uma: muda o que o menu de jogos oferece. */
+  minhaPartida: 'lobby' | 'jogando' | 'fim' | null;
+  /** Abrir uma partida: a sua, ou a de quem está jogando, como plateia. */
+  onPartida: (mesaId: number) => void;
+  /** O item Xadrez do menu de jogos: abre uma mesa, ou volta para a sua. */
+  onXadrez: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -56,6 +67,17 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   const [alvo, setAlvo] = useState<Alvo | null>(null);
   const [fechadas, setFechadas] = useState<Set<number>>(new Set());
   const [escolhendoStatus, setEscolhendoStatus] = useState(false);
+  // O menu dos jogos abre ACIMA do painel de voz, na largura da barra: as medidas saem do
+  // painel de verdade, não de um número escrito aqui que envelhece quando ele muda.
+  const painelDaVoz = useRef<HTMLDivElement>(null);
+  const [menuDeJogos, setMenuDeJogos] = useState<{ left: number; bottom: number; width: number } | null>(null);
+  const abrirJogos = () => setMenuDeJogos((atual) => {
+    if (atual) return null;
+    const painel = painelDaVoz.current?.getBoundingClientRect();
+    const barra = painelDaVoz.current?.closest('.sidebar')?.getBoundingClientRect();
+    if (!painel || !barra) return null;
+    return { left: barra.left + 12, bottom: window.innerHeight - painel.top + 8, width: barra.width - 24 };
+  });
 
   /**
    * O cartão da live de quem está sendo apontado. Um relógio só, para abrir e para fechar:
@@ -105,6 +127,25 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
         onClick={(e) => { e.stopPropagation(); agirNaLive(acao, sala, identity); }}
       >
         {selo.texto}
+      </button>
+    );
+  };
+
+  /** O controle na linha de quem está jogando, pelo mesmo princípio do selo: ele É o botão. */
+  const controleNaLinha = (identity: string) => {
+    const conta = contaDaIdentidade(identity);
+    const mesa = conta ? jogando.get(conta) : null;
+    if (!mesa) return null;
+    return (
+      <button
+        type="button"
+        className="selo-na-linha jogo"
+        title={conta === eu.id
+          ? 'Voltar à sua partida'
+          : `Assistir ${nomeDoJogador(mesa.brancas)} × ${nomeDoJogador(mesa.pretas)}`}
+        onClick={(e) => { e.stopPropagation(); fecharCartao(); onPartida(mesa.id); }}
+      >
+        <Icon name="controle" size={13} />
       </button>
     );
   };
@@ -289,6 +330,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                               do Berserk, então o ícone repetia o que a cor diz e roubava a
                               vaga de câmera, microfone e live — que dizem coisas do momento.
                               Nos outros lugares ele continua. */}
+                          {controleNaLinha(p.identity)}
                           {p.screen && seloNaLinha(r, p.identity)}
                           {p.camera && <Icon name="camera" />}
                           {/* Fone desligado no lugar do microfone mudo, e não os dois: a
@@ -327,7 +369,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       </div>
 
       {connected && (
-        <div className="voice-panel">
+        <div className="voice-panel" ref={painelDaVoz}>
           <div className="voice-status">
             <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
             <div className="voice-texto">
@@ -345,6 +387,12 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
             <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
             <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
             <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
+            {/* Os jogos moram aqui porque é daqui que se chama gente: o lobby chama
+                primeiro quem está na call. */}
+            <button className={menuDeJogos ? 'on' : ''} data-abre-jogos onClick={abrirJogos}
+              title={minhaPartida ? 'Jogos — você tem uma mesa aberta' : 'Jogos'}>
+              <Icon name="controle" />
+            </button>
             <button className="danger" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
           </div>
         </div>
@@ -398,6 +446,15 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
           <button onClick={onSettings} title="Sua conta: perfil, microfone e câmera"><Icon name="gear" /></button>
         </div>
       </div>
+
+      {menuDeJogos && (
+        <MenuDeJogos
+          em={menuDeJogos}
+          minha={minhaPartida}
+          onXadrez={onXadrez}
+          onClose={() => setMenuDeJogos(null)}
+        />
+      )}
 
       {cartao && salaDoCartao && quemTransmite && acaoDoCartao && (
         <CartaoDaLive

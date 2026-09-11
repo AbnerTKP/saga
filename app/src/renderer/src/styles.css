@@ -1246,3 +1246,179 @@ body:has(.mini-live) .avisos { bottom: 322px; }
 /* No chat, a pessoa se abre pelo mesmo gesto de todo lugar. */
 .quem-falou { display: flex; align-items: center; gap: 9px; padding: 0; color: inherit; }
 .quem-falou:hover .from { text-decoration: underline; }
+
+/* ---- xadrez ---- */
+
+/* As peças vêm numa fonte DENTRO do app, com estas doze letras e mais nada (3 KB). Com a
+   fonte do sistema cada computador desenhava um rei diferente, e onde não houvesse o
+   desenho o peão sairia como emoji colorido. O CSP não deixa buscar fonte de fora. */
+@font-face {
+  font-family: 'Pecas';
+  src: url('./fontes/pecas.woff2') format('woff2');
+  font-display: block;
+  unicode-range: U+2654-265F;
+}
+
+.tela-do-xadrez { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.xadrez-titulo { font-size: 14px; color: var(--text2); }
+.selo-assistindo { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+  border-radius: 999px; background: var(--accent-tenue); color: var(--accent-claro);
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.xadrez-area { flex: 1; min-height: 0; margin: var(--e3); padding: var(--e3); background: var(--bg0);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 20px; }
+.xadrez-carregando { display: grid; place-items: center; }
+.xadrez-coluna-do-tabuleiro { display: flex; flex-direction: column; gap: 8px; }
+.xadrez-tabuleiro-e-camada { position: relative; }
+
+/* O tabuleiro B, a madeira de todo site de xadrez: escolhido pelo dono entre dois desenhos. */
+.tabuleiro { position: relative; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr)); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.casa { position: relative; display: grid; place-items: center; }
+.casa.clara { background: #eed8b4; }
+.casa.escura { background: #b1865f; }
+.casa.ultimo { background-image: linear-gradient(rgba(205,210,106,.55), rgba(205,210,106,.55)); }
+.casa.escolhida { background-image: linear-gradient(rgba(20,85,30,.35), rgba(20,85,30,.35)); }
+.casa.ultimo.escolhida { background-image:
+  linear-gradient(rgba(20,85,30,.35), rgba(20,85,30,.35)),
+  linear-gradient(rgba(205,210,106,.55), rgba(205,210,106,.55)); }
+/* O rei em xeque: um clarão que some nas bordas, e não a casa inteira pintada de vermelho. */
+.casa.xeque { background-image: radial-gradient(circle,
+  rgba(224,72,82,.95) 0%, rgba(224,72,82,.6) 38%, rgba(224,72,82,0) 70%); }
+.tabuleiro.mexe .casa.clicavel { cursor: pointer; }
+.alvo { width: 28%; height: 28%; border-radius: 50%; background: rgba(20,85,30,.42); }
+.alvo-captura { position: absolute; inset: 3px; border-radius: 50%; box-shadow: inset 0 0 0 5px rgba(20,85,30,.42); }
+.coord { position: absolute; font-size: 10.5px; font-weight: 700; line-height: 1; }
+.casa.clara .coord { color: #b1865f; }
+.casa.escura .coord { color: #eed8b4; }
+.coord.linha { left: 3px; top: 2px; }
+.coord.coluna { right: 3px; bottom: 2px; }
+
+.peca { position: relative; display: grid; line-height: 1; pointer-events: none;
+  font-family: 'Pecas', 'Apple Symbols', 'Segoe UI Symbol', serif;
+  text-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.peca > span { grid-area: 1 / 1; }
+.peca.preta .peca-corpo { color: #2b211b; }
+.peca.branca .peca-corpo { color: #fffdf8; }
+.peca.branca .peca-traco { color: #2b211b; }
+
+/* A promoção cai sobre a coluna da casa de chegada, a partir da borda — como em todo
+   tabuleiro na internet: a peça que se quer fica onde a mão já está. */
+.promocao-fundo { position: absolute; inset: 0; background: rgba(20,22,27,.55); }
+.promocao { position: absolute; display: flex; flex-direction: column; border-radius: 4px;
+  overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.promocao-peca { display: grid; place-items: center; padding: 0; background: #eed8b4; font-size: 28px; }
+.promocao-peca + .promocao-peca { border-top: 1px solid rgba(0,0,0,.15); }
+.promocao-peca:hover { background: #fff1d4; }
+
+.xadrez-barra { height: 40px; flex: none; display: flex; align-items: center; gap: 9px; }
+.xadrez-barra .spacer { flex: 1; }
+.xadrez-quem { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.xadrez-nome { font-size: 14px; font-weight: 600; color: var(--white);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xadrez-lado { font-size: 11.5px; color: var(--text2); }
+.xadrez-tomadas { flex: none; font-family: 'Pecas', 'Apple Symbols', 'Segoe UI Symbol', serif;
+  font-size: 17px; line-height: 1; letter-spacing: -3px; color: var(--text2); }
+.xadrez-lugar-vazio { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 2px dashed var(--bg4); }
+.xadrez-esperando { font-size: 14px; font-weight: 600; color: var(--text3); }
+
+/* O relógio de quem está na vez fica aceso; abaixo de 20 s, vermelho. */
+.xadrez-relogio { flex: none; min-width: 64px; text-align: center; padding: 5px 10px; border-radius: 6px;
+  font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--bg3); color: var(--text2); }
+.xadrez-relogio.pouco { color: #ff8a90; }
+.xadrez-relogio.correndo { background: #f4f7fb; color: #14161b; }
+.xadrez-relogio.correndo.pouco { background: var(--danger); color: #fff; }
+
+.xadrez-chip { flex: none; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--bg3); color: var(--text2); white-space: nowrap; }
+.xadrez-chip.vez { background: var(--accent-tenue); color: var(--accent-claro); }
+.xadrez-chip.venceu { background: rgba(46,163,106,.16); color: #57c98f; }
+
+.xadrez-lateral { width: 240px; flex: none; display: flex; flex-direction: column; gap: var(--e4); }
+.xadrez-cabecalho { font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text3); }
+.xadrez-lances { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px;
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 8px; }
+.xadrez-par { display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center; height: 26px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.xadrez-numero { color: var(--text3); }
+.xadrez-lance { padding: 2px 6px; border-radius: 4px; color: var(--text); }
+.xadrez-lance.ultimo { background: var(--bg4); color: var(--white); font-weight: 600; }
+.xadrez-lance .figura { font-family: 'Pecas', 'Apple Symbols', 'Segoe UI Symbol', serif; }
+.xadrez-plateia { display: flex; align-items: center; gap: 6px; font-size: 12px;
+  font-weight: 600; color: var(--text2); }
+.xadrez-botoes { display: flex; flex-direction: column; gap: var(--e2); }
+.xadrez-lateral .secundario, .xadrez-lateral .perigo, .xadrez-lateral .primary {
+  padding: 9px 14px; font-size: 13.5px; text-align: center; }
+.xadrez-proposta { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px;
+  background: var(--accent-tenue); border: 1px solid rgba(63,127,224,.35); font-size: 13px; }
+.xadrez-proposta-botoes { display: flex; align-items: center; gap: 12px; }
+/* A live que você assiste entra NA COLUNA: flutuando no canto, ela taparia o tabuleiro e os
+   botões da partida — foi por isso que ela saiu do canto aqui dentro. */
+.xadrez-live { flex: none; }
+.xadrez-live .mini-live { position: static; right: auto; bottom: auto; width: 100%; }
+
+/* O fim fica POR CIMA do tabuleiro: a posição final continua à vista. */
+.xadrez-fim { position: absolute; inset: 0; border-radius: 6px; background: rgba(20,22,27,.5);
+  display: grid; place-items: center; }
+.xadrez-fim-cartao { width: 280px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 22px 20px; background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); text-align: center; }
+.xadrez-fim-titulo { font-size: 20px; font-weight: 700; color: var(--white); }
+.xadrez-fim-botoes { display: flex; gap: 10px; margin-top: 6px; }
+.secundario.sm { padding: 8px 16px; font-size: 13.5px; }
+
+/* O lobby é a mesa antes de começar: o tempo, as peças e quem chamar. */
+.xadrez-lobby { gap: var(--e3); }
+.xadrez-escolha { display: flex; flex-direction: column; gap: var(--e2); }
+.xadrez-rotulo { font-size: 12px; font-weight: 600; color: var(--text2); }
+.xadrez-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.xadrez-escolher { padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--bg3); color: var(--text); white-space: nowrap; }
+.xadrez-escolher:hover:not(:disabled) { background: var(--bg4); }
+.xadrez-escolher.escolhido { background: var(--accent-tenue); color: var(--white);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.xadrez-risco { height: 1px; flex: none; background: var(--line); }
+.xadrez-chamaveis { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.xadrez-grupo { font-size: 11px; font-weight: 700; color: var(--text3); padding: 8px 0 2px; }
+.xadrez-chamaveis > .xadrez-grupo:first-child { padding-top: 0; }
+.xadrez-chamavel { display: flex; align-items: center; gap: 9px; min-height: 36px; }
+.xadrez-chamavel.apagada { opacity: .5; }
+.xadrez-chamavel-nome { flex: 1; min-width: 0; font-size: 14px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xadrez-chamado { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+.xadrez-jogando { font-size: 12px; color: var(--text3); }
+/* Ação de linha: contorno azul, o mesmo do "Abrir palco" da faixa. */
+.botao-de-linha { flex: none; padding: 5px 12px; border-radius: 8px; font-size: 12.5px;
+  font-weight: 600; color: var(--accent-claro); border: 1px solid var(--accent); white-space: nowrap; }
+.botao-de-linha:hover:not(:disabled) { background: var(--accent-tenue); }
+
+/* O controle ao lado do nome de quem joga: ele mesmo é o botão, como o selo AO VIVO. */
+.selo-na-linha.jogo { display: inline-flex; align-items: center; padding: 2px 6px;
+  background: var(--accent-tenue); color: var(--accent-claro); }
+button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
+  background: rgba(63,127,224,.32); color: #fff; }
+.membro-linha .selo-na-linha.jogo { margin-right: 0; cursor: pointer; }
+
+/* O menu dos jogos, acima do painel de voz. */
+.menu-de-jogos { -webkit-app-region: no-drag; position: fixed; z-index: 35; padding: 10px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 6px; }
+.menu-de-jogos-titulo { padding: 4px 10px 2px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text3); }
+.menu-de-jogos-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 6px; text-align: left; background: var(--bg3); }
+.menu-de-jogos-item:hover { background: var(--bg4); }
+.menu-de-jogos-textos { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.peca-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px;
+  background: #eed8b4; display: grid; place-items: center; font-size: 26px; }
+
+/* O convite para jogar, na pilha dos avisos — mas ele não some sozinho: quem chamou espera. */
+.convite-de-jogo { width: 330px; border-left-color: var(--accent); align-items: flex-start; }
+.convite-de-jogo-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.convite-de-jogo-texto { display: flex; flex-direction: column; }
+.convite-de-jogo-botoes { display: flex; align-items: center; gap: 14px; }
+
+.faixa-da-partida .faixa-partida-titulo { font-size: 12.5px; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

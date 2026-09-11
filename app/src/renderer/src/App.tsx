@@ -8,7 +8,14 @@ import {
   type Acao,
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
+  abrirMesa, agirNaMesa, type ConviteDeJogo,
 } from './api';
+import { ehMinhaVez, jogandoAgora, minhaMesa, type ResumoDaMesa } from './jogos';
+import { criarAvisos } from './avisos';
+import { ARQUIVOS } from './sons';
+import { TelaDoXadrez } from './components/TelaDoXadrez';
+import { ConviteDeXadrez } from './components/ConviteDeXadrez';
+import { FaixaDaPartida } from './components/FaixaDaPartida';
 import { useRoom, type SalaDaVoz } from './useRoom';
 import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
@@ -37,7 +44,7 @@ import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
-import { acharPessoa, identidadeDe, lembrarDasSalas, vistosEm, type Conhecidos } from './pessoas';
+import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm, type Conhecidos } from './pessoas';
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
@@ -52,6 +59,7 @@ const SEM_SALAS: RoomInfo[] = [];
 const SEM_CATEGORIAS: Categoria[] = [];
 const SEM_CARGOS: Cargo[] = [];
 const SEM_MEMBROS: Membro[] = [];
+const SEM_MESAS: ResumoDaMesa[] = [];
 
 /** Uma pessoa aberta num cartão ou num menu, com o servidor de que se está falando dela. */
 type PessoaAberta = { pessoa: PessoaNaCall; servidorId: number; servidorNome: string };
@@ -89,6 +97,20 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
+  /**
+   * As mesas de xadrez do servidor aberto e os convites que chegaram para você. Vêm na mesma
+   * busca de salas, como o "está digitando" — uma busca própria dobraria o trânsito para
+   * dizer uma coisa que muda devagar. Anotadas com o servidor, como todo o resto: mesa de um
+   * servidor não vale no vizinho.
+   */
+  const [jogos, setJogos] = useState<{ servidorId: number; mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] } | null>(null);
+  /** A partida aberta na tela, com o servidor DELA: é a ele que a tela do jogo pergunta. */
+  const [jogoAberto, setJogoAberto] = useState<{ mesaId: number; servidorId: number } | null>(null);
+  /** Convite já respondido: sai da tela na hora, sem esperar a busca seguinte confirmar. */
+  const [conviteRespondido, setConviteRespondido] = useState<number | null>(null);
+  const [respondendoConvite, setRespondendoConvite] = useState(false);
+  // O som do convite. A regra de não empilhar som é a mesma dos outros avisos (avisos.ts).
+  const tocarAviso = useRef(criarAvisos(ARQUIVOS)).current;
   const conhecidos = useRef<Conhecidos>(new Map());
   const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
   const notas = useAvisos();
@@ -168,9 +190,10 @@ export function App() {
    *
    * A voz NÃO cai junto, e isso é o ponto. Antes caía: clicar noutro servidor desligava a
    * call e tocava o som de saída, como se você tivesse desligado — e às vezes você só
-   * queria espiar o que está acontecendo do outro lado. Olhar não é sair. A sala no
-   * LiveKit é identificada pelo id, então continuar falando em "Geral" de um servidor
-   * enquanto se lê outro nunca foi um problema técnico: era só esta linha.
+   * queria espiar o que está acontecendo do outro lado. Olhar não é sair. Tecnicamente
+   * nunca foi preciso: a sala no LiveKit é identificada pelo id, então continuar falando
+   * em "Geral" de um servidor enquanto se lê outro nunca foi um problema técnico: era só
+   * esta linha.
    */
   /**
    * Relê quem sou e onde estou. É o que fecha toda mudança de vínculo: trocar de
@@ -180,6 +203,9 @@ export function App() {
    */
   const recarregarSessao = useCallback(async () => {
     setSalaAbertaId(null);
+    // A mesa de xadrez é de um servidor: indo para outro, a partida sai da tela (ela
+    // continua de pé, e a faixa a traz de volta quando você voltar para o servidor dela).
+    setJogoAberto(null);
     try {
       const r = await quemSou();
       guardarServidorAtual(r.servidor?.id ?? null);
@@ -275,6 +301,9 @@ export function App() {
         // Resposta de OUTRO servidor: o aberto não é mais seu.
         if (lista.servidorId && lista.servidorId !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
         setSalasDoServidor({ servidorId, rooms: lista.rooms, categorias: lista.categorias });
+        // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
+        // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
+        setJogos({ servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] });
         setPollError(null);
       } catch (e) {
         if (!vivo) return;
@@ -373,13 +402,16 @@ export function App() {
    * lendo. A regra mora em `navegacao.ts`, pura e testada.
    */
   const abrirSala = useCallback(async (sala: RoomInfo) => {
-    const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
+    // Com uma partida na tela você não está lendo conversa nenhuma: clicar numa sala de voz
+    // tem de abrir o palco dela, e não devolver o chat que estava atrás do jogo.
+    const lendo = jogoAberto ? null : rooms.find((s) => s.id === salaAbertaId) ?? null;
     const { abrir, entrar } = oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null);
+    setJogoAberto(null);
     if (abrir) setSalaAbertaId(sala.id);
     const naVoz = entrar ? paraAVoz(sala) : null;
     if (!naVoz) return;
     try { await entrarNaVoz(naVoz); } catch (e) { rm.setError((e as Error).message); }
-  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId]);
+  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId, jogoAberto]);
 
   const logout = useCallback(async () => {
     await rm.leave();
@@ -389,6 +421,8 @@ export function App() {
     setSessao(null);
     setSalasDoServidor(null);
     setDadosDoServidor(null);
+    setJogos(null);
+    setJogoAberto(null);
     conhecidos.current.clear();
   }, [rm]);
 
@@ -584,6 +618,7 @@ export function App() {
     if (!naVoz) return;
     const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
     if (oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null).abrir) setSalaAbertaId(sala.id);
+    setJogoAberto(null);
     try {
       await entrarNaVoz(naVoz);
       rm.assistir(identity);
@@ -591,6 +626,76 @@ export function App() {
       rm.setError((e as Error).message);
     }
   }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId]);
+
+  /**
+   * O xadrez visto da busca de salas: quem está jogando (o controle ao lado do nome), a
+   * mesa que é sua (a faixa e o menu de jogos) e o convite que chegou. Só valem os do
+   * servidor aberto — mesa é de um servidor, como tudo o mais.
+   */
+  const jogosDaqui = jogos?.servidorId === servidorAberto ? jogos : null;
+  const mesas = jogosDaqui?.mesas ?? SEM_MESAS;
+  const jogandoPorPessoa = jogandoAgora(mesas);
+  const minhaMesaAgora = sessao?.eu ? minhaMesa(mesas, sessao.eu.id) : null;
+  const convite = jogosDaqui?.convites.find((c) => c.mesa !== conviteRespondido) ?? null;
+  // Quem está na SUA call agora, por conta: é a primeira lista do lobby do xadrez.
+  const naMinhaCall = new Set(
+    rm.participants.map((p) => contaDaIdentidade(p.identity)).filter((id): id is number => id !== null),
+  );
+
+  /** O nome de quem joga, para o título do controle na linha: "Assistir TKP × Juninho". */
+  const nomeDoJogador = useCallback((id: number | null) => (
+    (id !== null && membrosDoServidor.find((m) => m.id === id)?.nome) || 'alguém'
+  ), [membrosDoServidor]);
+
+  /**
+   * Convite novo toca o som, uma vez por mesa: quem foi chamado pode estar de fone, lendo
+   * outra coisa. Na tela ele é um cartão que não some sozinho — quem chamou está esperando.
+   */
+  const conviteTocado = useRef<number | null>(null);
+  useEffect(() => {
+    if (!convite) { conviteTocado.current = null; return; }
+    if (conviteTocado.current === convite.mesa) return;
+    conviteTocado.current = convite.mesa;
+    tocarAviso('convite', rm.deafened);
+  }, [convite?.mesa, rm.deafened, tocarAviso]);
+
+  /** Abre uma partida na tela — a sua, ou a de quem está jogando, como plateia. */
+  const abrirPartida = useCallback((mesaId: number) => {
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
+    setJogoAberto({ mesaId, servidorId });
+  }, [sessao?.servidor?.id]);
+
+  /** O item Xadrez do menu de jogos: volta para a sua mesa, ou abre uma e cai no lobby. */
+  const abrirXadrez = useCallback(async () => {
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
+    if (minhaMesaAgora) { setJogoAberto({ mesaId: minhaMesaAgora.id, servidorId }); return; }
+    try {
+      // Os padrões do desenho: 10 minutos para cada um, peças no sorteio. Os dois se trocam
+      // no lobby, que é a tela que abre em seguida.
+      const mesa = await abrirMesa(600, 'sorteio', servidorId);
+      setJogoAberto({ mesaId: mesa.id, servidorId });
+    } catch (e) { notas.mostrarFalha(e, 'Xadrez'); }
+  }, [sessao?.servidor?.id, minhaMesaAgora, notas]);
+
+  const responderConvite = useCallback(async (c: ConviteDeJogo, aceitar: boolean) => {
+    const servidorId = jogosDaqui?.servidorId;
+    if (!servidorId) return;
+    setRespondendoConvite(true);
+    try {
+      await agirNaMesa(c.mesa, { acao: aceitar ? 'aceitar' : 'recusar' }, servidorId);
+      setConviteRespondido(c.mesa);
+      if (aceitar) setJogoAberto({ mesaId: c.mesa, servidorId });
+    } catch (e) {
+      // Cancelado, ou você entrou noutra partida no meio: o convite sai da tela do mesmo
+      // jeito, senão fica um botão que não faz mais nada.
+      setConviteRespondido(c.mesa);
+      notas.mostrarFalha(e, 'Xadrez');
+    } finally {
+      setRespondendoConvite(false);
+    }
+  }, [jogosDaqui?.servidorId, notas]);
 
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
@@ -706,8 +811,14 @@ export function App() {
     // A voz pode estar noutro servidor: voltar para ela é voltar para lá também,
     // senão o id da sala não existe na lista daqui e o palco fica vazio.
     if (rm.salaDaVoz.servidorId !== servidor.id) trocarDeServidor(rm.salaDaVoz.servidorId);
+    setJogoAberto(null);
     setSalaAbertaId(rm.salaDaVoz.id);
   };
+
+  /** O adversário da sua partida, para a faixa dizer de quem é a vez. */
+  const oOutroDaMesa = minhaMesaAgora
+    ? nomeDoJogador(minhaMesaAgora.brancas === eu.id ? minhaMesaAgora.pretas : minhaMesaAgora.brancas)
+    : null;
 
   return (
     <div className="app-raiz">
@@ -739,7 +850,14 @@ export function App() {
         lives={lives}
         onAssistirLive={assistirDaBarra}
         onAbrirPalco={abrirPalcoDaVoz}
-        salaAbertaId={salaAbertaId}
+        jogando={jogandoPorPessoa}
+        nomeDoJogador={nomeDoJogador}
+        minhaPartida={minhaMesaAgora?.estado ?? null}
+        onPartida={abrirPartida}
+        onXadrez={abrirXadrez}
+        // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
+        // aqui" sobre um lugar que não é o que se está vendo.
+        salaAbertaId={jogoAberto ? null : salaAbertaId}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}
         // As salas da barra são do servidor aberto; quem está nelas, também.
@@ -764,6 +882,33 @@ export function App() {
         podeApagar={podeApagar}
         lives={lives}
         onAssistirLive={assistirLive}
+        // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
+        // coluna dela — flutuando no canto, taparia o tabuleiro.
+        jogo={jogoAberto ? (live) => (
+          <TelaDoXadrez
+            key={jogoAberto.mesaId}
+            mesaId={jogoAberto.mesaId}
+            servidorId={jogoAberto.servidorId}
+            euId={eu.id}
+            membros={membrosDoServidor}
+            naCall={naMinhaCall}
+            jogando={new Set(jogandoPorPessoa.keys())}
+            live={live}
+            onFechar={() => setJogoAberto(null)}
+            onAviso={notas.mostrar}
+          />
+        ) : undefined}
+        faixaDaPartida={minhaMesaAgora && !jogoAberto ? (
+          <FaixaDaPartida
+            estado={minhaMesaAgora.estado}
+            titulo={minhaMesaAgora.estado === 'lobby'
+              ? 'mesa aberta'
+              : `${nomeDoJogador(minhaMesaAgora.brancas)} × ${nomeDoJogador(minhaMesaAgora.pretas)}`}
+            minhaVez={ehMinhaVez(minhaMesaAgora, eu.id)}
+            outroNome={oOutroDaMesa}
+            onVoltar={() => abrirPartida(minhaMesaAgora.id)}
+          />
+        ) : undefined}
       />
       {picker && (
         <ScreenPicker
@@ -816,6 +961,10 @@ export function App() {
         cargos={cargos}
         naVoz={naVoz}
         eu={eu}
+        // Quem joga fora da call só aparece aqui: é por esta lista que se assiste a ele.
+        jogando={jogandoPorPessoa}
+        nomeDoJogador={nomeDoJogador}
+        onPartida={abrirPartida}
         // Pelo mesmo caminho de todo mundo: a lista tem o membro na mão, mas montar o
         // objeto aqui é como as duas versões do cartão nasceram.
         onPessoa={(m, em, tipo) => abrirMenu(identidadeDe(m.id), m.nome, em, tipo)}
@@ -906,7 +1055,21 @@ export function App() {
         />
       )}
       {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
-      <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
+      <Avisos
+        avisos={notas.avisos}
+        // O convite para jogar fica na mesma pilha, mas não some sozinho: quem chamou está
+        // esperando a resposta.
+        extra={convite && (
+          <ConviteDeXadrez
+            convite={convite}
+            ocupado={respondendoConvite}
+            onJogar={() => responderConvite(convite, true)}
+            onRecusar={() => responderConvite(convite, false)}
+          />
+        )}
+        onFechar={notas.fechar}
+        onRegistro={() => setRegistro(true)}
+      />
       <UpdateToast estado={atualizacao} />
       <Versao />
     </div>

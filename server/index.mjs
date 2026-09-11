@@ -19,6 +19,7 @@ import * as notas from './notas.mjs';
 import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
+import { criarMesas } from './jogos.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
@@ -63,6 +64,9 @@ const svc = new RoomServiceClient(HOST, KEY, SECRET);
 const db = abrirBanco(BANCO);
 // Quem está escrevendo agora. Mora na memória do processo de propósito — ver digitando.mjs.
 const digitando = criarRegistroDeDigitacao();
+// As mesas de xadrez, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
+// Publicar o servidor com alguém jogando apaga a partida dele — ver jogos.mjs.
+const mesas = criarMesas();
 // O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
 // só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
@@ -180,6 +184,31 @@ const salasDoServidor = (sid, quem) => salasM.salasDe(db, sid, quem);
 const pararDeDigitar = (sid, usuarioId, sala) =>
   digitando.parou(salasM.buscarSala(db, sid, sala)?.id, usuarioId);
 const salasDeVoz = (sid, quem) => salasDoServidor(sid, quem).filter((s) => s.tipo === 'voz');
+
+/**
+ * O pedido como as mesas de xadrez o enxergam: de que servidor é, quem está pedindo, e como
+ * cada pessoa aparece.
+ *
+ * `jogos.mjs` não sabe SQL — quem é quem é perguntado aqui. O nome é o exibido NESTE servidor,
+ * pelo mesmo motivo do resto: cargo e nome pertencem ao vínculo. Quem saiu do servidor no meio
+ * de uma partida continua tendo nome, o da conta, senão a mesa desenharia um buraco no lugar
+ * de um dos jogadores.
+ */
+const naMesa = (sid, eu) => ({
+  sid,
+  eu: eu.id,
+  pessoa: (id) => {
+    const m = membros.buscarMembro(db, sid, id);
+    if (m) return { id: m.id, nome: m.nome, foto: m.foto ?? null, idExibido: m.id_exibido ?? null };
+    const conta = buscarPorId(db, id);
+    return { id, nome: conta?.apelido ?? 'alguém', foto: conta?.foto ?? null, idExibido: null };
+  },
+  // Banido não é pessoa do servidor: não recebe convite, como não aparece na lista da direita.
+  membroAtivo: (id) => {
+    const m = membros.buscarMembro(db, sid, id);
+    return !!m && !m.banido_em;
+  },
+});
 
 /**
  * A pessoa vista sem servidor nenhum: só a conta.
@@ -557,7 +586,16 @@ const ROTAS = {
     // `servidorId` diz de QUAL servidor é a resposta. Pedir por um servidor de que você não
     // faz mais parte — banido ou expulso com o app aberto — devolve outro, sem erro; é o
     // número que deixa o app perceber que o servidor aberto sumiu e sair dele.
-    return { servidorId: sid, rooms: salas, categorias: categoriasM.listarCategorias(db, sid) };
+    //
+    // As mesas de xadrez vão de carona pelo mesmo motivo do "está digitando": o convite para
+    // uma partida precisa chegar a quem está em qualquer tela, e esta é a busca que toda tela
+    // já faz. Só as deste servidor, e os convites são os de quem perguntou.
+    return {
+      servidorId: sid,
+      rooms: salas,
+      categorias: categoriasM.listarCategorias(db, sid),
+      jogos: mesas.resumo(naMesa(sid, eu)),
+    };
   },
 
   'POST /salas/criar': async (req) => {
@@ -743,6 +781,26 @@ const ROTAS = {
     });
     pararDeDigitar(sid, eu.id, q.get('sala'));
     return { mensagem };
+  },
+
+  // --- xadrez -----------------------------------------------------------------
+  // A mesa é sempre do servidor do pedido; a de outro responde como mesa que não existe. Quem
+  // valida o lance é o servidor, nunca o app de quem joga — ver xadrez.mjs.
+  'POST /jogos/abrir': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return { mesa: mesas.abrir(naMesa(sid, eu), await lerCorpo(req)) };
+  },
+
+  'GET /jogos/mesa': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    return { mesa: mesas.ver(naMesa(sid, eu), id) };
+  },
+
+  // Devolve `{ mesa }` depois de qualquer ação — e `{ ok: true }` quando a ação foi fechar a mesa.
+  'POST /jogos/mesa': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return mesas.agir(naMesa(sid, eu), await lerCorpo(req));
   },
 
   'POST /token': async (req) => {

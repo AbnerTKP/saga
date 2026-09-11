@@ -1014,6 +1014,50 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   juntas viram ruído.
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
+- **O xadrez é da DUPLA, e cada dupla joga na SUA tela.** Foi a correção do dono, duas
+  vezes: mostrar as mesas como cartões na faixa do palco é "vários xadrez na mesma tela", e
+  o pedido era o contrário — "é como se fosse um jogo multiplayer de dupla, cada dupla no
+  seu". A partida toma o palco inteiro, sem a faixa da call e sem o resto da sala em volta.
+  Várias duplas jogam ao mesmo tempo porque as mesas são independentes, não porque aparecem
+  juntas em algum lugar.
+- **A regra do xadrez mora no servidor, e o app só desenha.** `xadrez.mjs` é o motor
+  (conferido por perft nas seis posições padrão) e `jogos.mjs` são as mesas; cada leitura da
+  mesa já traz os LANCES QUE VALEM para quem está na vez, e a tela desenha esses e mais
+  nada. Duas cópias da regra, uma em cada ponta, discordariam no primeiro caso raro — en
+  passant, roque atravessando xeque — e quem perderia a partida seria quem confiou na tela.
+- **As mesas vivem na MEMÓRIA do servidor**, como o "está digitando": reiniciar o servidor
+  encerra as partidas, e é por isso que publicar servidor no meio de um jogo é uma decisão.
+  Tabela nova para estado de agora só deixaria lixo para trás.
+- **O relógio é contado no servidor; a tela só desconta o que passou desde a resposta.** O
+  restante vem em cada leitura, e entre uma e outra o app subtrai o tempo local — senão o
+  relógio andaria aos saltos, de busca em busca. Quem estoura perde na leitura seguinte:
+  não há timer esperando ninguém do lado de lá.
+- **Resposta mais velha que a última aplicada não entra**, e quem as data é o relógio do
+  SERVIDOR (`agora`): a busca que saiu antes do seu lance e voltou depois dele desfaria o
+  lance na tela até a busca seguinte. E o lance aparece feito antes de o servidor
+  confirmar — a resposta leva dezenas de milissegundos, e nesse vão a peça ficaria parada
+  onde estava.
+- **O convite chega pela busca de salas, com som, onde a pessoa estiver** — e some quando
+  quem chamou cancela. Ele não é aviso que sai sozinho: quem chamou está esperando, então o
+  cartão fica até "Jogar", "agora não" ou o cancelamento. **Quem está jogando não recebe
+  convite**: o servidor o segura até a partida acabar, senão tocaria um chamado que ele
+  mesmo recusaria.
+- **Quem joga ganha um controle ao lado do nome, e ele É o botão** — o mesmo princípio do
+  selo AO VIVO de quem transmite. Na linha da call e na lista de pessoas, porque quem joga
+  FORA da call só aparece na segunda. Um clique e você está assistindo; a plateia aparece
+  para os dois jogadores, com o olho, na coluna dos lances.
+- **Saiu da partida para ler o chat, ela fica no alto**, logo abaixo da faixa da call,
+  dizendo de quem é a vez e com a volta num clique: o relógio continua correndo, e uma
+  partida que some da vista é uma partida perdida no tempo.
+- **Na partida, a live que você assiste entra na COLUNA**, e não flutuando no canto: por
+  cima do tabuleiro ela taparia casas e os botões da partida.
+- **Desistir arma no próprio botão.** Abandonar é decisão de um segundo e uma janela a mais
+  seria ruído, mas um clique só é fácil demais de errar: o primeiro clique vira um botão
+  vermelho cheio, que desarma sozinho em 4 s.
+- **A fonte das peças vai DENTRO do app** (`fontes/pecas.woff2`, 3 KB, só as doze letras de
+  xadrez). Com a fonte do sistema cada computador desenha um rei diferente, e onde não
+  houvesse o desenho o peão sairia como emoji colorido; o CSP não deixa buscar fonte de
+  fora, e o resto do arquivo não é preciso.
 
 ## A limitação que caiu sem ser atacada
 
@@ -1241,7 +1285,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (276) + app (182), segundos, sem nada externo
+pnpm test        # servidor (330) + app (204), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1325,3 +1369,10 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   pessoa vista antes na call de outro. O caminho do palco — voz no CORNUME, olhos no
   "teste", clique em alguém da call — mostrando o cargo do CORNUME e o menu sem moderação
   está nos testes de `pessoas.ts` e no typecheck; numa call de verdade, não foi exercido.
+- **O xadrez entre duas pessoas de verdade.** O que está medido, na janela escondida contra
+  um servidor local, é o caminho inteiro com o adversário e a plateia agindo por HTTP: a
+  mesa abrindo em 0,1 s, o convite chegando ao outro em 20 ms e ao canto da tela em 1,7 s, o
+  lance do outro aparecendo em 0,3 s, o relógio andando, a plateia na coluna, a faixa no
+  chat, o controle na barra e na lista, a desistência e a revanche — tudo conferido também
+  em imagem. **Não foram exercidos**: duas pessoas em dois computadores, o som do convite
+  tocando, e uma partida inteira até o mate ou até o tempo acabar.

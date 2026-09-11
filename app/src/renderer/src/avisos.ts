@@ -1,9 +1,10 @@
-// Avisos sonoros: alguém entrou na call, alguém saiu, alguém abriu a live.
+// Avisos sonoros: alguém entrou na call, alguém saiu, alguém abriu a live, alguém te chamou
+// para jogar.
 //
 // Só as regras moram aqui, sem tocar em arquivo nem em `Audio`: é o que permite testar
 // "não empilhar som" sem navegador. Os arquivos ficam em `sons/index.ts`.
 
-export type Aviso = 'entrou' | 'saiu' | 'live';
+export type Aviso = 'entrou' | 'saiu' | 'live' | 'convite';
 
 /** Baixo de propósito: aviso que assusta é aviso que a pessoa desliga. */
 export const VOLUME_DO_AVISO = 0.45;

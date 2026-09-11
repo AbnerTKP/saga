@@ -1212,3 +1212,98 @@ test('arquivo dentro do limite entra, com o nome que a pessoa deu', async () => 
   assert.equal(mensagem.arquivo.nome, 'coisas.zip');
   assert.match(mensagem.arquivo.url, /^[0-9a-f]{32}\.bin$/, 'no disco vira hash inerte');
 });
+
+// --- xadrez -------------------------------------------------------------------
+
+test('xadrez pela rede: abrir, chamar, o convite no /rooms, aceitar, jogar, assistir e o número noutro servidor', async () => {
+  // Contas novas: a costura das rotas não pode depender do que os casos acima fizeram com o bruno.
+  const tkp = (await cadastrar('xadrez_tkp')).corpo;
+  const juninho = (await cadastrar('xadrez_juninho')).corpo;
+  const tava = (await cadastrar('xadrez_tava')).corpo;
+  const casa = tkp.servidor.id;
+  const naMesa = (sessao, corpo) => chamar('POST', '/jogos/mesa', { sessao, servidor: casa, corpo });
+
+  const aberta = await chamar('POST', '/jogos/abrir', { sessao: tkp.token, servidor: casa, corpo: { tempo: 300, cor: 'brancas' } });
+  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
+  const { id } = aberta.corpo.mesa;
+  assert.equal(aberta.corpo.mesa.eu, 'anfitriao');
+
+  const chamou = await naMesa(tkp.token, { id, acao: 'chamar', alvo: juninho.eu.id });
+  assert.equal(chamou.status, 200, JSON.stringify(chamou.corpo));
+
+  // O convite vai de carona na busca de salas, como o "está digitando" na de mensagens.
+  const doConvidado = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo.jogos;
+  assert.deepEqual(
+    doConvidado.convites.map((c) => ({ mesa: c.mesa, de: c.de.id, nome: c.de.nome, tempo: c.tempo, cor: c.cor })),
+    [{ mesa: id, de: tkp.eu.id, nome: 'xadrez_tkp', tempo: 300, cor: 'pretas' }],
+  );
+  assert.ok(doConvidado.mesas.some((m) => m.id === id && m.estado === 'lobby' && m.convidado === juninho.eu.id));
+  assert.deepEqual((await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa })).corpo.jogos.convites, []);
+
+  const aceitou = await naMesa(juninho.token, { id, acao: 'aceitar' });
+  assert.equal(aceitou.status, 200, JSON.stringify(aceitou.corpo));
+  assert.equal(aceitou.corpo.mesa.estado, 'jogando');
+  assert.deepEqual([aceitou.corpo.mesa.brancas.id, aceitou.corpo.mesa.pretas.id], [tkp.eu.id, juninho.eu.id]);
+
+  const ilegal = await naMesa(tkp.token, { id, acao: 'lance', de: 'e2', para: 'e5' });
+  assert.equal(ilegal.status, 400);
+  assert.match(ilegal.corpo.error, /não vale/);
+  assert.equal((await naMesa(juninho.token, { id, acao: 'lance', de: 'e7', para: 'e5' })).status, 409, 'jogou fora da vez');
+
+  const jogou = await naMesa(tkp.token, { id, acao: 'lance', de: 'e2', para: 'e4' });
+  assert.equal(jogou.status, 200, JSON.stringify(jogou.corpo));
+  assert.deepEqual(jogou.corpo.mesa.lances, [{ san: 'e4', de: 'e2', para: 'e4' }]);
+  assert.equal(jogou.corpo.mesa.relogio.correndo, 'b');
+
+  // Um terceiro abre a mesa: entra na plateia, e não tem lance nenhum a fazer.
+  const vista = await chamar('GET', `/jogos/mesa?id=${id}`, { sessao: tava.token, servidor: casa });
+  assert.equal(vista.status, 200, JSON.stringify(vista.corpo));
+  assert.equal(vista.corpo.mesa.eu, 'plateia');
+  assert.deepEqual(vista.corpo.mesa.legais, []);
+  assert.equal((await naMesa(tava.token, { id, acao: 'lance', de: 'e7', para: 'e5' })).status, 403);
+
+  const dasPretas = (await chamar('GET', `/jogos/mesa?id=${id}`, { sessao: juninho.token, servidor: casa })).corpo.mesa;
+  assert.equal(dasPretas.eu, 'pretas');
+  assert.equal(dasPretas.legais.length, 20);
+  assert.deepEqual(dasPretas.plateia.map((p) => p.id), [tava.eu.id]);
+
+  const noResumo = (await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa })).corpo.jogos.mesas.find((m) => m.id === id);
+  assert.deepEqual(noResumo, { id, estado: 'jogando', anfitriao: tkp.eu.id, brancas: tkp.eu.id, pretas: juninho.eu.id, convidado: null, vez: 'b' });
+
+  // Noutro servidor o número não abre a mesa: responde como mesa que não existe.
+  const outro = (await chamar('POST', '/servidores/criar', { sessao: tava.token, corpo: { nome: 'Clube do Xadrez' } })).corpo.servidor;
+  const deFora = await chamar('GET', `/jogos/mesa?id=${id}`, { sessao: tava.token, servidor: outro.id });
+  assert.equal(deFora.status, 404);
+  assert.equal(deFora.corpo.error, 'Essa mesa não existe mais.');
+  assert.equal((await chamar('POST', '/jogos/mesa', { sessao: tava.token, servidor: outro.id, corpo: { id, acao: 'fechar' } })).status, 404);
+  assert.deepEqual((await chamar('GET', '/rooms', { sessao: tava.token, servidor: outro.id })).corpo.jogos.mesas, []);
+
+  // Com a partida andando não se fecha; depois de desistir, sim.
+  assert.equal((await naMesa(tkp.token, { id, acao: 'fechar' })).status, 409);
+  assert.equal((await naMesa(juninho.token, { id, acao: 'desistir' })).corpo.mesa.fim.vencedor, tkp.eu.id);
+  assert.deepEqual((await naMesa(juninho.token, { id, acao: 'fechar' })).corpo, { ok: true });
+});
+
+test('xadrez: só se chama quem é do servidor e não foi banido, e sem sessão nada', async () => {
+  const dono = await sessaoDe('abner');
+  const quem = (await cadastrar('xadrez_quem')).corpo;
+  const banido = (await cadastrar('xadrez_banido')).corpo;
+  const deFora = (await criarConta('xadrez_defora')).corpo;
+  const casa = quem.servidor.id;
+  await chamar('POST', '/moderar', { sessao: dono.token, servidor: casa, corpo: { acao: 'banir', alvo: banido.eu.id } });
+
+  const aberta = await chamar('POST', '/jogos/abrir', { sessao: quem.token, servidor: casa, corpo: {} });
+  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
+  const { id } = aberta.corpo.mesa;
+  for (const alvo of [deFora.eu.id, banido.eu.id]) {
+    const r = await chamar('POST', '/jogos/mesa', { sessao: quem.token, servidor: casa, corpo: { id, acao: 'chamar', alvo } });
+    assert.equal(r.status, 404, `chamou ${alvo}: ${JSON.stringify(r.corpo)}`);
+  }
+  assert.equal((await chamar('POST', '/jogos/abrir', { sessao: quem.token, servidor: casa, corpo: {} })).status, 409,
+    'abriu uma segunda mesa com a primeira esperando');
+
+  for (const [metodo, rota] of [['POST', '/jogos/abrir'], ['GET', `/jogos/mesa?id=${id}`], ['POST', '/jogos/mesa']]) {
+    const r = await chamar(metodo, rota, metodo === 'GET' ? {} : { corpo: { id, acao: 'fechar' } });
+    assert.equal(r.status, 401, `${metodo} ${rota} respondeu ${r.status} sem sessão`);
+  }
+});

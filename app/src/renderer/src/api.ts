@@ -7,6 +7,8 @@
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
 import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
 import { lerResposta } from './resposta';
+import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
+import type { ResumoDaMesa } from './jogos';
 
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
@@ -426,9 +428,71 @@ export const renomearServidor = (nome: string) =>
 /** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
 export const buscarSalas = async (lidas = '', servidorId?: number) =>
   // `servidorId` é de qual servidor a resposta É — pode não ser o pedido, se você não faz
-  // mais parte dele. Servidor antigo não manda.
-  pedir<{ servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[] }>(
+  // mais parte dele. `jogos` são as mesas de xadrez. Servidor antigo não manda nenhum dos dois.
+  pedir<{ servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor }>(
     'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`, undefined, servidorId);
+
+// --- xadrez -----------------------------------------------------------------
+
+/** Alguém numa mesa, com o nome que tem NESTE servidor. */
+export type PessoaDaMesa = { id: number; nome: string; foto: string | null; idExibido: string | null };
+
+/** `cor` é a de quem foi chamado: quem abriu de brancas chama alguém para as pretas. */
+export type ConviteDeJogo = { mesa: number; de: PessoaDaMesa; tempo: number | null; cor: CorEscolhida };
+
+export type JogosNoServidor = { mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] };
+
+/** A mesa como quem pediu a vê. */
+export type Mesa = {
+  id: number;
+  estado: 'lobby' | 'jogando' | 'fim';
+  anfitriao: PessoaDaMesa;
+  /** Segundos para cada jogador; null é sem relógio. */
+  tempo: number | null;
+  /** A escolha de quem abriu a mesa. */
+  cor: CorEscolhida;
+  convidado: PessoaDaMesa | null;
+  recusou: PessoaDaMesa | null;
+  brancas: PessoaDaMesa | null;
+  pretas: PessoaDaMesa | null;
+  fen: string;
+  vez: Lado;
+  xeque: boolean;
+  lances: { san: string; de: string; para: string }[];
+  ultimo: { de: string; para: string } | null;
+  /** Os lances que valem — só para quem está na vez; para os outros, vazio. */
+  legais: LanceLegal[];
+  relogio: Relogio | null;
+  empateOferecidoPor: number | null;
+  revanchePedidaPor: number | null;
+  fim: { motivo: MotivoDoFim; vencedor: number | null } | null;
+  plateia: PessoaDaMesa[];
+  /** O papel de quem pediu. Depois de começar, quem abriu é 'brancas' ou 'pretas'. */
+  eu: 'anfitriao' | 'convidado' | 'brancas' | 'pretas' | 'plateia';
+  /** O relógio do servidor na hora da resposta. */
+  agora: number;
+};
+
+export type AcaoNaMesa =
+  | { acao: 'configurar'; tempo?: number | null; cor?: CorEscolhida }
+  | { acao: 'chamar'; alvo: number }
+  | { acao: 'lance'; de: string; para: string; promocao?: Promocao }
+  | { acao: 'cancelarConvite' | 'aceitar' | 'recusar' | 'desistir' | 'oferecerEmpate' | 'aceitarEmpate' | 'recusarEmpate' | 'revanche' | 'fechar' };
+
+/**
+ * A mesa é de um servidor, e o pedido vai sempre ao servidor DELA — nunca ao aberto: trocar
+ * de servidor no meio de uma partida não pode mandar o lance para outro lugar.
+ */
+export const abrirMesa = async (tempo: number | null, cor: CorEscolhida, servidorId: number) =>
+  (await pedir<{ mesa: Mesa }>('POST', '/jogos/abrir', { tempo, cor }, servidorId)).mesa;
+
+/** Quem pede e não joga entra na plateia: é assim que o servidor conta quem assiste. */
+export const verMesa = async (id: number, servidorId: number) =>
+  (await pedir<{ mesa: Mesa }>('GET', `/jogos/mesa?id=${id}`, undefined, servidorId)).mesa;
+
+/** Uma ação na mesa. Fechar não devolve mesa nenhuma: ela deixou de existir. */
+export const agirNaMesa = async (id: number, a: AcaoNaMesa, servidorId: number) =>
+  (await pedir<{ mesa?: Mesa; ok?: true }>('POST', '/jogos/mesa', { id, ...a }, servidorId)).mesa ?? null;
 
 /**
  * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.

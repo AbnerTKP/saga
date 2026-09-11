@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
@@ -201,7 +201,7 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida }: {
   rm: RM;
   /** Quem foi visto nas calls do servidor DA CALL: os rostos do palco são de lá. */
   pessoas: Map<string, PessoaNaCall>;
@@ -237,6 +237,14 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   onAssistirLive: (live: LiveNoChat) => void;
   /** Volta para a sala de voz em que você está, a partir do chat. */
   onVoltarAVoz?: () => void;
+  /**
+   * A partida de xadrez aberta, quando há uma: ela toma o lugar da sala na tela — é a tela
+   * da dupla, e nada mais. Recebe a live que você assiste para pôr na coluna: flutuando no
+   * canto, ela taparia o tabuleiro e os botões da partida.
+   */
+  jogo?: (live: ReactNode | null) => ReactNode;
+  /** A sua partida, quando você saiu dela para ler outra coisa. */
+  faixaDaPartida?: ReactNode;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -313,6 +321,48 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
   const nomeDaLiveNoPalco = liveNoPalco ? (liveNoPalco.participant.name || liveNoPalco.participant.identity) : null;
 
+  /**
+   * O quadro pequeno da live que você assiste. É o mesmo conteúdo nos dois lugares onde ele
+   * cabe: flutuando no canto do chat, e dentro da coluna da partida de xadrez.
+   */
+  const quadroDaLive = liveNoPalco && nomeDaLiveNoPalco ? (
+    <>
+      <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} />
+      <div className="mini-live-controles">
+        <span className="ponto-ao-vivo" />
+        <span className="mini-live-nome">{nomeDaLiveNoPalco}</span>
+        {!liveNoPalco.local && (
+          <ControleDeVolume
+            volume={rm.volumeDaTelaDe(liveNoPalco.participant.identity)}
+            onVolume={(v) => rm.definirVolumeDaTela(liveNoPalco.participant.identity, v)}
+            largura={56}
+            porcentagem={false}
+          />
+        )}
+        {onVoltarAVoz && (
+          <button type="button" className="mini-live-icone" title="Voltar ao palco" onClick={onVoltarAVoz}>
+            <Icon name="expandir" size={17} />
+          </button>
+        )}
+        <button type="button" className="sair-da-live pequeno" onClick={() => rm.assistir(null)}
+          title={liveNoPalco.local ? 'Fechar a prévia' : 'Sair da live'}>
+          <Icon name="close" size={13} /> Sair
+        </button>
+      </div>
+    </>
+  ) : null;
+
+  // A partida toma o palco inteiro: é a tela da dupla, sem a faixa da call e sem o resto da
+  // sala em volta. Quem sai dela para ler o chat leva a faixa da partida junto.
+  if (jogo) {
+    return (
+      <main className="stage">
+        {jogo(quadroDaLive && <div className="mini-live na-coluna">{quadroDaLive}</div>)}
+        {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
+      </main>
+    );
+  }
+
   return (
     <main className="stage">
       <header className="stage-head">
@@ -334,6 +384,10 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           onAbrir={onVoltarAVoz}
         />
       )}
+
+      {/* Logo abaixo da call: a partida de xadrez que você deixou aberta. O relógio dela
+          continua correndo enquanto você lê outra coisa. */}
+      {faixaDaPartida}
 
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
@@ -491,32 +545,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       {/* Abriu o chat com uma live rodando: ela continua aqui, pequena, com os controles
           fixos embaixo — volume, voltar ao palco e sair. Eram um "voltar" e um X soltos no
           alto, e o volume só existia no botão direito. */}
-      {salaAberta?.tipo === 'texto' && liveNoPalco && nomeDaLiveNoPalco && (
-        <div className="mini-live">
-          <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} />
-          <div className="mini-live-controles">
-            <span className="ponto-ao-vivo" />
-            <span className="mini-live-nome">{nomeDaLiveNoPalco}</span>
-            {!liveNoPalco.local && (
-              <ControleDeVolume
-                volume={rm.volumeDaTelaDe(liveNoPalco.participant.identity)}
-                onVolume={(v) => rm.definirVolumeDaTela(liveNoPalco.participant.identity, v)}
-                largura={56}
-                porcentagem={false}
-              />
-            )}
-            {onVoltarAVoz && (
-              <button type="button" className="mini-live-icone" title="Voltar ao palco" onClick={onVoltarAVoz}>
-                <Icon name="expandir" size={17} />
-              </button>
-            )}
-            <button type="button" className="sair-da-live pequeno" onClick={() => rm.assistir(null)}
-              title={liveNoPalco.local ? 'Fechar a prévia' : 'Sair da live'}>
-              <Icon name="close" size={13} /> Sair
-            </button>
-          </div>
-        </div>
-      )}
+      {salaAberta?.tipo === 'texto' && quadroDaLive && <div className="mini-live">{quadroDaLive}</div>}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
     </main>
   );
