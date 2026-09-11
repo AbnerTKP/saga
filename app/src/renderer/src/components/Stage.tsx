@@ -58,8 +58,10 @@ function QuemAssiste({ espectadores, nomes = 0, mostrarVazio, extra }: {
   );
 }
 
-function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMenu }: {
+function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMenu, onSair }: {
   tile: Tile; big?: boolean;
+  /** Parar de assistir: a transmissão deixa de chegar, imagem e som. Só no quadro escolhido. */
+  onSair?: () => void;
   /** Cortar as bordas para ocupar tudo, em vez de deixar tarja preta. */
   preencher?: boolean;
   /** Quem está falando agora, medido do som — ver niveis.ts. */
@@ -132,6 +134,18 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
           onDoubleClick={(e) => e.stopPropagation()}
         >
           <Icon name="expandir" size={16} />
+        </button>
+      )}
+      {isScreen && onSair && (
+        /* Sair era clicar na própria imagem, e isso ninguém adivinha. O botão fica no canto
+           de cima, à direita: embaixo moram o nome e a tela cheia; em cima, à esquerda, quem
+           está assistindo. */
+        <button
+          className="tile-sair"
+          onClick={(e) => { e.stopPropagation(); onSair(); }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Icon name="close" size={13} /> {tile.local ? 'Fechar a prévia' : 'Sair da live'}
         </button>
       )}
     </div>
@@ -337,7 +351,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           {!idle && (focusTile || rm.lives.length > 0) && (
             <div className="focus-layout">
               {focusTile
-                ? <VideoTile tile={focusTile} big preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(focusTile.participant.identity)} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)} />
+                ? <VideoTile tile={focusTile} big preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(focusTile.participant.identity)} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)}
+                    onSair={focusTile === liveNoPalco ? () => rm.assistir(null) : undefined} />
                 : (
                   <div className="tile grande-vazio">
                     <div className="muted">
@@ -410,6 +425,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                 voltar
               </button>
             )}
+            {/* O X do quadro flutuante é sair da live: fechá-lo e continuar recebendo a
+                transmissão escondida seria gastar banda e som com nada. */}
+            <button className="mini-live-sair" onClick={() => rm.assistir(null)}
+              title={liveNoPalco.local ? 'Fechar a prévia' : 'Sair da live'}>
+              <Icon name="close" size={14} />
+            </button>
           </div>
           <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(liveNoPalco.participant.identity)} onMenu={menuDaTransmissao(liveNoPalco)} />
         </div>

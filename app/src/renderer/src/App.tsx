@@ -563,6 +563,25 @@ export function App() {
     }
   }, [rooms, entrarNaVoz, paraAVoz, rm]);
 
+  /**
+   * "Entrar e assistir" pelo cartão da live na barra: o clique na sala mais a escolha da
+   * transmissão. O que fica na tela segue a regra do clique na sala (`navegacao.ts`), e não
+   * uma segunda: lendo uma conversa, você continua nela e a live vai para o quadro
+   * flutuante; olhando o palco de outra call, o palco passa a ser o desta.
+   */
+  const assistirDaBarra = useCallback(async (sala: RoomInfo, identity: string) => {
+    const naVoz = paraAVoz(sala);
+    if (!naVoz) return;
+    const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
+    if (oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null).abrir) setSalaAbertaId(sala.id);
+    try {
+      await entrarNaVoz(naVoz);
+      rm.assistir(identity);
+    } catch (e) {
+      rm.setError((e as Error).message);
+    }
+  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId]);
+
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
   const ultimaNaTela = chat.mensagens.at(-1)?.id ?? 0;
@@ -698,6 +717,8 @@ export function App() {
         servidor={servidor}
         rm={rm}
         onAbrir={abrirSala}
+        lives={lives}
+        onAssistirLive={assistirDaBarra}
         salaAbertaId={salaAbertaId}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}

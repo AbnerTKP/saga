@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { identidadeDe } from '../pessoas';
+import { acaoDaLive } from '../cartaoDaLive';
+import type { LiveNoChat } from '../lives';
 import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
@@ -9,11 +11,12 @@ import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { Sinal } from './Sinal';
+import { CartaoDaLive } from './CartaoDaLive';
 import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -29,6 +32,10 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** Botão direito EM CIMA de uma sala: as opções daquela sala, não as de criar. */
   onMenuDaSala: (sala: RoomInfo, em: { x: number; y: number }) => void;
   onAbrir: (sala: RoomInfo) => void;
+  /** As telas no ar nas salas deste servidor, com quem está vendo cada uma — ver lives.ts. */
+  lives: LiveNoChat[];
+  /** "Entrar e assistir" pelo cartão da live: entra na call dela e escolhe a transmissão. */
+  onAssistirLive: (sala: RoomInfo, identity: string) => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -47,6 +54,29 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   const [alvo, setAlvo] = useState<Alvo | null>(null);
   const [fechadas, setFechadas] = useState<Set<number>>(new Set());
   const [escolhendoStatus, setEscolhendoStatus] = useState(false);
+
+  /**
+   * O cartão da live de quem está sendo apontado. Um relógio só, para abrir e para fechar:
+   * sair do nome marca o fechar, e chegar ao cartão o desmarca — é assim que se vai do
+   * nome até o botão sem o cartão sumir no caminho.
+   */
+  const [cartao, setCartao] = useState<{ identity: string; salaId: number; em: { x: number; meio: number } } | null>(null);
+  const relogioDoCartao = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(relogioDoCartao.current), []);
+  const marcarCartao = (fazer: () => void, ms: number) => {
+    window.clearTimeout(relogioDoCartao.current);
+    relogioDoCartao.current = window.setTimeout(fazer, ms);
+  };
+  const apontarLive = (identity: string, salaId: number, linha: HTMLElement) => {
+    const caixa = linha.getBoundingClientRect();
+    const barra = linha.closest('.sidebar')?.getBoundingClientRect();
+    const em = { x: (barra?.right ?? caixa.right) + 6, meio: caixa.top + caixa.height / 2 };
+    // Fechado, espera um instante: o mouse passando pela lista a caminho de outra coisa
+    // não acende cartão nenhum. Já aberto, troca na hora.
+    marcarCartao(() => setCartao({ identity, salaId, em }), cartao ? 0 : 250);
+  };
+  const largarLive = () => marcarCartao(() => setCartao(null), 200);
+  const fecharCartao = () => { window.clearTimeout(relogioDoCartao.current); setCartao(null); };
 
   const ordemDosGrupos: (number | null)[] = [null, ...categorias.map((c) => c.id)];
   const grupos = ordemDosGrupos.map((g) => ({
@@ -81,6 +111,41 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   const risco = (categoriaId: number | null, indice: number) =>
     alvo && alvo.categoriaId === categoriaId && alvo.indice === indice
       ? <li className="risco-de-solta" aria-hidden /> : null;
+
+  /** Quem aparece pendurado numa sala: a sua call sai do LiveKit; as outras, da busca. */
+  const quemEstaNa = (r: RoomInfo) => (rm.salaDaVoz?.id === r.id
+    ? rm.participants.map((p) => ({
+        identity: p.identity, name: p.name || p.identity,
+        foto: pessoas.get(p.identity)?.foto ?? null,
+        enquadramento: pessoas.get(p.identity)?.enquadramento,
+        turbo: pessoas.get(p.identity)?.turbo ?? false,
+        idExibido: pessoas.get(p.identity)?.idExibido ?? null,
+        speaking: rm.falando.has(p.identity), muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
+        surdo: rm.surdos.has(p.identity),
+      }))
+    : ocupantes(r.participants, { euSou: identidadeDe(eu.id), estouNesta: false })
+        .map((p) => ({
+          ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
+          idExibido: p.idExibido ?? null, speaking: false, surdo: !!p.surdo,
+        })));
+
+  // O cartão é montado de novo a cada desenho, do que está na sala AGORA: quem para de
+  // transmitir, ou sai da sala, com o cartão aberto leva o cartão junto.
+  const salaDoCartao = cartao ? rooms.find((s) => s.id === cartao.salaId) ?? null : null;
+  const quemTransmite = cartao && salaDoCartao
+    ? quemEstaNa(salaDoCartao).find((p) => p.identity === cartao.identity && p.screen) ?? null
+    : null;
+  const acaoDoCartao = salaDoCartao && quemTransmite
+    ? acaoDaLive({
+        identity: quemTransmite.identity, minhaIdentity: identidadeDe(eu.id), salaId: salaDoCartao.id,
+        salaDaVozId: rm.salaDaVoz?.id ?? null, assistindo: rm.assistindo,
+      })
+    : null;
+  // Na sua call, quem está vendo sai do LiveKit, na hora; nas outras, da busca de salas.
+  const plateiaDoCartao = !salaDoCartao || !quemTransmite ? []
+    : rm.salaDaVoz?.id === salaDoCartao.id
+      ? (rm.espectadores.get(quemTransmite.identity) ?? []).map((e) => e.nome)
+      : lives.find((l) => l.identity === quemTransmite.identity && l.salaId === salaDoCartao.id)?.espectadores ?? [];
 
   return (
     <aside className="sidebar">
@@ -130,21 +195,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
               <ul className="lista-de-salas">
                 {g.salas.map((r, i) => {
                       const live = rm.salaDaVoz?.id === r.id;
-              const people = live
-                ? rm.participants.map((p) => ({
-                    identity: p.identity, name: p.name || p.identity,
-                    foto: pessoas.get(p.identity)?.foto ?? null,
-                    enquadramento: pessoas.get(p.identity)?.enquadramento,
-                    turbo: pessoas.get(p.identity)?.turbo ?? false,
-                    idExibido: pessoas.get(p.identity)?.idExibido ?? null,
-                    speaking: rm.falando.has(p.identity), muted: !p.isMicrophoneEnabled, camera: p.isCameraEnabled, screen: p.isScreenShareEnabled,
-                    surdo: rm.surdos.has(p.identity),
-                  }))
-                : ocupantes(r.participants, { euSou: identidadeDe(eu.id), estouNesta: false })
-                    .map((p) => ({
-                      ...p, foto: p.foto ?? null, enquadramento: p.enquadramento, turbo: p.turbo ?? false,
-                      idExibido: p.idExibido ?? null, speaking: false, surdo: !!p.surdo,
-                    }));
+              const people = quemEstaNa(r);
               return (
                 <li
                   key={r.id}
@@ -186,11 +237,17 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                       <li
                         key={p.identity}
                         className={`clicavel ${p.speaking ? 'speaking' : ''}`}
-                        title={`${p.name} — clique para o perfil, botão direito para as opções`}
-                        onClick={(e) => { e.stopPropagation(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil'); }}
+                        // Quem transmite já ganha o cartão da live ao apontar; o balão amarelo
+                        // do navegador por cima dele diria outra coisa no mesmo lugar.
+                        title={p.screen ? undefined : `${p.name} — clique para o perfil, botão direito para as opções`}
+                        onClick={(e) => { e.stopPropagation(); fecharCartao(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil'); }}
                         /* Sem parar aqui, o clique sobe até a lista de salas e abre O MENU DELA junto:
                            dois menus na tela, um por cima do outro. */
-                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); fecharCartao(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}
+                        /* Apontar para quem transmite abre o cartão da live — o mesmo da faixa
+                           do palco —, com o "assistir" a um clique de onde o ícone já estava. */
+                        onMouseEnter={p.screen ? (e) => apontarLive(p.identity, r.id, e.currentTarget) : undefined}
+                        onMouseLeave={p.screen ? largarLive : undefined}
                       >
                         <Avatar nome={p.name} foto={p.foto} enquadramento={p.enquadramento?.foto}
                       status={pessoas.get(p.identity)?.status} />
@@ -310,6 +367,25 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
           <button onClick={onSettings} title="Sua conta: perfil, microfone e câmera"><Icon name="gear" /></button>
         </div>
       </div>
+
+      {cartao && salaDoCartao && quemTransmite && acaoDoCartao && (
+        <CartaoDaLive
+          em={cartao.em}
+          nome={quemTransmite.name}
+          foto={quemTransmite.foto}
+          enquadramento={quemTransmite.enquadramento?.foto}
+          plateia={plateiaDoCartao}
+          acao={acaoDoCartao}
+          onEntrar={() => window.clearTimeout(relogioDoCartao.current)}
+          onSair={largarLive}
+          onAcao={() => {
+            fecharCartao();
+            if (acaoDoCartao === 'assistir') rm.assistir(quemTransmite.identity);
+            else if (acaoDoCartao === 'assistindo') rm.assistir(null);
+            else if (acaoDoCartao === 'entrarEAssistir') onAssistirLive(salaDoCartao, quemTransmite.identity);
+          }}
+        />
+      )}
     </aside>
   );
 }

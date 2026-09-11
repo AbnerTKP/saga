@@ -716,6 +716,25 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   faixa de fichas no alto da tela, e escolher longe do que se escolhe foi rejeitado na
   hora. O palco tem dois campos: em cima a escolhida, embaixo quem está no ar. Sem
   escolha, o campo de cima não some — ele diz o que fazer.
+- **Apontar para quem transmite, na barra, abre o cartão da live.** O "assistir" só
+  existia DENTRO do palco: quem via o ícone de tela ao lado de um nome tinha de abrir a
+  sala, achar o cartão e só então clicar. Agora o mesmo cartão — retrato, "ao vivo", nome e
+  quantos estão vendo — flutua à direita da barra, e ele INTEIRO é o botão, com o texto
+  dizendo o que vai acontecer, que depende de onde você está (`cartaoDaLive.ts`, puro e
+  testado): na sua call, "Assistir"; a que você já assiste, "Sair da live"; noutra sala,
+  "Entrar e assistir", que segue a regra do clique na sala (`navegacao.ts`) em vez de
+  inventar uma segunda; a sua própria só diz que está no ar. **Não traz a imagem da
+  transmissão**: só a escolhida chega, e uma prévia gastaria a banda que essa regra poupa.
+  Abre depois de 250 ms — o mouse passando a caminho de outra coisa não acende nada —, e um
+  relógio só abre e fecha: sair do nome marca o fechar, chegar ao cartão o desmarca. Medido
+  no app de verdade, numa janela escondida, com uma tela no ar num LiveKit local: o cartão
+  aparece à direita da barra, continua ao ir do nome até ele e some ao sair dos dois.
+- **Sair da live é um botão, e não só clicar na imagem.** Clicar no quadro escolhido já
+  largava a transmissão, e isso ninguém adivinha. O botão fica no canto de cima à direita
+  — embaixo moram o nome e a tela cheia; em cima à esquerda, quem assiste — e aparece com o
+  mouse, como a tela cheia: fixo, ficaria por cima do filme o tempo todo. No quadro
+  flutuante, o X é sair: fechá-lo e continuar recebendo escondido gastaria banda e som com
+  nada.
 - **O cartão da live é deitado, não empilhado.** A faixa de baixo tem 110 px de altura, e
   selo + retrato + nome + chamada empilhados não cabem: o selo acabava por cima do
   retrato. Largura é o que sobra ali. Medido renderizando o `styles.css` de verdade — o
@@ -1175,7 +1194,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (267) + app (169), segundos, sem nada externo
+pnpm test        # servidor (276) + app (176), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1243,6 +1262,11 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   inteiro — alguém abre a tela, a linha aparece na conversa em até 4 s, o "Entrar e
   assistir" entra na voz e põe a live no quadro flutuante sem tirar você do chat — precisa
   de LiveKit e de duas pessoas, e não foi exercido.
+- **Entrar e sair de uma live pelo cartão da barra, numa call de verdade.** O que está
+  medido é o cartão aparecer, dizer a ação certa e não sumir no caminho até o botão — com o
+  app FORA da call. Clicar em "Entrar e assistir" e a live chegar, e o "Sair da live" do
+  quadro e o X do flutuante cortarem imagem e som, não foi exercido: entrar na call pediria
+  o microfone desta máquina.
 - **Abrir junto com o Windows, inteiro.** Nada disso foi exercido em Windows nenhum: a
   entrada aparecer no registro e na lista de programas que abrem sozinhos, o
   `--ao-iniciar` chegando de verdade ao app, a janela vindo encolhida na barra de tarefas

@@ -304,6 +304,17 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .tile-expandir:hover { background: rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { .tile-expandir { transition: none; } }
 
+/* Sair da live, no canto de cima à direita do quadro escolhido. Aparece com o mouse, como a
+   tela cheia: fixo, ficaria por cima do filme o tempo todo — inclusive em tela cheia. */
+.tile-sair { position: absolute; right: 8px; top: 8px; display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px 5px 8px; border-radius: 6px; color: #fff; background: rgba(0,0,0,.6);
+  font-size: 12px; font-weight: 650; opacity: 0; transition: opacity .12s, background .12s; }
+.tile:hover .tile-sair, .tile-sair:focus-visible { opacity: 1; }
+.tile-sair:hover { background: var(--danger); }
+/* Quem está assistindo mora no canto de cima à esquerda e não pode correr até o botão. */
+.tile.big .quem-assiste.no-quadro { max-width: calc(100% - 150px); }
+@media (prefers-reduced-motion: reduce) { .tile-sair { transition: none; } }
+
 .menu-check { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; font-size: 13px; }
 .menu-check input { margin-top: 2px; flex: none; }
 .menu-check .block { display: block; }
@@ -1045,6 +1056,31 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--white); }
 .mini-live .tile { border-radius: 0; aspect-ratio: 16 / 9; }
 .mini-live .tile-label { display: none; }
+.mini-live-sair { display: grid; place-items: center; width: 24px; height: 24px; flex: none;
+  border-radius: 5px; color: var(--text2); }
+.mini-live-sair:hover { background: rgba(242,63,67,.15); color: #fa777c; }
+
+/* O cartão da live na barra lateral: o mesmo da faixa do palco, flutuando à direita da
+   barra, na altura de quem transmite. Fica no degrau dos menus (35) e fora da região de
+   arraste — sem isso, o clique iria para a janela e não para o botão. */
+/* 264 px e não 250: com 250, "ninguém assistindo ainda" quebrava em duas linhas ao lado
+   do retrato — visto na imagem, não no typecheck. */
+.cartao-live { -webkit-app-region: no-drag; position: fixed; z-index: 35; width: 264px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; }
+.cartao-live-corpo { display: grid; width: 100%; text-align: left; color: var(--text); }
+.cartao-live-cima { display: flex; align-items: center; gap: 11px; padding: 12px 12px 10px; min-width: 0; }
+.cartao-live .avatar.huge { width: 46px; height: 46px; font-size: 19px; flex: none; }
+.cartao-live-plateia { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  color: var(--text2); white-space: nowrap; }
+.cartao-live-acao { display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 0 12px 12px; padding: 7px 10px; border-radius: 6px; font-size: 13px; font-weight: 650;
+  background: var(--accent); color: #fff; transition: background .12s; }
+button.cartao-live-corpo:hover .cartao-live-acao { background: var(--accent-h); }
+/* Já assistindo, o botão é sair — não é a ação principal, então não leva a cor da casa. */
+.cartao-live-acao.assistindo { background: var(--bg3); color: var(--text); }
+button.cartao-live-corpo:hover .cartao-live-acao.assistindo { background: rgba(242,63,67,.18); color: #fa777c; }
+.cartao-live-acao.sua { background: none; color: var(--text3); font-weight: 500; }
 
 /* O som que está no ar: o botão vira "parar", então precisa parecer outra coisa. */
 .som.tocando .tocar { background: var(--accent); color: #fff; }
