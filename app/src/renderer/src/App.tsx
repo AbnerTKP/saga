@@ -37,7 +37,7 @@ import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
-import { acharPessoa, identidadeDe } from './pessoas';
+import { acharPessoa, identidadeDe, lembrarDasSalas, vistosEm, type Conhecidos } from './pessoas';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
 import type { UpdateState } from './desktop';
@@ -46,11 +46,28 @@ import type { UpdateState } from './desktop';
 const ULTIMO_APELIDO = 'cantinho.apelido';
 const STATUS_ESCOLHIDO = 'cantinho.status';
 
+// Vazias e sempre as mesmas: "ainda não chegou" não pode virar uma lista nova a cada desenho.
+const SEM_SALAS: RoomInfo[] = [];
+const SEM_CATEGORIAS: Categoria[] = [];
+const SEM_CARGOS: Cargo[] = [];
+const SEM_MEMBROS: Membro[] = [];
+
+/** Uma pessoa aberta num cartão ou num menu, com o servidor de que se está falando dela. */
+type PessoaAberta = { pessoa: PessoaNaCall; servidorId: number; servidorNome: string };
+
 export function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [conferindo, setConferindo] = useState(!!lerToken());
-  const [rooms, setRooms] = useState<RoomInfo[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  /**
+   * Tudo que é DE UM SERVIDOR anda com o servidor junto — as salas aqui, cargos e pessoas
+   * logo abaixo.
+   *
+   * Trocar de servidor não troca estas listas na hora: até a busca voltar, elas ainda são
+   * as de onde se veio, e sem a etiqueta o app as usava como se fossem do servidor novo —
+   * com o nome dele no alto. Com ela, lista de outro servidor não vale aqui: é como se
+   * ainda não tivesse chegado. As que valem são tiradas logo depois do `useRoom`.
+   */
+  const [salasDoServidor, setSalasDoServidor] = useState<{ servidorId: number; rooms: RoomInfo[]; categorias: Categoria[] } | null>(null);
   const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
   const [menuDaSala, setMenuDaSala] = useState<{ sala: RoomInfo; em: { x: number; y: number } } | null>(null);
   // A sala cujo "quem pode ver" está aberto.
@@ -71,19 +88,18 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
-  const conhecidos = useRef(new Map<string, PessoaNaCall>());
+  const conhecidos = useRef<Conhecidos>(new Map());
   const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
   const notas = useAvisos();
-  const [perfilAberto, setPerfilAberto] = useState<PessoaNaCall | null>(null);
-  // Os cargos que dá para atribuir pelo menu. Vêm com o servidor, não com a sessão,
-  // porque mudam quando alguém os edita.
-  const [cargos, setCargos] = useState<Cargo[]>([]);
-  const [membrosDoServidor, setMembrosDoServidor] = useState<Membro[]>([]);
+  const [perfilAberto, setPerfilAberto] = useState<PessoaAberta | null>(null);
+  // Os cargos que dá para atribuir pelo menu, e quem faz parte. Vêm com o servidor, não com
+  // a sessão, porque mudam quando alguém os edita — e, como as salas, com o servidor junto.
+  const [dadosDoServidor, setDadosDoServidor] = useState<{ servidorId: number; cargos: Cargo[]; membros: Membro[] } | null>(null);
   // Pede a lista de pessoas de novo AGORA, sem esperar a volta de 10 s — ver a busca dela.
   const [buscarServidorDeNovo, setBuscarServidorDeNovo] = useState(0);
   const recarregarServidor = useCallback(() => setBuscarServidorDeNovo((n) => n + 1), []);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
-  const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
+  const [menu, setMenu] = useState<(PessoaAberta & { em: { x: number; y: number } }) | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
   // A tela de partida só aparece na primeira consulta. Depois disso, versão nova chega
   // pelo aviso no canto, sem interromper quem está no meio de uma conversa.
@@ -105,6 +121,15 @@ export function App() {
     [notas.mostrar],
   );
   const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem);
+
+  // O que vale para o servidor ABERTO: só as listas etiquetadas com ele.
+  const servidorAberto = sessao?.servidor?.id ?? null;
+  const salasDaqui = salasDoServidor?.servidorId === servidorAberto ? salasDoServidor : null;
+  const rooms = salasDaqui?.rooms ?? SEM_SALAS;
+  const categorias = salasDaqui?.categorias ?? SEM_CATEGORIAS;
+  const dadosDaqui = dadosDoServidor?.servidorId === servidorAberto ? dadosDoServidor : null;
+  const cargos = dadosDaqui?.cargos ?? SEM_CARGOS;
+  const membrosDoServidor = dadosDaqui?.membros ?? SEM_MEMBROS;
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 
@@ -208,14 +233,15 @@ export function App() {
 
   // Quem está em cada sala
   useEffect(() => {
-    if (!sessao?.servidor) return;
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
     let vivo = true;
     const tick = async () => {
       try {
-        const lista = await buscarSalas(paraParametro(lidasRef.current));
+        // O pedido diz de que servidor fala, porque a resposta vai ser guardada como dele.
+        const lista = await buscarSalas(paraParametro(lidasRef.current), servidorId);
         if (!vivo) return;
-        setRooms(lista.rooms);
-        setCategorias(lista.categorias);
+        setSalasDoServidor({ servidorId, rooms: lista.rooms, categorias: lista.categorias });
         setPollError(null);
       } catch (e) {
         if (!vivo) return;
@@ -316,28 +342,19 @@ export function App() {
     guardarToken(null);
     guardarServidorAtual(null);
     setSessao(null);
-    setRooms([]);
+    setSalasDoServidor(null);
+    setDadosDoServidor(null);
+    conhecidos.current.clear();
   }, [rm]);
 
   // Identidade -> quem é a pessoa, montado do que o servidor manda. O LiveKit sabe quem
   // está falando mas não sabe de foto nem de cargo; a barra lateral, o palco e o menu
   // precisam das duas coisas, então o mapa é montado aqui, uma vez.
   //
-  // Ele ACUMULA em vez de só refletir o servidor aberto. Com a voz num servidor e os
-  // olhos noutro, quem está na sua call não vem no /rooms daqui — e sem guardar, os
-  // rostos da conversa virariam iniciais no meio dela. O que a busca traz sobrescreve,
-  // então o dado do servidor aberto continua sendo o mais novo.
-  const pessoas = conhecidos.current;
-  for (const sala of rooms) {
-    for (const p of sala.participants) {
-      pessoas.set(p.identity, {
-        identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo,
-        foto: p.foto ?? null, banner: p.banner ?? null, enquadramento: p.enquadramento,
-        entrouEm: p.entrouEm ?? null, turbo: p.turbo, idExibido: p.idExibido ?? null,
-        status: p.status,
-      });
-    }
-  }
+  // Ele acumula, e acumula POR SERVIDOR: cada lista é anotada debaixo do servidor de onde
+  // veio. Numa pilha só, quem esteve na call de um servidor levava o cargo, o nome e o
+  // identificador de lá para o cartão aberto noutro — ver pessoas.ts.
+  if (salasDoServidor) lembrarDasSalas(conhecidos.current, salasDoServidor.servidorId, salasDoServidor.rooms);
 
   // Quem está em alguma sala de voz agora: a lista da direita marca essas pessoas.
   const naVoz = new Set<number>();
@@ -350,17 +367,26 @@ export function App() {
    * Ver quem é a pessoa é o que mais se faz, e era o que menos aparecia — enquanto o que
    * quase nunca se usa, e não se quer errar, ficava a um clique de distância.
    */
-  const abrirMenu = useCallback((identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes' = 'perfil') => {
-    // UM lugar responde "quem é essa pessoa", para os quatro caminhos que abrem o cartão.
-    // Antes isto olhava só o mapa da CALL: quem não estivesse numa sala de voz naquele
-    // instante virava um objeto pelado, sem foto nem cargo — e do CHAT esse era o caso
-    // normal. A mesma pessoa aparecia inteira pela lista da direita e vazia pelo chat.
-    const pessoa = acharPessoa(identity, { naCall: pessoas, membros: membrosDoServidor, nome });
-    if (tipo === 'perfil') { setPerfilAberto(pessoa); return; }
-    setMenu({ pessoa, em });
-  // pessoas é remontado a cada render; depender dele aqui só criaria a função à toa.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms, membrosDoServidor]);
+  const abrirMenu = useCallback((
+    identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes' = 'perfil',
+    // O servidor do lugar do clique. Sem ele, o aberto: lista de pessoas, chat e salas da
+    // barra são dele. O palco passa o da call, que pode ser outro.
+    onde?: { servidorId: number; servidorNome: string },
+  ) => {
+    const servidor = onde ?? (sessao?.servidor ? { servidorId: sessao.servidor.id, servidorNome: sessao.servidor.nome } : null);
+    if (!servidor) return;
+    // UM lugar responde "quem é essa pessoa NESTE servidor", para todos os caminhos que
+    // abrem o cartão. A lista de membros vai com a etiqueta dela: quem decide se ela vale
+    // para o servidor perguntado é `acharPessoa`, não quem chama.
+    const pessoa = acharPessoa(identity, {
+      servidorId: servidor.servidorId,
+      membros: dadosDoServidor && { servidorId: dadosDoServidor.servidorId, lista: dadosDoServidor.membros },
+      conhecidos: conhecidos.current,
+      nome,
+    });
+    if (tipo === 'perfil') { setPerfilAberto({ pessoa, ...servidor }); return; }
+    setMenu({ pessoa, ...servidor, em });
+  }, [sessao?.servidor, dadosDoServidor]);
 
   const moderarPeloMenu = useCallback(async (alvo: number, acao: Acao, extra?: { minutos?: number; cargo?: number }) => {
     try { await moderar(acao, alvo, extra); } catch (e) { notas.mostrarFalha(e); }
@@ -395,11 +421,12 @@ export function App() {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
     let vivo = true;
-    const buscar = () => verServidor()
+    const buscar = () => verServidor(servidorId)
       .then((r) => {
         if (!vivo) return;
-        setCargos(r.cargos);
-        setMembrosDoServidor(r.membros);
+        // A etiqueta é o servidor que a RESPOSTA diz ser: pedir por um de que você não faz
+        // mais parte devolve outro, e ele não pode entrar como se fosse o pedido.
+        setDadosDoServidor({ servidorId: r.servidor.id, cargos: r.cargos, membros: r.membros });
         setSessao((atual) => (atual ? { ...atual, servidores: r.servidores } : atual));
       })
       .catch(() => undefined);
@@ -415,9 +442,12 @@ export function App() {
    * dando errado, é ela que devolve a ordem de verdade.
    */
   const reordenar = useCallback(async (novaOrdem: { id: number; categoriaId: number | null }[]) => {
-    setRooms((antes) => novaOrdem
-      .map((n) => { const r = antes.find((x) => x.id === n.id); return r && { ...r, categoriaId: n.categoriaId }; })
-      .filter((r): r is RoomInfo => !!r));
+    setSalasDoServidor((antes) => antes && {
+      ...antes,
+      rooms: novaOrdem
+        .map((n) => { const r = antes.rooms.find((x) => x.id === n.id); return r && { ...r, categoriaId: n.categoriaId }; })
+        .filter((r): r is RoomInfo => !!r),
+    });
     try { await reordenarSalas(novaOrdem); }
     catch (e) { notas.mostrar('erro', (e as Error).message); }
   }, [notas]);
@@ -598,6 +628,7 @@ export function App() {
       <Sidebar
         rooms={rooms}
         categorias={categorias}
+        salasCarregadas={!!salasDaqui}
         podeGerirSalas={pode(eu.cargo, 'gerirSalas')}
         onReordenar={reordenar}
         onMenuDeSalas={(em, categoria) => setMenuDeSalas({ em, categoria })}
@@ -610,7 +641,8 @@ export function App() {
         salaAbertaId={salaAbertaId}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}
-        pessoas={pessoas}
+        // As salas da barra são do servidor aberto; quem está nelas, também.
+        pessoas={vistosEm(conhecidos.current, servidor.id)}
         onPessoa={abrirMenu}
         onPainel={() => setPainel(true)}
         statusEscolhido={statusEscolhido}
@@ -620,7 +652,8 @@ export function App() {
       />
       <Stage
         rm={rm}
-        pessoas={pessoas}
+        // O palco é da call, e a call pode ser de outro servidor.
+        pessoas={vistosEm(conhecidos.current, rm.salaDaVoz?.servidorId)}
         onPessoa={abrirMenu}
         salaAberta={salaAberta}
         servidorId={servidor.id}
@@ -708,22 +741,24 @@ export function App() {
           eu={eu}
           cargos={cargos.filter((c) => c.nivel < (eu.cargo?.nivel ?? 0))}
           em={menu.em}
+          deOutroServidor={menu.servidorId !== servidor.id ? menu.servidorNome : null}
           volume={rm.volumeDe(menu.pessoa.identity)}
           onVolume={(v) => rm.definirVolume(menu.pessoa.identity, v)}
           onAcao={async (acao, extra) => {
             if (menu.pessoa.usuarioId !== undefined) await moderarPeloMenu(menu.pessoa.usuarioId, acao, extra);
           }}
-          onVerPerfil={() => setPerfilAberto(menu.pessoa)}
+          onVerPerfil={() => setPerfilAberto({ pessoa: menu.pessoa, servidorId: menu.servidorId, servidorNome: menu.servidorNome })}
           onClose={() => setMenu(null)}
         />
       )}
       {perfilAberto && (
         <CartaoDoPerfil
-          pessoa={perfilAberto}
-          naVoz={perfilAberto.usuarioId !== undefined && naVoz.has(perfilAberto.usuarioId)}
-          souEu={perfilAberto.usuarioId === eu.id}
-          volume={rm.volumeDe(perfilAberto.identity)}
-          onVolume={(v) => rm.definirVolume(perfilAberto.identity, v)}
+          pessoa={perfilAberto.pessoa}
+          servidorNome={perfilAberto.servidorNome}
+          naVoz={perfilAberto.pessoa.usuarioId !== undefined && naVoz.has(perfilAberto.pessoa.usuarioId)}
+          souEu={perfilAberto.pessoa.usuarioId === eu.id}
+          volume={rm.volumeDe(perfilAberto.pessoa.identity)}
+          onVolume={(v) => rm.definirVolume(perfilAberto.pessoa.identity, v)}
           onClose={() => setPerfilAberto(null)}
         />
       )}

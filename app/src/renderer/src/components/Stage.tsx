@@ -140,9 +140,16 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
 
 export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, lives, onAssistirLive, onVoltarAVoz }: {
   rm: RM;
+  /** Quem foi visto nas calls do servidor DA CALL: os rostos do palco são de lá. */
   pessoas: Map<string, PessoaNaCall>;
-  /** Esquerdo abre o perfil; direito, as ações. */
-  onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
+  /**
+   * Esquerdo abre o perfil; direito, as ações. `onde` é o servidor de quem se clicou: sem
+   * ele, o aberto — que é o do chat. Quem está na call vai com o servidor da call.
+   */
+  onPessoa: (
+    identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes',
+    onde?: { servidorId: number; servidorNome: string },
+  ) => void;
   /** A sala que está sendo olhada. Pode ser de texto mesmo com a voz noutra — ou de
       outro servidor, se a pessoa foi espiar o vizinho sem desligar a call. */
   salaAberta: RoomInfo | null;
@@ -244,6 +251,11 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
 
 
   const idle = rm.status === 'idle';
+  // Quem está no palco é da CALL, e a call pode ser de outro servidor: trocar de servidor
+  // não desliga a voz. O cartão dessas pessoas se pergunta ao servidor dela.
+  const daCall = rm.salaDaVoz
+    ? { servidorId: rm.salaDaVoz.servidorId, servidorNome: rm.salaDaVoz.servidorNome }
+    : undefined;
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
 
   return (
@@ -302,8 +314,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   <span
                     key={p.identity}
                     className="clicavel"
-                    onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}
+                    onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil', daCall)}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes', daCall); }}
                   >
                     <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto}
                       enquadramento={pessoas.get(p.identity)?.enquadramento?.foto}
@@ -353,8 +365,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                   ))}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${rm.falando.has(p.identity) ? 'speaking' : ''}`}
-                      onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil')}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes'); }}>
+                      onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil', daCall)}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes', daCall); }}>
                       <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>

@@ -11,8 +11,17 @@
  * O conserto não é copiar mais campos em cada lugar que abre o cartão: é ter UM lugar que
  * responde "quem é u12", olhando tudo que o app já sabe. Quem abre o cartão passa a só
  * perguntar.
+ *
+ * E a pergunta nunca é só "quem é u12": é "quem é u12 NESTE servidor". A conta é global —
+ * foto, banner, Berserk —, mas cargo, nome exibido, identificador e "desde quando" são do
+ * vínculo com um servidor. O mapa de quem apareceu nas calls juntava todos os servidores
+ * numa pilha só e era consultado ANTES da lista do servidor aberto: quem esteve numa call
+ * do CORNUME continuava "Peixe Souris" com o cartão aberto no "teste", onde é "Moderador".
+ * Medido no app de verdade: a lista da direita dizia Moderador e o cartão, na mesma tela,
+ * Peixe Souris — com o nome e o identificador de lá. Por isso aqui tudo que é de servidor
+ * anda com o servidor junto, e nada de um responde pelo outro.
  */
-import type { Membro } from './api';
+import type { Membro, RoomInfo } from './api';
 import type { PessoaNaCall } from './components/MenuDaPessoa';
 
 /** Como a call chama uma conta. É o mesmo que o servidor emite no crachá do LiveKit. */
@@ -39,25 +48,73 @@ export const doMembro = (m: Membro): PessoaNaCall => ({
   status: m.status,
 });
 
+/** Quem apareceu nas salas de voz, separado pelo servidor em cuja lista apareceu. */
+export type Conhecidos = Map<number, Map<string, PessoaNaCall>>;
+
 /**
- * Tudo que se sabe sobre quem tem esta identidade.
+ * Anota quem está nas salas de voz de UM servidor, debaixo dele.
  *
- * Duas fontes, nessa ordem: quem está na CALL (vale para gente de qualquer servidor,
- * inclusive de um que não está aberto) e a lista de MEMBROS do servidor aberto (vale
- * para quem não está em call nenhuma, que é a maioria). `nome` de reserva existe para o
- * caso de as duas falharem — alguém que saiu do servidor e cuja mensagem continua no
- * chat —, e aí o cartão mostra o pouco que dá, em vez de não abrir.
+ * O mapa acumula em vez de refletir só o servidor aberto: com a voz num servidor e os
+ * olhos noutro, quem está na sua call não vem na lista daqui, e sem guardar, os rostos da
+ * conversa virariam iniciais no meio dela. O que chega depois sobrescreve — dentro do
+ * mesmo servidor, e só nele.
+ */
+export function lembrarDasSalas(conhecidos: Conhecidos, servidorId: number, salas: RoomInfo[]): void {
+  let daqui = conhecidos.get(servidorId);
+  if (!daqui) {
+    daqui = new Map();
+    conhecidos.set(servidorId, daqui);
+  }
+  for (const sala of salas) {
+    for (const p of sala.participants) {
+      daqui.set(p.identity, {
+        identity: p.identity, nome: p.name, usuarioId: p.usuarioId, cargo: p.cargo,
+        foto: p.foto ?? null, banner: p.banner ?? null, enquadramento: p.enquadramento,
+        entrouEm: p.entrouEm ?? null, turbo: p.turbo, idExibido: p.idExibido ?? null,
+        status: p.status,
+      });
+    }
+  }
+}
+
+/** Quem foi visto nas calls de um servidor. Vazio para servidor nenhum ou nunca visto. */
+export const vistosEm = (conhecidos: Conhecidos, servidorId: number | null | undefined): Map<string, PessoaNaCall> =>
+  (servidorId == null ? undefined : conhecidos.get(servidorId)) ?? new Map();
+
+/**
+ * Tudo que se sabe sobre quem tem esta identidade NUM servidor.
+ *
+ * `servidorId` é o servidor do lugar onde se clicou: o aberto, para a lista de pessoas, o
+ * chat e as salas da barra; o da call, para quem está no palco — que pode ser outro,
+ * porque trocar de servidor não desliga a voz.
+ *
+ * Duas fontes, as duas daquele servidor e nessa ordem. A lista de membros, que tem todo
+ * mundo e é renovada — mas só se a lista na mão for DELE: trocar de servidor não troca a
+ * lista na hora, e até a busca voltar ela ainda é a de onde se veio. E quem foi visto nas
+ * calls dele, que é o que existe para a call de um servidor que não está aberto.
+ *
+ * Nenhuma das duas sabendo, sobra o nome que quem chamou tinha na mão — e NADA do que se
+ * viu da pessoa noutro servidor: mostrar o cargo de lá é afirmar algo falso sobre este. É
+ * o caso de quem saiu do servidor e cuja mensagem continua no chat.
  */
 export function acharPessoa(
   identity: string,
-  { naCall, membros, nome }: { naCall: Map<string, PessoaNaCall>; membros: Membro[]; nome?: string },
+  { servidorId, membros, conhecidos, nome }: {
+    servidorId: number;
+    /** A lista de membros que o app tem na mão, com o servidor a que ela pertence. */
+    membros: { servidorId: number; lista: Membro[] } | null;
+    conhecidos: Conhecidos;
+    nome?: string;
+  },
 ): PessoaNaCall {
-  const daCall = naCall.get(identity);
-  if (daCall) return daCall;
-
   const conta = contaDaIdentidade(identity);
-  const membro = conta !== null ? membros.find((m) => m.id === conta) : undefined;
-  if (membro) return doMembro(membro);
+  if (conta !== null && membros?.servidorId === servidorId) {
+    const membro = membros.lista.find((m) => m.id === conta);
+    if (membro) return doMembro(membro);
+  }
+
+  const vista = conhecidos.get(servidorId)?.get(identity);
+  if (vista) return vista;
 
   return { identity, nome: nome ?? identity };
 }

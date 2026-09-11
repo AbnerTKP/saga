@@ -22,9 +22,15 @@ export type PessoaNaCall = {
   idExibido?: string | null;
 };
 
-export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose }: {
+export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose, deOutroServidor }: {
   pessoa: PessoaNaCall;
   eu: Membro;
+  /**
+   * O nome do servidor da call, quando quem se clicou está numa call de um servidor que não
+   * é o aberto. Aí não há moderação daqui: `eu` e as ações são do servidor ABERTO — a régua
+   * daqui decidiria sobre o vínculo de lá, e "banir" baniria do servidor errado.
+   */
+  deOutroServidor?: string | null;
   /** Os cargos que podem ser dados: os abaixo do meu. */
   cargos: Cargo[];
   em: { x: number; y: number };
@@ -48,7 +54,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
     expulsar: 'expulsar', banir: 'banir', desbanir: 'banir', cargo: 'definirCargo',
   };
   const posso = (acao: AcaoDeModeracao) =>
-    pessoa.usuarioId !== undefined
+    !deOutroServidor
+    && pessoa.usuarioId !== undefined
     && podeSobre(eu, permissaoDe[acao], { id: pessoa.usuarioId, cargo: pessoa.cargo ?? null });
 
   useEffect(() => {
@@ -90,7 +97,8 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
           </div>
           <div className="muted small linha-do-cargo">
             <span style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}>
-              {souEu ? 'você' : (pessoa.cargo?.nome ?? 'Sem cargo')}
+              {/* Cargo que não se sabe — de quem não faz parte deste servidor — não vira "Sem cargo". */}
+              {souEu ? 'você' : pessoa.cargo === undefined ? null : (pessoa.cargo?.nome ?? 'Sem cargo')}
             </span>
           </div>
         </div>
@@ -107,6 +115,10 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
       )}
 
       {souEu && <div className="menu-nota muted small">Ajuste o próprio volume em Sua conta, na engrenagem.</div>}
+
+      {deOutroServidor && !souEu && (
+        <div className="menu-nota muted small">Esta call é de {deOutroServidor}. Para moderar, abra {deOutroServidor}.</div>
+      )}
 
       {(posso('mutar') || posso('desconectar') || posso('timeout') || posso('expulsar') || posso('banir') || posso('cargo')) && (
         <div className="menu-acoes">

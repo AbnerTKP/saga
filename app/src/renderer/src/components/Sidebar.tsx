@@ -13,9 +13,15 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
+  /**
+   * As salas DESTE servidor já chegaram. Logo depois de trocar de servidor ainda não, e
+   * lista vazia nessa hora não quer dizer "nenhuma sala": não ter carregado não é o mesmo
+   * que não ter nada.
+   */
+  salasCarregadas: boolean;
   /** Sem a permissão, a lista não arrasta e o botão direito não oferece nada. */
   podeGerirSalas: boolean;
   onReordenar: (salas: { id: number; categoriaId: number | null }[]) => void;
@@ -224,7 +230,7 @@ export function Sidebar({ rooms, categorias, podeGerirSalas, onReordenar, onMenu
             )}
           </div>
         ))}
-        {rooms.length === 0 && categorias.length === 0 && (
+        {salasCarregadas && rooms.length === 0 && categorias.length === 0 && (
           <div className="muted small pad">
             Nenhuma sala configurada no servidor.
             {podeGerirSalas && ' Clique com o botão direito aqui para criar uma.'}

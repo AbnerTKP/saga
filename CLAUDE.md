@@ -749,12 +749,16 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
   vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
-- **O identificador é do DONO DA SAGA, e de mais ninguém.** Ele aparece junto do nome em
-  TODO servidor: definir o de alguém é mexer em como a pessoa é vista na Saga inteira, e
-  isso não cabe ao cargo mais alto de UM servidor — nem a quem criou aquele servidor.
-  Mesma regra do Berserk e pelo mesmo motivo: quem concede tem de estar no plano do que
-  concede. `definirId` continua existindo como permissão de servidor e continua sendo o
-  dono de lá quem a desenha; ela é que não alcança isto.
+- **O identificador é do DONO DA SAGA, e de mais ninguém.** A intenção é que ele apareça
+  junto do nome em TODO servidor: definir o de alguém é mexer em como a pessoa é vista na
+  Saga inteira, e isso não cabe ao cargo mais alto de UM servidor — nem a quem criou aquele
+  servidor. Mesma regra do Berserk e pelo mesmo motivo: quem concede tem de estar no plano
+  do que concede. `definirId` continua existindo como permissão de servidor e continua sendo
+  o dono de lá quem a desenha; ela é que não alcança isto. **Mas o dado não acompanhou a
+  regra:** ele mora em `membros.id_exibido`, por vínculo, e `definirIdExibido` grava só no
+  servidor do pedido. Medido na produção em 11/09/2026: o dono tem "TKP" no CORNUME e nada
+  no "teste". Mover para a conta pede migração nova e é decisão do dono — até lá, "em todo
+  servidor" é o que se quis, não o que acontece.
 - **O soundboard é do cargo mais alto do servidor, e não de quem só tem a permissão.**
   `gerirSons` continua existindo e continua sendo do dono do servidor desenhar, mas ela
   só vale de fato no topo. Som é diferente de sala ou de castigo: toca para a call
@@ -975,6 +979,30 @@ a gente não conhece.
   que o app já tem (a call, e a lista de membros do servidor) e todo mundo perguntar a
   ela. A lista de pessoas montava o objeto dela à mão, e era assim que as duas versões
   nasciam; hoje ela chama o mesmo caminho.
+- **E a pergunta é "quem é ela NESTE servidor".** O mapa de quem apareceu nas calls juntava
+  todos os servidores numa pilha só, e `acharPessoa` o consultava ANTES da lista do servidor
+  aberto: quem esteve numa call do CORNUME levava de lá o cargo, o nome exibido e o
+  identificador para o cartão aberto no "teste". O dono abriu o próprio perfil no "teste" e
+  leu "Peixe Souris". O servidor mandava certo — no banco de produção, nenhum vínculo aponta
+  para cargo de outro servidor. Medido no app de verdade, em janela escondida, contra
+  servidor e LiveKit locais montados como a produção: a lista da direita dizia
+  `MODERADOR — TKP` e o cartão, na mesma tela, "Bagre", "Peixe Souris" e identificador TKP,
+  tudo do CORNUME; o de Tava1 dizia "BEN 10" em vez de "Membro". Depois: "TKP", "Moderador",
+  "Membro". Hoje o mapa é anotado POR SERVIDOR, `acharPessoa` recebe o servidor do lugar do
+  clique (o aberto; no palco, o da call) e a lista de membros só vale se for daquele
+  servidor. Sem nenhuma das duas, o cartão fica com o nome que tinha na mão e sem cargo — e
+  não afirma "Sem cargo", que seria outra coisa. E ele diz de onde é o que mostra: "Cargo em
+  teste", "Em teste desde".
+- **Tudo que é de um servidor anda com o servidor junto, inclusive na memória do app.**
+  Salas, cargos e pessoas eram listas soltas, e trocar de servidor não as troca na hora: até
+  a busca voltar, eram as do servidor de onde se veio, desenhadas com o nome do novo no
+  alto. Hoje cada uma guarda de que servidor é — as salas, o que se PEDIU; cargos e pessoas,
+  o que a RESPOSTA diz, porque pedir por um servidor de que você não faz parte devolve
+  outro — e só vale para ele. Enquanto a do novo não chega, a barra não diz "Nenhuma sala
+  configurada": não ter carregado não é não ter. A mesma confusão morava no menu do botão
+  direito: numa call de OUTRO servidor (a voz continua quando se troca), ele oferecia banir e
+  expulsar com a régua do servidor ABERTO, e a ação ia para o aberto. Ali agora não há
+  moderação, e o menu diz de qual servidor é a call.
 - **Esquerdo abre o perfil; direito, as ações.** Era tudo no mesmo popover: retrato
   minúsculo no topo e, logo abaixo, banir e expulsar. Ver quem é a pessoa é o que mais se
   faz e era o que menos aparecia, enquanto o que quase nunca se usa — e que não se quer
@@ -1098,7 +1126,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (267) + app (165), segundos, sem nada externo
+pnpm test        # servidor (267) + app (169), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1172,3 +1200,8 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   em vez de tomar a tela, e o clique no ícone trazendo de volta a Saga que já estava
   aberta. O que está medido é o comportamento do processo principal aqui no Mac, com as
   chamadas de janela interceptadas.
+- **O cartão e o menu de quem está numa call de OUTRO servidor.** O que está medido no app
+  de verdade é o caso que o dono viu: cartão aberto pela lista do servidor aberto, com a
+  pessoa vista antes na call de outro. O caminho do palco — voz no CORNUME, olhos no
+  "teste", clique em alguém da call — mostrando o cargo do CORNUME e o menu sem moderação
+  está nos testes de `pessoas.ts` e no typecheck; numa call de verdade, não foi exercido.

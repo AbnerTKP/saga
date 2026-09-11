@@ -180,9 +180,15 @@ function anotarFalha(rota: string, e: ErroDoServidor) {
   window.desktop?.registrar('erro', 'servidor', `${rota} → ${e.status} ${e.message}`).catch(() => undefined);
 }
 
-async function pedir<T>(metodo: string, rota: string, corpo?: unknown): Promise<T> {
+/**
+ * `servidorDoPedido` diz de que servidor o pedido fala. Sem ele, vale o que está guardado
+ * como aberto — lido NA HORA em que o pedido sai, e não quando quem pediu decidiu pedir.
+ * Quem vai guardar a resposta como "do servidor X" passa o X: senão, trocar de servidor no
+ * meio do caminho etiqueta a lista de um como sendo a do outro.
+ */
+async function pedir<T>(metodo: string, rota: string, corpo?: unknown, servidorDoPedido?: number): Promise<T> {
   const token = lerToken();
-  const servidor = lerServidorAtual();
+  const servidor = servidorDoPedido ?? lerServidorAtual();
   let res: Response;
   try {
     res = await fetch(BASE + rota, {
@@ -254,11 +260,11 @@ export const sairDoServidor = () => pedir<{ ok: true }>('POST', '/servidores/sai
 
 export const mudarMeuNome = (nome: string) => pedir<{ eu: Membro }>('PATCH', '/eu', { nome });
 
-export const verServidor = () =>
+export const verServidor = (servidorId?: number) =>
   pedir<{
     servidor: Servidor; salas: Sala[]; membros: Membro[];
     cargos: Cargo[]; permissoes: Record<Permissao, string>; servidores: Servidor[];
-  }>('GET', '/servidor');
+  }>('GET', '/servidor', undefined, servidorId);
 
 // --- cargos -----------------------------------------------------------------
 
@@ -410,9 +416,9 @@ export const renomearServidor = (nome: string) =>
   pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });
 
 /** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
-export const buscarSalas = async (lidas = '') =>
+export const buscarSalas = async (lidas = '', servidorId?: number) =>
   pedir<{ rooms: RoomInfo[]; categorias: Categoria[] }>(
-    'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`);
+    'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`, undefined, servidorId);
 
 export const pedirTokenDaSala = (room: string) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });

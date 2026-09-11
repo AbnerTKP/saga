@@ -22,8 +22,14 @@ const desde = (t: number | null | undefined) => {
  *
  * O enquadramento que ela escolheu vale aqui também — é a mesma imagem, vista de perto.
  */
-export function CartaoDoPerfil({ pessoa, naVoz, souEu, volume, onVolume, onClose }: {
+export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onVolume, onClose }: {
   pessoa: PessoaNaCall;
+  /**
+   * De que servidor são o cargo e o "desde quando". Foto, banner e Berserk são da conta e
+   * valem em todo lugar; esses dois não — e o cartão que não dizia de onde eles eram deixou
+   * passar o cargo de um servidor aparecendo noutro.
+   */
+  servidorNome: string;
   /** Está numa sala de voz agora. */
   naVoz?: boolean;
   souEu?: boolean;
@@ -86,12 +92,15 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, volume, onVolume, onClose
             </div>
 
             <div className="perfil-selos">
-              <span
-                className="perfil-cargo"
-                style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}
-              >
-                {pessoa.cargo?.nome ?? 'Sem cargo'}
-              </span>
+              {/* Cargo que não se sabe — de quem não faz parte deste servidor — não vira "Sem cargo". */}
+              {pessoa.cargo !== undefined && (
+                <span
+                  className="perfil-cargo"
+                  style={pessoa.cargo?.cor ? { color: pessoa.cargo.cor } : undefined}
+                >
+                  {pessoa.cargo?.nome ?? 'Sem cargo'}
+                </span>
+              )}
               {souEu && <span className="perfil-selo">você</span>}
               {pessoa.turbo && (
                 <span className="perfil-selo berserk"><Icon name="berserk" size={12} /> Berserk</span>
@@ -101,12 +110,14 @@ export function CartaoDoPerfil({ pessoa, naVoz, souEu, volume, onVolume, onClose
 
             <dl className="perfil-dados">
               {entrou && (
-                <div><dt>No servidor desde</dt><dd>{entrou}</dd></div>
+                <div><dt>Em {servidorNome} desde</dt><dd>{entrou}</dd></div>
               )}
               {pessoa.idExibido && (
                 <div><dt>Identificador</dt><dd>{pessoa.idExibido}</dd></div>
               )}
-              <div><dt>Cargo</dt><dd>{pessoa.cargo?.nome ?? 'Sem cargo'}</dd></div>
+              {pessoa.cargo !== undefined && (
+                <div><dt>Cargo em {servidorNome}</dt><dd>{pessoa.cargo?.nome ?? 'Sem cargo'}</dd></div>
+              )}
             </dl>
 
             {/* O volume mora aqui porque é sobre esta pessoa e vale só para MIM — não é
