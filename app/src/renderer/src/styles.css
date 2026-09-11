@@ -324,8 +324,16 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 /* Uma mensagem tem duas colunas: a foto numa, o que foi dito na outra — e o texto
    alinhado com o NOME, não com a margem da tela. Tudo colado à esquerda formava degraus,
    e não se via onde uma pessoa parava e a outra começava. */
-.msg { display: grid; grid-template-columns: 40px 1fr; gap: var(--e3);
+.msg { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: var(--e3);
   padding: 3px var(--e5); font-size: 15px; }
+/* Apagar mora no canto da mensagem e só aparece com o mouse: é raro, e uma lixeira em cada
+   linha seria tinta pedindo clique por engano. Armado, fica vermelho até decidir. */
+.msg-acoes { position: absolute; top: 2px; right: var(--e4); opacity: 0; transition: opacity .12s; }
+.msg:hover .msg-acoes, .msg-acoes:focus-within, .msg-acoes.armado { opacity: 1; }
+.msg-acoes button { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--text2); font-size: 12px; }
+.msg-acoes button:hover { color: var(--danger); border-color: var(--danger); }
+.msg-acoes.armado button { color: #fff; background: var(--danger); border-color: var(--danger); font-weight: 650; }
 .msg:hover { background: rgba(255,255,255,.025); }
 /* Três linhas seguidas da mesma pessoa são uma fala só: sem foto e sem nome de novo.
    O respiro fica ENTRE as falas, e não entre as linhas — é ele que faz a conversa ter

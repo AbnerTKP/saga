@@ -661,6 +661,48 @@ test('mensagem enviada fica guardada e volta com quem escreveu', async () => {
   assert.equal(lidas.corpo.mensagens.at(-1).texto, 'olha esse link');
 });
 
+test('quem escreveu apaga, e a mensagem some também da tela de quem já a tinha', async () => {
+  const dono = await sessaoDe('abner');
+  // Conta nova: a esta altura o bruno está de castigo, e castigo não escreve.
+  const autor = (await cadastrar('ivo_apaga')).corpo;
+  const avisos = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms.find((s) => s.name === 'Avisos');
+
+  const envio = await chamar('POST', '/mensagens', { sessao: autor.token, corpo: { sala: avisos.id, texto: 'mandei errado' } });
+  assert.equal(envio.status, 200, JSON.stringify(envio.corpo));
+  const { mensagem } = envio.corpo;
+  // O dono já estava com a sala aberta: a tela dele tem a mensagem e guardou o `agora`.
+  const antes = (await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: dono.token })).corpo;
+  assert.ok(antes.mensagens.some((m) => m.id === mensagem.id));
+
+  const apagou = await chamar('POST', '/mensagens/apagar', { sessao: autor.token, corpo: { id: mensagem.id } });
+  assert.equal(apagou.status, 200);
+
+  // A pergunta de sempre — o que chegou depois, e desde quando —: a apagada vem na resposta.
+  const depois = (await chamar('GET', `/mensagens?sala=${avisos.id}&depoisDe=${mensagem.id}&apagadasDesde=${antes.agora}`, { sessao: dono.token })).corpo;
+  assert.deepEqual(depois.apagadas, [mensagem.id], 'a tela do dono não ficou sabendo');
+  const tudo = (await chamar('GET', `/mensagens?sala=${avisos.id}`, { sessao: dono.token })).corpo.mensagens;
+  assert.ok(!tudo.some((m) => m.id === mensagem.id), 'a mensagem apagada continuou na leitura');
+});
+
+test('apagar a dos outros é do cargo que pode, e só de quem está abaixo', async () => {
+  const dono = await sessaoDe('abner');
+  const membro = (await cadastrar('joana_apaga')).corpo;
+  const avisos = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms.find((s) => s.name === 'Avisos');
+
+  const doDono = (await chamar('POST', '/mensagens', { sessao: dono.token, corpo: { sala: avisos.id, texto: 'do dono' } })).corpo.mensagem;
+  const doMembro = (await chamar('POST', '/mensagens', { sessao: membro.token, corpo: { sala: avisos.id, texto: 'do membro' } })).corpo.mensagem;
+  assert.ok(doDono && doMembro, 'as mensagens do teste nem chegaram a ser escritas');
+
+  const membroTentou = await chamar('POST', '/mensagens/apagar', { sessao: membro.token, corpo: { id: doDono.id } });
+  assert.equal(membroTentou.status, 403, 'membro apagou a mensagem do dono');
+
+  const donoApagou = await chamar('POST', '/mensagens/apagar', { sessao: dono.token, corpo: { id: doMembro.id } });
+  assert.equal(donoApagou.status, 200, 'quem criou o servidor não apagou a de um membro');
+
+  const inventada = await chamar('POST', '/mensagens/apagar', { sessao: dono.token, corpo: { id: 999999 } });
+  assert.equal(inventada.status, 404);
+});
+
 test('quem está de castigo não escreve', async () => {
   const dono = await sessaoDe('abner');
   const bruno = await sessaoDe('bruno');

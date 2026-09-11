@@ -50,6 +50,9 @@ const IMPRESSOES = [
   'f9821b9fa74e',  // 37 coluna privada em salas
   '40758e8a6181',  // 38 sala_cargos: quem vê uma sala privada
   '9661609923c8',  // 39 índice de sala_cargos
+  '63a23738c8ea',  // 40 coluna apagada_em em mensagens
+  '736605861bd8',  // 41 coluna apagada_por em mensagens
+  '8b80fe8fe26d',  // 42 índice das mensagens apagadas
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

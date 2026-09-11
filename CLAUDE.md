@@ -517,10 +517,26 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   a máquina inteira uma vez. Como o nome é o hash do CONTEÚDO, grava-se num temporário
   calculando o hash no caminho, e no fim ele é renomeado; conteúdo repetido descarta o
   temporário. Recusa no meio apaga o parcial, senão cada envio negado deixaria lixo.
-- **Escolher o arquivo não é mandá-lo.** Ia direto no clique, e engano não tem volta — não
-  há como apagar mensagem. Hoje ele vira uma ficha ao lado do campo, com nome e peso, dá
-  para escrever algo junto, desistir, e sai no mesmo botão de enviar de sempre. Arrastar
-  para qualquer lugar da conversa também escolhe.
+- **Escolher o arquivo não é mandá-lo.** Ia direto no clique, e mandar é público na hora
+  — apagar depois não desfaz quem já viu. Hoje ele vira uma ficha ao lado do campo, com
+  nome e peso, dá para escrever algo junto, desistir, e sai no mesmo botão de enviar de
+  sempre. Arrastar para qualquer lugar da conversa também escolhe.
+- **Mensagem apagada fica no banco como linha VAZIA, com a hora.** Não é apego ao
+  registro: o app só pergunta pelo que chegou DEPOIS da última mensagem que viu, então uma
+  linha removida de verdade continuaria na tela de quem já a tinha até ele trocar de sala.
+  Com `apagada_em`, a busca de sempre responde também "estas sumiram desde a sua última
+  pergunta" — e esse "desde" é o `agora` do SERVIDOR na resposta anterior, anotado ANTES
+  de ler, para que um apagar no meio da leitura caia na pergunta seguinte e não no vão
+  entre as duas. Medido no app de verdade, numa janela escondida: some de quem apagou em
+  12 ms e da tela do outro em ~2 s. O conteúdo sai de verdade — texto, imagem e anexo —;
+  o arquivo no disco fica, porque o nome é o hash e outra mensagem pode apontar para ele.
+  **A própria, qualquer um apaga**: desdizer não é moderar. **A dos outros** pede
+  `apagarMensagens` e só alcança quem está abaixo, a regra de toda moderação. A sala de
+  notas ninguém apaga: o servidor publicaria a nota de novo na volta seguinte. Confirma no
+  próprio botão — o primeiro clique arma, o segundo apaga —, porque uma janela a mais para
+  uma decisão de um segundo é ruído. **O Moderador semeado já nasce com a permissão, mas
+  só em servidor NOVO**: a semeadura não toca cargo que existe, então nos servidores de
+  hoje quem manda marca a caixinha.
 - **O envio mostra o quanto já subiu, e por isso usa `XMLHttpRequest`.** O `fetch` não
   conta o que SUBIU — só o que desce. Sem a barra, mandar 20 MB era um botão apagado e
   nada acontecendo: não dava para saber se estava indo, se travou ou se deu errado.

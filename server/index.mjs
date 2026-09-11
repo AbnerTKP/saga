@@ -643,6 +643,9 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const q = new URL(req.url, 'http://x').searchParams;
     const depoisDe = q.get('depoisDe');
+    // Anotado ANTES de ler: uma mensagem apagada entre a leitura e a resposta entra na
+    // próxima pergunta, em vez de sumir no vão entre as duas.
+    const agora = Date.now();
     const sala = salasM.buscarSala(db, sid, q.get('sala'));
     return {
       mensagens: mensagens.listarMensagens(db, sid, eu, q.get('sala'), {
@@ -652,7 +655,17 @@ const ROTAS = {
       // Não há empurrão no servidor, e uma segunda pergunta só para isto seria dobrar o
       // trânsito da rota mais chamada do app.
       digitando: sala ? digitando.quemEsta(sala.id, { exceto: eu.id }) : [],
+      // As que foram apagadas desde a última pergunta desta tela, que manda o `agora` que
+      // recebeu. Pelo mesmo motivo do `digitando`: vai de carona.
+      apagadas: mensagens.apagadasDesde(db, sid, eu, q.get('sala'), q.get('apagadasDesde')),
+      agora,
     };
+  },
+
+  'POST /mensagens/apagar': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { id } = await lerCorpo(req);
+    return mensagens.apagarMensagem(db, sid, eu, id);
   },
 
   /**

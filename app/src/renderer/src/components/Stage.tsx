@@ -138,7 +138,7 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, lives, onAssistirLive, onVoltarAVoz }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz }: {
   rm: RM;
   /** Quem foi visto nas calls do servidor DA CALL: os rostos do palco são de lá. */
   pessoas: Map<string, PessoaNaCall>;
@@ -163,8 +163,11 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     enviarGif: (url: string) => Promise<void>;
     enviarArquivo: (arquivo: File, texto: string, aoProgredir: (f: number) => void) => Promise<void>;
     contarQueDigito: () => void;
+    apagar: (id: number) => Promise<void>;
   };
   meuId: number;
+  /** Se quem lê pode apagar esta mensagem — ver apagar.ts. */
+  podeApagar?: (m: Mensagem) => boolean;
   /** As telas no ar agora, em qualquer sala de voz do servidor — ver lives.ts. */
   lives: LiveNoChat[];
   /** Assistir a uma live a partir do chat, entrando na sala de voz dela se preciso. */
@@ -296,6 +299,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             onVerImagem={setImagemAberta}
             sala={salaAberta.name}
             meuId={meuId}
+            podeApagar={podeApagar}
+            onApagar={chat.apagar}
             onPessoa={(id, nome, em, tipo) => onPessoa(identidadeDe(id), nome, em, tipo)}
             lives={lives}
             assistindo={rm.assistindo}

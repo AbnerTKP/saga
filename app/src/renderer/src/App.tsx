@@ -7,7 +7,7 @@ import {
   guardarServidorAtual, lerServidorAtual, meusServidores,
   type Acao,
   verServidor,
-  type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor,
+  type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
 } from './api';
 import { useRoom, type SalaDaVoz } from './useRoom';
 import { useChat } from './useChat';
@@ -38,6 +38,7 @@ import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { livesNasSalas, type LiveNoChat } from './lives';
 import { acharPessoa, identidadeDe, lembrarDasSalas, vistosEm, type Conhecidos } from './pessoas';
+import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
 import type { UpdateState } from './desktop';
@@ -529,6 +530,18 @@ export function App() {
   const chat = useChat(salaAberta?.id ?? null);
 
   /**
+   * Se quem lê pode apagar esta mensagem — espelho da regra do servidor, só para o botão
+   * não aparecer onde seria recusado. O cargo do autor é o do vínculo DESTE servidor, que é
+   * de onde a mensagem é: por isso a lista de membros daqui, e não o que se viu numa call.
+   */
+  const podeApagar = useCallback((m: Mensagem) => {
+    const eu = sessao?.eu;
+    if (!eu) return false;
+    const autor = m.autorId ? membrosDoServidor.find((p) => p.id === m.autorId) ?? null : null;
+    return podeApagarMensagem(eu, autor, { minha: m.autorId === eu.id, daSaga: salaAberta?.papel === 'notas' });
+  }, [sessao?.eu, membrosDoServidor, salaAberta?.papel]);
+
+  /**
    * As telas no ar, para a conversa avisar quem começou a transmitir.
    *
    * Sai da busca de salas, e não do LiveKit desta máquina: lendo uma sala de texto você
@@ -713,6 +726,7 @@ export function App() {
         }}
         chat={chat}
         meuId={eu.id}
+        podeApagar={podeApagar}
         lives={lives}
         onAssistirLive={assistirLive}
       />

@@ -209,6 +209,12 @@ export const MIGRACOES = [
      PRIMARY KEY (sala_id, cargo_id)
    )`,
   `CREATE INDEX sala_cargos_sala ON sala_cargos(sala_id)`,
+
+  // Apagar mensagem. A linha fica, vazia, com a hora e quem apagou: é por essa hora que as
+  // outras telas ficam sabendo que ela sumiu — ver `apagarMensagem`.
+  `ALTER TABLE mensagens ADD COLUMN apagada_em INTEGER`,
+  `ALTER TABLE mensagens ADD COLUMN apagada_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`,
+  `CREATE INDEX mensagens_apagadas ON mensagens(sala_id, apagada_em) WHERE apagada_em IS NOT NULL`,
 ];
 
 export function abrirBanco(caminho) {
@@ -277,7 +283,7 @@ export function garantirServidor(db, { nome, salas }) {
 const CARGOS_INICIAIS = [
   {
     nome: 'Moderador', nivel: 50, dono: 0, cor: '#3f7fe0',
-    permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons'],
+    permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons', 'apagarMensagens'],
   },
   { nome: 'Membro', nivel: 10, dono: 0, cor: null, permissoes: [] },
 ];

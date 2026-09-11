@@ -18,6 +18,7 @@ export const PERMISSOES = {
   gerirSons: 'Subir e apagar sons do soundboard',
   gerirServidor: 'Mudar nome e imagens do servidor',
   definirId: 'Definir o identificador de alguém',
+  apagarMensagens: 'Apagar mensagens dos outros',
 };
 
 // `concederTurbo` viveu aqui e saiu: o Berserk é da conta, e vale na Saga inteira. Quem
@@ -111,6 +112,31 @@ export function podeMexerNosSons(quem, cargosDoServidor) {
   const teto = Math.max(...niveis);
   if ((quem.cargo?.nivel ?? 0) < teto) {
     return { pode: false, motivo: 'o soundboard é do cargo mais alto do servidor' };
+  }
+  return { pode: true };
+}
+
+/**
+ * Quem apaga uma mensagem.
+ *
+ * A PRÓPRIA, sempre: é desfazer um engano, não moderar ninguém — e não há cargo que tire de
+ * alguém o direito de desdizer o que ele mesmo escreveu.
+ *
+ * A dos OUTROS é moderação, e segue a regra de toda moderação: precisa da permissão e só
+ * alcança quem está abaixo — um moderador não some com o que o dono escreveu. Quem saiu do
+ * servidor, ou apagou a conta, não tem cargo aqui e fica ao alcance de quem pode apagar.
+ *
+ * As notas da versão ninguém apaga: são da Saga, e o servidor as publicaria de novo na
+ * volta seguinte — apagar pareceria não funcionar.
+ */
+export function podeApagarMensagem(quem, autor, { minha = false, daSaga = false } = {}) {
+  if (daSaga) return { pode: false, motivo: 'as notas de versão são da Saga' };
+  if (minha) return { pode: true };
+  if (!temPermissao(quem?.cargo, 'apagarMensagens')) {
+    return { pode: false, motivo: 'seu cargo não permite apagar mensagem dos outros' };
+  }
+  if ((autor?.cargo?.nivel ?? 0) >= (quem.cargo?.nivel ?? 0)) {
+    return { pode: false, motivo: 'essa pessoa está no mesmo nível ou acima do seu' };
   }
   return { pode: true };
 }

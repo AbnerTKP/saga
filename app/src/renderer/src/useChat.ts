@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, avisarQueDigito,
+  lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, avisarQueDigito, apagarMensagem,
   type Digitando, type Mensagem,
 } from './api';
 import { aoDespertar } from './despertar';
@@ -25,11 +25,15 @@ export function useChat(salaId: number | null) {
   const [erro, setErro] = useState<string | null>(null);
   const ultima = useRef(0);
   const ultimoAviso = useRef(0);
+  // O relógio do SERVIDOR na última resposta: a próxima pergunta é "o que foi apagado
+  // desde então". Relógio de lá, e não daqui, porque é o mesmo para todas as telas.
+  const apagadasDesde = useRef(0);
 
   useEffect(() => {
     setMensagens([]);
     setDigitando([]);
     ultima.current = 0;
+    apagadasDesde.current = 0;
     // A primeira tecla numa sala nova avisa na hora, sem herdar o relógio da anterior.
     ultimoAviso.current = 0;
     if (!salaId) return;
@@ -37,11 +41,18 @@ export function useChat(salaId: number | null) {
     let vivo = true;
     const buscar = async () => {
       try {
-        const r = await lerMensagens(salaId, ultima.current || undefined);
+        const r = await lerMensagens(salaId, ultima.current || undefined, apagadasDesde.current || undefined);
         if (!vivo) return;
         // Servidor antigo não manda o campo: aí ninguém aparece digitando, e nada quebra.
         setDigitando(r.digitando ?? []);
         setErro(null);
+        if (r.agora) apagadasDesde.current = r.agora;
+        // Apagada por alguém noutra tela: sai desta também. A busca só traz o que é NOVO, e
+        // sem isto a mensagem ficava aqui até a pessoa trocar de sala.
+        if (r.apagadas?.length) {
+          const fora = new Set(r.apagadas);
+          setMensagens((antigas) => antigas.filter((m) => !fora.has(m.id)));
+        }
         if (r.mensagens.length === 0) return;
         ultima.current = r.mensagens.at(-1)!.id;
         // A primeira busca traz o histórico; as seguintes, só o que chegou.
@@ -117,5 +128,14 @@ export function useChat(salaId: number | null) {
     mandou();
   }, [salaId, mostrarJa, mandou]);
 
-  return { mensagens, digitando, erro, enviar, enviarGif, enviarArquivo, contarQueDigito };
+  /**
+   * Apaga uma mensagem. Sai desta tela na hora; as outras ficam sabendo na busca delas. O
+   * erro sobe para quem clicou — é ao lado da mensagem que ele precisa aparecer.
+   */
+  const apagar = useCallback(async (id: number) => {
+    await apagarMensagem(id);
+    setMensagens((antigas) => antigas.filter((m) => m.id !== id));
+  }, []);
+
+  return { mensagens, digitando, erro, enviar, enviarGif, enviarArquivo, contarQueDigito, apagar };
 }

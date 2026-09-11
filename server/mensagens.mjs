@@ -3,6 +3,8 @@
 // virava pó quando a sala esvaziava.
 import { ErroDeConta } from './contas.mjs';
 import { salaVisivel } from './salas.mjs';
+import { buscarMembro } from './membros.mjs';
+import { podeApagarMensagem } from './permissoes.mjs';
 import { ler as lerEnquadramento } from './enquadramento.mjs';
 import * as tabela from './repositorios/mensagens.mjs';
 
@@ -62,6 +64,43 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
 
   const [nova] = listarMensagens(db, servidorId, quem, sala.id, { depoisDe: id - 1 });
   return nova;
+}
+
+/**
+ * Apaga uma mensagem: a própria, ou a de alguém abaixo, com a permissão — ver
+ * `podeApagarMensagem`.
+ *
+ * A linha fica, vazia, com a hora em que foi apagada. Não é apego ao registro: é como as
+ * OUTRAS telas ficam sabendo. O app só pergunta pelo que chegou depois da última mensagem
+ * que viu, então uma linha simplesmente removida continuaria na tela de quem já a tinha,
+ * até essa pessoa trocar de sala. Com a hora anotada, a busca de sempre responde também
+ * "estas foram apagadas desde a sua última pergunta". O conteúdo sai de verdade — texto,
+ * imagem e anexo —; o arquivo em disco fica, pelo mesmo motivo dos sons: o nome é o hash, e
+ * outra mensagem pode apontar para o mesmo conteúdo.
+ */
+export function apagarMensagem(db, servidorId, quem, id) {
+  const msg = tabela.buscar(db, id);
+  // Mensagem de sala que a pessoa não vê responde como inexistente, igual à própria sala.
+  const sala = msg && salaVisivel(db, servidorId, quem, msg.sala_id);
+  if (!msg || !sala) throw new ErroDeConta('Essa mensagem não existe.', 404);
+  if (msg.apagada_em) return { ok: true, id: msg.id };
+
+  const autor = msg.usuario_id ? buscarMembro(db, servidorId, msg.usuario_id) : null;
+  const r = podeApagarMensagem(quem, autor, {
+    minha: msg.usuario_id === quem.id,
+    daSaga: sala.papel === 'notas',
+  });
+  if (!r.pode) throw new ErroDeConta(`Não dá para apagar: ${r.motivo}.`, 403);
+
+  tabela.apagar(db, msg.id, { porQuem: quem.id, quando: Date.now() });
+  return { ok: true, id: msg.id };
+}
+
+/** As mensagens desta sala apagadas a partir de `desde`, para as outras telas tirarem. */
+export function apagadasDesde(db, servidorId, quem, salaId, desde) {
+  const sala = salaVisivel(db, servidorId, quem, salaId);
+  if (!sala || !(Number(desde) > 0)) return [];
+  return tabela.apagadasDesde(db, sala.id, Number(desde));
 }
 
 /**

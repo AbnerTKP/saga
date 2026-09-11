@@ -129,8 +129,12 @@ function LinhaDaLive({ live, naMinhaSala, assistindo, onAssistir }: {
 
 export function Chat({
   mensagens, digitando, erro, onEnviar, onEnviarGif, onEnviarArquivo, onDigitar, onVerImagem,
-  sala, meuId, onPessoa, lives = [], assistindo, onAssistir, salaDaVozId,
+  sala, meuId, onPessoa, lives = [], assistindo, onAssistir, salaDaVozId, podeApagar, onApagar,
 }: {
+  /** Se quem lê pode apagar esta mensagem — ver apagar.ts. */
+  podeApagar?: (m: Mensagem) => boolean;
+  /** Apaga. O erro sobe para aparecer aqui, perto da mensagem. */
+  onApagar?: (id: number) => Promise<void>;
   mensagens: Mensagem[];
   /** Quem está escrevendo agora, fora você. Vem na mesma busca das mensagens. */
   digitando: Digitando[];
@@ -165,6 +169,19 @@ export function Chat({
    * ao lado do campo, com nome e peso, e sai no mesmo botão de sempre.
    */
   const [anexo, setAnexo] = useState<File | null>(null);
+  /**
+   * Apagar confirma no próprio botão. Não tem volta, e uma janela a mais para uma decisão de
+   * um segundo é ruído: o primeiro clique arma, o segundo — em até 4 s — apaga.
+   */
+  const [armado, setArmado] = useState<number | null>(null);
+  // O erro fica debaixo da mensagem que não saiu: no alto da conversa ele não seria visto
+  // por quem está lá embaixo, que é onde se apaga quase sempre.
+  const [erroDeApagar, setErroDeApagar] = useState<{ id: number; texto: string } | null>(null);
+  useEffect(() => {
+    if (armado === null) return;
+    const id = setTimeout(() => setArmado(null), 4000);
+    return () => clearTimeout(id);
+  }, [armado]);
   const [progresso, setProgresso] = useState<number | null>(null);
   const [arrastando, setArrastando] = useState(false);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
@@ -309,7 +326,24 @@ export function Chat({
                     </button>
                   )}
                   {m.arquivo && <Anexo arquivo={m.arquivo} />}
+                  {erroDeApagar?.id === m.id && <div className="error" style={{ marginTop: 4 }}>{erroDeApagar.texto}</div>}
                 </div>
+                {onApagar && podeApagar?.(m) && (
+                  <div className={`msg-acoes ${armado === m.id ? 'armado' : ''}`}>
+                    <button
+                      title={armado === m.id ? 'Clique de novo para apagar' : 'Apagar mensagem'}
+                      onClick={async () => {
+                        if (armado !== m.id) { setArmado(m.id); return; }
+                        setArmado(null);
+                        setErroDeApagar(null);
+                        try { await onApagar(m.id); } catch (e) { setErroDeApagar({ id: m.id, texto: (e as Error).message }); }
+                      }}
+                    >
+                      <Icon name="lixeira" size={15} />
+                      {armado === m.id && <span>apagar?</span>}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );

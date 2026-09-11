@@ -17,7 +17,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'definirId';
+  | 'gerirServidor' | 'definirId' | 'apagarMensagens';
 
 export type Cargo = {
   id: number;
@@ -347,10 +347,12 @@ export type Digitando = { id: number; nome: string };
  * busca de 2 em 2 segundos só para isso dobraria o trânsito da rota mais chamada do app.
  * Servidor antigo não manda o campo — aí não aparece ninguém digitando, e nada quebra.
  */
-export const lerMensagens = (sala: number, depoisDe?: number) =>
-  pedir<{ mensagens: Mensagem[]; digitando?: Digitando[] }>(
+export const lerMensagens = (sala: number, depoisDe?: number, apagadasDesde?: number) =>
+  // `apagadas` são as que sumiram desde `apagadasDesde` — o `agora` da resposta anterior.
+  // É como uma mensagem apagada noutra tela sai desta. Servidor antigo não manda nenhum dos dois.
+  pedir<{ mensagens: Mensagem[]; digitando?: Digitando[]; apagadas?: number[]; agora?: number }>(
     'GET',
-    `/mensagens?sala=${sala}${depoisDe ? `&depoisDe=${depoisDe}` : ''}`,
+    `/mensagens?sala=${sala}${depoisDe ? `&depoisDe=${depoisDe}` : ''}${apagadasDesde ? `&apagadasDesde=${apagadasDesde}` : ''}`,
   );
 
 /**
@@ -363,6 +365,10 @@ export const avisarQueDigito = (sala: number) =>
 
 export const enviarMensagem = async (sala: number, texto: string) =>
   (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
+
+/** Apaga uma mensagem: a própria, ou a de alguém abaixo, com a permissão do cargo. */
+export const apagarMensagem = (id: number) =>
+  pedir<{ ok: true; id: number }>('POST', '/mensagens/apagar', { id });
 
 /**
  * Manda um arquivo qualquer. O corpo é o arquivo cru — o nome vai na URL, porque não há

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TODAS, SOBRE_ALGUEM, limparPermissoes, temPermissao, podeAgir, podeDarCargo, podeMexerNoCargo,
+  podeApagarMensagem,
 } from './permissoes.mjs';
 
 const cargo = (nivel, permissoes = [], dono = false) => ({ nivel, permissoes, dono });
@@ -13,6 +14,34 @@ const OUTRO_MOD = pessoa(3, cargo(50, ['mutar', 'desconectar', 'timeout', 'expul
 const MEMBRO = pessoa(4, cargo(10, []));
 
 const pode = (quem, acao, alvo) => podeAgir(quem, acao, alvo).pode;
+
+test('apagar a própria mensagem não pede cargo nenhum', () => {
+  // Desdizer o que se escreveu não é moderar ninguém.
+  assert.equal(podeApagarMensagem(MEMBRO, MEMBRO, { minha: true }).pode, true);
+  assert.equal(podeApagarMensagem(pessoa(8, null), null, { minha: true }).pode, true, 'nem sem cargo');
+});
+
+test('apagar a dos outros pede a permissão e só alcança quem está abaixo', () => {
+  const faxina = pessoa(5, cargo(30, ['apagarMensagens']));
+  assert.equal(podeApagarMensagem(MEMBRO, faxina).pode, false, 'membro sem a permissão apagou');
+  assert.equal(podeApagarMensagem(MOD, MEMBRO).pode, false, 'cargo sem a permissão apagou');
+  assert.equal(podeApagarMensagem(faxina, MEMBRO).pode, true);
+  assert.equal(podeApagarMensagem(faxina, MOD).pode, false, 'apagou a de quem está acima');
+  assert.equal(podeApagarMensagem(faxina, pessoa(6, cargo(30, ['apagarMensagens']))).pode, false, 'apagou a de um igual');
+  assert.equal(podeApagarMensagem(DONO, MOD).pode, true, 'o dono apaga a de qualquer um');
+  assert.equal(podeApagarMensagem(MOD, DONO).pode, false);
+});
+
+test('a mensagem de quem saiu do servidor fica ao alcance de quem pode apagar', () => {
+  const faxina = pessoa(5, cargo(30, ['apagarMensagens']));
+  assert.equal(podeApagarMensagem(faxina, null).pode, true);
+  assert.equal(podeApagarMensagem(MEMBRO, null).pode, false);
+});
+
+test('as notas da versão ninguém apaga, nem o dono', () => {
+  // O servidor publica de novo a nota que faltar: apagar pareceria não funcionar.
+  assert.equal(podeApagarMensagem(DONO, null, { daSaga: true }).pode, false);
+});
 
 test('o dono tem tudo, mesmo com a lista vazia', () => {
   // Se o dono dependesse da lista, editar o cargo dele no banco deixaria o servidor
