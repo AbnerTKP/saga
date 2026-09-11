@@ -473,7 +473,17 @@ export function App() {
         // sumiu, e a lista de lá não entra como se fosse a daqui.
         if (r.servidor.id !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
         setDadosDoServidor({ servidorId: r.servidor.id, cargos: r.cargos, membros: r.membros });
-        setSessao((atual) => (atual ? { ...atual, servidores: r.servidores } : atual));
+        setSessao((atual) => {
+          if (!atual) return atual;
+          // Você também está nessa lista, e é por ela que chega o que mudou em você com o app
+          // aberto: cargo, castigo, nome. O `eu` só era lido ao abrir, entrar ou trocar de
+          // servidor — quem ganhava cargo seguia sem os botões dele até reabrir o app. Só
+          // troca se mudou: é a identidade do objeto que mantém a tela quieta.
+          const euAgora = r.membros.find((m) => m.id === atual.eu?.id);
+          return euAgora && JSON.stringify(euAgora) !== JSON.stringify(atual.eu)
+            ? { ...atual, servidores: r.servidores, eu: euAgora }
+            : { ...atual, servidores: r.servidores };
+        });
       })
       .catch(() => undefined);
     buscar();

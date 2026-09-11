@@ -481,6 +481,18 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   se ainda fizesse parte. Hoje some dela e da seção Pessoas das configurações, e mora numa
   seção Banidos — quem baniu, quando, e o desbanir —, que aparece para quem pode banir.
   Medido: banido por fora do app, sai da lista na volta seguinte da busca (8,6 s).
+- **O seu cargo muda com o app aberto, e o app tem de ficar sabendo.** O `eu` da sessão —
+  de onde sai todo "posso?" da tela — só era lido ao abrir o app, ao entrar e ao trocar de
+  servidor; a busca de 10 em 10 s trazia a lista de pessoas e os cargos e deixava o `eu`
+  como estava. Aconteceu com o Blankito em 11/09/2026: expulso, voltou pelo convite com o
+  cargo padrão, ganhou o BEN 10 com o app aberto e seguiu sem botão nenhum — com o
+  servidor, que confere o cargo a cada pedido, pronto para aceitar tudo. Não era coisa da
+  expulsão: qualquer cargo dado com o app aberto só valia depois de reabrir, e o castigo
+  também. Medido no app de verdade, em janela escondida, dando por fora ao Tava1 um cargo
+  que mexe em salas: antes, a lista mostrava o cargo novo em 6,9 s e a barra não deixou
+  arrastar sala em 25 s; depois, as duas em 6,7 s. Hoje a mesma busca atualiza o `eu`
+  quando você aparece nela diferente — e só então, porque a identidade do objeto é o que
+  segura a tela quieta.
 - **Nome de arquivo é o hash do conteúdo.** Dá cache eterno, deduplicação, e ninguém
   escolhe o nome — o que elimina escrita fora da pasta.
 - **As imagens moram AO LADO DO BANCO** (`pastaDosArquivos`, derivada de `BANCO`), e isso
@@ -1219,7 +1231,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (276) + app (176), segundos, sem nada externo
+pnpm test        # servidor (276) + app (182), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
