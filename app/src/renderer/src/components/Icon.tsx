@@ -32,8 +32,6 @@ const paths: Record<string, string> = {
   // Seta para baixo sobre uma linha: SALVAR no disco. O anexo do chat não abre — ele vai
   // para onde a pessoa escolher, pelo diálogo do sistema.
   baixar: 'M11 3h2v9.2l3.6-3.6L18 10l-6 6-6-6 1.4-1.4L11 12.2V3zM5 19h14v2H5z',
-  // Lixeira: apagar. O desenho de todo lugar — não é hora de inventar símbolo.
-  lixeira: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
   // Moldura com foto: é o que se reconhece como "mandar imagem" num campo de conversa.
   gif: 'M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V5h14v14zM8.5 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM7 17l3-4 2 2.5L15 12l3 5H7z',
 };

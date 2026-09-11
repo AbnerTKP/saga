@@ -1,11 +1,13 @@
 import type { Cargo, Membro } from '../api';
+import { agruparPessoas } from '../listaDePessoas';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { Icon } from './Icon';
 
 /**
- * Todo mundo do servidor, agrupado por cargo — não só quem está numa sala. É a diferença
- * entre saber quem está agora e saber quem faz parte.
+ * Todo mundo do servidor, e não só quem está numa sala: é a diferença entre saber quem está
+ * agora e saber quem faz parte. Os cargos só com quem está aqui, e quem está offline num
+ * grupo único no fim — ver listaDePessoas.ts.
  */
 export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
   membros: Membro[];
@@ -19,16 +21,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
   // Banido não é pessoa DESTE servidor: some daqui e mora nas configurações, em Banidos.
   // Ficava na lista com o nome riscado, como se ainda fizesse parte.
   const presentes = membros.filter((m) => !m.banido);
-
-  // Do cargo mais alto para o mais baixo, como se lê uma hierarquia.
-  const grupos = cargos
-    .slice()
-    .sort((a, b) => b.nivel - a.nivel)
-    .map((c) => ({ cargo: c, gente: presentes.filter((m) => m.cargo?.id === c.id) }))
-    .filter((g) => g.gente.length > 0);
-
-  const semCargo = presentes.filter((m) => !m.cargo);
-  if (semCargo.length) grupos.push({ cargo: null as unknown as Cargo, gente: semCargo });
+  const grupos = agruparPessoas(membros, cargos);
 
   return (
     <aside className="lista-membros">
@@ -36,18 +29,20 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
 
       <div className="lista-membros-corpo">
         {grupos.map((g) => (
-          <div key={g.cargo?.id ?? 'sem'} className="grupo-de-cargo">
-            <div className="cabecalho-do-grupo" style={g.cargo?.cor ? { color: g.cargo.cor } : undefined}>
-              {g.cargo?.nome ?? 'Sem cargo'} — {g.gente.length}
+          <div key={g.chave} className="grupo-de-cargo">
+            <div className="cabecalho-do-grupo" style={g.cor ? { color: g.cor } : undefined}>
+              {g.titulo} — {g.gente.length}
             </div>
 
             {g.gente.map((m) => {
               const naCall = naVoz.has(m.id);
               // Apagado é quem NÃO ESTÁ, e não quem está fora da call: quem está ausente
-              // ou ocupado está aí, e some da lista tanto quanto quem fechou o app. A
-              // variável aqui já se chamava `online` querendo dizer "na voz" — era essa a
-              // confusão.
+              // ou ocupado está aí. A variável aqui já se chamava `online` querendo dizer
+              // "na voz" — era essa a confusão.
               const offline = m.status === 'offline';
+              // A cor é a do cargo DA PESSOA, não a do grupo: no grupo de offline é só por
+              // ela que ainda se vê o cargo de cada um.
+              const cor = m.cargo?.cor;
               return (
                 <button
                   key={m.id}
@@ -58,7 +53,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
                 >
                   <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto}
                     tamanho="big" status={m.status} />
-                  <span className="membro-nome" style={g.cargo?.cor && !m.turbo ? { color: g.cargo.cor } : undefined}>
+                  <span className="membro-nome" style={cor && !m.turbo ? { color: cor } : undefined}>
                     <Nome membro={m} />
                   </span>
                   {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="berserk" size={13} /></span>}

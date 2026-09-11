@@ -15,6 +15,12 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
   versão por pedido polui a lista e obriga cada amigo a baixar 93 MB de novo. Implemente,
   teste, deixe commitado **sem tag**, e pergunte "é só isso?". Correção que quebra o uso
   fura a fila.
+- **Design antes do código, com o `/design`.** Feature com tela começa pelo desenho: como o
+  app já resolve algo parecido, como o Discord resolve, e opções renderizadas com as
+  medidas do `styles.css` para o dono escolher — antes de escrever componente. O "apagar
+  mensagem" saiu com uma lixeira surgindo em cada mensagem, passou em todos os testes e foi
+  recusado na hora: teste diz que funciona, não que cabe no app. Foco no visual é olhar a
+  tela inteira como quem usa, e não só a peça pedida.
 - **Sem rodapé de atribuição em commits.** Nada de `Co-Authored-By` nem link de sessão.
 - **Commit semântico, e a nota do amigo à parte.** O assunto é do repositório
   (`feat(chat): …`, `fix(servidor): …`); o que os amigos leem na versão sai da linha
@@ -532,11 +538,20 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   o arquivo no disco fica, porque o nome é o hash e outra mensagem pode apontar para ele.
   **A própria, qualquer um apaga**: desdizer não é moderar. **A dos outros** pede
   `apagarMensagens` e só alcança quem está abaixo, a regra de toda moderação. A sala de
-  notas ninguém apaga: o servidor publicaria a nota de novo na volta seguinte. Confirma no
-  próprio botão — o primeiro clique arma, o segundo apaga —, porque uma janela a mais para
-  uma decisão de um segundo é ruído. **O Moderador semeado já nasce com a permissão, mas
-  só em servidor NOVO**: a semeadura não toca cargo que existe, então nos servidores de
-  hoje quem manda marca a caixinha.
+  notas ninguém apaga: o servidor publicaria a nota de novo na volta seguinte. **O
+  Moderador semeado já nasce com a permissão, mas só em servidor NOVO**: a semeadura não
+  toca cargo que existe, então nos servidores de hoje quem manda marca a caixinha.
+- **Apagar mora no botão direito da mensagem, e a confirmação MOSTRA a mensagem.** Saiu
+  primeiro, na v0.44.0, como uma lixeira surgindo em cada mensagem ao passar o mouse — o
+  primeiro clique armava, o segundo apagava —, e o dono recusou na hora: tinta pedindo
+  clique por engano, num gesto que o app não usa em lugar nenhum. Ações moram no botão
+  direito, na sala e na pessoa. Hoje o botão direito na mensagem abre um menu que diz de
+  quem é e o começo do texto, com a mensagem marcada enquanto ele está aberto (na foto e no
+  nome continua sendo o menu da pessoa); "Apagar mensagem" abre a caixa pequena do app com
+  a mensagem desenhada dentro, porque o menu abre onde o clique caiu e numa conversa
+  corrida ele pode cair na de cima. O vermelho cheio fica só ali, onde apagar É a ação da
+  caixa; o foco nasce nele, então Enter apaga e Esc desiste. O desenho foi escolhido pelo
+  dono entre opções renderizadas, antes do código.
 - **O envio mostra o quanto já subiu, e por isso usa `XMLHttpRequest`.** O `fetch` não
   conta o que SUBIU — só o que desce. Sem a barra, mandar 20 MB era um botão apagado e
   nada acontecendo: não dava para saber se estava indo, se travou ou se deu errado.
@@ -649,7 +664,10 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   propósito. A mesma família tem outra forma, por ESPECIFICIDADE e não por nome: `.form
   label` é grid, versalete e negrito — o rótulo de um campo — e vencia `.check`, deixando
   as caixinhas de marcar empilhadas ACIMA dos nomes, tudo em maiúsculas. Quem escreve uma
-  regra larga para "todo label do formulário" precisa deixar a exceção escrita junto.
+  regra larga para "todo label do formulário" precisa deixar a exceção escrita junto. O
+  `.perigo` fez o mesmo nos menus: é o contorno do botão de sair de um servidor, e a borda
+  vazava para o "Banir" e o "Apagar mensagem", que são texto vermelho — só apareceu
+  olhando a imagem.
 - **Contêiner de canto não recebe clique — só os cartões dentro dele.** A pilha de avisos
   é larga e quase toda vazia, e fica por cima do quadro flutuante da live: sem
   `pointer-events: none` no contêiner e `auto` nos cartões, o vão entre um aviso e outro
@@ -1138,6 +1156,13 @@ a gente não conhece.
   se chamava `online` querendo dizer "na voz", e era essa a confusão. Medido com os quatro
   casos na mesma tela: online fora da call, ocupado e o dono ficam em opacidade 1; só o
   offline vai a 0,45.
+- **Na lista de pessoas, quem está aqui vem antes de quem não está.** A ordem era só a do
+  nome dentro de cada cargo, e quem estava offline ficava ACIMA de quem está aqui — foi o
+  exemplo com que o dono cobrou foco no visual. Hoje é como no Discord (`listaDePessoas.ts`,
+  puro e testado): os cargos só com quem está aqui, e quem está offline num grupo único no
+  fim, com o cargo ainda na cor do nome — por isso a cor sai do cargo da PESSOA, e não do
+  grupo. Ausente e ocupado ficam nos cargos: são recados de quem está aí. Quem tem um cargo
+  que não está na lista cai em "Sem cargo", em vez de sumir sem ninguém notar.
 - **Quem está na sala fica pendurado nela por um fio** (`.people` com borda à esquerda).
   Sem ele, com duas salas cheias não se sabe quem está com quem.
 

@@ -5,6 +5,8 @@ import { partirEmLinks } from '../links';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherGif } from './EscolherGif';
+import { MenuDaMensagem } from './MenuDaMensagem';
+import { ApagarMensagem } from './ApagarMensagem';
 import { mudouDeDia, rotuloDoDia } from '../dias';
 import { ehContinuacao } from '../agrupamento';
 import { fraseDeQuemDigita } from '../digitando';
@@ -133,7 +135,7 @@ export function Chat({
 }: {
   /** Se quem lê pode apagar esta mensagem — ver apagar.ts. */
   podeApagar?: (m: Mensagem) => boolean;
-  /** Apaga. O erro sobe para aparecer aqui, perto da mensagem. */
+  /** Apaga. O erro sobe para a confirmação, que fica aberta com ele. */
   onApagar?: (id: number) => Promise<void>;
   mensagens: Mensagem[];
   /** Quem está escrevendo agora, fora você. Vem na mesma busca das mensagens. */
@@ -164,24 +166,19 @@ export function Chat({
   /**
    * O arquivo escolhido espera aqui até a pessoa confirmar.
    *
-   * Ia direto ao clicar, e isso é errado por dois motivos: engano não tem volta — não há
-   * como apagar mensagem — e não dava para escrever nada junto. Agora ele vira uma ficha
-   * ao lado do campo, com nome e peso, e sai no mesmo botão de sempre.
+   * Ia direto ao clicar, e isso é errado por dois motivos: mandar é público na hora —
+   * apagar depois não desfaz quem já viu — e não dava para escrever nada junto. Agora ele
+   * vira uma ficha ao lado do campo, com nome e peso, e sai no mesmo botão de sempre.
    */
   const [anexo, setAnexo] = useState<File | null>(null);
   /**
-   * Apagar confirma no próprio botão. Não tem volta, e uma janela a mais para uma decisão de
-   * um segundo é ruído: o primeiro clique arma, o segundo — em até 4 s — apaga.
+   * Apagar mora no botão direito da mensagem, como as ações da sala e da pessoa, e confirma
+   * numa caixa que MOSTRA a mensagem. Já foi uma lixeira surgindo em cada mensagem ao passar
+   * o mouse, e o dono a recusou: tinta pedindo clique por engano. Enquanto o menu ou a
+   * confirmação estão abertos, a mensagem de que eles falam fica marcada.
    */
-  const [armado, setArmado] = useState<number | null>(null);
-  // O erro fica debaixo da mensagem que não saiu: no alto da conversa ele não seria visto
-  // por quem está lá embaixo, que é onde se apaga quase sempre.
-  const [erroDeApagar, setErroDeApagar] = useState<{ id: number; texto: string } | null>(null);
-  useEffect(() => {
-    if (armado === null) return;
-    const id = setTimeout(() => setArmado(null), 4000);
-    return () => clearTimeout(id);
-  }, [armado]);
+  const [menuDaMensagem, setMenuDaMensagem] = useState<{ mensagem: Mensagem; em: { x: number; y: number } } | null>(null);
+  const [apagando, setApagando] = useState<Mensagem | null>(null);
   const [progresso, setProgresso] = useState<number | null>(null);
   const [arrastando, setArrastando] = useState(false);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
@@ -210,6 +207,9 @@ export function Chat({
    * cada mensagem que chega roubaria o cursor de volta no meio de uma frase.
    */
   useEffect(() => { if (sala) campo.current?.focus(); }, [sala]);
+
+  // Trocou de sala: o menu e a confirmação eram de uma mensagem que já não está na tela.
+  useEffect(() => { setMenuDaMensagem(null); setApagando(null); }, [sala]);
 
   const semSala = !sala;
 
@@ -294,7 +294,16 @@ export function Chat({
               {outroDia && (
                 <div className="dia-separa"><span>{rotuloDoDia(m.criadoEm, Date.now())}</span></div>
               )}
-              <div className={`msg ${seguida ? 'seguida' : ''} ${m.autorId === meuId ? 'mine' : ''}`}>
+              <div
+                className={`msg ${seguida ? 'seguida' : ''} ${m.autorId === meuId ? 'mine' : ''} ${menuDaMensagem?.mensagem.id === m.id || apagando?.id === m.id ? 'com-menu' : ''}`}
+                // Botão direito na mensagem é sobre a MENSAGEM. Na foto e no nome continua
+                // sendo sobre a pessoa: ali o evento para antes de chegar aqui.
+                onContextMenu={(e) => {
+                  if (!onApagar || !podeApagar?.(m)) return;
+                  e.preventDefault();
+                  setMenuDaMensagem({ mensagem: m, em: { x: e.clientX, y: e.clientY } });
+                }}
+              >
                 <div className="msg-lado">
                   {seguida
                     ? <span className="msg-hora-margem">{hora(m.criadoEm)}</span>
@@ -326,24 +335,7 @@ export function Chat({
                     </button>
                   )}
                   {m.arquivo && <Anexo arquivo={m.arquivo} />}
-                  {erroDeApagar?.id === m.id && <div className="error" style={{ marginTop: 4 }}>{erroDeApagar.texto}</div>}
                 </div>
-                {onApagar && podeApagar?.(m) && (
-                  <div className={`msg-acoes ${armado === m.id ? 'armado' : ''}`}>
-                    <button
-                      title={armado === m.id ? 'Clique de novo para apagar' : 'Apagar mensagem'}
-                      onClick={async () => {
-                        if (armado !== m.id) { setArmado(m.id); return; }
-                        setArmado(null);
-                        setErroDeApagar(null);
-                        try { await onApagar(m.id); } catch (e) { setErroDeApagar({ id: m.id, texto: (e as Error).message }); }
-                      }}
-                    >
-                      <Icon name="lixeira" size={15} />
-                      {armado === m.id && <span>apagar?</span>}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -455,6 +447,27 @@ export function Chat({
 
       {gifAberto && (
         <EscolherGif onEscolher={onEnviarGif} onClose={() => setGifAberto(false)} />
+      )}
+
+      {menuDaMensagem && onApagar && (
+        <MenuDaMensagem
+          mensagem={menuDaMensagem.mensagem}
+          minha={menuDaMensagem.mensagem.autorId === meuId}
+          quando={hora(menuDaMensagem.mensagem.criadoEm)}
+          em={menuDaMensagem.em}
+          onApagar={() => setApagando(menuDaMensagem.mensagem)}
+          onClose={() => setMenuDaMensagem(null)}
+        />
+      )}
+      {apagando && onApagar && (
+        <ApagarMensagem
+          mensagem={apagando}
+          minha={apagando.autorId === meuId}
+          quando={`${rotuloDoDia(apagando.criadoEm, Date.now())} às ${hora(apagando.criadoEm)}`}
+          onApagar={() => onApagar(apagando.id)}
+          // A mão estava na conversa: o cursor volta para o campo em vez de ficar no nada.
+          onClose={() => { setApagando(null); campo.current?.focus(); }}
+        />
       )}
     </div>
   );
