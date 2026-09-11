@@ -436,6 +436,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   redesenhando a tela a cada resposta. Hoje a dependência é o NÚMERO do servidor, e quem
   muda algo daqui — cargo pelo menu, foto e nome, painel do servidor — chama
   `recarregarServidor`, que era a parte boa que o laço fazia por acidente.
+- **A volta da call pede o passe ao servidor DA SALA, pelo id.** Pedia ao servidor aberto,
+  pelo nome. Dá no mesmo enquanto só se clica em sala do servidor aberto, e não na volta de
+  uma call que caiu enquanto se olhava o vizinho: o passe saía para a sala de mesmo nome do
+  servidor aberto, se houvesse — "Geral" existe em todos —, e a voz passava a guardar o
+  servidor aberto como sendo o da call; sem sala de mesmo nome, a volta era recusada de 30
+  em 30 s para sempre. Medido por HTTP contra um servidor local com as duas "Geral" (sala-1
+  no CORNUME, sala-3 no "teste"): pedido do jeito antigo, olhando o "teste", o passe saía
+  para a **sala-3**; do jeito de agora sai para a sala-1, e o mesmo id pedido ao servidor
+  errado é recusado. Hoje `entrarNaVoz` recebe a sala com
+  o servidor dela (`SalaDaVoz`) e `pedirTokenDaSala` manda o id e o cabeçalho desse
+  servidor; o `/token` da produção já aceitava o id. Não foi exercido numa queda de verdade.
 - **Queda curta o LiveKit resolve sozinho; a longa é que precisava de conserto.** Medido:
   matando o servidor de voz, o app passa a "Reconectando…" e o próprio cliente refaz a
   conexão se ela voltar em ~40 s. Passado isso ele DESISTE, e era aí que a call morria de

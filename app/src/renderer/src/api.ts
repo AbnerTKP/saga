@@ -420,8 +420,18 @@ export const buscarSalas = async (lidas = '', servidorId?: number) =>
   pedir<{ rooms: RoomInfo[]; categorias: Categoria[] }>(
     'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`, undefined, servidorId);
 
-export const pedirTokenDaSala = (room: string) =>
-  pedir<{ url: string; token: string; identity: string }>('POST', '/token', { room });
+/**
+ * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.
+ *
+ * Ia ao servidor aberto, pelo nome. Quase sempre dá no mesmo — clicar numa sala é clicar
+ * numa sala do servidor aberto —, menos na volta de uma call que caiu enquanto se olhava
+ * outro servidor: aí o passe saía para a sala de mesmo nome do servidor aberto, se ele
+ * tivesse uma ("Geral" existe em todos), ou era recusado de 30 em 30 s, se não tivesse. O
+ * nome vai junto só para servidor antigo, que ainda não conhecia o id.
+ */
+export const pedirTokenDaSala = (sala: { id: number; nome: string; servidorId: number }) =>
+  pedir<{ url: string; token: string; identity: string }>(
+    'POST', '/token', { sala: sala.id, room: sala.nome }, sala.servidorId);
 
 // --- imagens ----------------------------------------------------------------
 

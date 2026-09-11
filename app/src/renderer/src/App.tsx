@@ -9,7 +9,7 @@ import {
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor,
 } from './api';
-import { useRoom } from './useRoom';
+import { useRoom, type SalaDaVoz } from './useRoom';
 import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
@@ -264,16 +264,22 @@ export function App() {
    * chat, e nesse caso quem estava lendo a conversa continua nela — a live vai para o
    * quadro flutuante do canto, que existe exatamente para isso.
    */
-  const entrarNaVoz = useCallback(async (sala: RoomInfo, comMicrofone = true) => {
+  const entrarNaVoz = useCallback(async (sala: SalaDaVoz, comMicrofone = true) => {
     // Pelo id, não pelo nome: clicar em "Geral" de outro servidor tem de levar você para
     // lá, e comparando nome o app achava que você já estava e não fazia nada.
     if (rm.salaDaVoz?.id === sala.id) return;
-    const { url, token } = await pedirTokenDaSala(sala.name);
-    await rm.join(url, token, {
-      id: sala.id, nome: sala.name,
-      servidorId: sessao?.servidor?.id ?? 0, servidorNome: sessao?.servidor?.nome ?? '',
-    }, comMicrofone);
-  }, [rm, sessao?.servidor?.id, sessao?.servidor?.nome]);
+    // A sala vem com o servidor dela, e o passe é pedido a ELE. A volta de uma call que
+    // caiu chega aqui com a sala de onde se caiu — que pode não ser do servidor aberto.
+    const { url, token } = await pedirTokenDaSala(sala);
+    await rm.join(url, token, sala, comMicrofone);
+  }, [rm]);
+
+  /** Uma sala da lista do servidor aberto, do jeito que a voz a guarda: com o servidor junto. */
+  const paraAVoz = useCallback((sala: RoomInfo): SalaDaVoz | null => (
+    sessao?.servidor
+      ? { id: sala.id, nome: sala.name, servidorId: sessao.servidor.id, servidorNome: sessao.servidor.nome }
+      : null
+  ), [sessao?.servidor]);
 
   /**
    * A call que caiu volta sozinha, do jeito que estava.
@@ -308,7 +314,8 @@ export function App() {
       if (!vivo || tentando || !navigator.onLine) return;
       tentando = true;
       try {
-        await entrarNaVozRef.current({ id: caiu.sala.id, name: caiu.sala.nome } as RoomInfo, caiu.comMicrofone);
+        // A sala de onde se caiu, com o servidor dela — e não o servidor aberto agora.
+        await entrarNaVozRef.current(caiu.sala, caiu.comMicrofone);
         avisarRef.current('info', `A conexão caiu e você voltou para ${caiu.sala.nome}.`);
       } catch {
         // Ainda fora. A próxima volta tenta de novo; insistir mais rápido não traz
@@ -332,9 +339,10 @@ export function App() {
     const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
     const { abrir, entrar } = oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null);
     if (abrir) setSalaAbertaId(sala.id);
-    if (!entrar) return;
-    try { await entrarNaVoz(sala); } catch (e) { rm.setError((e as Error).message); }
-  }, [rm, entrarNaVoz, rooms, salaAbertaId]);
+    const naVoz = entrar ? paraAVoz(sala) : null;
+    if (!naVoz) return;
+    try { await entrarNaVoz(naVoz); } catch (e) { rm.setError((e as Error).message); }
+  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId]);
 
   const logout = useCallback(async () => {
     await rm.leave();
@@ -493,16 +501,17 @@ export function App() {
 
   const assistirLive = useCallback(async (live: LiveNoChat) => {
     const sala = rooms.find((s) => s.id === live.salaId);
-    if (!sala) return;
+    const naVoz = sala ? paraAVoz(sala) : null;
+    if (!naVoz) return;
     try {
       // Entrar é preciso: a faixa da transmissão só chega para quem está na sala. O que
       // não muda é o que você está lendo — a live vai para o quadro flutuante.
-      await entrarNaVoz(sala);
+      await entrarNaVoz(naVoz);
       rm.assistir(live.identity);
     } catch (e) {
       rm.setError((e as Error).message);
     }
-  }, [rooms, entrarNaVoz, rm]);
+  }, [rooms, entrarNaVoz, paraAVoz, rm]);
 
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
