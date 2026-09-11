@@ -16,19 +16,23 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
   /** Esquerdo abre o perfil; direito, as ações. */
   onPessoa: (m: Membro, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
 }) {
+  // Banido não é pessoa DESTE servidor: some daqui e mora nas configurações, em Banidos.
+  // Ficava na lista com o nome riscado, como se ainda fizesse parte.
+  const presentes = membros.filter((m) => !m.banido);
+
   // Do cargo mais alto para o mais baixo, como se lê uma hierarquia.
   const grupos = cargos
     .slice()
     .sort((a, b) => b.nivel - a.nivel)
-    .map((c) => ({ cargo: c, gente: membros.filter((m) => m.cargo?.id === c.id) }))
+    .map((c) => ({ cargo: c, gente: presentes.filter((m) => m.cargo?.id === c.id) }))
     .filter((g) => g.gente.length > 0);
 
-  const semCargo = membros.filter((m) => !m.cargo);
+  const semCargo = presentes.filter((m) => !m.cargo);
   if (semCargo.length) grupos.push({ cargo: null as unknown as Cargo, gente: semCargo });
 
   return (
     <aside className="lista-membros">
-      <div className="lista-membros-topo">Pessoas <span className="count">{membros.length}</span></div>
+      <div className="lista-membros-topo">Pessoas <span className="count">{presentes.length}</span></div>
 
       <div className="lista-membros-corpo">
         {grupos.map((g) => (
@@ -47,7 +51,7 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, onPessoa }: {
               return (
                 <button
                   key={m.id}
-                  className={`membro-linha ${naCall ? 'na-voz' : ''} ${offline ? 'offline' : ''} ${m.banido ? 'banido' : ''}`}
+                  className={`membro-linha ${naCall ? 'na-voz' : ''} ${offline ? 'offline' : ''}`}
                   title={`${m.nome} — ${m.cargoNome}${naCall ? ' · na voz agora' : ''}`}
                   onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY }, 'perfil')}
                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(m, { x: e.clientX, y: e.clientY }, 'acoes'); }}

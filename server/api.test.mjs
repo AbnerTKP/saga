@@ -291,16 +291,49 @@ test('quem está de castigo não recebe token de sala', async () => {
   assert.match(r.corpo.error, /castigo/);
 });
 
-test('banir derruba a sessão de quem está com o app aberto', async () => {
+test('banido num servidor continua logado: perde só aquele servidor', async () => {
+  // Banir derrubava as sessões da conta, e o banido num servidor ia parar na tela de login
+  // — inclusive o dono, banido do servidor de um amigo em 11/09/2026.
   const dono = await sessaoDe('abner');
   const alvo = (await cadastrar('elias')).corpo;
+  const casa = alvo.servidor.id;
   assert.equal((await chamar('GET', '/eu', { sessao: alvo.token })).status, 200);
 
-  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'banir', alvo: alvo.eu.id } });
-  assert.equal((await chamar('GET', '/eu', { sessao: alvo.token })).status, 401, 'a sessão do banido sobreviveu');
+  await chamar('POST', '/moderar', { sessao: dono.token, servidor: casa, corpo: { acao: 'banir', alvo: alvo.eu.id } });
+  const depois = await chamar('GET', '/eu', { sessao: alvo.token });
+  assert.equal(depois.status, 200, 'a sessão do banido caiu');
+  assert.equal(depois.corpo.servidor, null, 'o servidor de que foi banido devia sumir');
+  assert.match(depois.corpo.impedimento ?? '', /banido/, 'o banido devia ver o motivo');
 
   const volta = await chamar('POST', '/entrar', { corpo: { apelido: 'elias', senha: 'segredo123' } });
   assert.match(volta.corpo.impedimento ?? '', /banido/, 'o banido devia ver o motivo ao entrar');
+});
+
+test('expulso sai do servidor, continua logado e volta com convite', async () => {
+  const dono = await sessaoDe('abner');
+  const alvo = (await cadastrar('gilda')).corpo;
+  await chamar('POST', '/moderar', { sessao: dono.token, servidor: alvo.servidor.id, corpo: { acao: 'expulsar', alvo: alvo.eu.id } });
+
+  const depois = await chamar('GET', '/eu', { sessao: alvo.token });
+  assert.equal(depois.status, 200, 'a sessão do expulso caiu');
+  assert.equal(depois.corpo.servidor, null, 'o expulso continuou no servidor');
+
+  const volta = await chamar('POST', '/servidores/entrar', { sessao: alvo.token, corpo: { codigo: await convite() } });
+  assert.equal(volta.status, 200, 'o expulso não conseguiu voltar com convite');
+});
+
+test('pedindo pelo servidor de que foi banido, a resposta diz que é de outro', async () => {
+  // É por esse número que o app percebe, com a janela aberta, que o servidor aberto não é
+  // mais dele: o servidor não responde erro, de propósito.
+  const dono = await sessaoDe('abner');
+  const alvo = (await cadastrar('helena')).corpo;
+  const casa = alvo.servidor.id;
+  const dela = (await chamar('POST', '/servidores/criar', { sessao: alvo.token, corpo: { nome: 'Da Helena' } })).corpo.servidor;
+
+  await chamar('POST', '/moderar', { sessao: dono.token, servidor: casa, corpo: { acao: 'banir', alvo: alvo.eu.id } });
+  const r = await chamar('GET', '/rooms', { sessao: alvo.token, servidor: casa });
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.servidorId, dela.id, 'a resposta devia ser do servidor que sobrou');
 });
 
 test('banir e castigo valem mesmo com o LiveKit fora do ar', async () => {

@@ -98,6 +98,11 @@ export function App() {
   // Pede a lista de pessoas de novo AGORA, sem esperar a volta de 10 s — ver a busca dela.
   const [buscarServidorDeNovo, setBuscarServidorDeNovo] = useState(0);
   const recarregarServidor = useCallback(() => setBuscarServidorDeNovo((n) => n + 1), []);
+  // O que as buscas chamam quando o servidor aberto deixa de ser seu, e quando a sessão cai.
+  // Em referência porque as buscas vivem de relógio e não podem nascer de novo a cada
+  // desenho — ver `perdeuOServidorRef`, logo depois de `recarregarSessao`.
+  const perdeuOServidorRef = useRef<(id: number) => void>(() => {});
+  const sairDaVozRef = useRef<() => void>(() => {});
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<(PessoaAberta & { em: { x: number; y: number } }) | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -183,6 +188,25 @@ export function App() {
     }
   }, [rm]);
 
+  /**
+   * O servidor aberto deixou de ser seu com a janela aberta: banido ou expulso.
+   *
+   * O servidor não responde erro — pedir por um servidor de que você não faz parte devolve
+   * outro, de propósito, porque saber o número de um servidor alheio não abre porta. Quem
+   * percebe é o app, pelo servidor que a resposta diz ser; aí ele avisa e relê onde você
+   * está. Antes isto nunca acontecia com a janela aberta: banir derrubava a sessão da CONTA,
+   * e o banido de um servidor ia parar na tela de login, fora de todos.
+   */
+  const avisadoDaPerda = useRef<number | null>(null);
+  perdeuOServidorRef.current = (id: number) => {
+    if (avisadoDaPerda.current === id) return;
+    avisadoDaPerda.current = id;
+    const nome = sessao?.servidor?.id === id ? sessao.servidor.nome : 'um servidor';
+    notas.mostrar('erro', `Você não faz mais parte de ${nome}.`);
+    recarregarSessao().finally(() => { avisadoDaPerda.current = null; });
+  };
+  sairDaVozRef.current = rm.leave;
+
   const trocarDeServidor = useCallback(async (id: number) => {
     guardarServidorAtual(id);
     await recarregarSessao();
@@ -247,12 +271,18 @@ export function App() {
         // O pedido diz de que servidor fala, porque a resposta vai ser guardada como dele.
         const lista = await buscarSalas(paraParametro(lidasRef.current), servidorId);
         if (!vivo) return;
+        // Resposta de OUTRO servidor: o aberto não é mais seu.
+        if (lista.servidorId && lista.servidorId !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
         setSalasDoServidor({ servidorId, rooms: lista.rooms, categorias: lista.categorias });
         setPollError(null);
       } catch (e) {
         if (!vivo) return;
-        // Sessão derrubada com o app aberto (expulso ou banido): volta para o login.
-        if ((e as { status?: number }).status === 401) { guardarToken(null); setSessao(null); return; }
+        const status = (e as { status?: number }).status;
+        // Sessão derrubada com o app aberto: volta para o login — e SAI da call. Sem isto a
+        // call continuava rodando atrás da tela de login, sem botão nenhum para desligar.
+        if (status === 401) { sairDaVozRef.current(); guardarToken(null); setSessao(null); return; }
+        // Era o único servidor que você tinha, e não há outro para responder por ele.
+        if (status === 403 || status === 404) { perdeuOServidorRef.current(servidorId); return; }
         setPollError((e as Error).message);
       }
     };
@@ -438,8 +468,9 @@ export function App() {
     const buscar = () => verServidor(servidorId)
       .then((r) => {
         if (!vivo) return;
-        // A etiqueta é o servidor que a RESPOSTA diz ser: pedir por um de que você não faz
-        // mais parte devolve outro, e ele não pode entrar como se fosse o pedido.
+        // Pedir por um servidor de que você não faz mais parte devolve outro: o aberto
+        // sumiu, e a lista de lá não entra como se fosse a daqui.
+        if (r.servidor.id !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
         setDadosDoServidor({ servidorId: r.servidor.id, cargos: r.cargos, membros: r.membros });
         setSessao((atual) => (atual ? { ...atual, servidores: r.servidores } : atual));
       })

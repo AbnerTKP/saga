@@ -3,7 +3,7 @@
 // diferentes — hoje só existe um, mas o formato já é esse.
 import { podeAgir, podeDarCargo, temPermissao } from './permissoes.mjs';
 import { buscarCargo } from './cargos.mjs';
-import { ErroDeConta, derrubarSessoes } from './contas.mjs';
+import { ErroDeConta } from './contas.mjs';
 import { ehDonoDaSaga } from './plataforma.mjs';
 import * as tabela from './repositorios/membros.mjs';
 import * as tabelaDeCargos from './repositorios/cargos.mjs';
@@ -146,10 +146,19 @@ export function exigirPermissao(db, servidorId, quemId, acao, alvoId) {
   return { quem, alvo };
 }
 
+/**
+ * Banir vale para ESTE servidor, e só para ele.
+ *
+ * Banir derrubava todas as sessões da conta — e a conta é da Saga inteira: quem era banido
+ * num servidor caía da Saga toda, inclusive dos servidores que ele mesmo criou. Aconteceu
+ * com o dono em 11/09/2026: banido do servidor de um amigo, foi parar na tela de login, e a
+ * call dele NOUTRO servidor continuou rodando sem tela nenhuma para desligar. O banimento é
+ * do vínculo; a sessão é da conta. Quem tira o banido das calls DESTE servidor é a rota, e o
+ * app dele, ao ver que o servidor aberto não é mais dele, vai para outro.
+ */
 export function banir(db, servidorId, quemId, alvoId) {
   const { quem, alvo } = exigirPermissao(db, servidorId, quemId, 'banir', alvoId);
   tabela.banir(db, servidorId, alvo.id, { quando: Date.now(), porQuem: quem.apelido });
-  derrubarSessoes(db, alvo.id);   // não continua dentro com o app já aberto
   return buscarMembro(db, servidorId, alvo.id);
 }
 
@@ -172,9 +181,17 @@ export function tirarTimeout(db, servidorId, quemId, alvoId) {
   return buscarMembro(db, servidorId, alvo.id);
 }
 
+/**
+ * Expulsar tira a pessoa DESTE servidor; ao contrário do ban, ela volta com um convite.
+ *
+ * Expulsar derrubava as sessões da conta e deixava o vínculo onde estava: a pessoa caía da
+ * Saga inteira e, ao entrar de novo, continuava no servidor de onde tinha sido expulsa — um
+ * castigo em todos os servidores e, ao mesmo tempo, em nenhum. Agora o vínculo sai e a
+ * sessão fica.
+ */
 export function expulsar(db, servidorId, quemId, alvoId) {
   const { alvo } = exigirPermissao(db, servidorId, quemId, 'expulsar', alvoId);
-  derrubarSessoes(db, alvo.id);   // precisa entrar de novo; pode voltar, ao contrário do ban
+  tabela.apagar(db, servidorId, alvo.id);
   return alvo;
 }
 

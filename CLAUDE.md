@@ -457,6 +457,24 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   vez e ninguém voltava. É essa a queda que o app agora cobre.
 - **Banir e dar castigo também tiram da call.** Sem isso a punição parece não funcionar.
   A remoção é consequência: se o LiveKit estiver fora, o registro vale do mesmo jeito.
+- **Banir e expulsar são do SERVIDOR; a sessão é da CONTA.** Os dois derrubavam todas as
+  sessões da conta, e a conta é da Saga inteira: quem era banido num servidor caía na tela
+  de login e ficava fora de todos, inclusive dos que ele mesmo criou. Aconteceu com o dono
+  em 11/09/2026, banido do servidor de um amigo — e a call dele NOUTRO servidor continuou
+  rodando atrás da tela de login, sem botão nenhum para desligar, porque o app voltava ao
+  login sem sair da call. Expulsar, de quebra, nem tirava do servidor: derrubava as sessões
+  e deixava o vínculo lá, inteiro, esperando a pessoa entrar de novo. Hoje banir marca só o
+  vínculo daquele servidor e tira a pessoa das calls de lá; expulsar apaga o vínculo, e a
+  pessoa volta com convite, ao contrário do ban. Ninguém avisa o app: quem percebe é ele,
+  porque pedir por um servidor de que você não faz mais parte devolve OUTRO — e o `/rooms`
+  agora diz qual. Medido no app de verdade, em janela escondida, banido do servidor que
+  estava aberto: em 0,6 s aparece "Você não faz mais parte de…", em 0,8 s a tela já é outro
+  servidor, sem passar pelo login, e a sessão continua respondendo. Sessão que cai de
+  verdade (401) agora sai da call antes de ir para o login — isso não foi exercido.
+- **Banido não é pessoa do servidor.** Ficava na lista da direita com o nome riscado, como
+  se ainda fizesse parte. Hoje some dela e da seção Pessoas das configurações, e mora numa
+  seção Banidos — quem baniu, quando, e o desbanir —, que aparece para quem pode banir.
+  Medido: banido por fora do app, sai da lista na volta seguinte da busca (8,6 s).
 - **Nome de arquivo é o hash do conteúdo.** Dá cache eterno, deduplicação, e ninguém
   escolhe o nome — o que elimina escrita fora da pasta.
 - **As imagens moram AO LADO DO BANCO** (`pastaDosArquivos`, derivada de `BANCO`), e isso

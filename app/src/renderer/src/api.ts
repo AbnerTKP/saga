@@ -78,6 +78,8 @@ export type Membro = {
   idExibido: string | null;
   banido: boolean;
   banidoPor: string | null;
+  /** Quando foi banido. Servidor antigo não manda. */
+  banidoEm?: number | null;
   castigoAte: number | null;
   /** Quando entrou neste servidor. */
   entrouEm: number | null;
@@ -417,7 +419,9 @@ export const renomearServidor = (nome: string) =>
 
 /** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
 export const buscarSalas = async (lidas = '', servidorId?: number) =>
-  pedir<{ rooms: RoomInfo[]; categorias: Categoria[] }>(
+  // `servidorId` é de qual servidor a resposta É — pode não ser o pedido, se você não faz
+  // mais parte dele. Servidor antigo não manda.
+  pedir<{ servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[] }>(
     'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`, undefined, servidorId);
 
 /**

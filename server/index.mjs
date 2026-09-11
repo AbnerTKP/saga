@@ -159,6 +159,8 @@ const verMembro = (m) => m && ({
   idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
+  // Para a lista de banidos das configurações dizer desde quando.
+  banidoEm: m.banido_em ?? null,
   castigoAte: m.silenciado_ate ?? null,
   entrouEm: m.entrou_em ?? null,
 });
@@ -551,7 +553,11 @@ const ROTAS = {
     })));
     // As gavetas vão junto: a barra lateral desenha as duas coisas na mesma passada, e
     // uma segunda busca só para elas piscaria a lista a cada atualização.
-    return { rooms: salas, categorias: categoriasM.listarCategorias(db, sid) };
+    //
+    // `servidorId` diz de QUAL servidor é a resposta. Pedir por um servidor de que você não
+    // faz mais parte — banido ou expulso com o app aberto — devolve outro, sem erro; é o
+    // número que deixa o app perceber que o servidor aberto sumiu e sair dele.
+    return { servidorId: sid, rooms: salas, categorias: categoriasM.listarCategorias(db, sid) };
   },
 
   'POST /salas/criar': async (req) => {

@@ -74,14 +74,16 @@ test('moderador não bane; o dono bane', () => {
   assert.ok(banir(db, sid, dono.id, membro.id).banido_em);
 });
 
-test('banir derruba a sessão de quem está com o app aberto', () => {
+test('banir vale só para este servidor: a sessão da conta continua', () => {
+  // Banir derrubava as sessões da CONTA: quem era banido num servidor caía da Saga inteira,
+  // inclusive dos servidores dele. Aconteceu com o dono em 11/09/2026.
   const { db, sid, cria } = cenario();
   const dono = cria('abner'); cria('caio');
   const alvo = db.prepare("SELECT id FROM usuarios WHERE apelido = 'caio'").get();
   const { token } = entrar(db, { apelido: 'caio', senha: 'segredo123' });
-  assert.ok(usuarioDaSessao(db, token));
   banir(db, sid, dono.id, alvo.id);
-  assert.equal(usuarioDaSessao(db, token), null);
+  assert.ok(usuarioDaSessao(db, token), 'a sessão do banido caiu junto com o banimento');
+  assert.match(impedimento(buscarMembro(db, sid, alvo.id)), /banido/);
 });
 
 test('quem está banido não entra em sala, e desbanir libera', () => {
@@ -105,15 +107,16 @@ test('timeout impede por um tempo e depois libera sozinho', () => {
   assert.equal(impedimento(buscarMembro(db, sid, caio.id)), null);
 });
 
-test('expulsar derruba a sessão mas deixa voltar', () => {
+test('expulsar tira deste servidor, não derruba a sessão, e deixa voltar', () => {
   const { db, sid, cria } = cenario();
-  const dono = cria('abner'); cria('caio');
-  const caio = db.prepare("SELECT id FROM usuarios WHERE apelido = 'caio'").get();
+  const dono = cria('abner'); const caio = cria('caio');
   const { token } = entrar(db, { apelido: 'caio', senha: 'segredo123' });
   expulsar(db, sid, dono.id, caio.id);
-  assert.equal(usuarioDaSessao(db, token), null, 'a sessão devia cair');
-  assert.ok(entrar(db, { apelido: 'caio', senha: 'segredo123' }).token, 'devia poder entrar de novo');
-  assert.equal(impedimento(buscarMembro(db, sid, caio.id)), null);
+  assert.equal(buscarMembro(db, sid, caio.id), null, 'o expulso continuou no servidor');
+  assert.ok(usuarioDaSessao(db, token), 'a sessão do expulso caiu');
+  // Voltar é entrar de novo pelo convite — aqui, o mesmo vínculo que o convite cria.
+  garantirMembro(db, sid, caio);
+  assert.equal(impedimento(buscarMembro(db, sid, caio.id)), null, 'voltou impedido');
 });
 
 test('o dono promove, e o promovido passa a poder moderar', () => {

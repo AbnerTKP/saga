@@ -97,6 +97,11 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
     } catch (e) { setErro((e as Error).message); } finally { setOcupado(false); }
   };
 
+  // Banido sai da lista de pessoas e fica numa seção só dele: não faz mais parte, mas
+  // alguém precisa poder ver quem é e desfazer.
+  const presentes = membros.filter((m) => !m.banido);
+  const banidos = membros.filter((m) => m.banido);
+
   const salvarNomeServidor = async () => {
     setErro(null); setOcupado(true);
     try { onServidor((await renomearServidor(nomeServidor)).servidor); setAviso('Nome do servidor salvo.'); }
@@ -413,10 +418,10 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
         )}
 
         <section className="painel-bloco">
-          <h3>Pessoas <span className="count">{membros.length}</span></h3>
+          <h3>Pessoas <span className="count">{presentes.length}</span></h3>
           <ul className="membros">
-            {membros.map((m) => (
-              <li key={m.id} className={m.banido ? 'banido' : ''}>
+            {presentes.map((m) => (
+              <li key={m.id}>
                 <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
                 <div className="quem">
                   <div className="strong">
@@ -426,7 +431,6 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
                   </div>
                   <div className="muted small">
                     <span style={m.cargo?.cor ? { color: m.cargo.cor } : undefined}>{m.cargoNome}</span> · {m.apelido}
-                    {m.banido && ` · banido por ${m.banidoPor ?? 'alguém'}`}
                     {emCastigo(m) && ` · de castigo até ${new Date(m.castigoAte!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
                   </div>
                 </div>
@@ -447,11 +451,10 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
                     : <button title="Castigo de 10 minutos" disabled={ocupado} onClick={() => agir('timeout', m, { minutos: 10 })}>castigo</button>
                   )}
                   {posso(eu, 'expulsar', m) && (
-                    <button title="Expulsar (pode voltar)" disabled={ocupado} onClick={() => agir('expulsar', m)}>expulsar</button>
+                    <button title="Tirar deste servidor — volta com um convite" disabled={ocupado} onClick={() => agir('expulsar', m)}>expulsar</button>
                   )}
-                  {posso(eu, 'banir', m) && (m.banido
-                    ? <button title="Desbanir" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
-                    : <button className="danger" title="Banir para sempre" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
+                  {posso(eu, 'banir', m) && (
+                    <button className="danger" title="Banir deste servidor" disabled={ocupado} onClick={() => agir('banir', m)}>banir</button>
                   )}
                   {donoDaSaga && (
                     <input
@@ -484,6 +487,34 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
             ))}
           </ul>
         </section>
+
+        {/* Quem pode banir vê quem está banido, e desfaz. Banido não aparece na lista de
+            pessoas: ele não faz mais parte, e com o nome riscado parecia que fazia. */}
+        {pode(eu.cargo, 'banir') && (
+          <section className="painel-bloco">
+            <h3>Banidos <span className="count">{banidos.length}</span></h3>
+            {banidos.length === 0 && <p className="muted small">Ninguém banido deste servidor.</p>}
+            <ul className="membros">
+              {banidos.map((m) => (
+                <li key={m.id}>
+                  <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
+                  <div className="quem">
+                    <div className="strong"><Nome membro={m} /></div>
+                    <div className="muted small">
+                      {m.apelido} · banido por {m.banidoPor ?? 'alguém'}
+                      {m.banidoEm ? ` em ${new Date(m.banidoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+                    </div>
+                  </div>
+                  <div className="acoes">
+                    {posso(eu, 'desbanir', m) && (
+                      <button title="Desbanir: volta a poder entrar com um convite" disabled={ocupado} onClick={() => agir('desbanir', m)}>desbanir</button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Sair fica fora de toda permissão: entrar num servidor é decisão de quem chega,
             e sair também — não é moderação. Quem CRIOU não sai, e o servidor recusa: ele

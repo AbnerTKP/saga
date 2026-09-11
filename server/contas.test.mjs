@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirBanco } from './banco.mjs';
-import { criarConta, entrar, usuarioDaSessao, sair, derrubarSessoes, senhaConfere, buscarPorApelido, esquecerAnotacoes, trocarSenha } from './contas.mjs';
+import { criarConta, entrar, usuarioDaSessao, sair, senhaConfere, buscarPorApelido, esquecerAnotacoes, trocarSenha } from './contas.mjs';
 
 const novo = () => abrirBanco(':memory:');
 const conta = (db, apelido = 'abner', senha = 'segredo123') =>
@@ -89,16 +89,16 @@ test('o token guardado no banco não é o token em si', () => {
   assert.ok(!guardados.includes(token), 'o token cru foi parar no banco');
 });
 
-test('sair encerra só aquela sessão; derrubarSessoes encerra todas', () => {
+test('sair encerra só aquela sessão', () => {
+  // Não existe mais "derrubar todas": era o que banir e expulsar usavam, e banimento é de
+  // um servidor, não da conta — ver membros.mjs.
   const db = novo();
-  const u = conta(db, 'abner');
+  conta(db, 'abner');
   const a = entrar(db, { apelido: 'abner', senha: 'segredo123' }).token;
   const b = entrar(db, { apelido: 'abner', senha: 'segredo123' }).token;
   sair(db, a);
   assert.equal(usuarioDaSessao(db, a), null);
   assert.ok(usuarioDaSessao(db, b), 'a outra sessão caiu junto');
-  derrubarSessoes(db, u.id);
-  assert.equal(usuarioDaSessao(db, b), null);
 });
 
 test('apagar o usuário leva as sessões junto', () => {

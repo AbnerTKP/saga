@@ -151,6 +151,3 @@ export function usuarioDaSessao(db, token) {
 export const esquecerAnotacoes = () => anotadas.clear();
 
 export const sair = (db, token) => sessoes.apagar(db, hashDoToken(token ?? ''));
-
-/** Expulsar e banir derrubam todas as sessões: a pessoa não continua dentro com o app aberto. */
-export const derrubarSessoes = (db, usuarioId) => sessoes.apagarDaConta(db, usuarioId);

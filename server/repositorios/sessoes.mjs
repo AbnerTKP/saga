@@ -25,7 +25,3 @@ export const anotarVista = (db, tokenHash, agora) =>
 
 export const apagar = (db, tokenHash) =>
   db.prepare('DELETE FROM sessoes WHERE token_hash = ?').run(tokenHash);
-
-/** Expulsar e banir derrubam todas: a pessoa não continua dentro com o app aberto. */
-export const apagarDaConta = (db, usuarioId) =>
-  db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(usuarioId);
