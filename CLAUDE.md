@@ -434,8 +434,12 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   único núcleo e o LiveKit em 1,6% — quanto disso era o laço só se sabe depois que todos
   atualizarem. Não aparece em registro nenhum: o app funciona, só que pedindo sem parar e
   redesenhando a tela a cada resposta. Hoje a dependência é o NÚMERO do servidor, e quem
-  muda algo daqui — cargo pelo menu, foto e nome, painel do servidor — chama
-  `recarregarServidor`, que era a parte boa que o laço fazia por acidente.
+  muda algo daqui — cargo pelo menu, foto e nome, painel do servidor, "Sua conta" — chama
+  `recarregarServidor`, que era a parte boa que o laço fazia por acidente. **O laço escondia
+  também um atraso da presença**, e tirá-lo o expôs: ao abrir o app você se via apagado na
+  própria lista por 10,3 s, e "ocupado" levava 8,4 s para aparecer. Hoje status confirmado
+  diferente do anterior pede a lista na hora — 0,3 s e 0,1 s, medidos. Tirar um laço assim
+  pede perguntar o que mais ele mantinha fresco sem ninguém saber.
 - **A volta da call pede o passe ao servidor DA SALA, pelo id.** Pedia ao servidor aberto,
   pelo nome. Dá no mesmo enquanto só se clica em sala do servidor aberto, e não na volta de
   uma call que caiu enquanto se olhava o vizinho: o passe saía para a sala de mesmo nome do

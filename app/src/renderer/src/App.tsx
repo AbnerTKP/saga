@@ -206,11 +206,17 @@ export function App() {
   useEffect(() => {
     if (!sessao?.eu) return;
     let vivo = true;
+    // O último status que o servidor confirmou: é por ele que se sabe que a SUA linha mudou.
+    let confirmado: string | null = null;
     const bater = async () => {
       try {
         const ocioso = await window.desktop.ociosidade();
         if (!vivo) return;
-        await baterPresenca(statusParaMandar(statusEscolhido, ocioso));
+        const agora = await baterPresenca(statusParaMandar(statusEscolhido, ocioso));
+        // A lista de pessoas vem de 10 em 10 s, e o sinal de vida corre ao lado dela: quem
+        // abria o app se via apagado na própria lista por 10 s, e "ocupado" levava 8 s para
+        // aparecer — medido. Status confirmado diferente do anterior pede a lista na hora.
+        if (vivo && agora !== confirmado) { confirmado = agora; recarregarServidor(); }
       } catch { /* rede piscou; o próximo batimento resolve */ }
     };
     bater();
@@ -218,7 +224,7 @@ export function App() {
     // Voltar a aparecer online na hora, e não até 30 s depois de a máquina acordar.
     const pararDeDespertar = aoDespertar(bater);
     return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
-  }, [sessao?.eu?.id, statusEscolhido]);
+  }, [sessao?.eu?.id, statusEscolhido, recarregarServidor]);
 
   const escolherStatus = useCallback((s: Status) => {
     setStatusEscolhido(s);
@@ -606,7 +612,8 @@ export function App() {
             onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
             onEu={atualizarEu}
             onRegistro={() => { setDevices(false); setRegistro(true); }}
-            onClose={() => setDevices(false)}
+            // O Berserk dado pelo painel da Saga aparece na lista ao fechar, e não em 10 s.
+            onClose={() => { setDevices(false); recarregarServidor(); }}
           />
         )}
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
