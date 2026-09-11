@@ -3,15 +3,16 @@ import { Track } from 'livekit-client';
 import type { useRoom, Tile } from '../useRoom';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
-import { MenuDaTela } from './MenuDaTela';
 import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
+import { ControleDeVolume } from './ControleDeVolume';
 import type { Digitando, Mensagem, RoomInfo } from '../api';
 import type { LiveNoChat } from '../lives';
 import { identidadeDe } from '../pessoas';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { Espectador } from '../espectadores';
+import type { Enquadramento } from '../enquadramento';
 import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
@@ -58,21 +59,65 @@ function QuemAssiste({ espectadores, nomes = 0, mostrarVazio, extra }: {
   );
 }
 
-function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMenu, onSair }: {
+/**
+ * Os controles da live aparecem quando o mouse mexe e somem 2,5 s depois de ele parar,
+ * como num player de vídeo — foi a escolha do dono entre isto e uma barra sempre à vista.
+ * Com o mouse EM CIMA deles, não somem: quem está ajustando o volume não pode ver a barra
+ * fugir da mão.
+ */
+function useControlesQueSomem(ms = 2500) {
+  const [visiveis, setVisiveis] = useState(false);
+  const relogio = useRef<number | undefined>(undefined);
+  const segurando = useRef(false);
+  useEffect(() => () => window.clearTimeout(relogio.current), []);
+
+  const agendar = useCallback(() => {
+    window.clearTimeout(relogio.current);
+    if (!segurando.current) relogio.current = window.setTimeout(() => setVisiveis(false), ms);
+  }, [ms]);
+  const mostrar = useCallback(() => { setVisiveis(true); agendar(); }, [agendar]);
+  const esconder = useCallback(() => {
+    window.clearTimeout(relogio.current);
+    segurando.current = false;
+    setVisiveis(false);
+  }, []);
+  const segurar = useCallback((sim: boolean) => {
+    segurando.current = sim;
+    if (sim) window.clearTimeout(relogio.current);
+    else agendar();
+  }, [agendar]);
+
+  return { visiveis, mostrar, esconder, segurar };
+}
+
+/** Tudo o que os controles da live escolhida precisam saber e fazer. */
+type ControlesDaLive = {
+  nome: string;
+  foto?: string | null;
+  enquadramento?: Enquadramento | null;
+  espectadores: Espectador[];
+  /** A sua própria transmissão: não há som seu para ajustar, e sair é fechar a prévia. */
+  local: boolean;
+  volume: number;
+  onVolume: (v: number) => void;
+  preencher: boolean;
+  onPreencher: (v: boolean) => void;
+  onSair: () => void;
+};
+
+function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   tile: Tile; big?: boolean;
-  /** Parar de assistir: a transmissão deixa de chegar, imagem e som. Só no quadro escolhido. */
-  onSair?: () => void;
   /** Cortar as bordas para ocupar tudo, em vez de deixar tarja preta. */
   preencher?: boolean;
   /** Quem está falando agora, medido do som — ver niveis.ts. */
   falando: Set<string>;
-  /** Quem está assistindo, quando o quadro é de transmissão. */
-  espectadores?: Espectador[];
   onClick?: () => void;
-  onMenu?: (e: React.MouseEvent) => void;
+  /** Só na live escolhida, no palco: os controles por cima da imagem. */
+  controles?: ControlesDaLive;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const caixa = useRef<HTMLDivElement>(null);
+  const { visiveis, mostrar, esconder, segurar } = useControlesQueSomem();
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -98,55 +143,59 @@ function VideoTile({ tile, big, preencher, falando, espectadores, onClick, onMen
     }
   };
 
+  // Nos controles, clique e dois cliques são deles: não sobem até a imagem de baixo.
+  const soDosControles = {
+    onMouseEnter: () => segurar(true),
+    onMouseLeave: () => segurar(false),
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onDoubleClick: (e: React.MouseEvent) => e.stopPropagation(),
+  };
+
   return (
     <div
       ref={caixa}
-      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${falando.has(tile.participant.identity) && !isScreen ? 'speaking' : ''}`}
-      onClick={onClick}
+      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${falando.has(tile.participant.identity) && !isScreen ? 'speaking' : ''} ${controles ? 'com-controles' : ''} ${controles && visiveis ? 'controles-visiveis' : ''}`}
+      // Na live escolhida, clicar na imagem mostra os controles. Clicar SAÍA da live — um
+      // clique para dar foco à janela bastava para perder a transmissão.
+      onClick={controles ? mostrar : onClick}
+      onMouseMove={controles ? mostrar : undefined}
+      onMouseLeave={controles ? esconder : undefined}
       onDoubleClick={(e) => { e.stopPropagation(); telaCheia(); }}
-      onContextMenu={onMenu}
-      title={isScreen ? 'Dois cliques: tela cheia. Botão direito: volume e ajuste.' : undefined}
     >
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
-      {isScreen && (
-        <QuemAssiste
-          espectadores={espectadores ?? []}
-          // Dois nomes e o resto contado — "Juninho, Junio e mais 5" —, que é o formato
-          // que se lê de relance. A lista inteira vem parando o mouse em cima. Na
-          // transmissão dos OUTROS continua só o número: ali o que importa é se tem
-          // gente, não quem.
-          nomes={big || tile.local ? 2 : 0}
-          mostrarVazio={tile.local}
-          extra="no-quadro"
-        />
-      )}
-      <div className="tile-label">
-        {isScreen && <Icon name="screen" size={14} />}
-        {name}{tile.local ? ' (você)' : ''}{isScreen ? (big ? ' · tela' : ' · assistir') : ''}
-      </div>
-      {isScreen && (
-        <button
-          className="tile-expandir"
-          title="Tela cheia (dois cliques também)"
-          onClick={(e) => { e.stopPropagation(); telaCheia(); }}
-          // 'dblclick' é outro evento: sem isto, dois cliques no botão disparam três vezes
-          // (click, click e o dblclick subindo até o quadro) e a tela cheia entra e sai.
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <Icon name="expandir" size={16} />
-        </button>
-      )}
-      {isScreen && onSair && (
-        /* Sair era clicar na própria imagem, e isso ninguém adivinha. O botão fica no canto
-           de cima, à direita: embaixo moram o nome e a tela cheia; em cima, à esquerda, quem
-           está assistindo. */
-        <button
-          className="tile-sair"
-          onClick={(e) => { e.stopPropagation(); onSair(); }}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <Icon name="close" size={13} /> {tile.local ? 'Fechar a prévia' : 'Sair da live'}
-        </button>
+      {controles ? (
+        <>
+          <div className="controles-da-live cima" {...soDosControles}>
+            <Avatar nome={controles.nome} foto={controles.foto} enquadramento={controles.enquadramento} />
+            <span className="controles-nome">{controles.nome}{controles.local ? ' (você)' : ''}</span>
+            <span className="selo-ao-vivo"><span className="ponto" /> ao vivo</span>
+            <QuemAssiste espectadores={controles.espectadores} mostrarVazio={controles.local} />
+            <span className="spacer" />
+            <button type="button" className="controles-sair" onClick={controles.onSair}>
+              <Icon name="close" size={14} /> {controles.local ? 'Fechar a prévia' : 'Sair da live'}
+            </button>
+          </div>
+          <div className="controles-da-live baixo" {...soDosControles}>
+            {!controles.local && <ControleDeVolume volume={controles.volume} onVolume={controles.onVolume} claro />}
+            <span className="spacer" />
+            <button
+              type="button"
+              className={`controles-icone ${controles.preencher ? 'ligado' : ''}`}
+              title={controles.preencher ? 'Mostrar a imagem inteira' : 'Preencher o quadro, cortando as bordas'}
+              onClick={() => controles.onPreencher(!controles.preencher)}
+            >
+              <Icon name="aspecto" size={20} />
+            </button>
+            <button type="button" className="controles-icone" title="Tela cheia (dois cliques também)" onClick={telaCheia}>
+              <Icon name="expandir" size={20} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="tile-label">
+          {isScreen && <Icon name="screen" size={14} />}
+          {name}{tile.local ? ' (você)' : ''}
+        </div>
       )}
     </div>
   );
@@ -190,7 +239,6 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   onVoltarAVoz?: () => void;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
-  const [menuDaTela, setMenuDaTela] = useState<{ identity: string; nome: string; em: { x: number; y: number } } | null>(null);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
   // Preferência de quem assiste, não de quem transmite: uma tela 16:9 numa janela 16:10
   // sobra tarja preta, e tem quem prefira cortar as bordas a ver a faixa.
@@ -202,48 +250,34 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     try { localStorage.setItem('cantinho.preencher', v ? '1' : '0'); } catch { /* sem guardar, volta ao padrão */ }
   }, []);
 
-
-
-
-
   /**
    * O palco não escolhe sozinho. Quem escolhe é quem assiste.
    *
    * Antes ele focava a primeira transmissão que aparecesse — e "a primeira" é a ordem em
    * que os participantes calharam de vir, que muda quando alguém liga a câmera ou troca
    * de faixa. Com duas pessoas transmitindo, o quadro grande pulava de uma para a outra
-   * sozinho, e não havia como dizer "quero ESTA". Agora não há palpite: sem clique, todas
-   * ficam do mesmo tamanho, esperando.
+   * sozinho, e não havia como dizer "quero ESTA". Agora não há palpite: sem escolha, quem
+   * está no ar aparece em cartões, esperando.
    *
    * A escolha vale para imagem E som: a que está no palco é a que se vê e a única que se
-   * ouve. Sem escolha, palco vazio — e silêncio, que é o que audivel.ts já dizia.
+   * ouve. Sem escolha, silêncio — que é o que audivel.ts já dizia.
    */
   const screens = rm.tiles.filter((t) => t.source === Track.Source.ScreenShare);
-
-  /**
-   * A transmissão escolhida manda no palco. As outras nem chegam — não estão inscritas —,
-   * então não há o que mostrar delas além do nome na faixa de cima.
-   *
-   * Sem escolha, o palco fica com as câmeras; e aí vale o destaque manual de sempre, que
-   * é o que permite ampliar a câmera de alguém.
-   */
   const liveNoPalco = screens.find((t) => t.participant.identity === rm.assistindo) ?? null;
   const focusTile = liveNoPalco ?? rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
   /**
-   * O que o clique num quadro faz. Numa transmissão, escolher é assistir — e é o som que
-   * muda de dono, não só o tamanho. Numa câmera, é só ampliar.
-   */
-  /**
    * As transmissões que estão no ar mas não estão sendo recebidas.
    *
-   * Elas não têm faixa, logo não têm quadro — mas precisam continuar na fila de baixo,
-   * apagadas, para dar onde clicar. Sem isso, escolher outra viraria adivinhação.
+   * Elas não têm faixa, logo não têm quadro — mas precisam continuar à vista para dar onde
+   * clicar. Sem nada no palco, elas SÃO o palco, em cartões grandes; com algo no palco,
+   * ficam na faixa de baixo.
    */
   const apagadas = rm.lives.filter(
     (l) => !rm.tiles.some((t) => t.source === Track.Source.ScreenShare && t.participant.identity === l.identity),
   );
+  const cartoesNaFaixa = focusTile ? apagadas : [];
 
   const escolher = (t: Tile) => {
     if (t.source === Track.Source.ScreenShare) {
@@ -254,18 +288,21 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     setFocus(focus === t.key ? null : t.key);
   };
 
-  // Só transmissão tem volume próprio; câmera não carrega áudio separado.
-  const menuDaTransmissao = (t: Tile) => (e: React.MouseEvent) => {
-    if (t.source !== Track.Source.ScreenShare) return;
-    e.preventDefault();
-    setMenuDaTela({
-      identity: t.participant.identity,
-      nome: t.participant.name || t.participant.identity,
-      em: { x: e.clientX, y: e.clientY },
-    });
+  const controlesDe = (t: Tile): ControlesDaLive => {
+    const id = t.participant.identity;
+    return {
+      nome: t.participant.name || id,
+      foto: pessoas.get(id)?.foto,
+      enquadramento: pessoas.get(id)?.enquadramento?.foto,
+      espectadores: rm.espectadores.get(id) ?? [],
+      local: t.local,
+      volume: rm.volumeDaTelaDe(id),
+      onVolume: (v) => rm.definirVolumeDaTela(id, v),
+      preencher,
+      onPreencher: trocarPreencher,
+      onSair: () => rm.assistir(null),
+    };
   };
-
-
 
   const idle = rm.status === 'idle';
   // Quem está no palco é da CALL, e a call pode ser de outro servidor: trocar de servidor
@@ -274,6 +311,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     ? { servidorId: rm.salaDaVoz.servidorId, servidorNome: rm.salaDaVoz.servidorNome }
     : undefined;
   const audioOnly = rm.participants.filter((p) => !rm.tiles.some((t) => t.participant === p));
+  const nomeDaLiveNoPalco = liveNoPalco ? (liveNoPalco.participant.name || liveNoPalco.participant.identity) : null;
 
   return (
     <main className="stage">
@@ -283,8 +321,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       </header>
 
       {/* Estando na voz de uma sala e lendo outra, a call fica à mostra aqui em cima: quem
-          está nela, quantas telas no ar, e o caminho de volta num clique. Era uma linha de
-          texto no cabeçalho ("voz em Geral") que não dizia nem quem estava lá. Não aparece
+          está nela, a live que está rodando, e o caminho de volta num clique. Não aparece
           na própria sala de voz — ali o palco já está na tela. */}
       {!idle && rm.salaDaVoz && salaAberta && rm.salaDaVoz.id !== salaAberta.id && (
         <FaixaDoPalco
@@ -292,6 +329,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           participantes={rm.participants.map((p) => ({ identity: p.identity, nome: p.name || p.identity }))}
           pessoas={pessoas}
           transmitindo={rm.lives.length}
+          assistindoNome={nomeDaLiveNoPalco}
           servidorAberto={servidorId}
           onAbrir={onVoltarAVoz}
         />
@@ -326,7 +364,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       <div className="stage-body">
         <section className="videos">
           {idle && <div className="empty">Clique numa sala à esquerda para entrar na voz.</div>}
-          {!idle && rm.tiles.length === 0 && (
+          {!idle && rm.tiles.length === 0 && rm.lives.length === 0 && (
             <div className="empty">
               <div className="avatars">
                 {rm.participants.map((p) => (
@@ -345,26 +383,64 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
               <div className="muted">Só voz por enquanto. Ligue a câmera ou compartilhe a tela.</div>
             </div>
           )}
-          {/* Dois campos: em cima a que você escolheu, embaixo todas, para escolher.
-              A escolha é um clique na própria imagem — era em fichas no alto da tela, e
-              escolher longe do que se escolhe é o que estava ruim. */}
           {!idle && (focusTile || rm.lives.length > 0) && (
             <div className="focus-layout">
-              {focusTile
-                ? <VideoTile tile={focusTile} big preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(focusTile.participant.identity)} onClick={() => escolher(focusTile)} onMenu={menuDaTransmissao(focusTile)}
-                    onSair={focusTile === liveNoPalco ? () => rm.assistir(null) : undefined} />
-                : (
-                  <div className="tile grande-vazio">
-                    <div className="muted">
-                      <Icon name="screen" size={22} />
-                      <div>Clique numa transmissão aqui embaixo para assistir</div>
-                    </div>
+              {focusTile ? (
+                <VideoTile
+                  tile={focusTile}
+                  big
+                  preencher={preencher}
+                  falando={rm.falando}
+                  onClick={focusTile === liveNoPalco ? undefined : () => escolher(focusTile)}
+                  controles={focusTile === liveNoPalco ? controlesDe(focusTile) : undefined}
+                />
+              ) : apagadas.length > 0 ? (
+                /* Lives no ar e nenhuma escolhida: quem transmite, grande, com o botão
+                   escrito. Era um quadro tracejado pedindo para clicar na faixa de baixo —
+                   entrar numa live "não era evidente". */
+                <div className="escolher-live">
+                  <div className="escolher-live-titulo">
+                    {apagadas.length === 1 ? `${apagadas[0].nome} está transmitindo` : `${apagadas.length} pessoas estão transmitindo`}
                   </div>
-                )}
-              {(rest.length > 0 || audioOnly.length > 0) && (
+                  <div className="escolher-live-cartoes">
+                    {apagadas.map((l) => (
+                      <div key={l.identity} className="escolher-live-cartao">
+                        <Avatar nome={l.nome} foto={pessoas.get(l.identity)?.foto}
+                          enquadramento={pessoas.get(l.identity)?.enquadramento?.foto} tamanho="huge" />
+                        <span className="selo-ao-vivo"><span className="ponto" /> ao vivo</span>
+                        <span className="strong">{l.nome}</span>
+                        <QuemAssiste espectadores={rm.espectadores.get(l.identity) ?? []} nomes={2} mostrarVazio />
+                        <button type="button" className="primary" onClick={() => rm.assistir(l.identity)}>
+                          <Icon name="screen" size={16} /> Assistir
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="tile grande-vazio">
+                  <div className="muted">
+                    <Icon name="screen" size={22} />
+                    <div>Clique numa transmissão aqui embaixo para assistir</div>
+                  </div>
+                </div>
+              )}
+              {(liveNoPalco || cartoesNaFaixa.length > 0 || rest.length > 0 || audioOnly.length > 0) && (
                 <div className="strip">
-                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(t.participant.identity)} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
-                  {apagadas.map((l) => (
+                  {/* A live que está no palco também fica na faixa, marcada: é assim que se
+                      sabe qual das que estão no ar é a que se vê, e para qual se troca. */}
+                  {liveNoPalco && nomeDaLiveNoPalco && (
+                    <div className="tile live-apagada assistindo" title="Esta é a live que está no palco">
+                      <Avatar nome={nomeDaLiveNoPalco} foto={pessoas.get(liveNoPalco.participant.identity)?.foto}
+                        enquadramento={pessoas.get(liveNoPalco.participant.identity)?.enquadramento?.foto} tamanho="huge" />
+                      <span className="live-quem">
+                        <span className="selo-ao-vivo assistindo">assistindo</span>
+                        <span className="strong">{nomeDaLiveNoPalco}</span>
+                        <QuemAssiste espectadores={rm.espectadores.get(liveNoPalco.participant.identity) ?? []} mostrarVazio={liveNoPalco.local} />
+                      </span>
+                    </div>
+                  )}
+                  {cartoesNaFaixa.map((l) => (
                     <button key={l.identity} className="tile live-apagada"
                       title={`Assistir a transmissão de ${l.nome}`}
                       onClick={() => rm.assistir(l.identity)}>
@@ -373,20 +449,21 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                       <span className="live-quem">
                         <span className="selo-ao-vivo"><span className="ponto" /> ao vivo</span>
                         <span className="strong">{l.nome}</span>
-                        {/* Quantos estão vendo entra na MESMA linha do "assistir": o cartão
-                          tem 110 px de altura e uma quarta linha ali já saiu por cima do
-                          retrato uma vez. */}
-                      <span className="live-chamada">
-                        <Icon name="screen" size={13} /> assistir
-                        <QuemAssiste espectadores={rm.espectadores.get(l.identity) ?? []} />
-                      </span>
+                        {/* Quantos estão vendo entra na MESMA linha do botão: o cartão tem
+                            110 px de altura e uma quarta linha ali já saiu por cima do
+                            retrato uma vez. */}
+                        <span className="live-chamada">
+                          <span className="live-assistir"><Icon name="screen" size={13} /> Assistir</span>
+                          <QuemAssiste espectadores={rm.espectadores.get(l.identity) ?? []} />
+                        </span>
                       </span>
                     </button>
                   ))}
+                  {rest.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} onClick={() => escolher(t)} />)}
                   {audioOnly.map((p) => (
                     <div key={p.identity} className={`tile audio clicavel ${rm.falando.has(p.identity) ? 'speaking' : ''}`}
                       onClick={(e) => onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'perfil', daCall)}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes', daCall); }}>
+                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(p.identity, p.name || p.identity, { x: e.clientX, y: e.clientY }, 'acoes', daCall); }}>
                       <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="big" />
                       <div className="tile-label">{p.name || p.identity}</div>
                     </div>
@@ -397,7 +474,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           )}
           {!idle && !focusTile && rm.lives.length === 0 && rm.tiles.length > 0 && (
             <div className={`grid n${Math.min(rm.tiles.length + audioOnly.length, 9)}`}>
-              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(t.participant.identity)} onClick={() => escolher(t)} onMenu={menuDaTransmissao(t)} />)}
+              {rm.tiles.map((t) => <VideoTile key={t.key} tile={t} preencher={preencher} falando={rm.falando} onClick={() => escolher(t)} />)}
               {audioOnly.map((p) => (
                 <div key={p.identity} className={`tile audio ${rm.falando.has(p.identity) ? 'speaking' : ''}`}>
                   <Avatar nome={p.name || p.identity} foto={pessoas.get(p.identity)?.foto} enquadramento={pessoas.get(p.identity)?.enquadramento?.foto} tamanho="huge" />
@@ -411,42 +488,36 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       </div>
       )}
 
-      {/* Abriu o chat com uma live rodando: ela continua aqui, pequena. Sem isto, ir ao
-          chat obrigava a voltar na sala de voz para ver de novo quem está transmitindo. */}
-      {salaAberta?.tipo === 'texto' && liveNoPalco && (
+      {/* Abriu o chat com uma live rodando: ela continua aqui, pequena, com os controles
+          fixos embaixo — volume, voltar ao palco e sair. Eram um "voltar" e um X soltos no
+          alto, e o volume só existia no botão direito. */}
+      {salaAberta?.tipo === 'texto' && liveNoPalco && nomeDaLiveNoPalco && (
         <div className="mini-live">
-          <div className="mini-live-topo">
-            <span className="mini-live-nome">
-              <Icon name="screen" size={13} />
-              {liveNoPalco.participant.name || liveNoPalco.participant.identity}
-            </span>
+          <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} />
+          <div className="mini-live-controles">
+            <span className="ponto-ao-vivo" />
+            <span className="mini-live-nome">{nomeDaLiveNoPalco}</span>
+            {!liveNoPalco.local && (
+              <ControleDeVolume
+                volume={rm.volumeDaTelaDe(liveNoPalco.participant.identity)}
+                onVolume={(v) => rm.definirVolumeDaTela(liveNoPalco.participant.identity, v)}
+                largura={56}
+                porcentagem={false}
+              />
+            )}
             {onVoltarAVoz && (
-              <button className="link" onClick={onVoltarAVoz} title="Voltar para a sala de voz">
-                voltar
+              <button type="button" className="mini-live-icone" title="Voltar ao palco" onClick={onVoltarAVoz}>
+                <Icon name="expandir" size={17} />
               </button>
             )}
-            {/* O X do quadro flutuante é sair da live: fechá-lo e continuar recebendo a
-                transmissão escondida seria gastar banda e som com nada. */}
-            <button className="mini-live-sair" onClick={() => rm.assistir(null)}
+            <button type="button" className="sair-da-live pequeno" onClick={() => rm.assistir(null)}
               title={liveNoPalco.local ? 'Fechar a prévia' : 'Sair da live'}>
-              <Icon name="close" size={14} />
+              <Icon name="close" size={13} /> Sair
             </button>
           </div>
-          <VideoTile tile={liveNoPalco} preencher={preencher} falando={rm.falando} espectadores={rm.espectadores.get(liveNoPalco.participant.identity)} onMenu={menuDaTransmissao(liveNoPalco)} />
         </div>
       )}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
-      {menuDaTela && (
-        <MenuDaTela
-          nome={menuDaTela.nome}
-          em={menuDaTela.em}
-          volume={rm.volumeDaTelaDe(menuDaTela.identity)}
-          onVolume={(v) => rm.definirVolumeDaTela(menuDaTela.identity, v)}
-          preencher={preencher}
-          onPreencher={trocarPreencher}
-          onClose={() => setMenuDaTela(null)}
-        />
-      )}
     </main>
   );
 }

@@ -700,6 +700,15 @@ export function App() {
   const eu = sessao.eu;
   const servidor = sessao.servidor;
 
+  /** Abre o palco da call em que você está — do chat, da barra ou do cartão da live. */
+  const abrirPalcoDaVoz = () => {
+    if (!rm.salaDaVoz) return;
+    // A voz pode estar noutro servidor: voltar para ela é voltar para lá também,
+    // senão o id da sala não existe na lista daqui e o palco fica vazio.
+    if (rm.salaDaVoz.servidorId !== servidor.id) trocarDeServidor(rm.salaDaVoz.servidorId);
+    setSalaAbertaId(rm.salaDaVoz.id);
+  };
+
   return (
     <div className="app-raiz">
       {/* No Mac os botões da janela ficam POR CIMA do conteúdo, então o cabeçalho do
@@ -729,6 +738,7 @@ export function App() {
         onAbrir={abrirSala}
         lives={lives}
         onAssistirLive={assistirDaBarra}
+        onAbrirPalco={abrirPalcoDaVoz}
         salaAbertaId={salaAbertaId}
         onShare={compartilhar}
         onSettings={() => setDevices(true)}
@@ -748,13 +758,7 @@ export function App() {
         onPessoa={abrirMenu}
         salaAberta={salaAberta}
         servidorId={servidor.id}
-        onVoltarAVoz={() => {
-          if (!rm.salaDaVoz) return;
-          // A voz pode estar noutro servidor: voltar para ela é voltar para lá também,
-          // senão o id da sala não existe na lista daqui e o palco fica vazio.
-          if (rm.salaDaVoz.servidorId !== servidor.id) trocarDeServidor(rm.salaDaVoz.servidorId);
-          setSalaAbertaId(rm.salaDaVoz.id);
-        }}
+        onVoltarAVoz={abrirPalcoDaVoz}
         chat={chat}
         meuId={eu.id}
         podeApagar={podeApagar}

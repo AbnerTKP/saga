@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { identidadeDe } from '../pessoas';
-import { acaoDaLive } from '../cartaoDaLive';
+import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
 import type { LiveNoChat } from '../lives';
 import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
@@ -16,7 +16,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -36,6 +36,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   lives: LiveNoChat[];
   /** "Entrar e assistir" pelo cartão da live: entra na call dela e escolhe a transmissão. */
   onAssistirLive: (sala: RoomInfo, identity: string) => void;
+  /** Abre o palco da call em que você está — é lá que mora a live que você assiste. */
+  onAbrirPalco: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -71,12 +73,41 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
     const caixa = linha.getBoundingClientRect();
     const barra = linha.closest('.sidebar')?.getBoundingClientRect();
     const em = { x: (barra?.right ?? caixa.right) + 6, meio: caixa.top + caixa.height / 2 };
-    // Fechado, espera um instante: o mouse passando pela lista a caminho de outra coisa
-    // não acende cartão nenhum. Já aberto, troca na hora.
-    marcarCartao(() => setCartao({ identity, salaId, em }), cartao ? 0 : 250);
+    // Abre quase na hora: esperar 250 ms parecia demora, e foi uma das queixas que
+    // refizeram o assistir live. Os 60 ms só evitam acender cartão com o mouse de passagem.
+    marcarCartao(() => setCartao({ identity, salaId, em }), cartao ? 0 : 60);
   };
   const largarLive = () => marcarCartao(() => setCartao(null), 200);
   const fecharCartao = () => { window.clearTimeout(relogioDoCartao.current); setCartao(null); };
+
+  /** O que fazer com uma live — do selo na linha ou do botão do cartão, que fazem o mesmo. */
+  const agirNaLive = (acao: AcaoDaLive, sala: RoomInfo, identity: string) => {
+    fecharCartao();
+    if (acao === 'assistir') rm.assistir(identity);
+    else if (acao === 'entrarEAssistir') onAssistirLive(sala, identity);
+    else if (acao === 'assistindo') onAbrirPalco();
+  };
+
+  /** O selo na linha de quem transmite: ele mesmo é o botão — ver seloDaLive. */
+  const seloNaLinha = (sala: RoomInfo, identity: string) => {
+    const acao = acaoDaLive({
+      identity, minhaIdentity: identidadeDe(eu.id), salaId: sala.id,
+      salaDaVozId: rm.salaDaVoz?.id ?? null, assistindo: rm.assistindo,
+    });
+    const selo = seloDaLive(acao);
+    if (!selo.titulo) return <span className="selo-na-linha" title="Você está transmitindo">{selo.texto}</span>;
+    return (
+      <button
+        type="button"
+        className={`selo-na-linha ${selo.assistindo ? 'assistindo' : ''}`}
+        title={selo.titulo}
+        // Sem parar aqui, o clique sobe até a linha e abre o perfil junto.
+        onClick={(e) => { e.stopPropagation(); agirNaLive(acao, sala, identity); }}
+      >
+        {selo.texto}
+      </button>
+    );
+  };
 
   const ordemDosGrupos: (number | null)[] = [null, ...categorias.map((c) => c.id)];
   const grupos = ordemDosGrupos.map((g) => ({
@@ -258,7 +289,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                               do Berserk, então o ícone repetia o que a cor diz e roubava a
                               vaga de câmera, microfone e live — que dizem coisas do momento.
                               Nos outros lugares ele continua. */}
-                          {p.screen && <span className="transmitindo" title="Transmitindo agora"><Icon name="screen" /></span>}
+                          {p.screen && seloNaLinha(r, p.identity)}
                           {p.camera && <Icon name="camera" />}
                           {/* Fone desligado no lugar do microfone mudo, e não os dois: a
                               linha é estreita, e desligar o fone JÁ muta o microfone —
@@ -376,14 +407,13 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
           enquadramento={quemTransmite.enquadramento?.foto}
           plateia={plateiaDoCartao}
           acao={acaoDoCartao}
-          onEntrar={() => window.clearTimeout(relogioDoCartao.current)}
-          onSair={largarLive}
-          onAcao={() => {
-            fecharCartao();
-            if (acaoDoCartao === 'assistir') rm.assistir(quemTransmite.identity);
-            else if (acaoDoCartao === 'assistindo') rm.assistir(null);
-            else if (acaoDoCartao === 'entrarEAssistir') onAssistirLive(salaDoCartao, quemTransmite.identity);
-          }}
+          volume={rm.volumeDaTelaDe(quemTransmite.identity)}
+          onVolume={(v) => rm.definirVolumeDaTela(quemTransmite.identity, v)}
+          onManter={() => window.clearTimeout(relogioDoCartao.current)}
+          onSoltar={largarLive}
+          onAssistir={() => agirNaLive(acaoDoCartao, salaDoCartao, quemTransmite.identity)}
+          onAbrirPalco={() => { fecharCartao(); onAbrirPalco(); }}
+          onSairDaLive={() => { fecharCartao(); rm.assistir(null); }}
         />
       )}
     </aside>

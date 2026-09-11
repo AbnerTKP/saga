@@ -20,6 +20,10 @@ const paths: Record<string, string> = {
   close: 'M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7l1.4-1.4 6.3 6.3 6.3-6.3z',
   send: 'M2 21l21-9L2 3v7l15 2-15 2z',
   expandir: 'M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z',
+  // Alto-falante cortado: o som da live desligado por quem assiste.
+  speakerOff: 'M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z',
+  // Moldura com cantos: preencher o quadro com a imagem, cortando as bordas.
+  aspecto: 'M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z',
   // Mais, dentro de um círculo: "juntar alguma coisa aqui". É o gesto que o pessoal já
   // reconhece na esquerda de um campo de conversa — anexar, sem precisar da palavra.
   mais: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 9h4v2h-4v4h-2v-4H7v-2h4V7h2z',

@@ -1,6 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VOLUME, volumeGuardado } from './volume.ts';
+import { VOLUME, alternarMudo, volumeGuardado } from './volume.ts';
+
+test('cortar o som guarda o volume, e devolver volta a ele', () => {
+  const cortado = alternarMudo(0.4, 1);
+  assert.deepEqual(cortado, { volume: 0, guardado: 0.4 });
+  assert.deepEqual(alternarMudo(cortado.volume, cortado.guardado), { volume: 0.4, guardado: 0.4 },
+    'voltou a 100% em vez de ao que a pessoa tinha escolhido');
+});
+
+test('devolver o som sem nada guardado volta a 100%, e não fica mudo', () => {
+  assert.deepEqual(alternarMudo(0, 0), { volume: 1, guardado: 1 });
+  assert.deepEqual(alternarMudo(0, NaN), { volume: 1, guardado: 1 });
+});
 
 test('o valor que derrubou o app é contido', () => {
   // 1.5 vinha do reforço de 150%: o elemento de áudio recusa e lança, e a exceção

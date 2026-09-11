@@ -244,23 +244,26 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .live-quem { display: grid; justify-items: start; gap: 4px; min-width: 0; }
 .live-quem .strong { font-size: 14px; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.live-chamada { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
-  font-weight: 600; color: var(--accent-claro); }
+/* O convite de cada cartão é um botão escrito, e não um texto azul solto: "entrar numa live
+   não era evidente" foi a queixa. A contagem de quem assiste vem ao lado. */
+.live-chamada { display: inline-flex; align-items: center; gap: 8px; }
+.live-apagada .live-assistir { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; }
+.tile.live-apagada:hover .live-assistir { background: var(--accent-tenue); }
+/* A live que está no palco também fica na faixa, marcada: é assim que se sabe qual das que
+   estão no ar é a que se vê, e para qual se troca. */
+.tile.live-apagada.assistindo { cursor: default; border-color: var(--accent); background: rgba(63,127,224,.10); }
 
-/* Quem está assistindo à transmissão. Dentro do quadro ela fica no ALTO: embaixo já moram
-   o nome, à esquerda, e o botão de tela cheia, à direita.
-   
+/* Quem está assistindo à transmissão — nos controles da live, nos cartões e no palco sem
+   live escolhida.
+
    Ela RECEBE o mouse, e isso é o ponto: é parando em cima dela que vem a lista inteira de
    quem está vendo. Chegou a ter `pointer-events: none` para não roubar o clique do quadro,
-   e não roubava mesmo — mas junto ia embora o passar o mouse, e com ele a única forma de
-   ver os nomes que não couberam. O clique continua chegando ao quadro sozinho: a etiqueta
-   é filha dele, então o clique sobe. */
+   e junto ia embora o passar o mouse, e com ele a única forma de ver os nomes que não
+   couberam. */
 .quem-assiste { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
   font-weight: 600; color: inherit; min-width: 0; }
 .quem-assiste span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quem-assiste .assiste-resto { flex: none; opacity: .85; }
-.quem-assiste.no-quadro { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px);
-  background: rgba(0,0,0,.66); color: #fff; padding: 3px 7px; border-radius: 6px; }
 
 /* O selo do que está no ar. Vermelho é a convenção, e o ponto pisca devagar: é para
    avisar, não para puxar o olho o tempo todo. */
@@ -271,12 +274,34 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
   animation: pulso-ao-vivo 2s ease-in-out infinite; }
 @keyframes pulso-ao-vivo { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .selo-ao-vivo .ponto { animation: none; } }
+/* Quem já está assistindo vê o selo em azul: a live é dele agora, não um aviso. */
+.selo-ao-vivo.assistindo { background: rgba(63,127,224,.16); color: var(--accent-claro); }
 
-/* Quem está transmitindo, na barra lateral: o ícone deixa de ser só mais um cinza. */
-.pico .transmitindo { color: #ff8a90; }
+/* Na barra, quem transmite ganha um selo que já é o botão: um clique e você está
+   assistindo. Era um ícone vermelho que só dizia "tem live" — e o caminho era esperar o
+   cartão abrir. */
+.selo-na-linha { flex: none; margin-right: 3px; padding: 2px 6px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; line-height: 1.4;
+  background: rgba(224,72,82,.16); color: #ff8a90; }
+button.selo-na-linha:hover { background: rgba(224,72,82,.32); color: #fff; }
+.selo-na-linha.assistindo { background: rgba(63,127,224,.16); color: var(--accent-claro); }
+button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color: #fff; }
 
 .grande-vazio { flex: 1; cursor: default; border: 2px dashed var(--linha-tracejada, #3a3d44); background: transparent; }
 .grande-vazio .muted { display: grid; place-items: center; gap: 8px; text-align: center; }
+
+/* Lives no ar e nenhuma escolhida: quem transmite aparece grande, com o botão escrito, no
+   lugar do quadro tracejado que pedia para clicar na faixa de baixo. */
+.escolher-live { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px; }
+.escolher-live-titulo { font-size: 15px; font-weight: 600; color: var(--white); }
+.escolher-live-cartoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; }
+.escolher-live-cartao { width: 300px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 24px 20px 20px; background: var(--bg1); border: 1px solid var(--line); border-radius: 12px; text-align: center; }
+.escolher-live-cartao .strong { font-size: 16px; }
+.escolher-live-cartao .quem-assiste { font-size: 12px; color: var(--text2); }
+.escolher-live-cartao .primary { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  padding: 8px 16px; font-size: 13.5px; }
 .live-ver { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 999px; color: var(--text); }
 .live-ver:hover { color: var(--white); }
 .live-nome { font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -297,23 +322,52 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .tile:fullscreen video { object-fit: contain; }
 .tile.preencher:fullscreen video { object-fit: cover; }
 
-.tile-expandir { position: absolute; right: 8px; bottom: 8px; width: 30px; height: 30px;
-  display: grid; place-items: center; border-radius: 6px; color: #fff;
-  background: rgba(0,0,0,.55); opacity: 0; transition: opacity .12s; }
-.tile:hover .tile-expandir { opacity: 1; }
-.tile-expandir:hover { background: rgba(0,0,0,.8); }
-@media (prefers-reduced-motion: reduce) { .tile-expandir { transition: none; } }
+/* Os controles da live escolhida moram POR CIMA da imagem e aparecem quando o mouse mexe,
+   como num player de vídeo — a escolha do dono entre isto e uma barra fixa embaixo. No
+   alto, quem é, o selo, quem assiste e o "Sair da live"; embaixo, volume, preencher e tela
+   cheia. Com o foco do teclado dentro deles, aparecem também. */
+.controles-da-live { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 10px;
+  padding: 12px; color: #fff; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.tile.controles-visiveis .controles-da-live, .controles-da-live:focus-within { opacity: 1; pointer-events: auto; }
+.controles-da-live.cima { top: 0; align-items: flex-start; padding-bottom: 28px;
+  background: linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,0)); }
+.controles-da-live.baixo { bottom: 0; padding-top: 28px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.78)); }
+.controles-da-live .spacer { flex: 1; }
+.controles-nome { font-size: 14px; font-weight: 600; line-height: 26px; max-width: 240px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.controles-da-live .selo-ao-vivo { margin-top: 3px; background: rgba(0,0,0,.45); }
+.controles-da-live .quem-assiste { margin-top: 5px; font-size: 12px; }
+.controles-sair { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+  background: rgba(0,0,0,.6); color: #fff; font-size: 13px; font-weight: 650; }
+.controles-sair:hover { background: var(--danger); }
+.controles-icone { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #fff; }
+.controles-icone:hover { background: rgba(255,255,255,.14); }
+.controles-icone.ligado { background: rgba(255,255,255,.22); }
+.tile.com-controles { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .controles-da-live { transition: none; } }
 
-/* Sair da live, no canto de cima à direita do quadro escolhido. Aparece com o mouse, como a
-   tela cheia: fixo, ficaria por cima do filme o tempo todo — inclusive em tela cheia. */
-.tile-sair { position: absolute; right: 8px; top: 8px; display: flex; align-items: center; gap: 5px;
-  padding: 5px 10px 5px 8px; border-radius: 6px; color: #fff; background: rgba(0,0,0,.6);
-  font-size: 12px; font-weight: 650; opacity: 0; transition: opacity .12s, background .12s; }
-.tile:hover .tile-sair, .tile-sair:focus-visible { opacity: 1; }
-.tile-sair:hover { background: var(--danger); }
-/* Quem está assistindo mora no canto de cima à esquerda e não pode correr até o botão. */
-.tile.big .quem-assiste.no-quadro { max-width: calc(100% - 150px); }
-@media (prefers-reduced-motion: reduce) { .tile-sair { transition: none; } }
+/* O volume da live, à vista: o alto-falante corta e devolve, a barra ajusta. Morava no
+   botão direito do vídeo. A parte cheia da barra é pintada pela variável --cheio. */
+.volume-da-live { display: inline-flex; align-items: center; gap: 8px; }
+.volume-mudo { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--text); }
+.volume-mudo:hover { background: var(--bg3); color: var(--white); }
+.volume-da-live input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; padding: 0; border: 0;
+  border-radius: 2px; cursor: pointer; background: linear-gradient(to right, var(--accent) var(--cheio), var(--bg4) var(--cheio)); }
+.volume-da-live input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--white); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.volume-da-live input[type="range"]:focus { outline: none; }
+.volume-da-live input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(63,127,224,.5); }
+.volume-pct { min-width: 34px; font-size: 12px; font-weight: 600; color: var(--text2); font-variant-numeric: tabular-nums; }
+.volume-da-live.claro .volume-mudo { color: #fff; }
+.volume-da-live.claro .volume-mudo:hover { background: rgba(255,255,255,.14); }
+.volume-da-live.claro input[type="range"] { background: linear-gradient(to right, #fff var(--cheio), rgba(255,255,255,.28) var(--cheio)); }
+.volume-da-live.claro .volume-pct { color: #fff; }
+
+/* Sair da live ESCRITO, em todo lugar onde se assiste fora do palco. */
+.sair-da-live { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 12px;
+  border-radius: 8px; border: 1px solid rgba(224,72,82,.5); color: #ff8a90; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.sair-da-live:hover { background: rgba(224,72,82,.14); }
+.sair-da-live.pequeno { padding: 4px 10px; font-size: 12.5px; }
 
 .menu-check { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; font-size: 13px; }
 .menu-check input { margin-top: 2px; flex: none; }
@@ -1043,41 +1097,48 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .perfil-dados dd { margin: 0; font-size: 14px; color: var(--text); }
 
 /* Live em miniatura, para quem foi ao chat sem querer perder a transmissão. Fica no canto,
-   por cima, e sai do caminho: dois cliques nela abrem em tela cheia como qualquer outra. */
+   por cima, e sai do caminho: dois cliques nela abrem em tela cheia como qualquer outra.
+   Os controles ficam FIXOS embaixo da imagem — volume, voltar ao palco e sair —: num
+   quadro deste tamanho, controle que some com o mouse é controle que ninguém acha. */
 .mini-live { -webkit-app-region: no-drag; position: absolute; right: 16px; bottom: 84px;
-  width: 300px; z-index: 15; background: var(--bg1); border: 1px solid var(--line);
+  width: 320px; z-index: 15; background: var(--bg1); border: 1px solid var(--line);
   border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.55); }
-.mini-live-topo { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px;
-  font-size: 12px; color: var(--text2); }
-.mini-live-nome { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--white); }
-.mini-live .tile { border-radius: 0; aspect-ratio: 16 / 9; }
+.mini-live .tile { border-radius: 0; aspect-ratio: 16 / 9; width: 100%; }
 .mini-live .tile-label { display: none; }
-.mini-live-sair { display: grid; place-items: center; width: 24px; height: 24px; flex: none;
-  border-radius: 5px; color: var(--text2); }
-.mini-live-sair:hover { background: rgba(242,63,67,.15); color: #fa777c; }
+.mini-live-controles { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 8px 0 10px; }
+.mini-live-controles .ponto-ao-vivo { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--danger); }
+.mini-live-nome { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--white);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-live-controles .volume-mudo { width: 26px; height: 26px; }
+.mini-live-icone { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 6px; color: var(--text); }
+.mini-live-icone:hover { background: var(--bg3); color: var(--white); }
+/* Com o quadro flutuante aberto, os avisos do canto sobem para cima dele: nasciam por cima
+   dos controles do quadro e cobriam justamente o "Sair" — visto na foto, não no código. O
+   quadro tem ~226 px de altura a partir dos 84 px do fundo. */
+body:has(.mini-live) .avisos { bottom: 322px; }
 
-/* O cartão da live na barra lateral: o mesmo da faixa do palco, flutuando à direita da
-   barra, na altura de quem transmite. Fica no degrau dos menus (35) e fora da região de
-   arraste — sem isso, o clique iria para a janela e não para o botão. */
+/* O cartão da live na barra lateral, flutuando à direita da barra, na altura de quem
+   transmite. Fica no degrau dos menus (35) e fora da região de arraste — sem isso, o clique
+   iria para a janela e não para o botão. */
 /* 264 px e não 250: com 250, "ninguém assistindo ainda" quebrava em duas linhas ao lado
    do retrato — visto na imagem, não no typecheck. */
 .cartao-live { -webkit-app-region: no-drag; position: fixed; z-index: 35; width: 264px;
   background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; }
-.cartao-live-corpo { display: grid; width: 100%; text-align: left; color: var(--text); }
 .cartao-live-cima { display: flex; align-items: center; gap: 11px; padding: 12px 12px 10px; min-width: 0; }
 .cartao-live .avatar.huge { width: 46px; height: 46px; font-size: 19px; flex: none; }
 .cartao-live-plateia { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
   color: var(--text2); white-space: nowrap; }
 .cartao-live-acao { display: flex; align-items: center; justify-content: center; gap: 6px;
-  margin: 0 12px 12px; padding: 7px 10px; border-radius: 6px; font-size: 13px; font-weight: 650;
-  background: var(--accent); color: #fff; transition: background .12s; }
-button.cartao-live-corpo:hover .cartao-live-acao { background: var(--accent-h); }
-/* Já assistindo, o botão é sair — não é a ação principal, então não leva a cor da casa. */
-.cartao-live-acao.assistindo { background: var(--bg3); color: var(--text); }
-button.cartao-live-corpo:hover .cartao-live-acao.assistindo { background: rgba(242,63,67,.18); color: #fa777c; }
-.cartao-live-acao.sua { background: none; color: var(--text3); font-weight: 500; }
+  width: calc(100% - 24px); margin: 0 12px 12px; padding: 7px 10px; border-radius: 6px; font-size: 13px;
+  font-weight: 650; background: var(--accent); color: #fff; transition: background .12s; }
+.cartao-live-acao:hover { background: var(--accent-h); }
+/* Na live que você já assiste, o cartão traz o volume e o sair: ajustar sem voltar ao palco. */
+.cartao-live-volume { padding: 0 12px 10px; }
+.cartao-live-botoes { display: flex; gap: 8px; padding: 0 12px 12px; }
+.cartao-live-botoes > * { flex: 1; }
+.cartao-live-botoes .secundario { padding: 7px 10px; font-size: 13px; }
+.cartao-live-nota { padding: 0 12px 12px; font-size: 13px; color: var(--text3); }
 
 /* O som que está no ar: o botão vira "parar", então precisa parecer outra coisa. */
 .som.tocando .tocar { background: var(--accent); color: #fff; }

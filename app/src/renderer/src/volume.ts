@@ -22,3 +22,15 @@ export const volumeGuardado = (bruto: string | null): number => {
   const n = Number(bruto);
   return Number.isFinite(n) ? VOLUME(n) : 1;
 };
+
+/**
+ * O alto-falante da live: cortar guarda o volume de antes, e devolver volta a ELE — não a
+ * 100%, que seria um susto para quem tinha abaixado. Sem nada que valha guardado, volta a
+ * 100%: devolver o som e continuar mudo pareceria botão quebrado.
+ */
+export function alternarMudo(volume: number, guardado: number): { volume: number; guardado: number } {
+  const agora = VOLUME(volume);
+  if (agora > 0) return { volume: 0, guardado: agora };
+  const antes = VOLUME(guardado);
+  return antes > 0 ? { volume: antes, guardado: antes } : { volume: 1, guardado: 1 };
+}

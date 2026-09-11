@@ -34,6 +34,19 @@ export const ROTULO_DA_ACAO: Record<AcaoDaLive, string> = {
   entrarEAssistir: 'Entrar e assistir',
 };
 
+/**
+ * O selo na linha de quem transmite, na barra lateral — ele mesmo é o botão.
+ *
+ * Era um ícone vermelho que só dizia "tem live", e o caminho para assistir era esperar o
+ * cartão abrir. Agora um clique no selo faz o que o cartão faria. `titulo` nulo quer dizer
+ * que não é botão: a própria transmissão não se assiste por aqui.
+ */
+export function seloDaLive(acao: AcaoDaLive): { texto: string; assistindo: boolean; titulo: string | null } {
+  if (acao === 'sua') return { texto: 'ao vivo', assistindo: false, titulo: null };
+  if (acao === 'assistindo') return { texto: 'assistindo', assistindo: true, titulo: 'Abrir no palco' };
+  return { texto: 'ao vivo', assistindo: false, titulo: acao === 'assistir' ? 'Assistir' : 'Entrar na call e assistir' };
+}
+
 /** Quantos estão vendo. O zero é informação — "ninguém ainda" —, não ausência dela. */
 export function plateiaEmTexto(quantos: number): string {
   return quantos > 0 ? `${quantos} assistindo` : 'ninguém assistindo ainda';

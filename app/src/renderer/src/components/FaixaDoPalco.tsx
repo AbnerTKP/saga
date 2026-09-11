@@ -17,13 +17,15 @@ const ROSTOS = 4;
  * Só aparece quando a voz está NOUTRA sala: olhando a própria sala de voz, o palco já
  * está na tela e a faixa seria uma segunda cópia do que se está vendo.
  */
-export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, servidorAberto, onAbrir }: {
+export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, assistindoNome, servidorAberto, onAbrir }: {
   sala: SalaDaVoz;
   /** Quem está na call agora, pelo LiveKit — inclusive você. */
   participantes: { identity: string; nome: string }[];
   pessoas: Map<string, PessoaNaCall>;
   /** Quantas telas estão no ar nessa sala. */
   transmitindo: number;
+  /** A live que você está assistindo, se houver: a faixa diz qual está rodando. */
+  assistindoNome?: string | null;
   /** O servidor que está sendo lido: se for outro, o nome do servidor da voz entra junto. */
   servidorAberto: number;
   onAbrir?: () => void;
@@ -47,7 +49,12 @@ export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, servi
         {sobra > 0 && <span className="faixa-mais">+{sobra}</span>}
       </span>
 
-      {transmitindo > 0 && (
+      {assistindoNome ? (
+        <span className="faixa-live">
+          <Icon name="screen" size={14} />
+          assistindo {assistindoNome}
+        </span>
+      ) : transmitindo > 0 && (
         <span className="faixa-live">
           <Icon name="screen" size={14} />
           {transmitindo === 1 ? '1 compartilhando' : `${transmitindo} compartilhando`}

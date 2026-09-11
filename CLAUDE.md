@@ -746,25 +746,35 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   faixa de fichas no alto da tela, e escolher longe do que se escolhe foi rejeitado na
   hora. O palco tem dois campos: em cima a escolhida, embaixo quem está no ar. Sem
   escolha, o campo de cima não some — ele diz o que fazer.
-- **Apontar para quem transmite, na barra, abre o cartão da live.** O "assistir" só
-  existia DENTRO do palco: quem via o ícone de tela ao lado de um nome tinha de abrir a
-  sala, achar o cartão e só então clicar. Agora o mesmo cartão — retrato, "ao vivo", nome e
-  quantos estão vendo — flutua à direita da barra, e ele INTEIRO é o botão, com o texto
-  dizendo o que vai acontecer, que depende de onde você está (`cartaoDaLive.ts`, puro e
-  testado): na sua call, "Assistir"; a que você já assiste, "Sair da live"; noutra sala,
-  "Entrar e assistir", que segue a regra do clique na sala (`navegacao.ts`) em vez de
-  inventar uma segunda; a sua própria só diz que está no ar. **Não traz a imagem da
+- **Quem transmite ganha, na barra, um selo AO VIVO que já é o botão.** O "assistir" só
+  existia DENTRO do palco; depois veio um cartão ao passar o mouse, que esperava 250 ms e
+  foi a primeira queixa quando o dono mandou refazer o assistir live ("demora muito pra
+  aparecer"). Hoje um clique no selo faz o que o cartão faria, e o que ele faz depende de
+  onde você está (`seloDaLive` e `acaoDaLive`, em `cartaoDaLive.ts`, puros e testados): na
+  sua call, assistir; noutra sala, entrar e assistir, pela regra do clique na sala
+  (`navegacao.ts`); na live que você já vê, o selo vira ASSISTINDO e abre o palco; a sua
+  própria só diz que está no ar. O cartão continua, abrindo em 60 ms, com um relógio só
+  para abrir e fechar — sair do nome marca o fechar, chegar ao cartão o desmarca —, e na
+  live que você já assiste ele traz o volume e o Sair. **Não traz a imagem da
   transmissão**: só a escolhida chega, e uma prévia gastaria a banda que essa regra poupa.
-  Abre depois de 250 ms — o mouse passando a caminho de outra coisa não acende nada —, e um
-  relógio só abre e fecha: sair do nome marca o fechar, chegar ao cartão o desmarca. Medido
-  no app de verdade, numa janela escondida, com uma tela no ar num LiveKit local: o cartão
-  aparece à direita da barra, continua ao ir do nome até ele e some ao sair dos dois.
-- **Sair da live é um botão, e não só clicar na imagem.** Clicar no quadro escolhido já
-  largava a transmissão, e isso ninguém adivinha. O botão fica no canto de cima à direita
-  — embaixo moram o nome e a tela cheia; em cima à esquerda, quem assiste — e aparece com o
-  mouse, como a tela cheia: fixo, ficaria por cima do filme o tempo todo. No quadro
-  flutuante, o X é sair: fechá-lo e continuar recebendo escondido gastaria banda e som com
-  nada.
+  Medido no app de verdade, em janela escondida, com uma tela no ar num LiveKit local: o
+  cartão abre em ~0,1 s, e o clique no selo põe a live no palco, entrando na call, em 1,4 s.
+- **Os controles da live ficam por cima da imagem e aparecem com o mouse.** Foi a escolha
+  do dono entre isto e uma barra fixa embaixo da live, desenhadas lado a lado antes do
+  código. No alto, quem é, o selo, quem assiste e "Sair da live" escrito; embaixo, o volume
+  com a porcentagem e o mudo, preencher e tela cheia. Somem 2,5 s depois de o mouse parar,
+  nunca com o mouse em cima deles, e aparecem também com o foco do teclado. **Clicar na
+  imagem mostra os controles, e não sai mais da live**: saía, e um clique para dar foco à
+  janela bastava para perder a transmissão. Volume e preencher moravam no botão direito do
+  vídeo, onde ninguém os achava — o menu saiu. **Devolver o som volta ao volume de antes, e
+  não a 100%** (`alternarMudo`, em `volume.ts`, testado). Sem live escolhida, o palco mostra
+  quem está transmitindo em cartões grandes com "Assistir", no lugar do quadro tracejado;
+  com uma escolhida, ela fica marcada na faixa de baixo e as outras levam o botão escrito.
+  No quadro flutuante do chat os controles são FIXOS — num quadro daquele tamanho, controle
+  que some é controle que ninguém acha —, e a faixa do alto diz qual live está rodando. Os
+  avisos do canto sobem quando o quadro flutuante está aberto: nasciam por cima dos
+  controles dele e cobriam justamente o Sair, o que só apareceu na foto. Tudo isso foi
+  exercido na janela escondida, inclusive o mudo voltando aos 30% de antes.
 - **O cartão da live é deitado, não empilhado.** A faixa de baixo tem 110 px de altura, e
   selo + retrato + nome + chamada empilhados não cabem: o selo acabava por cima do
   retrato. Largura é o que sobra ali. Medido renderizando o `styles.css` de verdade — o
@@ -1299,11 +1309,11 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   inteiro — alguém abre a tela, a linha aparece na conversa em até 4 s, o "Entrar e
   assistir" entra na voz e põe a live no quadro flutuante sem tirar você do chat — precisa
   de LiveKit e de duas pessoas, e não foi exercido.
-- **Entrar e sair de uma live pelo cartão da barra, numa call de verdade.** O que está
-  medido é o cartão aparecer, dizer a ação certa e não sumir no caminho até o botão — com o
-  app FORA da call. Clicar em "Entrar e assistir" e a live chegar, e o "Sair da live" do
-  quadro e o X do flutuante cortarem imagem e som, não foi exercido: entrar na call pediria
-  o microfone desta máquina.
+- **O assistir live novo com uma tela e um som de verdade.** O que está medido, na janela
+  escondida contra um LiveKit local, é o fluxo inteiro com uma faixa de tela sem imagem e
+  sem som: selo, cartão, entrar na call, controles aparecendo e sumindo, volume e mudo,
+  preencher, quadro flutuante e sair. O volume mexendo num som de verdade, os controles em
+  tela cheia e a imagem de alguém transmitindo não foram exercidos.
 - **Abrir junto com o Windows, inteiro.** Nada disso foi exercido em Windows nenhum: a
   entrada aparecer no registro e na lista de programas que abrem sozinhos, o
   `--ao-iniciar` chegando de verdade ao app, a janela vindo encolhida na barra de tarefas

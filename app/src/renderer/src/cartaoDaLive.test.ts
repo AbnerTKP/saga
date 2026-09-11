@@ -1,6 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { acaoDaLive, plateiaEmTexto, ROTULO_DA_ACAO } from './cartaoDaLive.ts';
+import { acaoDaLive, plateiaEmTexto, ROTULO_DA_ACAO, seloDaLive } from './cartaoDaLive.ts';
+
+test('o selo na barra é o botão: assistir, entrar e assistir, ou abrir o palco da que já se vê', () => {
+  assert.deepEqual(seloDaLive('assistir'), { texto: 'ao vivo', assistindo: false, titulo: 'Assistir' });
+  assert.deepEqual(seloDaLive('entrarEAssistir'), { texto: 'ao vivo', assistindo: false, titulo: 'Entrar na call e assistir' });
+  assert.deepEqual(seloDaLive('assistindo'), { texto: 'assistindo', assistindo: true, titulo: 'Abrir no palco' });
+});
+
+test('a própria transmissão tem selo, mas não é botão', () => {
+  assert.equal(seloDaLive('sua').titulo, null);
+  assert.equal(seloDaLive('sua').texto, 'ao vivo');
+});
 
 const base = { identity: 'u7', minhaIdentity: 'u1', salaId: 10, salaDaVozId: 10, assistindo: null };
 
