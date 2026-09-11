@@ -79,6 +79,9 @@ export function App() {
   // porque mudam quando alguém os edita.
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [membrosDoServidor, setMembrosDoServidor] = useState<Membro[]>([]);
+  // Pede a lista de pessoas de novo AGORA, sem esperar a volta de 10 s — ver a busca dela.
+  const [buscarServidorDeNovo, setBuscarServidorDeNovo] = useState(0);
+  const recarregarServidor = useCallback(() => setBuscarServidorDeNovo((n) => n + 1), []);
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<{ pessoa: PessoaNaCall; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -361,7 +364,9 @@ export function App() {
 
   const moderarPeloMenu = useCallback(async (alvo: number, acao: Acao, extra?: { minutos?: number; cargo?: number }) => {
     try { await moderar(acao, alvo, extra); } catch (e) { notas.mostrarFalha(e); }
-  }, [notas]);
+    // O cargo que você acabou de dar aparece na lista da direita na hora, e não em 10 s.
+    finally { recarregarServidor(); }
+  }, [notas, recarregarServidor]);
 
   // O seletor do sistema, quando entra, escolhe a janela sozinho — abrir o nosso ali
   // significaria escolher duas vezes. Quem decide qual é qual é o processo principal.
@@ -371,10 +376,24 @@ export function App() {
     try { await rm.startScreen(null, true); } catch (e) { notas.mostrarFalha(e, 'Tela'); }
   }, [rm, seletorDoSistema, notas]);
 
-  // Quem faz parte do servidor muda devagar — cargo novo, alguém que entrou. De dez em
-  // dez segundos basta, e não concorre com a busca de salas, que é de quatro.
+  /**
+   * Quem faz parte do servidor muda devagar — cargo novo, alguém que entrou. De dez em dez
+   * segundos basta, e não concorre com a busca de salas, que é de quatro.
+   *
+   * Esse "de dez em dez" não existiu da v0.16.0 até aqui. O efeito dependia da sessão
+   * INTEIRA e, lá dentro, gravava na sessão a lista de servidores: cada resposta fazia o
+   * efeito nascer de novo e pedir outra vez, na hora — um pedido atrás do outro enquanto o
+   * app estivesse aberto. Medido no app de verdade, parado, contra um servidor local:
+   * 4.204 pedidos de /servidor em 10 s, contra 2 de /rooms. Contra a produção o ritmo é o
+   * que a rede deixa, vezes cada app aberto, numa VPS de um núcleo. Por isso a dependência
+   * é o NÚMERO do servidor, que não muda quando a resposta chega.
+   *
+   * O laço escondia uma coisa boa, por acidente: o que você mudava aparecia na lista na
+   * hora. Isso continua, de propósito — quem muda algo daqui chama `recarregarServidor`.
+   */
   useEffect(() => {
-    if (!sessao?.servidor) return;
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
     let vivo = true;
     const buscar = () => verServidor()
       .then((r) => {
@@ -388,7 +407,7 @@ export function App() {
     const id = setInterval(buscar, 10_000);
     const pararDeDespertar = aoDespertar(buscar);
     return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
-  }, [sessao]);
+  }, [sessao?.servidor?.id, buscarServidorDeNovo]);
 
   /**
    * Reordenar é só dado: a sala do LiveKit é o id, e arrastar não toca em id nenhum —
@@ -464,8 +483,16 @@ export function App() {
     }
   }, [salaAberta?.id, salaAberta?.tipo, ultimaNaTela]);
 
-  const atualizarEu = useCallback((eu: Membro) => setSessao((s) => (s ? { ...s, eu } : s)), []);
-  const atualizarServidor = useCallback((servidor: Servidor) => setSessao((s) => (s ? { ...s, servidor } : s)), []);
+  // Mudou a sua foto, o seu nome ou o do servidor: a lista da direita e a trilha mostram na
+  // hora, sem esperar a busca de 10 s.
+  const atualizarEu = useCallback((eu: Membro) => {
+    setSessao((s) => (s ? { ...s, eu } : s));
+    recarregarServidor();
+  }, [recarregarServidor]);
+  const atualizarServidor = useCallback((servidor: Servidor) => {
+    setSessao((s) => (s ? { ...s, servidor } : s));
+    recarregarServidor();
+  }, [recarregarServidor]);
 
   // Atualizar vem antes de tudo: não faz sentido entrar numa conta para reiniciar em seguida.
   if (!partidaResolvida) return <TelaDeAtualizacao estado={atualizacao} onPular={() => setPartidaResolvida(true)} />;
@@ -639,7 +666,8 @@ export function App() {
           donoDaSaga={!!eu.donoDaSaga}
           onServidor={atualizarServidor}
           onSaiu={() => { setPainel(false); recarregarSessao(); }}
-          onClose={() => setPainel(false)}
+          // Cargos e pessoas mexidos lá dentro aparecem na lista da direita ao fechar.
+          onClose={() => { setPainel(false); recarregarServidor(); }}
         />
       )}
       {soundboard && (

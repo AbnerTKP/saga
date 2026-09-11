@@ -425,6 +425,17 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   se caiu vem dentro dele, então nem se procura na lista) e uma trava impede empilhar
   tentativas — entrar tem tempo limite de dezenas de segundos, e bater de novo antes disso
   garante que nenhuma termine.
+- **Efeito que grava no que ele mesmo lê refaz a si mesmo — e não dá erro nenhum.** A busca
+  de `/servidor` dependia da sessão INTEIRA e, lá dentro, gravava na sessão a lista de
+  servidores: cada resposta refazia o efeito, que pedia de novo na hora. O "de 10 em 10 s"
+  do comentário nunca aconteceu, da v0.16.0 à v0.42.0. Medido no app de verdade, parado,
+  contra um servidor local: **4.204 pedidos de `/servidor` em 10 s**, contra 2 de `/rooms`.
+  Na produção, na mesma manhã, com três apps abertos, o servidor de token estava em 43% do
+  único núcleo e o LiveKit em 1,6% — quanto disso era o laço só se sabe depois que todos
+  atualizarem. Não aparece em registro nenhum: o app funciona, só que pedindo sem parar e
+  redesenhando a tela a cada resposta. Hoje a dependência é o NÚMERO do servidor, e quem
+  muda algo daqui — cargo pelo menu, foto e nome, painel do servidor — chama
+  `recarregarServidor`, que era a parte boa que o laço fazia por acidente.
 - **Queda curta o LiveKit resolve sozinho; a longa é que precisava de conserto.** Medido:
   matando o servidor de voz, o app passa a "Reconectando…" e o próprio cliente refaz a
   conexão se ela voltar em ~40 s. Passado isso ele DESISTE, e era aí que a call morria de
