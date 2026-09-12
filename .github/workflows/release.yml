@@ -60,8 +60,35 @@ jobs:
           FAIXA=${ANTERIOR:+$ANTERIOR..}$TAG
           # Em ordem de acontecimento (--reverse): assim quem escreve o commit da versão
           # sabe onde o que ele acrescentar vai cair — no fim da lista.
-          MUDANCAS=$(git log --no-merges --reverse --format='%B' "$FAIXA" \
-            | sed -nE 's/^[[:space:]]*Nota:[[:space:]]*(.+)$/- \1/p')
+          #
+          # A nota é UMA frase, mas ela é escrita num commit — e commit se escreve com a
+          # linha quebrada em 80 colunas, como todo o resto. Lendo só a primeira linha, a
+          # frase chegava cortada no meio ao amigo que lê o Release: aconteceu duas vezes,
+          # nas v0.46.0 e v0.47.0, com cinco notas terminando em "abre", "e o pedido" e
+          # "criar". Escrever tudo numa linha só é "ter cuidado", e isso não sobrevive a um
+          # dia corrido; juntar as continuações, sim. A nota termina onde vem uma linha em
+          # branco, outra `Nota:` ou o fim do commit — que é como elas já são escritas.
+          MUDANCAS=$(git log --no-merges --reverse --format='%B%x00' "$FAIXA" \
+            | awk 'BEGIN { RS = "\0" }
+                   {
+                     n = split($0, linhas, "\n")
+                     nota = ""
+                     for (i = 1; i <= n; i++) {
+                       linha = linhas[i]
+                       sub(/^[ \t]+/, "", linha)
+                       if (linha ~ /^Nota:/) {
+                         if (nota != "") print "- " nota
+                         sub(/^Nota:[ \t]*/, "", linha)
+                         nota = linha
+                       } else if (nota != "" && linha != "") {
+                         nota = nota " " linha
+                       } else if (nota != "") {
+                         print "- " nota
+                         nota = ""
+                       }
+                     }
+                     if (nota != "") print "- " nota
+                   }')
 
           # Versão sem nota nenhuma não sobe. Cair nos assuntos quando falta nota
           # devolveria em silêncio exatamente o que isto conserta; e "ter cuidado" não
