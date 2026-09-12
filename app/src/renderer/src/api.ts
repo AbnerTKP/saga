@@ -231,6 +231,23 @@ export const entrar = (c: { apelido: string; senha: string }) =>
 export const sair = () => pedir<{ ok: true }>('POST', '/sair');
 
 /**
+ * Escolhe uma senha nova com o código que o dono da Saga gerou, e já entra: a resposta é a
+ * mesma de `entrar`. As contas não têm e-mail, então quem atesta que é a pessoa é o dono,
+ * que manda o código por fora. Toda recusa DO CÓDIGO traz a mesma mensagem — apelido que
+ * não existe, código errado, vencido ou gasto —, para ela não contar qual conta tem código.
+ */
+export const recuperarSenha = (c: { apelido: string; codigo: string; senha: string; senhaRepetida: string }) =>
+  pedir<Sessao>('POST', '/recuperar', c);
+
+/**
+ * Troca a senha de quem está logado, pedindo a atual. As OUTRAS sessões da conta caem e esta
+ * fica; `encerradas` diz quantas saíram. Senha atual errada é 403, e não 401: 401 no app quer
+ * dizer que a sessão caiu.
+ */
+export const trocarMinhaSenha = (c: { senhaAtual: string; senha: string; senhaRepetida: string }) =>
+  pedir<{ ok: true; encerradas: number }>('POST', '/eu/senha', c);
+
+/**
  * Quem sou eu e onde estou.
  *
  * `servidor` vem nulo quando a conta não está em servidor nenhum — que é onde toda conta
@@ -657,6 +674,11 @@ export const usarGif = (onde: OndeAImagemVai, url: string) =>
 export type ContaDaSaga = {
   id: number; apelido: string; foto: string | null;
   berserk: boolean; dono: boolean; criadoEm: number; servidores: number;
+  /**
+   * Até quando vale o código de senha emitido para a conta; null sem código usável. O código
+   * em si nunca volta por aqui: o servidor guarda só o hash. Servidor antigo não manda.
+   */
+  recuperacaoAte?: number | null;
 };
 
 export const contasDaSaga = async () =>
@@ -664,6 +686,16 @@ export const contasDaSaga = async () =>
 
 export const definirBerserk = async (alvo: number, berserk: boolean) =>
   (await pedir<{ conta: ContaDaSaga }>('POST', '/saga/berserk', { alvo, berserk })).conta;
+
+/**
+ * Gera o código de senha de uma conta, e o anterior deixa de valer. Esta resposta é a única
+ * vez que o código aparece: quem fechar a tela sem mandá-lo gera outro.
+ *
+ * Leva a senha do dono: sessão aberta não prova quem está no teclado, e o código vale a conta
+ * de outra pessoa. Errada é 403, e não 401, que aqui quer dizer "a sessão caiu".
+ */
+export const emitirRecuperacao = (alvo: number, senha: string) =>
+  pedir<{ codigo: string; expiraEm: number; conta: ContaDaSaga }>('POST', '/saga/recuperacao', { alvo, senha });
 
 /** Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. */
 export const baterPresenca = async (status?: string) =>

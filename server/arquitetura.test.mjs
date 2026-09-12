@@ -57,6 +57,28 @@ test('repositório não conhece regra de negócio', () => {
   assert.deepEqual(errados, [], 'repositório importando regra: a regra é de quem chama, não da tabela');
 });
 
+/**
+ * As formas de ESCREVER numa tabela, e o nome dela logo depois.
+ *
+ * Era `INSERT INTO|UPDATE|DELETE FROM`, e `INSERT OR REPLACE INTO` — que a recuperação de
+ * senha usa — passava sem ser lido: a conferência abaixo ficava verde para um repositório
+ * escrevendo na tabela de outro, desde que escrevesse desse jeito. Continua sensível a
+ * maiúsculas, para não pescar "update" de comentário.
+ */
+const ESCRITA = /(?:INSERT(?:\s+OR\s+[A-Z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM)\s+(\w+)/g;
+const tabelasEscritas = (texto) => [...texto.matchAll(ESCRITA)].map((m) => m[1]);
+
+test('a conferência de escrita enxerga toda forma de escrever do SQLite', () => {
+  assert.deepEqual(tabelasEscritas('INSERT INTO membros (x)'), ['membros']);
+  assert.deepEqual(tabelasEscritas('INSERT OR REPLACE INTO membros (x)'), ['membros']);
+  assert.deepEqual(tabelasEscritas('INSERT OR IGNORE INTO membros (x)'), ['membros']);
+  assert.deepEqual(tabelasEscritas('REPLACE INTO membros (x)'), ['membros']);
+  assert.deepEqual(tabelasEscritas('UPDATE OR IGNORE membros SET x = 1'), ['membros']);
+  assert.deepEqual(tabelasEscritas(`DELETE
+     FROM membros`), ['membros']);
+  assert.deepEqual(tabelasEscritas('// update do cargo, sem SQL nenhum'), []);
+});
+
 test('cada repositório é de UMA tabela', () => {
   // O nome do arquivo é a tabela. Um repositório que escreve em duas tabelas esconde
   // dependência — foi assim que apagar um cargo mexia em `membros` sem dizer.
@@ -76,8 +98,7 @@ test('cada repositório é de UMA tabela', () => {
   for (const arquivo of readdirSync(join(AQUI, 'repositorios')).filter((f) => f.endsWith('.mjs'))) {
     const minha = arquivo.replace('.mjs', '');
     const texto = readFileSync(join(AQUI, 'repositorios', arquivo), 'utf8');
-    for (const m of texto.matchAll(/(?:INSERT INTO|UPDATE|DELETE FROM)\s+(\w+)/g)) {
-      const tabela = m[1];
+    for (const tabela of tabelasEscritas(texto)) {
       if (tabela === minha || (excecoes[arquivo] ?? []).includes(tabela)) continue;
       escrevendoFora.push(`${arquivo} escreve em ${tabela}`);
     }

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ClipboardEvent } from 'react';
 import { criarServidor, entrarComConvite } from '../api';
 import { Icon } from './Icon';
 import { useFecharComEsc } from '../useFechar';
+import { conviteDepoisDeColar, conviteDigitado } from '../convite';
 
 /** Criar um servidor ou entrar num com código de convite. */
 export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
@@ -18,6 +19,18 @@ export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
   const [ocupado, setOcupado] = useState(false);
 
   const criando = aba === 'criar';
+
+  // Colar passa pela arrumação ANTES de o navegador aparar: o convite copiado de uma conversa
+  // vem com espaço, hífen ou a mensagem inteira em volta. A conta mora em `convite.ts`.
+  const colarConvite = (e: ClipboardEvent<HTMLInputElement>) => {
+    if (criando) return;
+    const campo = e.currentTarget;
+    e.preventDefault();
+    setTexto(conviteDepoisDeColar(
+      campo.value, campo.selectionStart ?? campo.value.length, campo.selectionEnd ?? campo.value.length,
+      e.clipboardData.getData('text'),
+    ));
+  };
 
   const enviar = async () => {
     setErro(null); setOcupado(true);
@@ -51,9 +64,12 @@ export function NovoServidor({ inicial = 'entrar', onPronto, onClose }: {
             <input
               autoFocus
               value={texto}
-              maxLength={criando ? 40 : 8}
+              // No convite, quem corta em 8 é `conviteDigitado`, DEPOIS de tirar hífen e espaço:
+              // um `maxLength` 8 cortava antes, e "ABCD-2345" chegava ao servidor sem o 5.
+              maxLength={criando ? 40 : undefined}
               placeholder={criando ? 'Cardume dos Jogos' : 'ABCD2345'}
-              onChange={(e) => setTexto(criando ? e.target.value : e.target.value.toUpperCase())}
+              onChange={(e) => setTexto(criando ? e.target.value : conviteDigitado(e.target.value))}
+              onPaste={colarConvite}
               onKeyDown={(e) => { if (e.key === 'Enter' && texto.trim()) enviar(); }}
             />
             <small className="muted">

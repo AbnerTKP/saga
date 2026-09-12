@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lerResposta } from './resposta.ts';
+import { derrubouASessao, lerResposta } from './resposta.ts';
 
 test('resposta boa passa com os dados', () => {
   const r = lerResposta(true, 200, { cargos: [], membros: [] });
@@ -35,4 +35,14 @@ test('erro sem corpo legível continua sendo erro, pelo status', () => {
 test('o convite do Berserk continua chegando como convite', () => {
   const r = lerResposta(false, 403, { error: 'Isso é do Berserk.', tipo: 'turbo' });
   assert.equal(r.ok === false && r.tipo, 'turbo');
+});
+
+test('só o 401 derruba a sessão: senha errada, código errado e rede caída, não', () => {
+  // 403 é a senha atual ou a do dono errada, 400 é o código de senha errado: quem só errou
+  // uma digitação não pode ir parar na tela de entrar.
+  assert.equal(derrubouASessao({ status: 401, message: 'Faça login novamente.' }), true);
+  for (const erro of [{ status: 403 }, { status: 400 }, { status: 404 }, { status: 0 }, { status: '401' },
+    new Error('sem status'), null, undefined, 'Faça login novamente.']) {
+    assert.equal(derrubouASessao(erro), false, JSON.stringify(erro));
+  }
 });

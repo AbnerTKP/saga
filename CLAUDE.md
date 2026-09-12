@@ -283,6 +283,91 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   dono ficou 10 minutos de fora por errar a senha, e foi por isso que ele saiu. Um freio
   que vale a pena contaria só o que falhou, por CONTA e não por IP, e atrasaria a resposta
   em vez de fechar a porta — quem erra a senha é quase sempre quem a esqueceu.
+- **Quem esqueceu a senha recupera com um código que o DONO DA SAGA gera.** As contas não
+  têm e-mail — a coluna existe e nunca foi pedida —, então não há como o app provar sozinho
+  que alguém é quem diz: quem atesta é o dono, que conhece o grupo e manda o código por
+  fora. E-mail foi descartado de propósito: pediria provedor, chave na VPS e cadastro de
+  e-mail que ninguém fez, e e-mail que não chega é mais um jeito de parar em silêncio.
+  O código tem 8 letras do alfabeto dos convites, vale **uma hora e uma vez**, e gerar
+  outro mata o anterior (`recuperacoes`, uma linha por conta). As regras, cada uma com o
+  seu motivo:
+  - **Guardado com o scrypt da senha, nunca em sha256.** São 40 bits: em sha256, quem
+    lesse o banco quebraria o código em minutos.
+  - **5 erros matam o CÓDIGO, não a conta.** O login com senha continua sem freio (ver
+    acima). O preço é que um estranho que saiba o apelido queima o código: não entra, só
+    obriga a pedir outro. O servidor anota no `docker logs` quando isso acontece, junto
+    de cada código emitido e de cada senha trocada por código. O código e a senha nunca
+    aparecem ali — `api.test.mjs` lê o registro do servidor, stdout e stderr, e trava isso.
+  - **A recusa é uma só**, 400, para apelido que não existe, conta sem código, código
+    vencido, gasto ou errado: mensagens diferentes contariam quem tem código pendente.
+    Não há scrypt "fantasma" para igualar o tempo de quem não tem código, porque numa VPS
+    de um núcleo isso faria cada pedido de lixo custar um scrypt. O `/entrar` já tem a
+    mesma propriedade.
+  - **Nunca 401.** No app, 401 quer dizer "a sessão caiu" e desloga. Por isso a recusa da
+    recuperação é 400, e senha atual errada ao trocar a senha em "Sua conta" é 403.
+  - **Recuperar derruba TODAS as sessões e já entra**: quem tinha a senha antiga,
+    inclusive um invasor, sai, e sai também das calls (sem esperar o LiveKit: um LiveKit
+    lento prenderia a resposta com o código já gasto). Trocar logado derruba as OUTRAS
+    sessões e mata o código pendente. O aviso não diz QUANTOS computadores saíram porque
+    sessão não vence, e o número contaria crachás esquecidos. **Do outro lado, o 401
+    esquece a conta como o "Sair"** (`esquecerAConta`, em `App.tsx`): antes só o `/sair`
+    apagava sessão, e a volta ao login pelo 401 saía da call, limpava o crachá e mais
+    nada — a próxima conta a entrar naquele computador receberia desenhadas, até a
+    primeira busca, as salas privadas, as conversas e a partida aberta da anterior, e o
+    aviso com som de cada conversa não lida dela. **O que estava aberto na tela vai
+    junto**: o `App` não desmonta na tela de entrar, e o "quem pode ver" de uma sala
+    privada, o cartão de alguém ou o "Convidar" (que gera convite ao montar) voltavam
+    sozinhos para quem entrasse. `saidaDaConta.test.ts` lê o `App.tsx` e exige que todo
+    estado novo seja esquecido ali ou diga por que fica. **Quem percebe o 401 são as duas
+    buscas que rodam sozinhas**: a de salas e o sinal de vida. Só a de salas o tratava, e
+    ela não roda sem servidor — na tela inicial vazia a conta derrubada ficava na tela sem
+    prazo, até alguma ação responder "Faça login novamente.". Hoje o sinal de vida, que
+    roda com ou sem servidor, a tira em até 30 s.
+  - **Gerar pede a senha do dono, e não vale para a própria conta.** Uma sessão aberta
+    não prova quem está no teclado, e um crachá roubado do dono viraria a chave de todas
+    as contas. Na conta dele, o código derrubaria todas as sessões do único dono; ele
+    troca a senha em "Sua conta". **Se o dono esquecer a dele, o caminho é a VPS**, pela
+    mesma `trocarSenha` do app — um `UPDATE` com um hash feito à mão é a segunda cópia dos
+    parâmetros do scrypt que o comentário dela proíbe, e o sintoma seria "a senha certa
+    não entra":
+
+    ```bash
+    cd /root/server && docker compose -f docker-compose.ip.yml exec token \
+      node --input-type=module -e "
+        import { abrirBanco } from './banco.mjs';
+        import { buscarPorApelido, trocarSenha } from './contas.mjs';
+        const db = abrirBanco(process.env.BANCO);
+        trocarSenha(db, buscarPorApelido(db, 'TKP').id, process.argv[1]);
+        console.log('senha trocada');
+      " 'senha-provisoria'
+    ```
+
+    Por aqui nenhuma sessão cai, e a provisória fica no histórico do shell: entre com ela
+    e troque em "Sua conta", que derruba as outras sessões. O `node` da receita foi
+    conferido com o Node 22 num banco de rascunho: a senha nova entra, a antiga é recusada
+    e a sessão antiga continua de pé. O `docker compose exec` no contêiner de produção
+    **não foi exercido**.
+  - Na tela de entrar, **colar a mensagem inteira** ("Código: K7QM-2XPA") acha o código
+    no meio do texto (`recuperacao.ts`, pura e testada): colar e somar letras formava um
+    código completo e errado, que gastava tentativa.
+- **Corpo que não é JSON é 400, não 500**, em toda rota. A mensagem do `JSON.parse` traz
+  um pedaço do corpo (medido no Node 24), e o `console.error` do 500 escreveria no registro
+  a senha do `/entrar` ou o código do `/recuperar`. **JSON que não é objeto também**:
+  `null`, `5`, `"texto"` e `[]` passam pelo `JSON.parse`, e toda rota desestrutura o corpo
+  — era 500 com a pilha no registro no `/entrar` e em quase toda rota com sessão. O
+  `api.test.mjs` lê o stdout E o stderr do servidor, porque o `docker logs` junta os dois
+  e o `console.error` do 500 é justamente o canal por onde um segredo vazaria.
+- **Na tela de entrar, quem rola é o CARTÃO.** A recuperação com erro tem 784 px e a
+  janela mínima, 560. O `body` não rola, então o botão ficava inalcançável. Rolar o
+  `.connect` resolvia a roda do mouse, mas punha a barra de rolagem na região de arraste,
+  que engole clique. Medido no Electron do projeto, em 760, 700, 650 e 560 px: a roda
+  sobre o cartão desce até o botão, e o `.connect` não rola. **A altura máxima desconta a
+  barra da janela do Windows** (`--topo-da-janela`, como o painel): lá o `.connect` começa
+  34 px abaixo, e sem o desconto o cartão ficava maior que o espaço — medido com a barra
+  montada por cima, 7 px de folga acima e abaixo em vez de 24. **Quando chega um erro, o
+  cartão rola até o fim**, e não só até o botão: `scrollIntoView({ block: 'nearest' })`
+  deixava o botão encostado na borda, sem o respiro do cartão e com o "ver o registro"
+  escondido. Medido a 900x560, no Mac e com a barra do Windows: 78 px abaixo do botão.
 - **Reordenar sala é só dado, e por isso não derruba ninguém da call.** A sala do LiveKit
   é o id; arrastar mexe em `ordem` e `categoria_id`, e em id nenhum. A lista muda na hora
   e a busca seguinte confirma — dando errado, é ela que devolve a ordem de verdade.
@@ -1517,7 +1602,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (360) + app (274), segundos, sem nada externo
+pnpm test        # servidor (398) + app (304), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1550,6 +1635,27 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 
 - A atualização abrindo já atualizada no Windows (v0.16.2) — exige uma atualização real
   acontecendo com alguém do outro lado.
+- **Recuperar a senha, de ponta a ponta, no app de verdade.** O que está medido: as rotas
+  por HTTP contra o servidor de verdade (`api.test.mjs`), as regras em `contas.test.mjs`,
+  cada garantia quebrada de propósito numa cópia até um teste falhar, e as telas com os
+  componentes reais e o `styles.css`, só que com `fetch` e ponte falsos. Não foi
+  exercido: gerar o código em "Sua conta", no bloco "Berserk e senha"; copiar pela ponte do
+  processo principal (`log:copiar`); usar o código noutra máquina e já entrar; ver a outra
+  sessão cair e sair da call; a tela inicial sem servidor voltando ao login pelo sinal de
+  vida; outra conta entrando depois naquele computador sem nada da anterior na tela, nem
+  painel ou menu que estava aberto; e nada disso no Windows — o cartão de entrar debaixo
+  da barra da janela foi medido só com o `styles.css` e a barra montada à mão, no Electron
+  deste Mac. **O servidor sobe junto**: app novo com servidor antigo mostra "o servidor
+  precisa ser atualizado". **As três telas foram feitas antes da regra do `/design`**, na
+  v0.44.0, e o dono as aprovou em 13/09/2026 pelas capturas dos componentes reais, sem
+  opções lado a lado: o "Esqueci a senha" e o modo de recuperar na tela de entrar, a seção
+  Senha em "Sua conta" e o formulário da senha do dono com o código dentro do cartão da
+  conta, em "Berserk e senha". Ficou como está o que a medição mostrou: com 712 px, o
+  cartão de recuperar já nasce rolando na janela padrão do Windows (1200x760, 36 px); no
+  Mac, numa janela de 720 px de altura, o "ver o registro" sai cortado na borda sem nada
+  dizer que o cartão rola; e a barra de rolagem dele entra na curva do canto de baixo,
+  como a de todo contêiner arredondado que rola no app (o corpo dos painéis, a lista de
+  cargos).
 - Som, câmera, microfone e compartilhamento de tela em máquinas que não são este Mac.
 - **Se o modo de tela (`detail`) segura os quadros no conteúdo real dele.** O que está
   medido é o extremo: numa cena artificial de ruído fino em panorâmica, protegendo a

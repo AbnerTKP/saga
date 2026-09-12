@@ -11,6 +11,7 @@ import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { useMicrofone } from './useMicrofone';
+import { comLimite } from './limite';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -111,14 +112,6 @@ function guardarVolumeDoSoundboard(v: number) {
 // engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
 // desabilitadas e nada é dito, que por fora parece o clique não ter funcionado.
 const LIMITE_DE_CONEXAO = 20_000;
-
-function comLimite<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<T> {
-  let id: ReturnType<typeof setTimeout>;
-  const limite = new Promise<never>((_, reject) => {
-    id = setTimeout(() => reject(new Error(aviso)), ms);
-  });
-  return Promise.race([promessa, limite]).finally(() => clearTimeout(id)) as Promise<T>;
-}
 
 /** Recebe se a pessoa é Berserk porque a qualidade de transmissão depende disso. */
 /**

@@ -11,6 +11,11 @@ import { join } from 'node:path';
 import { TODAS } from './permissoes.mjs';
 
 let processo, base, pasta;
+// O que o servidor escreveu no console: há testes que conferem o que foi anotado, e o que
+// NUNCA pode ser — código e senha. Os DOIS canais, porque o `docker logs` junta os dois: só
+// com o stdout, um segredo que saísse pelo `console.error` do 500 — o canal mais provável de
+// vazamento — passaria com o teste verde e iria parar no registro de produção.
+let registro = '';
 
 before(async () => {
   pasta = mkdtempSync(join(tmpdir(), 'cantinho-'));
@@ -29,9 +34,16 @@ before(async () => {
       LIVEKIT_PUBLIC_URL: 'ws://exemplo:7880',
       SEM_NOTAS: '1',   // sem ir ao GitHub: o teste não depende da internet
     },
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
-  processo.stderr.on('data', (d) => { const s = String(d); if (!s.includes('Experimental')) console.error('servidor:', s); });
+  // Lido sempre, e não só quando um teste quer: um cano que ninguém esvazia enche, e o
+  // servidor passa a travar no próximo console.log.
+  processo.stdout.on('data', (d) => { registro += String(d); });
+  processo.stderr.on('data', (d) => {
+    const s = String(d);
+    registro += s;
+    if (!s.includes('Experimental')) console.error('servidor:', s);
+  });
 
   for (let i = 0; i < 60; i++) {
     try { if ((await fetch(`${base}/health`)).ok) return; } catch { /* ainda subindo */ }
@@ -1333,4 +1345,250 @@ test('xadrez: só se chama quem é do servidor e não foi banido, e sem sessão 
     const r = await chamar(metodo, rota, metodo === 'GET' ? {} : { corpo: { id, acao: 'fechar' } });
     assert.equal(r.status, 401, `${metodo} ${rota} respondeu ${r.status} sem sessão`);
   }
+});
+
+// --- recuperar e trocar a senha -------------------------------------------------
+//
+// Só com contas destes testes: `sessaoDe` guarda a sessão por apelido, e trocar a senha de
+// alguém que outro teste usa (abner, bruno…) mataria o crachá guardado dele, com o erro
+// aparecendo num teste que não tem nada a ver com senha.
+
+const RECUSA_DO_CODIGO = 'Código inválido ou vencido. Peça outro ao dono da Saga.';
+
+const recuperarPorHttp = (apelido, codigo, senha = 'novasenha789') =>
+  chamar('POST', '/recuperar', { corpo: { apelido, codigo, senha, senhaRepetida: senha } });
+
+/** O código que o dono da Saga gera para a conta — com a senha dele, que a rota pede. */
+async function codigoPara(conta) {
+  const dono = await sessaoDe('abner');
+  const r = await chamar('POST', '/saga/recuperacao', { sessao: dono.token, corpo: { alvo: conta.eu.id, senha: 'segredo123' } });
+  assert.equal(r.status, 200, `não saiu código: ${JSON.stringify(r.corpo)}`);
+  return r;
+}
+
+/**
+ * Espera o servidor anotar um trecho no registro. O console do processo filho chega por um
+ * cano, e pode chegar depois da resposta HTTP que o provocou.
+ */
+async function noRegistro(trecho) {
+  for (let i = 0; i < 60 && !registro.includes(trecho); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(registro.includes(trecho), `o registro não anotou: ${trecho}`);
+}
+
+/** Um corpo com um array de milhares de níveis, montado à mão: `JSON.stringify` nem chegaria nele. */
+const comFundo = (campo, resto) => {
+  const fundo = '['.repeat(20_000) + ']'.repeat(20_000);
+  return `{${Object.entries(resto).map(([k, v]) => `${JSON.stringify(k)}:${JSON.stringify(v)},`).join('')}"${campo}":${fundo}}`;
+};
+const cru = (rota, corpo, sessao) => fetch(`${base}${rota}`, {
+  method: 'POST', headers: { 'content-type': 'application/json', ...(sessao ? { 'x-sessao': sessao } : {}) }, body: corpo,
+});
+
+function semSegredo(respostas) {
+  const tudo = JSON.stringify(respostas.map((r) => r.corpo));
+  for (const segredo of ['senha_hash', 'codigo_hash', 'scrypt$']) {
+    assert.ok(!tudo.includes(segredo), `vazou na resposta: ${segredo}`);
+  }
+}
+
+test('quem não é dono da Saga não gera código de senha, nem para a própria conta', async () => {
+  const ele = (await criarConta('esqueceu1')).corpo;
+  const r = await chamar('POST', '/saga/recuperacao', { sessao: ele.token, corpo: { alvo: ele.eu.id } });
+  assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /dono da Saga/);
+  assert.equal(r.corpo.codigo, undefined);
+  assert.equal((await chamar('POST', '/saga/recuperacao', { corpo: { alvo: ele.eu.id } })).status, 401);
+
+  const dono = await sessaoDe('abner');
+  const ninguem = await chamar('POST', '/saga/recuperacao', { sessao: dono.token, corpo: { alvo: 999999, senha: 'segredo123' } });
+  assert.equal(ninguem.status, 404);
+});
+
+test('gerar código pede a senha do dono, e não serve para a conta dele: 403, nunca 401', async () => {
+  // Só o crachá do dono — uma Saga dele aberta sem ninguém por perto — não pode valer a conta
+  // de todo mundo. E 401 o app lê como "a sessão caiu": errar a senha deslogaria o dono.
+  const alvo = (await criarConta('esqueceu4')).corpo;
+  const dono = await sessaoDe('abner');
+  const pedir = (corpo) => chamar('POST', '/saga/recuperacao', { sessao: dono.token, corpo });
+
+  for (const corpo of [{ alvo: alvo.eu.id }, { alvo: alvo.eu.id, senha: 'naoeessa' }, { alvo: alvo.eu.id, senha: 12345678 }]) {
+    const r = await pedir(corpo);
+    assert.equal(r.status, 403, JSON.stringify(corpo));
+    assert.equal(r.corpo.error, 'A sua senha não confere.');
+    assert.equal(r.corpo.codigo, undefined);
+  }
+  const propria = await pedir({ alvo: dono.eu.id, senha: 'segredo123' });
+  assert.equal(propria.status, 403);
+  assert.match(propria.corpo.error, /Sua conta/);
+  assert.equal(propria.corpo.codigo, undefined);
+
+  assert.equal((await chamar('GET', '/eu', { sessao: dono.token })).status, 200, 'errar a senha derrubou a sessão do dono');
+  const contas = await chamar('GET', '/saga/contas', { sessao: dono.token });
+  assert.equal(contas.corpo.contas.find((c) => c.id === alvo.eu.id).recuperacaoAte, null, 'saiu código sem a senha');
+  assert.equal(contas.corpo.contas.find((c) => c.id === dono.eu.id).recuperacaoAte, null, 'saiu código para o próprio dono');
+});
+
+test('o registro anota código emitido, código queimado e senha trocada — nunca o código nem a senha', async () => {
+  const alvo = (await criarConta('registro1')).corpo;
+  const queimado = (await codigoPara(alvo)).corpo.codigo;
+  await noRegistro('recuperação: código emitido para registro1 por abner');
+
+  // Cinco chutes sem sessão queimam o código; quem pede não vê diferença, o registro vê.
+  const errado = queimado === 'AAAA-AAAA' ? 'BBBB-BBBB' : 'AAAA-AAAA';
+  for (let i = 0; i < 5; i++) assert.equal((await recuperarPorHttp('registro1', errado)).status, 400);
+  await noRegistro('recuperação: o código de registro1 morreu depois de 5 erros');
+
+  const { codigo } = (await codigoPara(alvo)).corpo;
+  const r = await recuperarPorHttp('registro1', codigo, 'senhaDoRegistro42');
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  await noRegistro('recuperação: registro1 trocou a senha com o código do dono');
+
+  for (const segredo of [queimado, codigo, codigo.replace('-', ''), errado, 'senhaDoRegistro42', 'segredo123']) {
+    assert.ok(!registro.includes(segredo), `o registro escreveu um segredo: ${segredo}`);
+  }
+});
+
+test('o código do dono troca a senha e já entra, com a mesma resposta do /entrar', async () => {
+  const antes = (await cadastrar('esqueceu2')).corpo;   // a sessão que a pessoa já tinha
+  const emitido = await codigoPara(antes);
+  assert.match(emitido.corpo.codigo, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+  assert.equal(emitido.corpo.conta.apelido, 'esqueceu2');
+  assert.equal(emitido.corpo.conta.recuperacaoAte, emitido.corpo.expiraEm);
+
+  // O painel diz até quando vale, e só isso.
+  const dono = await sessaoDe('abner');
+  const lista = await chamar('GET', '/saga/contas', { sessao: dono.token });
+  assert.equal(lista.corpo.contas.find((c) => c.id === antes.eu.id).recuperacaoAte, emitido.corpo.expiraEm);
+  assert.equal(lista.corpo.contas.find((c) => c.apelido === 'abner').recuperacaoAte, null);
+  assert.ok(!JSON.stringify(lista.corpo).includes(emitido.corpo.codigo.replace('-', '')), 'o código voltou na lista');
+
+  const r = await recuperarPorHttp('esqueceu2', emitido.corpo.codigo);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.ok(r.corpo.token);
+  assert.equal(r.corpo.eu.apelido, 'esqueceu2');
+
+  assert.equal((await chamar('GET', '/eu', { sessao: antes.token })).status, 401, 'a sessão de antes continuou valendo');
+  assert.equal((await chamar('GET', '/eu', { sessao: r.corpo.token })).status, 200);
+  const velha = await chamar('POST', '/entrar', { corpo: { apelido: 'esqueceu2', senha: 'segredo123' } });
+  assert.equal(velha.status, 401);
+  const nova = await chamar('POST', '/entrar', { corpo: { apelido: 'esqueceu2', senha: 'novasenha789' } });
+  assert.equal(nova.status, 200);
+
+  // Tirando o token, a mesma coisa que o /entrar: as duas portas dão na mesma tela.
+  const { token: _pelaRecuperacao, ...recuperou } = r.corpo;
+  const { token: _pelaSenha, ...entrou } = nova.corpo;
+  assert.deepEqual(recuperou, entrou);
+
+  // Uso único, e a lista para de mostrar o código.
+  assert.equal((await recuperarPorHttp('esqueceu2', emitido.corpo.codigo, 'outrasenha000')).status, 400);
+  const depois = await chamar('GET', '/saga/contas', { sessao: dono.token });
+  assert.equal(depois.corpo.contas.find((c) => c.id === antes.eu.id).recuperacaoAte, null);
+
+  semSegredo([emitido, lista, r, velha, nova, depois]);
+});
+
+test('código errado é 400 com a mesma recusa de apelido inexistente, e /recuperar nunca responde 401', async () => {
+  // 401, no app, é "a sessão caiu": errar um código na tela de entrar não pode soar assim.
+  const alvo = (await criarConta('esqueceu3')).corpo;
+  await criarConta('semcodigo1');
+  const { corpo: { codigo } } = await codigoPara(alvo);
+  const errado = codigo === 'AAAA-AAAA' ? 'BBBB-BBBB' : 'AAAA-AAAA';
+
+  const recusas = [
+    await recuperarPorHttp('esqueceu3', errado),
+    await recuperarPorHttp('ninguem_aqui', codigo),
+    await recuperarPorHttp('semcodigo1', codigo),
+  ];
+  for (const r of recusas) {
+    assert.equal(r.status, 400);
+    assert.equal(r.corpo.error, RECUSA_DO_CODIGO);
+  }
+
+  // Nem com lixo no corpo, nem com um crachá velho no cabeçalho.
+  for (const corpo of [
+    {},
+    { apelido: 'esqueceu3' },
+    { apelido: 5, codigo: {}, senha: 12345678, senhaRepetida: 12345678 },
+    { apelido: 'esqueceu3', codigo, senha: 'curta', senhaRepetida: 'curta' },
+  ]) {
+    const r = await chamar('POST', '/recuperar', { corpo, sessao: 'cracha-que-nao-vale' });
+    assert.equal(r.status, 400, JSON.stringify(corpo));
+  }
+  const malformado = await fetch(`${base}/recuperar`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"codigo": K7QM',
+  });
+  assert.equal(malformado.status, 400, 'corpo que não é JSON virou erro do servidor');
+
+  // Array de milhares de níveis: passa pelo JSON.parse e estourava a pilha ao virar texto —
+  // um 500, com a pilha inteira no registro, a cada pedido de 40 KB.
+  const senhas = { senha: 'novasenha789', senhaRepetida: 'novasenha789' };
+  for (const corpo of [comFundo('apelido', { codigo, ...senhas }), comFundo('codigo', { apelido: 'esqueceu3', ...senhas })]) {
+    const r = await cru('/recuperar', corpo);
+    assert.equal(r.status, 400, 'array aninhado virou erro do servidor');
+    assert.equal((await r.json()).error, RECUSA_DO_CODIGO);
+  }
+  assert.equal((await cru('/entrar', comFundo('apelido', { senha: 'segredo123' }))).status, 401);
+  assert.equal((await cru('/entrar', comFundo('senha', { apelido: 'esqueceu3' }))).status, 401);
+  assert.equal((await cru('/cadastrar', comFundo('apelido', senhas))).status, 400);
+
+  // Um erro não mata o código, e errar a senha nova não gastou tentativa: o certo ainda entra.
+  const certo = await recuperarPorHttp('esqueceu3', codigo);
+  assert.equal(certo.status, 200, JSON.stringify(certo.corpo));
+  semSegredo([...recusas, certo]);
+});
+
+test('corpo que é JSON mas não é objeto é 400 nas portas da conta e nas rotas com sessão, e não 500', async () => {
+  // `null`, `5`, `"texto"` e `[]` passam pelo JSON.parse. O `/entrar` desestruturava direto,
+  // e as rotas com sessão também: um 500 com "Cannot destructure" e a pilha no registro.
+  // /mensagens e /digitando leem o corpo antes da sessão, então ali nem crachá era preciso.
+  const dono = await sessaoDe('abner');
+  const semSessao = ['/entrar', '/cadastrar', '/recuperar', '/mensagens', '/digitando'];
+  const comSessao = ['/eu/senha', '/saga/recuperacao', '/amigos/pedir', '/conversas/abrir', '/mensagens/apagar', '/servidores/entrar'];
+  for (const corpo of ['null', '5', '"texto"', '[]']) {
+    for (const rota of semSessao) {
+      const r = await cru(rota, corpo);
+      assert.equal(r.status, 400, `${rota} com ${corpo} sem sessão`);
+      assert.equal((await r.json()).error, 'O pedido veio malformado.');
+    }
+    for (const rota of comSessao) {
+      const r = await cru(rota, corpo, dono.token);
+      assert.equal(r.status, 400, `${rota} com ${corpo} e sessão`);
+    }
+  }
+  assert.ok(!registro.includes('Cannot destructure'), 'um corpo que não é objeto chegou a uma rota');
+  // O objeto vazio continua sendo pedido, e quem responde é a regra de cada rota.
+  assert.equal((await cru('/entrar', '{}')).status, 401);
+  assert.equal((await cru('/entrar', '')).status, 401);
+  assert.equal((await chamar('GET', '/eu', { sessao: dono.token })).status, 200);
+});
+
+test('/eu/senha pede a senha atual: errada é 403 sem derrubar ninguém, certa derruba só as outras sessões', async () => {
+  const minha = (await criarConta('trocasenha1')).corpo;
+  const outra = (await chamar('POST', '/entrar', { corpo: { apelido: 'trocasenha1', senha: 'segredo123' } })).corpo;
+  const nova = { senha: 'novasenha789', senhaRepetida: 'novasenha789' };
+  const trocar = (sessao, corpo) => chamar('POST', '/eu/senha', { sessao, corpo });
+  const eu = (sessao) => chamar('GET', '/eu', { sessao });
+
+  assert.equal((await trocar(undefined, { senhaAtual: 'segredo123', ...nova })).status, 401);
+
+  const errada = await trocar(minha.token, { senhaAtual: 'naoeessa', ...nova });
+  assert.equal(errada.status, 403, 'senha atual errada não pode ser 401: o app deslogaria');
+  assert.equal(errada.corpo.error, 'A senha atual não confere.');
+  assert.equal((await eu(minha.token)).status, 200);
+  assert.equal((await eu(outra.token)).status, 200);
+
+  const curta = await trocar(minha.token, { senhaAtual: 'segredo123', senha: 'curta', senhaRepetida: 'curta' });
+  assert.equal(curta.status, 400);
+  const aninhada = await cru('/eu/senha', comFundo('senhaAtual', nova), minha.token);
+  assert.equal(aninhada.status, 403, 'array aninhado na senha atual virou erro do servidor');
+
+  const certa = await trocar(minha.token, { senhaAtual: 'segredo123', ...nova });
+  assert.equal(certa.status, 200, JSON.stringify(certa.corpo));
+  assert.deepEqual(certa.corpo, { ok: true, encerradas: 1 });
+  assert.equal((await eu(outra.token)).status, 401, 'a sessão de outro lugar continuou');
+  assert.equal((await eu(minha.token)).status, 200, 'a sessão de quem trocou caiu');
+  assert.equal((await chamar('POST', '/entrar', { corpo: { apelido: 'trocasenha1', senha: 'segredo123' } })).status, 401);
+  const entrou = await chamar('POST', '/entrar', { corpo: { apelido: 'trocasenha1', senha: 'novasenha789' } });
+  assert.equal(entrou.status, 200);
+  semSegredo([errada, curta, certa, entrou]);
 });

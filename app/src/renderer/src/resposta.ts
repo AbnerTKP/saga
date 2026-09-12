@@ -32,3 +32,14 @@ export function lerResposta(ok: boolean, status: number, dados: unknown): Leitur
   }
   return { ok: true, dados };
 }
+
+/**
+ * O pedido falhou porque a sessão deixou de valer — e só por isso.
+ *
+ * É o 401, e nenhum outro: senha atual errada em "Sua conta" e senha do dono errada ao gerar
+ * código são 403 de propósito, e código de senha errado é 400, justamente para não caírem
+ * aqui e deslogarem quem só errou uma digitação. Queda de rede é status 0 e também não é
+ * sessão perdida.
+ */
+export const derrubouASessao = (erro: unknown): boolean =>
+  ehObjeto(erro) && (erro as { status?: unknown }).status === 401;

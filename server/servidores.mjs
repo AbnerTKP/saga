@@ -1,7 +1,7 @@
 // Vários servidores. O banco já era assim desde o começo — cargo e banimento pertencem ao
 // vínculo entre pessoa e servidor, não à pessoa — então aqui é só criar, convidar e entrar.
-import { randomBytes } from 'node:crypto';
 import { ErroDeConta } from './contas.mjs';
+import { gerarCodigo, limparCodigo } from './codigos.mjs';
 import { garantirCargos } from './banco.mjs';
 import { temPermissao } from './permissoes.mjs';
 import * as tabela from './repositorios/servidores.mjs';
@@ -44,12 +44,6 @@ export function criarServidor(db, usuario, { nome }) {
   return buscarServidor(db, servidorId);
 }
 
-// Sem letras que se confundem lidas em voz alta ou copiadas à mão: O e 0, I e 1.
-const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-const gerarCodigo = () =>
-  [...randomBytes(8)].map((b) => ALFABETO[b % ALFABETO.length]).join('');
-
 export function criarConvite(db, servidorId, quem, { maxUsos } = {}) {
   // `convidar`, e não `gerirServidor`: trazer gente não é mexer no servidor. Ver a nota
   // em permissoes.mjs — enquanto era a mesma permissão, só quem criou convidava.
@@ -70,7 +64,11 @@ export const listarConvites = (db, servidorId) =>
     .map((c) => ({ codigo: c.codigo, criadoEm: c.criado_em, expiraEm: c.expira_em, usos: c.usos, maxUsos: c.max_usos }));
 
 export function usarConvite(db, usuario, codigo) {
-  const limpo = String(codigo ?? '').trim().toUpperCase();
+  // A mesma limpeza do código de senha: quem se acostumou a digitar "K7QM-2XPA" lá digita o
+  // convite do mesmo jeito. Convite guardado só tem letras do alfabeto, então tirar espaço e
+  // hífen não faz nenhum código de verdade deixar de bater. O campo do app precisa deixar isso
+  // chegar: com `maxLength` 8 ele cortava "ABCD-2345" antes daqui — ver `convite.ts`.
+  const limpo = limparCodigo(codigo);
   const convite = tabelaDeConvites.buscar(db, limpo);
   // A mesma mensagem para inexistente, vencido e esgotado: dizer qual é entregaria
   // quais códigos existem a quem estiver tentando adivinhar.

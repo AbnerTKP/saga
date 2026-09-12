@@ -300,6 +300,21 @@ export const MIGRACOES = [
    CREATE INDEX mensagens_conversa ON mensagens(conversa_id, id);
    CREATE INDEX mensagens_apagadas ON mensagens(sala_id, apagada_em) WHERE apagada_em IS NOT NULL;
    CREATE INDEX mensagens_apagadas_conversa ON mensagens(conversa_id, apagada_em) WHERE apagada_em IS NOT NULL`,
+
+  // Recuperar a senha. As contas não têm e-mail, então quem atesta que a pessoa é a pessoa
+  // é o dono da Saga: ele gera um código, manda por fora, e com ele a pessoa escolhe a senha
+  // nova. Uma linha por conta, porque gerar outro substitui o anterior. O código é guardado
+  // pelo mesmo scrypt da senha: são 40 bits, e num hash rápido quem lesse o banco os
+  // quebraria em minutos. `erros` é o freio, e é do CÓDIGO, não da conta: o login com senha
+  // nunca tranca.
+  `CREATE TABLE recuperacoes (
+     usuario_id  INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+     codigo_hash TEXT    NOT NULL,
+     criado_por  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     criado_em   INTEGER NOT NULL,
+     expira_em   INTEGER NOT NULL,
+     erros       INTEGER NOT NULL DEFAULT 0
+   )`,
 ];
 
 export function abrirBanco(caminho) {

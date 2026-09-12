@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Room } from 'livekit-client';
 import {
-  mudarMeuNome, minhaFoto, meuBanner, usarGif, salvarEnquadramento, type Membro,
+  mudarMeuNome, minhaFoto, meuBanner, usarGif, salvarEnquadramento, trocarMinhaSenha,
+  ErroDoServidor, type Membro,
 } from '../api';
 import { lerQualidadeGuardada, guardarQualidade } from '../useRoom';
 import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from '../qualidades';
+import { avisoDaTroca, explicarFalha } from '../recuperacao';
 import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocoDoMicrofone } from './AjustesDoMicrofone';
@@ -124,6 +126,15 @@ export function PainelDaConta({
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  // A troca de senha tem erro e acerto próprios, mostrados junto dos campos: o erro do alto
+  // do painel fica longe de quem está digitando lá embaixo.
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [senhaNova, setSenhaNova] = useState('');
+  const [senhaNovaRepetida, setSenhaNovaRepetida] = useState('');
+  const [trocandoSenha, setTrocandoSenha] = useState(false);
+  const [erroDaSenha, setErroDaSenha] = useState<string | null>(null);
+  const [senhaTrocada, setSenhaTrocada] = useState<string | null>(null);
+
   // 'erro' e null são coisas diferentes: null é "ainda perguntando", 'erro' é "perguntei e
   // não soube". Nenhum dos dois pode virar uma chave desligada na tela, que seria afirmar
   // que não abre com o sistema sem ter como saber.
@@ -167,6 +178,20 @@ export function PainelDaConta({
     try { const r = await mudarMeuNome(meuNome); onEu(r.eu); setMeuNome(r.eu.nome); }
     catch (e) { setErro((e as Error).message); }
     finally { setOcupado(false); }
+  };
+
+  // Pede a senha atual mesmo com a sessão aberta: quem sentar num computador com a Saga
+  // aberta não pode tomar a conta trocando a senha dela.
+  const trocarSenha = async (e: FormEvent) => {
+    e.preventDefault();
+    setErroDaSenha(null); setSenhaTrocada(null); setTrocandoSenha(true);
+    try {
+      const r = await trocarMinhaSenha({ senhaAtual, senha: senhaNova, senhaRepetida: senhaNovaRepetida });
+      setSenhaAtual(''); setSenhaNova(''); setSenhaNovaRepetida('');
+      setSenhaTrocada(avisoDaTroca(r.encerradas));
+    } catch (err) {
+      setErroDaSenha(explicarFalha(err instanceof ErroDoServidor ? err.status : 0, (err as Error).message));
+    } finally { setTrocandoSenha(false); }
   };
 
   return (
@@ -215,6 +240,39 @@ export function PainelDaConta({
                 </div>
               </>
             )}
+          </section>
+
+          <section className="painel-bloco">
+            <h3>Senha</h3>
+            <form className="form bloco-da-senha" onSubmit={trocarSenha}>
+              <label>
+                Senha atual
+                <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} autoComplete="current-password" />
+              </label>
+              <label>
+                Senha nova
+                <input type="password" value={senhaNova} onChange={(e) => setSenhaNova(e.target.value)} autoComplete="new-password" />
+              </label>
+              <label>
+                Repita a senha nova
+                <input type="password" value={senhaNovaRepetida} onChange={(e) => setSenhaNovaRepetida(e.target.value)} autoComplete="new-password" />
+              </label>
+              <p className="muted small">
+                Trocar a senha tira a sua conta dos outros computadores em que ela estava
+                aberta. Neste você continua.
+              </p>
+              {erroDaSenha && <div className="error">{erroDaSenha}</div>}
+              {senhaTrocada && <div className="aviso-ok">{senhaTrocada}</div>}
+              <div className="linha-campo">
+                <button
+                  type="submit"
+                  className="primary sm"
+                  disabled={trocandoSenha || !senhaAtual || !senhaNova || !senhaNovaRepetida}
+                >
+                  {trocandoSenha ? 'Trocando…' : 'Trocar senha'}
+                </button>
+              </div>
+            </form>
           </section>
 
           <section className="painel-bloco">

@@ -61,6 +61,7 @@ const IMPRESSOES = [
   '8807ab302e98',  // 47 conversa_pessoas
   'e179f2754686',  // 48 índice de conversa_pessoas
   'fdc7af335ba5',  // 49 mensagens: de uma sala OU de uma conversa (a tabela é refeita)
+  '8a01e8cc0053',  // 50 recuperacoes: código de senha emitido pelo dono da Saga
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -80,7 +81,7 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['amizades', 'cargos', 'categorias', 'conversa_pessoas', 'conversas', 'convites', 'membros', 'mensagens', 'migracoes', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+  assert.deepEqual(tabelas, ['amizades', 'cargos', 'categorias', 'conversa_pessoas', 'conversas', 'convites', 'membros', 'mensagens', 'migracoes', 'recuperacoes', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
 });
 
 test('refazer a tabela de mensagens não perde o que já foi dito', () => {

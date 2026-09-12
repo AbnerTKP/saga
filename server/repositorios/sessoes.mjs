@@ -25,3 +25,18 @@ export const anotarVista = (db, tokenHash, agora) =>
 
 export const apagar = (db, tokenHash) =>
   db.prepare('DELETE FROM sessoes WHERE token_hash = ?').run(tokenHash);
+
+/**
+ * Todas as sessões de uma conta; devolve quantas saíram.
+ *
+ * Já existiu um "derrubar todas", que banir e expulsar usavam, e saiu: banimento é de um
+ * servidor, e a sessão é da conta. Quem usa este é a troca de senha pelo código do dono —
+ * aí quem tinha a senha antiga, seja quem for, tem mesmo de sair.
+ */
+export const apagarDaConta = (db, usuarioId) =>
+  db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(Number(usuarioId)).changes;
+
+/** As da conta menos uma: quem troca a senha em "Sua conta" continua onde está. */
+export const apagarOutrasDaConta = (db, usuarioId, tokenHashQueFica) =>
+  db.prepare('DELETE FROM sessoes WHERE usuario_id = ? AND token_hash <> ?')
+    .run(Number(usuarioId), tokenHashQueFica).changes;

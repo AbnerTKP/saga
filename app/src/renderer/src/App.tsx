@@ -54,6 +54,7 @@ import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
+import { derrubouASessao } from './resposta';
 import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
 import type { UpdateState } from './desktop';
@@ -150,6 +151,7 @@ export function App() {
   // desenho — ver `perdeuOServidorRef`, logo depois de `recarregarSessao`.
   const perdeuOServidorRef = useRef<(id: number) => void>(() => {});
   const sairDaVozRef = useRef<() => void>(() => {});
+  const sessaoCaiuRef = useRef<() => void>(() => {});
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<(PessoaAberta & { em: { x: number; y: number } }) | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -217,7 +219,8 @@ export function App() {
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 
   // Abrir já logado: se existe um crachá guardado, pergunta ao servidor se ainda vale.
-  // Ele pode não valer mais — a pessoa foi expulsa ou banida enquanto o app estava fechado.
+  // Ele pode não valer mais: a senha foi recuperada ou trocada noutro computador enquanto o
+  // app estava fechado.
   useEffect(() => {
     if (!lerToken()) return;
     let vivo = true;
@@ -323,7 +326,13 @@ export function App() {
         // abria o app se via apagado na própria lista por 10 s, e "ocupado" levava 8 s para
         // aparecer — medido. Status confirmado diferente do anterior pede a lista na hora.
         if (vivo && agora !== confirmado) { confirmado = agora; recarregarServidor(); }
-      } catch { /* rede piscou; o próximo batimento resolve */ }
+      } catch (e) {
+        // A sessão caiu: a senha foi recuperada ou trocada noutro computador. É por aqui que
+        // a tela inicial SEM servidor fica sabendo — a busca de salas, que também trata o
+        // 401, não roda sem servidor, e sem isto a conta derrubada ficava na tela sem prazo.
+        if (vivo && derrubouASessao(e)) sessaoCaiuRef.current();
+        // Fora isso, é rede piscando: o próximo batimento resolve.
+      }
     };
     bater();
     const id = setInterval(bater, 30_000);
@@ -357,6 +366,66 @@ export function App() {
   const conversasVistas = useRef<Map<number, number> | null>(null);
   const conversaAbertaRef = useRef<number | null>(null);
   conversaAbertaRef.current = modoConversas ? conversaAberta?.id ?? null : null;
+
+  /**
+   * Esquece o que era da conta que saiu: as listas do servidor, as mesas, as conversas e
+   * quem é quem.
+   *
+   * Serve às duas saídas — o "Sair" e a sessão que caiu com a janela aberta (401) —, porque
+   * as duas deixam o computador pronto para OUTRA conta entrar, e o que sobrasse da anterior
+   * seria desenhado para ela até a primeira busca responder: as salas privadas que ela não
+   * vê, as conversas de outra pessoa, a partida aberta de outro. E `conversasVistas` velho
+   * faria a primeira busca da conta nova avisar, com som, cada conversa não lida dela como
+   * se tivesse acabado de chegar. O 401 com a janela aberta era quase teórico: só o `/sair`
+   * apagava sessão, e cada um apaga a sua. Com a recuperação de senha ele virou caminho de
+   * verdade — recuperar derruba todas as sessões da conta, e trocar a senha em "Sua conta",
+   * as outras —, e a saída pelo 401 tinha ficado para trás da do botão.
+   *
+   * O que estava ABERTO na tela também é da conta que saiu. O `App` não desmonta na tela de
+   * entrar — ela é só um `return` antes do resto —, então painel, menu e cartão abertos
+   * voltavam sozinhos no primeiro desenho de quem entrasse: o "quem pode ver" com o nome de
+   * uma sala privada de um servidor em que ele não está, o cartão de uma pessoa de lá, e o
+   * "Convidar", que gera um convite ao montar. Pelo "Sair" isso quase não acontecia, porque
+   * os painéis cobrem o botão; o 401 chega com o que estiver aberto. `saidaDaConta.test.ts`
+   * lê este arquivo e exige que todo estado novo do `App` seja esquecido aqui ou diga por
+   * que fica: lista à mão esquece em silêncio o que nasceu depois dela.
+   */
+  const esquecerAConta = useCallback(() => {
+    guardarToken(null);
+    setSessao(null);
+    setSalasDoServidor(null);
+    setDadosDoServidor(null);
+    setJogos(null);
+    setJogoAberto(null);
+    setModoConversas(false);
+    setConversaAberta(null);
+    setConversas([]);
+    setAmigos({ pedidos: 0, ids: [] });
+    conversasVistas.current = null;
+    conhecidos.current.clear();
+    // O que estava aberto, e o que se estava olhando.
+    setSalaAbertaId(null);
+    setDevices(false);
+    setPainel(false);
+    setConvidando(false);
+    setSoundboard(false);
+    setPicker(false);
+    setNovoServidor(null);
+    setMenu(null);
+    setPerfilAberto(null);
+    setMenuDaSala(null);
+    setMenuDeSalas(null);
+    setMenuDoServidor(null);
+    setTrancando(null);
+    setPedido(null);
+    setConviteRespondido(null);
+    setRespondendoConvite(false);
+    setPollError(null);
+  }, []);
+  // As buscas vivem de relógio e chamam isto por referência — ver `perdeuOServidorRef`.
+  // Sessão derrubada com o app aberto: volta para o login e SAI da call. Sem sair, a call
+  // continuava rodando atrás da tela de login, sem botão nenhum para desligar.
+  sessaoCaiuRef.current = () => { sairDaVozRef.current(); esquecerAConta(); };
 
   // Quem está em cada sala
   useEffect(() => {
@@ -395,9 +464,7 @@ export function App() {
       } catch (e) {
         if (!vivo) return;
         const status = (e as { status?: number }).status;
-        // Sessão derrubada com o app aberto: volta para o login — e SAI da call. Sem isto a
-        // call continuava rodando atrás da tela de login, sem botão nenhum para desligar.
-        if (status === 401) { sairDaVozRef.current(); guardarToken(null); setSessao(null); return; }
+        if (derrubouASessao(e)) { sessaoCaiuRef.current(); return; }
         // Era o único servidor que você tinha, e não há outro para responder por ele.
         if (status === 403 || status === 404) { perdeuOServidorRef.current(servidorId); return; }
         setPollError((e as Error).message);
@@ -503,15 +570,9 @@ export function App() {
   const logout = useCallback(async () => {
     await rm.leave();
     await sair().catch(() => undefined);
-    guardarToken(null);
     guardarServidorAtual(null);
-    setSessao(null);
-    setSalasDoServidor(null);
-    setDadosDoServidor(null);
-    setJogos(null);
-    setJogoAberto(null);
-    conhecidos.current.clear();
-  }, [rm]);
+    esquecerAConta();
+  }, [rm, esquecerAConta]);
 
   // Identidade -> quem é a pessoa, montado do que o servidor manda. O LiveKit sabe quem
   // está falando mas não sabe de foto nem de cargo; a barra lateral, o palco e o menu

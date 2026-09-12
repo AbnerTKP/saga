@@ -27,7 +27,10 @@ import { verParticipante } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
 import * as tabelaDeUsuarios from './repositorios/usuarios.mjs';
 import * as tabelaDeMembros from './repositorios/membros.mjs';
-import { ErroDeConta, criarConta, entrar, usuarioDaSessao, buscarPorId, sair } from './contas.mjs';
+import {
+  ErroDeConta, criarContaEEntrar, entrar, usuarioDaSessao, buscarPorId, sair, recuperarSenha, trocarMinhaSenha,
+  ERROS_POR_CODIGO,
+} from './contas.mjs';
 import { temPermissao, PERMISSOES } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
@@ -103,7 +106,22 @@ function lerCorpo(req) {
   return new Promise((resolve, reject) => {
     let dados = '';
     req.on('data', (c) => { dados += c; if (dados.length > 100_000) req.destroy(); });
-    req.on('end', () => { try { resolve(dados ? JSON.parse(dados) : {}); } catch (e) { reject(e); } });
+    req.on('end', () => {
+      const malformado = () => reject(new ErroDeConta('O pedido veio malformado.', 400));
+      let corpo;
+      try { corpo = dados ? JSON.parse(dados) : {}; }
+      // Sem repassar o erro do JSON.parse: a mensagem dele carrega um pedaço do corpo
+      // (medido: `Unexpected token 's', ..."{"senha": segredo123"... is not valid JSON`), e
+      // o `console.error` do 500 escreveria no registro a senha de /entrar ou o código de
+      // /recuperar. Corpo que não é JSON é pedido malformado, e não falha do servidor.
+      catch { malformado(); return; }
+      // `null`, `5`, `"texto"` e `[]` também são JSON, e passavam: toda rota desestrutura o
+      // corpo, e `const { apelido } = null` é um 500 com a pilha no registro — no `/entrar`
+      // e em quase toda rota com sessão. Nenhuma recebe outra coisa que não um objeto: o
+      // `pedir` do app sempre manda um, e o que é lista vai DENTRO dele (`{ salas }`).
+      if (corpo === null || typeof corpo !== 'object' || Array.isArray(corpo)) { malformado(); return; }
+      resolve(corpo);
+    });
     req.on('error', reject);
   });
 }
@@ -299,6 +317,22 @@ function sessaoCompleta(usuario, token) {
   };
 }
 
+/**
+ * A resposta de quem acabou de entrar na conta: pelo cadastro, pela senha ou pelo código do
+ * dono.
+ *
+ * Mora num lugar só porque as três portas dão na mesma tela. Com a resposta montada em
+ * cada rota, bastaria o `/entrar` ganhar um campo para quem recuperou a senha abrir o app
+ * com um pedaço faltando — e ninguém ligaria uma coisa à outra.
+ */
+function sessaoDeQuemEntrou(usuario, token) {
+  const sessao = sessaoCompleta(usuario, token);
+  // Banido entra na conta mas não na voz; o app mostra o motivo em vez de uma tela vazia.
+  const barrado = sessao.impedimento
+    ?? (sessao.servidor ? membros.impedimento(membros.buscarMembro(db, sessao.servidor.id, usuario.id)) : null);
+  return { ...sessao, impedimento: barrado };
+}
+
 /** Só a conta, sem servidor: serve para o que é global, como listar meus servidores. */
 function exigirConta(req) {
   const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
@@ -426,6 +460,27 @@ async function tirarDaSala(sid, usuarioId) {
   esquecerSalas();
 }
 
+/**
+ * Tira a CONTA de toda call, em qualquer servidor: a conta é da Saga inteira, e a identidade
+ * no LiveKit é a mesma em todos. É o que a recuperação usa quando derruba as sessões.
+ *
+ * Derrubar a sessão não tira ninguém da call: o crachá do LiveKit vale 12 h e ninguém o
+ * revoga. O app de hoje sai da call ao receber 401, mas o de antes da v0.43.1 voltava ao
+ * login com a call rodando atrás — e quem estava com a senha antiga continuaria falando
+ * como a pessoa. Isto não impede um cliente que guarde o crachá de reconectar; isso pediria
+ * um crachá mais curto, que é outra decisão.
+ *
+ * É consequência: com o LiveKit fora, a senha já foi trocada do mesmo jeito.
+ */
+async function tirarDeTodasAsCalls(usuarioId) {
+  const alvo = identidadeDe(usuarioId);
+  const vivas = await svc.listRooms().catch(() => []);
+  await Promise.all(vivas
+    .filter((r) => Number(r.numParticipants) > 0)
+    .map((r) => svc.removeParticipant(r.name, alvo).catch(() => {})));
+  esquecerSalas();
+}
+
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
 async function ondeEsta(sid, usuarioId) {
   const alvo = identidadeDe(usuarioId);
@@ -503,21 +558,38 @@ const ROTAS = {
   'POST /cadastrar': async (req) => {
     // A senha do grupo saiu por pedido do dono. Ela era o convite: sem ela, quem souber
     // o endereço do servidor cria conta. O que continua barrando é o convite por servidor
-    // (`/servidores/entrar`) — a conta nova cai no servidor de casa e mais nada.
-    const c = await lerCorpo(req);
-    const usuario = criarConta(db, c);
-    const { token } = entrar(db, { apelido: usuario.apelido, senha: c.senha });
-    return sessaoCompleta(usuario, token);
+    // (`/servidores/entrar`) — a conta nova não cai em servidor nenhum.
+    const { usuario, token } = criarContaEEntrar(db, await lerCorpo(req));
+    return sessaoDeQuemEntrou(usuario, token);
   },
 
   'POST /entrar': async (req) => {
     const c = await lerCorpo(req);
     const { usuario, token } = entrar(db, c);
-    const sessao = sessaoCompleta(usuario, token);
-    // Banido entra na conta mas não na voz; o app mostra o motivo em vez de uma tela vazia.
-    const barrado = sessao.impedimento
-      ?? (sessao.servidor ? membros.impedimento(membros.buscarMembro(db, sessao.servidor.id, usuario.id)) : null);
-    return { ...sessao, impedimento: barrado };
+    return sessaoDeQuemEntrou(usuario, token);
+  },
+
+  /**
+   * Esqueci a senha: o código que o dono da Saga gerou troca a senha e já abre a sessão.
+   *
+   * Sem sessão, como o `/entrar`: quem chega aqui é justamente quem não consegue entrar. A
+   * recusa é 400 e nunca 401, que no app quer dizer "a sessão caiu".
+   */
+  'POST /recuperar': async (req) => {
+    const c = await lerCorpo(req);
+    const { usuario, token } = recuperarSenha(db, c, {
+      // Só o apelido: a recusa de quem pede é a de sempre, e é aqui que "alguém está
+      // queimando os códigos desta conta" deixa de ser invisível.
+      aoEsgotar: (conta) => console.log(`recuperação: o código de ${conta.apelido} morreu depois de ${ERROS_POR_CODIGO} erros`),
+    });
+    // Por este caminho o dono da Saga entra em qualquer conta, e o registro é o que deixa
+    // isso à vista. Só o apelido: no corpo vão o código e a senha nova.
+    console.log(`recuperação: ${usuario.apelido} trocou a senha com o código do dono`);
+    // As sessões caíram; quem estava com a senha antiga numa call sai dela também. SEM
+    // esperar: o código já foi gasto, e um LiveKit lento prenderia a resposta com a sessão
+    // nova — quem tentasse de novo receberia "código inválido" com a senha já trocada.
+    tirarDeTodasAsCalls(usuario.id).catch(() => {});
+    return sessaoDeQuemEntrou(usuario, token);
   },
 
   'POST /sair': async (req) => {
@@ -701,6 +773,17 @@ const ROTAS = {
     return { status: presenca.bater(db, eu.id, status) };
   },
 
+  /**
+   * Trocar a senha em "Sua conta". Pede a atual, e errá-la é 403: 401 o app lê como "a
+   * sessão caiu" e desloga. As outras sessões da conta caem; a deste pedido continua.
+   */
+  'POST /eu/senha': async (req) => {
+    exigirConta(req);
+    const corpo = await lerCorpo(req);
+    const { encerradas } = trocarMinhaSenha(db, req.headers['x-sessao'], corpo);
+    return { ok: true, encerradas };
+  },
+
   'GET /saga/contas': async (req) => {
     const eu = exigirConta(req);
     return { contas: plataforma.listarContas(db, eu.id) };
@@ -710,6 +793,21 @@ const ROTAS = {
     const eu = exigirConta(req);
     const { alvo, berserk } = await lerCorpo(req);
     return { conta: plataforma.definirBerserk(db, eu.id, alvo, berserk) };
+  },
+
+  /**
+   * O código de senha de uma conta, para o dono da Saga mandar por fora.
+   *
+   * O registro diz para quem e por quem, e nunca o código: com ele o dono entra em qualquer
+   * conta, e o que torna isso aceitável é ficar anotado. A senha do dono vem no corpo — ver
+   * `emitirRecuperacao` — e também não vai para o registro.
+   */
+  'POST /saga/recuperacao': async (req) => {
+    const eu = exigirConta(req);
+    const { alvo, senha } = await lerCorpo(req);
+    const emitido = plataforma.emitirRecuperacao(db, eu.id, alvo, senha);
+    console.log(`recuperação: código emitido para ${emitido.conta.apelido} por ${eu.apelido}`);
+    return emitido;
   },
 
   'POST /categorias/ordem': async (req) => {

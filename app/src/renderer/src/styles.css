@@ -69,17 +69,39 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 
 /* Tela de entrada */
 /* O brilho vem do azul da logo: a primeira tela tem de parecer o app, não um formulário. */
+/* Quem rola é o CARTÃO, não a tela. O `body` não rola nunca, e o "Esqueci a senha" com
+   erro tem 784 px: numa janela de 700 — notebook de 768 com a barra de tarefas — o "Trocar
+   e entrar" saía da tela, e nem a roda do mouse o trazia. Rolar o `.connect` resolvia a
+   roda, mas punha a barra de rolagem dentro da região de ARRASTE, que engole clique: pegar
+   a barra moveria a janela. Dentro do cartão, que é `no-drag`, a barra é clicável.
+   A conta desconta a barra da janela do Windows (`--topo-da-janela`), como a do `.modal`:
+   sem isso, lá o cartão ficava 34 px maior que o espaço e comia a folga — medido com a
+   barra montada por cima, 7 px acima e abaixo em vez de 24. */
 .connect { height: 100%; display: grid; place-items: center; -webkit-app-region: drag;
+  padding-block: var(--e5);
   background:
     radial-gradient(60% 55% at 50% 0%, rgba(63,127,224,.18) 0%, transparent 65%),
     linear-gradient(165deg, #1b1f28, #101218 70%); }
 .connect-card { -webkit-app-region: no-drag; width: 400px; background: var(--bg2);
   border: 1px solid var(--line); border-radius: 16px; padding: 36px; display: grid; gap: var(--e4);
+  max-height: calc(100vh - 2 * var(--e5) - var(--topo-da-janela, 0px)); overflow-y: auto;
   box-shadow: 0 24px 60px -20px rgba(0,0,0,.7); }
 .connect-card h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.03em; color: var(--white); }
 .connect-card p { margin: -8px 0 4px; }
 .connect-card label { display: grid; gap: 7px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text3); letter-spacing: .07em; }
 .connect-card input { font-size: 15px; }
+/* "Esqueci a senha" fica colado no campo de senha, mas FORA do label: dentro, herdaria o
+   versalete do rótulo, e o label passaria a ter dois controles — o campo e o botão. */
+.connect-esqueci { display: flex; justify-content: flex-end; margin-top: calc(-1 * var(--e3)); }
+.connect-recuperar { display: grid; gap: var(--e1); justify-items: start; }
+.connect-recuperar h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; color: var(--white); }
+/* `.connect-card p` puxa o subtítulo para junto do título; aqui não há título colado acima. */
+.connect-card .connect-recuperar p { margin: 0; font-size: 13.5px; line-height: 1.45; }
+/* O código na mesma letra em que o dono o lê no painel dele. */
+.connect-card input.connect-codigo { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
+/* Sem o versalete do rótulo: em maiúsculas o O e o 0 ficam iguais, e o aviso fala justo deles. */
+.connect-card label .connect-aviso-codigo { text-transform: none; letter-spacing: normal; font-weight: 500;
+  font-size: 12.5px; line-height: 1.4; }
 
 /* A Saga sem servidor nenhum -------------------------------------------------
    Onde toda conta nova começa. O mesmo fundo da tela de entrada, porque é a mesma
@@ -643,6 +665,8 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .linha-campo input { flex: 1; min-width: 0; }
 
 .aviso-ok { margin: 10px 18px 0; padding: 8px 10px; border-radius: 6px; background: #1d3a2c; color: #9fe0bf; font-size: 13px; }
+/* A margem do `.aviso-ok` é a do alto do painel; dentro do bloco da senha ele fica rente aos campos. */
+.bloco-da-senha .aviso-ok { margin: 0; }
 
 .membros { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .membros li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; flex-wrap: wrap; }
@@ -1319,6 +1343,21 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .conta-da-saga button { display: flex; align-items: center; gap: 5px; padding: 7px 12px;
   border-radius: 8px; background: var(--bg3); color: var(--text); font-size: 13px; font-weight: 600; }
 .conta-da-saga button:hover:not(:disabled) { background: var(--bg4); color: var(--white); }
+/* Largura mínima pelo rótulo mais longo de cada um ("código de senha", "tirar"): com a largura
+   do próprio texto, a coluna de botões fazia zigue-zague de uma conta para a outra. */
+.conta-da-saga .conta-botao-codigo { min-width: 9.5rem; justify-content: center; }
+.conta-da-saga .conta-botao-berserk { min-width: 4.75rem; justify-content: center; }
+/* O código de senha abre DENTRO do cartão da conta, embaixo dela: solto na lista, pareceria
+   da conta de baixo. */
+.conta-da-saga.com-codigo-de-senha { flex-wrap: wrap; }
+.codigo-de-senha { flex-basis: 100%; display: grid; gap: var(--e2); padding-top: var(--e3);
+  border-top: 1px solid var(--line); }
+.codigo-de-senha p { margin: 0; line-height: 1.45; }
+.codigo-de-senha-linha { display: flex; align-items: center; gap: var(--e3); }
+/* Selecionável, ao contrário do resto do app: se copiar falhar, o caminho é a mão. */
+.codigo-de-senha-valor { font: 700 26px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .12em; color: var(--white); user-select: text; }
+.codigo-de-senha-falha { color: var(--warn); font-size: 12px; }
 
 /* ---- presença ---- */
 /* A bolinha vive no canto do avatar, com um anel da cor do fundo em volta: sem o anel
