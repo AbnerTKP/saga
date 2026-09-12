@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { TODAS } from './permissoes.mjs';
 
 let processo, base, pasta;
 
@@ -1142,13 +1143,39 @@ test('convite inventado é recusado sem dizer o que existe', async () => {
   assert.match(r.corpo.error, /inválido ou vencido/);
 });
 
-test('membro comum não gera convite', async () => {
+/*
+ * Convidar é permissão PRÓPRIA, e o Membro nasce com ela.
+ *
+ * Era `gerirServidor` — a de trocar nome e foto — que abria o convite, e nenhum cargo
+ * semeado a tem: no "Amigos do Wow" da produção, o Blankito só convidava por ter CRIADO o
+ * servidor, e o Druidax, moderador, não convidava ninguém. Estes dois testes trancam as
+ * duas pontas: que o cargo mais baixo convida, e que tirar `convidar` de um cargo tira
+ * mesmo — por mais poder que ele tenha em tudo o mais.
+ */
+test('o cargo mais baixo convida, como o @everyone do Discord', async () => {
   const bruno = await sessaoDe('bruno');
   const dele = (await chamar('GET', '/servidores', { sessao: bruno.token })).corpo.servidores
     .find((s) => s.nome === 'Sala do Bruno');
-  const caio = await sessaoDe('caio');
+  const caio = await sessaoDe('caio');   // entrou por convite, no cargo mais baixo
   const r = await chamar('POST', '/servidores/convite', { sessao: caio.token, servidor: dele.id, corpo: {} });
+  assert.equal(r.status, 200, 'quem entrou no cargo mais baixo devia poder convidar');
+  assert.match(r.corpo.convite.codigo, /^[A-Z2-9]{8}$/);
+});
+
+test('sem `convidar` no cargo, não sai convite — nem com todo o resto', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  // Tudo menos convidar: se o convite voltar a depender de outra permissão, este passa a
+  // sair e o teste cai.
+  const semConvite = (await chamar('POST', '/cargos/criar', {
+    sessao: dono.token,
+    corpo: { nome: 'Tudo menos convidar', nivel: 30, permissoes: TODAS.filter((p) => p !== 'convidar') },
+  })).corpo.cargo;
+  await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'cargo', alvo: bruno.eu.id, cargo: semConvite.id } });
+
+  const r = await chamar('POST', '/servidores/convite', { sessao: bruno.token, corpo: {} });
   assert.equal(r.status, 403);
+  assert.match(r.corpo.error, /não permite convidar/);
 });
 
 test('dá para sair de um servidor, menos se você o criou', async () => {

@@ -1180,6 +1180,23 @@ body:has(.mini-live) .avisos { bottom: 322px; }
   letter-spacing: .04em; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .menu-risco { height: 1px; background: var(--line); margin: 4px 0; }
+
+/* O menu do nome do servidor. Reusa o menu de salas — é o mesmo objeto, uma lista de
+   ações — e muda duas coisas.
+
+   Convidar é o único item em cor de acento: é o que mais se quer ali, e é o que estava
+   enterrado dentro do painel até agora. E `.perigo` aqui é só TEXTO vermelho: o `.perigo`
+   genérico é o botão de sair do servidor, com contorno — dentro de um menu essa borda vira
+   um retângulo vermelho no meio da lista. Já aconteceu com o "Banir" e com o "Apagar
+   mensagem", e o `.menu-acoes` teve de aprender o mesmo. */
+.menu-do-servidor .convidar { color: var(--accent-claro); font-weight: 600; }
+.menu-do-servidor .convidar:hover { background: var(--accent-tenue); color: var(--accent-claro); }
+.menu-do-servidor .perigo { color: #fa777c; border: 0; border-radius: 4px; font-weight: inherit; }
+.menu-do-servidor .perigo:hover { background: rgba(242,63,67,.15); color: #fa777c; }
+/* Armado, ele é o botão cheio: o segundo clique sai do servidor, e isso tem de parecer o
+   que é. Mesma ideia do desistir do xadrez. */
+.menu-do-servidor .perigo.armado { background: var(--danger); color: #fff; }
+.menu-do-servidor .perigo.armado:hover { background: var(--danger); color: #fff; }
 .linha-botoes { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
 
 /* A confirmação de apagar mostra a mensagem que vai sumir, desenhada como no chat: "apagar

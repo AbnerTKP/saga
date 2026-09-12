@@ -18,7 +18,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, salaAbertaId, onShare, onSettings, onPainel, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -53,7 +53,9 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
-  onPainel: () => void; onSoundboard: () => void; onLogout: () => void;
+  /** O menu do nome do servidor abre onde o cabeçalho termina, não onde o cursor caiu. */
+  onMenuDoServidor: (em: { x: number; y: number }) => void;
+  onSoundboard: () => void; onLogout: () => void;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   statusEscolhido: Status;
   onStatus: (s: Status) => void;
@@ -224,7 +226,16 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       {/* O nome do servidor é onde você está: ganha a foto dele, peso de título e uma
           seta dizendo que abre. Era um texto solto, do mesmo tamanho do resto. */}
       <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
-        <button className="cabeca-do-servidor" onClick={onPainel} title={`${servidor.nome} — configurações do servidor`}>
+        {/* A seta ▾ sempre pareceu um menu e abria o painel direto. Hoje ela abre o menu
+            que ela promete, com "Convidar gente" em primeiro — ver MenuDoServidor. */}
+        <button
+          className="cabeca-do-servidor"
+          title={`${servidor.nome} — convidar, configurar, sair`}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            onMenuDoServidor({ x: r.left, y: r.bottom + 4 });
+          }}
+        >
           <Avatar nome={servidor.nome} foto={servidor.foto} tamanho="big" />
           <span className="nome-do-servidor">{servidor.nome}</span>
           <span className="seta-do-servidor">▾</span>

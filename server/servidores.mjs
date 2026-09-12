@@ -51,7 +51,9 @@ const gerarCodigo = () =>
   [...randomBytes(8)].map((b) => ALFABETO[b % ALFABETO.length]).join('');
 
 export function criarConvite(db, servidorId, quem, { maxUsos } = {}) {
-  if (!temPermissao(quem?.cargo, 'gerirServidor')) {
+  // `convidar`, e não `gerirServidor`: trazer gente não é mexer no servidor. Ver a nota
+  // em permissoes.mjs — enquanto era a mesma permissão, só quem criou convidava.
+  if (!temPermissao(quem?.cargo, 'convidar')) {
     throw new ErroDeConta('Seu cargo não permite convidar.', 403);
   }
   const codigo = gerarCodigo();

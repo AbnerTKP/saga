@@ -17,6 +17,13 @@ export const PERMISSOES = {
   gerirSalas: 'Criar, renomear e apagar salas',
   gerirSons: 'Subir e apagar sons do soundboard',
   gerirServidor: 'Mudar nome e imagens do servidor',
+  // Convidar é permissão SEPARADA de gerir o servidor, como no Discord: lá "Criar
+  // Convite" vem ligada para todo mundo e "Gerenciar Servidor" só serve para VER e
+  // revogar os convites. Enquanto as duas eram a mesma coisa aqui, trazer um amigo
+  // exigia poder de trocar a foto e o nome do servidor — e o Moderador semeado não tem
+  // esse poder. Resultado medido na produção: no "Amigos do Wow", só quem CRIOU o
+  // servidor conseguia gerar código, e não por causa do cargo dele.
+  convidar: 'Convidar gente para o servidor',
   definirId: 'Definir o identificador de alguém',
   apagarMensagens: 'Apagar mensagens dos outros',
 };

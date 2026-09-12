@@ -53,6 +53,7 @@ const IMPRESSOES = [
   '63a23738c8ea',  // 40 coluna apagada_em em mensagens
   '736605861bd8',  // 41 coluna apagada_por em mensagens
   '8b80fe8fe26d',  // 42 índice das mensagens apagadas
+  'a481cf46ecbf',  // 43 todo cargo que já existia passa a poder convidar
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

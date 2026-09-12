@@ -215,6 +215,16 @@ export const MIGRACOES = [
   `ALTER TABLE mensagens ADD COLUMN apagada_em INTEGER`,
   `ALTER TABLE mensagens ADD COLUMN apagada_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`,
   `CREATE INDEX mensagens_apagadas ON mensagens(sala_id, apagada_em) WHERE apagada_em IS NOT NULL`,
+
+  // `convidar` nasceu depois dos cargos que o pessoal já criou, e cargo que existe não
+  // ganha permissão nova sozinho. Mexer só no padrão do cargo NOVO seria repetir o erro do
+  // BEN 10: conserto que depende de cada dono ir marcar a caixinha à mão não é conserto —
+  // o Druidax continuaria sem convidar. Então todo cargo que existe hoje ganha, que é o
+  // padrão do Discord (@everyone convida); quem não quiser, desmarca no editor de cargos.
+  `UPDATE cargos
+      SET permissoes = json_insert(CASE WHEN json_valid(permissoes) THEN permissoes ELSE '[]' END,
+                                   '$[#]', 'convidar')
+    WHERE permissoes NOT LIKE '%"convidar"%'`,
 ];
 
 export function abrirBanco(caminho) {
@@ -283,9 +293,12 @@ export function garantirServidor(db, { nome, salas }) {
 const CARGOS_INICIAIS = [
   {
     nome: 'Moderador', nivel: 50, dono: 0, cor: '#3f7fe0',
-    permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons', 'apagarMensagens'],
+    permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'gerirSons', 'apagarMensagens', 'convidar'],
   },
-  { nome: 'Membro', nivel: 10, dono: 0, cor: null, permissoes: [] },
+  // O Membro nasce podendo convidar, como o @everyone do Discord: trazer um amigo é o que
+  // mais se faz num servidor de amigos, e quem não quiser desmarca no cargo. A alternativa
+  // — só o topo convida — é o que fazia o Druidax, moderador, depender do Blankito.
+  { nome: 'Membro', nivel: 10, dono: 0, cor: null, permissoes: ['convidar'] },
 ];
 
 /**

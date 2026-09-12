@@ -19,7 +19,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'definirId' | 'apagarMensagens';
+  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens';
 
 export type Cargo = {
   id: number;

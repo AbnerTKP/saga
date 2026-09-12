@@ -4,7 +4,7 @@ import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar, baterPresenca,
   pode, criarSala, reordenarSalas, criarCategoria, renomearCategoria, apagarCategoria,
   renomearSala, apagarSala,
-  guardarServidorAtual, lerServidorAtual, meusServidores,
+  guardarServidorAtual, lerServidorAtual, meusServidores, sairDoServidor,
   type Acao,
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
@@ -25,6 +25,8 @@ import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
+import { MenuDoServidor, type AcaoNoServidor } from './components/MenuDoServidor';
+import { Convidar } from './components/Convidar';
 import { MenuDaSala, type AcaoNaSala } from './components/MenuDaSala';
 import { QuemPodeVer } from './components/QuemPodeVer';
 import { PedirNome } from './components/PedirNome';
@@ -90,6 +92,8 @@ export function App() {
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
   const [painel, setPainel] = useState(false);
+  const [menuDoServidor, setMenuDoServidor] = useState<{ x: number; y: number } | null>(null);
+  const [convidando, setConvidando] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [registro, setRegistro] = useState(false);
   // Qual aba abrir: quem clicou em "criar" não quer chegar na de convite.
@@ -549,6 +553,17 @@ export function App() {
     } catch (e) { notas.mostrar('erro', (e as Error).message); }
   }, [notas]);
 
+  /** O que o menu do nome do servidor faz. */
+  const fazerNoServidor = useCallback(async (a: AcaoNoServidor) => {
+    if (a.tipo === 'convidar') { setConvidando(true); return; }
+    if (a.tipo === 'configurar') { setPainel(true); return; }
+    if (a.tipo === 'criarSala') { setPedido({ tipo: 'criar', sala: a.sala }); return; }
+    // Sair já foi confirmado no próprio botão do menu. Quem CRIOU não chega aqui — o item
+    // nem aparece —, e o servidor recusa de todo jeito.
+    try { await sairDoServidor(); await recarregarSessao(); }
+    catch (e) { notas.mostrar('erro', (e as Error).message); }
+  }, [notas, recarregarSessao]);
+
   /** O que o botão direito EM CIMA de uma sala faz. */
   const fazerNaSala = useCallback(async (a: AcaoNaSala) => {
     if (a.tipo === 'quemVe') { setTrancando(a.sala); return; }
@@ -863,7 +878,7 @@ export function App() {
         // As salas da barra são do servidor aberto; quem está nelas, também.
         pessoas={vistosEm(conhecidos.current, servidor.id)}
         onPessoa={abrirMenu}
-        onPainel={() => setPainel(true)}
+        onMenuDoServidor={(em) => setMenuDoServidor(em)}
         statusEscolhido={statusEscolhido}
         onStatus={escolherStatus}
         onSoundboard={() => setSoundboard(true)}
@@ -1023,6 +1038,19 @@ export function App() {
           onPronto={() => setTrancando(null)}
           onClose={() => setTrancando(null)}
         />
+      )}
+      {menuDoServidor && (
+        <MenuDoServidor
+          em={menuDoServidor}
+          eu={eu}
+          nomeDoServidor={servidor.nome}
+          podeGerirSalas={pode(eu.cargo, 'gerirSalas')}
+          onAcao={fazerNoServidor}
+          onClose={() => setMenuDoServidor(null)}
+        />
+      )}
+      {convidando && (
+        <Convidar nomeDoServidor={servidor.nome} onClose={() => setConvidando(false)} />
       )}
       {menuDeSalas && (
         <MenuDeSalas

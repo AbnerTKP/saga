@@ -168,12 +168,26 @@ export function PainelDoServidor({ eu, servidor, donoDaSaga, onServidor, onSaiu,
               <button onClick={salvarNomeServidor} disabled={ocupado || nomeServidor === servidor.nome}>Salvar</button>
             </div>
 
-            <p className="muted small" style={{ marginTop: 12 }}>
-              Convite para trazer gente. Vale por uma semana; quem entrar cai no cargo mais baixo.
+          </section>
+        )}
+
+        {/* Convidar é bloco PRÓPRIO, e não um rodapé de "O servidor".
+            Morava lá dentro, atrás de `gerirServidor` — a permissão de trocar nome e foto
+            —, e nenhum cargo semeado a tem: no "Amigos do Wow", o Druidax era moderador e
+            não conseguia trazer ninguém; só o Blankito, por ter CRIADO o servidor. São
+            coisas diferentes, como no Discord, e agora são permissões diferentes. */}
+        {pode(eu.cargo, 'convidar') && (
+          <section className="painel-bloco">
+            <h3>Convidar gente</h3>
+            <p className="muted small" style={{ margin: '0 0 10px' }}>
+              O código vale por uma semana. Quem entrar cai no cargo mais baixo.
             </p>
             <div className="linha-campo">
               <input readOnly value={convite?.codigo ?? ''} placeholder="Gere um código" className="codigo-convite" />
+              {/* Cheio, como o enviar da barra de escrever: é A ação do bloco, e os botões
+                  sem classe do painel viram texto solto ao lado de um campo. */}
               <button
+                className="primary"
                 disabled={ocupado}
                 onClick={async () => {
                   setErro(null); setOcupado(true);
