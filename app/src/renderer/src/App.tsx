@@ -13,6 +13,7 @@ import {
 } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
+import { anotar } from './registro';
 import { ARQUIVOS } from './sons';
 import { TelaDoXadrez } from './components/TelaDoXadrez';
 import { ConviteDeXadrez } from './components/ConviteDeXadrez';
@@ -119,7 +120,8 @@ export function App() {
   const [conviteRespondido, setConviteRespondido] = useState<number | null>(null);
   const [respondendoConvite, setRespondendoConvite] = useState(false);
   // O som do convite. A regra de não empilhar som é a mesma dos outros avisos (avisos.ts).
-  const tocarAviso = useRef(criarAvisos(ARQUIVOS)).current;
+  const tocarAviso = useRef(criarAvisos(ARQUIVOS, undefined,
+    (qual, e) => anotar('erro', 'som', `o aviso "${qual}" não tocou: ${(e as Error)?.message ?? e}`))).current;
   const conhecidos = useRef<Conhecidos>(new Map());
   const [lidas, setLidas] = useState<Marcadores>(() => lerGuardado());
   /**

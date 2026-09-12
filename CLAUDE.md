@@ -1158,6 +1158,21 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   - **o ganho não é fixo: mede-se o pico e aplica-se o que falta.** A soma das parciais
     nunca chega a 1,0, então um `volume=-3.5dB` fixo entregou a primeira leva inteira 4 dB
     abaixo da família — cada som num nível diferente.
+- **Som nunca é embutido no código — e os de mutar e desmutar nunca tinham tocado.** O
+  Vite embute como `data:` todo arquivo abaixo de 4 KB, e três sons caíram ali: desmutar
+  (3.831 bytes), mutar (3.787) e o lance do xadrez (1.501). O CSP da tela não libera
+  `data:` para som, o navegador recusava, e o `catch` do aviso era `() => undefined`: os
+  três nunca tocaram, em versão nenhuma, sem uma linha no registro. Medido com o CSP de
+  verdade: o mesmo `.ogg` como arquivo "tocou"; como `data:`, `NotSupportedError`. E no
+  app de verdade, depois do conserto, os onze tocam. O conserto não abriu o CSP: som
+  deixou de ser embutido, **pelo tipo e não pelo tamanho** (`embutir.ts`, testado contra a
+  pasta `sons/` inteira) — o tamanho é decidido por quem gera o som, e o próximo curto
+  cairia abaixo dos 4 KB sem ninguém lembrar. E a recusa agora vai para o registro com o
+  nome do som: foi o silêncio que deixou isto viver.
+- **Quem começa a compartilhar ouve o próprio "live".** O som chegava aos outros pelo
+  `TrackPublished`, que só fala das publicações DOS OUTROS — quem transmitia não ouvia
+  nada e ficava sem confirmação de que a live começou. É o mesmo som, e sai depois de
+  publicar, não no clique: tocar antes afirmaria uma live que ainda pode ser recusada.
 - **Entrar é CLARO, sair é ESCURO — e vale para a live e para o microfone.** Foi o pedido
   do dono, e virou a regra do par: na live, si5 → mi6 subindo contra mi5 → si4 descendo
   (com a oitava abaixo, que é o que dá peso); no microfone, o mesmo gesto mais curto e
@@ -1444,7 +1459,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (360) + app (254), segundos, sem nada externo
+pnpm test        # servidor (360) + app (259), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1537,6 +1552,10 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   pessoa vista antes na call de outro. O caminho do palco — voz no CORNUME, olhos no
   "teste", clique em alguém da call — mostrando o cargo do CORNUME e o menu sem moderação
   está nos testes de `pessoas.ts` e no typecheck; numa call de verdade, não foi exercido.
+- **Os sons de mutar, desmutar e da própria live, ouvidos numa call.** O que está medido
+  é o arquivo tocando no app de verdade, com o CSP de verdade e a saída muda. Clicar no
+  microfone numa call e ouvir, e começar a compartilhar e ouvir o "live", precisa de
+  LiveKit e de ouvido, e não foi exercido.
 - **O overlay por cima de um jogo de verdade.** O que está medido, no app de verdade e em
   janela escondida, é o mecanismo inteiro: a janela abrindo acima de tudo e fora da barra
   de tarefas, os quadros chegando a 1280x720, travar e destravar, esticar pela quina, o

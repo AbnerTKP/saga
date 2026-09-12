@@ -287,7 +287,10 @@ function createWindow() {
     // Nasce escondida. Quem clica no ícone espera que o app já venha atualizado — ver a
     // janela abrir e só depois anunciar que há atualização é a ordem errada.
     show: false,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // No Mac os botões continuam os do sistema, por cima da faixa do app. No Windows a
+    // barra inteira é nossa (`BarraDaJanela`): 'hidden' sem `titleBarOverlay` tira a do
+    // sistema e mantém a borda de esticar, a sombra e o encaixe arrastando até o topo.
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     autoHideMenuBar: true,
     webPreferences: {
       /**
@@ -370,6 +373,12 @@ function createWindow() {
     powerMonitor.off('resume', acordou);
     powerMonitor.off('unlock-screen', acordou);
   });
+
+  // O botão do meio da barra desenha "maximizar" ou "restaurar". Maximizar não passa só
+  // pelo botão — dois cliques na faixa e arrastar até o topo também maximizam —, então
+  // quem sabe é a janela, e ela avisa.
+  win.on('maximize', () => win.webContents.send('janela:maximizada', true));
+  win.on('unmaximize', () => win.webContents.send('janela:maximizada', false));
 
   // Carregar a tela é o essencial; atualização é acessório. Se algo falhar aqui, a janela
   // tem de abrir do mesmo jeito — antes, uma exceção aqui deixava a janela em branco.
@@ -565,6 +574,18 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
+
+  // Os botões da barra da janela no Windows. Fechar é o mesmo `close()` do X do sistema,
+  // então sair da Saga continua acontecendo pelo mesmo caminho de antes.
+  const janelaDe = (e: Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
+  ipcMain.handle('janela:minimizar', (e) => janelaDe(e)?.minimize());
+  ipcMain.handle('janela:alternarMaximizar', (e) => {
+    const j = janelaDe(e);
+    if (!j) return;
+    if (j.isMaximized()) j.unmaximize(); else j.maximize();
+  });
+  ipcMain.handle('janela:fechar', (e) => janelaDe(e)?.close());
+  ipcMain.handle('janela:estaMaximizada', (e) => janelaDe(e)?.isMaximized() ?? false);
 
   // Abrir junto com o sistema. `disponivel` é falso em desenvolvimento: ali o executável é
   // o Electron, e o que se gravaria no arranque não é a Saga de ninguém.

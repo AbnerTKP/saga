@@ -8,6 +8,18 @@ const desktop = {
   usaSeletorDoSistema: (): Promise<boolean> => ipcRenderer.invoke('screen:seletorDoSistema'),
   openScreenSettings: () => ipcRenderer.invoke('screen:openSettings'),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  /** Os botões da barra da janela, que no Windows é desenhada pelo app. */
+  janela: {
+    minimizar: () => ipcRenderer.invoke('janela:minimizar'),
+    alternarMaximizar: () => ipcRenderer.invoke('janela:alternarMaximizar'),
+    fechar: () => ipcRenderer.invoke('janela:fechar'),
+    estaMaximizada: (): Promise<boolean> => ipcRenderer.invoke('janela:estaMaximizada'),
+    aoMaximizar: (cb: (maximizada: boolean) => void) => {
+      const ouvir = (_e: unknown, maximizada: boolean) => cb(maximizada);
+      ipcRenderer.on('janela:maximizada', ouvir);
+      return () => { ipcRenderer.off('janela:maximizada', ouvir); };
+    },
+  },
   registrar: (nivel: 'erro' | 'aviso' | 'info', origem: string, mensagem: string) =>
     ipcRenderer.invoke('log:escrever', nivel, origem, mensagem),
   lerRegistro: (): Promise<string> => ipcRenderer.invoke('log:ler'),

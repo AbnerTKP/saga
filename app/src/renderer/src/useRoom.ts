@@ -259,7 +259,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   }, []);
 
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
-  const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS), []);
+  const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS, undefined,
+    (qual, e) => anotar('erro', 'som', `o aviso "${qual}" não tocou: ${(e as Error)?.message ?? e}`)), []);
 
   // Uma vez no registro basta: sem o crachá novo isso falharia a cada clique.
   const jaContei = useRef(false);
@@ -639,6 +640,11 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         pararMedicoes();
         anotarComoEstaSaindo(10);
         anotarComoEstaSaindo(45);
+        // O mesmo som que os outros ouvem quando você entra no ar. Ele chega a eles pelo
+        // `TrackPublished`, que só fala das publicações dos OUTROS — então quem transmitia
+        // não ouvia nada, e não tinha a confirmação de que a live começou. Sai só depois de
+        // publicar: tocar no clique afirmaria uma live que ainda pode ser recusada.
+        tocarAviso('live', deafenedRef.current);
         bump();
         return;
       } catch (e) {
@@ -666,7 +672,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room, souBerserk, avisar, anotarComoEstaSaindo, pararMedicoes]);
+  }, [room, souBerserk, avisar, anotarComoEstaSaindo, pararMedicoes, tocarAviso]);
 
   const stopScreen = useCallback(async () => {
     pararMedicoes();

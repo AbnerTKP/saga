@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import { podeEmbutir } from './src/renderer/src/embutir.ts';
 
 export default defineConfig({
   main: { plugins: [externalizeDepsPlugin()] },
@@ -8,6 +9,8 @@ export default defineConfig({
   renderer: {
     plugins: [react()],
     build: {
+      // Som nunca vira `data:`: o CSP da tela não o tocaria. Ver embutir.ts.
+      assetsInlineLimit: (caminho: string) => podeEmbutir(caminho),
       rollupOptions: {
         /**
          * Duas páginas: a Saga e o overlay da live, que vive numa janela à parte — sem

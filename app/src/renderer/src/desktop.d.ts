@@ -30,6 +30,15 @@ declare global {
       usaSeletorDoSistema: () => Promise<boolean>;
       openScreenSettings: () => Promise<void>;
       version: () => Promise<string>;
+      /** Os botões da barra da janela, que no Windows é desenhada pelo app. */
+      janela: {
+        minimizar: () => Promise<void>;
+        alternarMaximizar: () => Promise<void>;
+        fechar: () => Promise<void>;
+        estaMaximizada: () => Promise<boolean>;
+        /** Maximizar também acontece por fora do botão. Devolve como se desinscrever. */
+        aoMaximizar: (cb: (maximizada: boolean) => void) => () => void;
+      };
       registrar: (nivel: 'erro' | 'aviso' | 'info', origem: string, mensagem: string) => Promise<void>;
       lerRegistro: () => Promise<string>;
       copiarRegistro: (texto: string) => Promise<void>;

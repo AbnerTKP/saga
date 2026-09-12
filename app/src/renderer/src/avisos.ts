@@ -31,24 +31,37 @@ export function podeTocar(
   return ultimo === undefined || agora - ultimo >= intervalo;
 }
 
+/** Toca de verdade, no navegador. Devolve a promessa do `play()` para a falha ter quem a veja. */
+function tocarNoNavegador(url: string, volume: number): Promise<void> {
+  const som = new Audio(url);
+  som.volume = volume;
+  return som.play();
+}
+
 /**
  * Devolve a função que toca os avisos. Cada som guarda o próprio instante do último
  * toque, então "entrou" não silencia "abriu a live".
+ *
+ * Aviso é acessório: se o navegador recusar tocar, isso não pode derrubar a tela. Mas
+ * recusar em SILÊNCIO foi o que escondeu, por versões, que os sons de mutar e desmutar
+ * nunca tocaram — o `catch` era `() => undefined`, e o CSP recusava cada um deles sem
+ * deixar rastro. Por isso a recusa vai para `aoFalhar`, com o nome do som.
  */
 export function criarAvisos(
   arquivos: Record<Aviso, string>,
-  tocar = (url: string, volume: number) => {
-    const som = new Audio(url);
-    som.volume = volume;
-    // Aviso é acessório: se o navegador recusar tocar, isso não pode derrubar a tela.
-    som.play().catch(() => undefined);
-  },
+  tocar: (url: string, volume: number) => unknown = tocarNoNavegador,
+  aoFalhar?: (qual: Aviso, erro: unknown) => void,
 ) {
   const ultimos: Partial<Record<Aviso, number>> = {};
   return (qual: Aviso, surdo: boolean, agora = Date.now()) => {
     if (!podeTocar(agora, ultimos[qual], surdo)) return false;
     ultimos[qual] = agora;
-    tocar(arquivos[qual], VOLUME_DO_AVISO);
+    try {
+      const tocando = tocar(arquivos[qual], VOLUME_DO_AVISO);
+      if (tocando instanceof Promise) tocando.catch((e) => aoFalhar?.(qual, e));
+    } catch (e) {
+      aoFalhar?.(qual, e);
+    }
     return true;
   };
 }

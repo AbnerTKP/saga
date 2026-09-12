@@ -45,3 +45,22 @@ test('ouvido desligado não toca e nem marca o relógio', () => {
   assert.equal(avisar('entrou', false, 1010), true, 'religou o ouvido e o próximo toca');
   assert.deepEqual(tocados, ['a']);
 });
+
+test('som recusado não passa calado: a falha chega com o nome do som', async () => {
+  const falhas: string[] = [];
+  const avisar = criarAvisos(
+    ARQUIVOS,
+    () => Promise.reject(new Error('NotSupportedError')),
+    (qual, erro) => falhas.push(`${qual}: ${(erro as Error).message}`),
+  );
+  assert.equal(avisar('micMutou', false, 1000), true);
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(falhas, ['micMutou: NotSupportedError']);
+});
+
+test('tocar que lança na hora também não derruba quem avisou', () => {
+  const falhas: string[] = [];
+  const avisar = criarAvisos(ARQUIVOS, () => { throw new Error('sem Audio'); }, (qual) => falhas.push(qual));
+  assert.doesNotThrow(() => avisar('live', false, 1000));
+  assert.deepEqual(falhas, ['live']);
+});
