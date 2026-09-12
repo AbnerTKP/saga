@@ -6,7 +6,17 @@
 
 export type Marcadores = Record<number, number>;
 
-const CHAVE = 'cantinho.leituras';
+/**
+ * Dois marcadores, guardados separados: as salas de um lado, as conversas privadas do
+ * outro. Juntos, a sala 3 e a conversa 3 seriam a mesma chave — e ler uma marcaria a
+ * outra como lida.
+ */
+export const ONDE = {
+  salas: 'cantinho.leituras',
+  conversas: 'cantinho.leiturasConversas',
+} as const;
+
+const CHAVE = ONDE.salas;
 
 /** "3:40,7:0" — o formato que a busca de salas entende. */
 export const paraParametro = (m: Marcadores): string =>
@@ -41,17 +51,17 @@ export function deTexto(texto: string | null): Marcadores {
 
 // O acesso ao armazenamento pode lançar sozinho (janela anônima, site bloqueado), e o
 // aviso de mensagem nova não é motivo para derrubar a tela.
-export function lerGuardado(): Marcadores {
+export function lerGuardado(chave: string = CHAVE): Marcadores {
   try {
-    return deTexto(localStorage.getItem(CHAVE));
+    return deTexto(localStorage.getItem(chave));
   } catch {
     return {};
   }
 }
 
-export function guardar(m: Marcadores): void {
+export function guardar(m: Marcadores, chave: string = CHAVE): void {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify(m));
+    localStorage.setItem(chave, JSON.stringify(m));
   } catch {
     /* sem marcador guardado o aviso volta na próxima abertura; não é motivo para quebrar */
   }

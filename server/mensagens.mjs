@@ -7,12 +7,42 @@ import { buscarMembro } from './membros.mjs';
 import { podeApagarMensagem } from './permissoes.mjs';
 import { ler as lerEnquadramento } from './enquadramento.mjs';
 import * as tabela from './repositorios/mensagens.mjs';
+// Só para saber se a pessoa faz parte da conversa. A regra da conversa privada mora em
+// `conversas.mjs`; o que vem aqui é a pergunta que apagar precisa fazer, e apagar é um
+// caminho só — o app manda o id da mensagem, não o lugar dela.
+import * as conversasDaConta from './repositorios/conversas.mjs';
 
 const TAMANHO_MAXIMO = 2000;
 
 // Quanto a tela carrega de uma vez. Chat de cinco amigos não precisa de mais que isso, e
 // mandar tudo tornaria a abertura lenta com o tempo.
 export const QUANTAS = 100;
+
+/**
+ * A linha do banco como a tela a desenha.
+ *
+ * Mora aqui, e não em cada lugar que lista mensagens, porque a conversa privada desenha
+ * exatamente a mesma coisa: mudar o formato da mensagem num lugar e esquecer o outro é
+ * como o cartão de perfil nasceu com duas versões.
+ *
+ * `semAutor` é o que escrever quando a mensagem não tem dono: "alguém" na sala (a conta
+ * foi apagada e a mensagem ficou) e "Saga" na sala de notas, onde ninguém escreveu de fato.
+ */
+export const verMensagem = (m, semAutor = 'alguém') => ({
+  id: m.id,
+  texto: m.texto,
+  imagem: m.imagem ?? null,
+  // O que vai para a tela é o nome que a pessoa escolheu; `arquivo` é o do disco, que
+  // é o hash e não diz nada a ninguém.
+  arquivo: m.arquivo ? { url: m.arquivo, nome: m.arquivo_nome ?? 'arquivo', bytes: m.arquivo_bytes ?? 0 } : null,
+  criadoEm: m.criado_em,
+  autorId: m.usuario_id,
+  nome: m.nome ?? semAutor,
+  foto: m.foto ?? null,
+  enquadramento: lerEnquadramento(m.enquadramento),
+  turbo: !!m.turbo,
+  idExibido: m.id_exibido ?? null,
+});
 
 /** Da mais antiga para a mais nova, que é a ordem em que se lê. */
 export function listarMensagens(db, servidorId, quem, salaId, { depoisDe } = {}) {
@@ -26,23 +56,9 @@ export function listarMensagens(db, servidorId, quem, salaId, { depoisDe } = {})
     ? tabela.depoisDe(db, servidorId, sala.id, depoisDe, QUANTAS)
     : tabela.ultimas(db, servidorId, sala.id, QUANTAS);
 
-  return linhas.map((m) => ({
-    id: m.id,
-    texto: m.texto,
-    imagem: m.imagem ?? null,
-    // O que vai para a tela é o nome que a pessoa escolheu; `arquivo` é o do disco, que
-    // é o hash e não diz nada a ninguém.
-    arquivo: m.arquivo ? { url: m.arquivo, nome: m.arquivo_nome ?? 'arquivo', bytes: m.arquivo_bytes ?? 0 } : null,
-    criadoEm: m.criado_em,
-    autorId: m.usuario_id,
-    // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não. Já na sala de
-    // notas ninguém escreveu de fato — foi a Saga —, e "alguém" ali seria mentira.
-    nome: m.nome ?? (sala.papel === 'notas' ? 'Saga' : 'alguém'),
-    foto: m.foto ?? null,
-    enquadramento: lerEnquadramento(m.enquadramento),
-    turbo: !!m.turbo,
-    idExibido: m.id_exibido ?? null,
-  }));
+  // Quem apagou a conta vira "alguém": a mensagem fica, o vínculo não. Já na sala de
+  // notas ninguém escreveu de fato — foi a Saga —, e "alguém" ali seria mentira.
+  return linhas.map((m) => verMensagem(m, sala.papel === 'notas' ? 'Saga' : 'alguém'));
 }
 
 /** `imagem` é o nome do arquivo já guardado — um GIF do Giphy, por exemplo. */
@@ -80,10 +96,28 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
  */
 export function apagarMensagem(db, servidorId, quem, id) {
   const msg = tabela.buscar(db, id);
-  // Mensagem de sala que a pessoa não vê responde como inexistente, igual à própria sala.
-  const sala = msg && salaVisivel(db, servidorId, quem, msg.sala_id);
-  if (!msg || !sala) throw new ErroDeConta('Essa mensagem não existe.', 404);
+  if (!msg) throw new ErroDeConta('Essa mensagem não existe.', 404);
   if (msg.apagada_em) return { ok: true, id: msg.id };
+
+  /**
+   * Numa conversa privada não existe moderação: cada um apaga o que DISSE, e ninguém
+   * apaga o do outro. Não há cargo entre duas pessoas, e "quem está acima" — que é o que
+   * sustenta toda a moderação do resto do app — não quer dizer nada aqui.
+   */
+  if (msg.conversa_id) {
+    if (!conversasDaConta.souDela(db, msg.conversa_id, quem.id)) {
+      throw new ErroDeConta('Essa mensagem não existe.', 404);
+    }
+    if (msg.usuario_id !== quem.id) {
+      throw new ErroDeConta('Não dá para apagar: numa conversa privada, cada um apaga só o que disse.', 403);
+    }
+    tabela.apagar(db, msg.id, { porQuem: quem.id, quando: Date.now() });
+    return { ok: true, id: msg.id };
+  }
+
+  // Mensagem de sala que a pessoa não vê responde como inexistente, igual à própria sala.
+  const sala = salaVisivel(db, servidorId, quem, msg.sala_id);
+  if (!sala) throw new ErroDeConta('Essa mensagem não existe.', 404);
 
   const autor = msg.usuario_id ? buscarMembro(db, servidorId, msg.usuario_id) : null;
   const r = podeApagarMensagem(quem, autor, {

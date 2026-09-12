@@ -343,18 +343,29 @@ export type Mensagem = {
 export type Digitando = { id: number; nome: string };
 
 /**
+ * ONDE a conversa acontece: uma sala de um servidor, ou uma conversa privada.
+ *
+ * As duas respondem pela mesma porta, com a mesma resposta — o app só troca `sala=` por
+ * `conversa=`. É isso que faz o chat da tela ser o mesmo componente nos dois, com o mesmo
+ * "está digitando", o mesmo anexo e o mesmo apagar.
+ */
+export type Onde = { sala: number } | { conversa: number };
+
+const comoQuery = (onde: Onde) => ('sala' in onde ? `sala=${onde.sala}` : `conversa=${onde.conversa}`);
+
+/**
  * Sem `depoisDe`, traz as últimas; com ele, só o que chegou desde então.
  *
  * Quem está digitando vem na MESMA resposta: não há empurrão no servidor, e uma segunda
  * busca de 2 em 2 segundos só para isso dobraria o trânsito da rota mais chamada do app.
  * Servidor antigo não manda o campo — aí não aparece ninguém digitando, e nada quebra.
  */
-export const lerMensagens = (sala: number, depoisDe?: number, apagadasDesde?: number) =>
+export const lerMensagens = (onde: Onde, depoisDe?: number, apagadasDesde?: number) =>
   // `apagadas` são as que sumiram desde `apagadasDesde` — o `agora` da resposta anterior.
   // É como uma mensagem apagada noutra tela sai desta. Servidor antigo não manda nenhum dos dois.
   pedir<{ mensagens: Mensagem[]; digitando?: Digitando[]; apagadas?: number[]; agora?: number }>(
     'GET',
-    `/mensagens?sala=${sala}${depoisDe ? `&depoisDe=${depoisDe}` : ''}${apagadasDesde ? `&apagadasDesde=${apagadasDesde}` : ''}`,
+    `/mensagens?${comoQuery(onde)}${depoisDe ? `&depoisDe=${depoisDe}` : ''}${apagadasDesde ? `&apagadasDesde=${apagadasDesde}` : ''}`,
   );
 
 /**
@@ -362,11 +373,11 @@ export const lerMensagens = (sala: number, depoisDe?: number, apagadasDesde?: nu
  * nunca a cada tecla: escrever a cada tecla é exatamente o que `vista_em` ensinou a não
  * fazer. Falhar aqui não é motivo para nada aparecer na tela.
  */
-export const avisarQueDigito = (sala: number) =>
-  pedir<{ ok: true }>('POST', '/digitando', { sala });
+export const avisarQueDigito = (onde: Onde) =>
+  pedir<{ ok: true }>('POST', '/digitando', onde);
 
-export const enviarMensagem = async (sala: number, texto: string) =>
-  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { sala, texto })).mensagem;
+export const enviarMensagem = async (onde: Onde, texto: string) =>
+  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens', { ...onde, texto })).mensagem;
 
 /** Apaga uma mensagem: a própria, ou a de alguém abaixo, com a permissão do cargo. */
 export const apagarMensagem = (id: number) =>
@@ -385,12 +396,16 @@ export const apagarMensagem = (id: number) =>
  * estava subindo, se tinha travado ou se tinha dado errado.
  */
 export function enviarArquivoNoChat(
-  sala: number,
+  onde: Onde,
   arquivo: File,
   texto = '',
   aoProgredir?: (fracao: number) => void,
 ): Promise<Mensagem> {
-  const q = new URLSearchParams({ sala: String(sala), nome: arquivo.name, texto });
+  const q = new URLSearchParams({
+    ...('sala' in onde ? { sala: String(onde.sala) } : { conversa: String(onde.conversa) }),
+    nome: arquivo.name,
+    texto,
+  });
   const servidor = lerServidorAtual();
   const token = lerToken();
 
@@ -419,18 +434,29 @@ export function enviarArquivoNoChat(
 }
 
 /** O servidor baixa o GIF, guarda como qualquer imagem e publica a mensagem. */
-export const enviarGifNoChat = async (sala: number, url: string) =>
-  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens/gif', { sala, url })).mensagem;
+export const enviarGifNoChat = async (onde: Onde, url: string) =>
+  (await pedir<{ mensagem: Mensagem }>('POST', '/mensagens/gif', { ...onde, url })).mensagem;
 
 export const renomearServidor = (nome: string) =>
   pedir<{ servidor: Servidor }>('PATCH', '/servidor', { nome });
 
 /** `lidas` é "sala:última lida" — o servidor devolve quanto falta ler em cada uma. */
-export const buscarSalas = async (lidas = '', servidorId?: number) =>
+export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConversa = '') =>
   // `servidorId` é de qual servidor a resposta É — pode não ser o pedido, se você não faz
   // mais parte dele. `jogos` são as mesas de xadrez. Servidor antigo não manda nenhum dos dois.
-  pedir<{ servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor }>(
-    'GET', `/rooms${lidas ? `?lidas=${encodeURIComponent(lidas)}` : ''}`, undefined, servidorId);
+  // `conversas` e `amigos` são da CONTA e vêm de carona nesta busca, como o xadrez: é a
+  // busca que toda tela já faz, e uma terceira só para elas dobraria o trânsito para
+  // dizer coisas que mudam devagar. Servidor antigo não manda nenhum dos dois.
+  pedir<{
+    servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
+    conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
+  }>('GET', `/rooms${comParametros({ lidas, lidasConversas: lidasDeConversa })}`, undefined, servidorId);
+
+/** Só os que têm algo a dizer entram na URL — `?lidas=&lidasConversas=` não diz nada. */
+const comParametros = (campos: Record<string, string>) => {
+  const q = new URLSearchParams(Object.entries(campos).filter(([, v]) => v));
+  return q.size ? `?${q}` : '';
+};
 
 // --- xadrez -----------------------------------------------------------------
 
@@ -642,3 +668,67 @@ export const definirBerserk = async (alvo: number, berserk: boolean) =>
 /** Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. */
 export const baterPresenca = async (status?: string) =>
   (await pedir<{ status: string }>('POST', '/eu/presenca', status ? { status } : {})).status;
+
+// --- amigos e conversas privadas --------------------------------------------
+//
+// Amizade e conversa são da CONTA, não de um servidor: nenhuma destas chamadas depende
+// do servidor aberto, e quem não está em servidor nenhum continua tendo amigos.
+
+/**
+ * Uma pessoa vista de fora de qualquer servidor: a CONTA.
+ *
+ * Sem cargo, sem nome exibido e sem identificador — os três pertencem ao vínculo com um
+ * servidor, e numa conversa privada não há um. É o mesmo que o `/eu` responde a quem não
+ * faz parte de lugar nenhum.
+ */
+export type Conta = {
+  id: number;
+  nome: string;
+  foto: string | null;
+  enquadramento: Enquadramentos;
+  turbo: boolean;
+  status: string;
+};
+
+export type Pedido = Conta & { desde: number };
+
+/** A tela de amigos inteira: quem é amigo, quem te chamou e quem você chamou. */
+export type Amizades = { amigos: Conta[]; recebidos: Pedido[]; enviados: Pedido[] };
+
+/** Uma conversa na lista da esquerda, com o começo da última mensagem. */
+export type Conversa = {
+  id: number;
+  com: Conta;
+  previa: string | null;
+  ultimaEm: number | null;
+  /** A última mensagem que existe — é com ela que o marcador de lidas se compara. */
+  ultimaId: number;
+  naoLidas: number;
+};
+
+/** A conversa aberta. `podeEscrever` é falso quando a amizade acabou. */
+export type ConversaAberta = { id: number; com: Conta; podeEscrever: boolean };
+
+export const verAmigos = () => pedir<Amizades>('GET', '/amigos');
+
+/**
+ * Manda o pedido de amizade.
+ *
+ * Pelo APELIDO na tela de amigos — é o que a pessoa sabe de cor e é o mesmo em toda a
+ * Saga — e pelo `alvo` quando a pessoa já está na sua frente (o menu, o cartão): ali o
+ * que se tem na mão é o id, e o nome que aparece é o exibido NAQUELE servidor, que não
+ * serve para achar a conta.
+ */
+export const pedirAmizade = (quem: { apelido: string } | { alvo: number }) =>
+  pedir<{ amigo: Conta; estado: 'pedido' | 'amigos' }>('POST', '/amigos/pedir', quem);
+
+export const responderAmizade = (alvo: number, aceitar: boolean) =>
+  pedir<{ ok: true }>('POST', '/amigos/responder', { alvo, aceitar });
+
+/** Cancela o pedido que você mandou, ou desfaz a amizade. A conversa não é apagada. */
+export const desfazerAmizade = (alvo: number) =>
+  pedir<{ ok: true }>('POST', '/amigos/desfazer', { alvo });
+
+/** Abre a conversa com um amigo — ou devolve a que já existe. */
+export const abrirConversa = async (alvo: number) =>
+  (await pedir<{ conversa: ConversaAberta }>('POST', '/conversas/abrir', { alvo })).conversa;

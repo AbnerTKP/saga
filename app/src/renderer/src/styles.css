@@ -1439,3 +1439,122 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 
 .faixa-da-partida .faixa-partida-titulo { font-size: 12.5px; color: var(--text2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- conversas privadas e amigos -------------------------------------------
+   O modo conversas troca a COLUNA da esquerda e tira a lista de pessoas: quem está na
+   tela não é um servidor, e a lista de gente de um servidor ali não teria a ver com
+   nada. A trilha continua, porque é por ela que se volta. */
+.app.sem-pessoas { grid-template-columns: 240px 1fr 60px; }
+
+/* O primeiro botão da trilha não é um servidor: são as suas conversas. Redondo seria
+   "uma pessoa"; ele é a CAIXA de todas elas, então continua quadrado, e o risco logo
+   abaixo é o que separa "com quem eu falo" de "onde eu estou". */
+.quadro-conversas {
+  width: 42px; height: 42px; flex: none; border-radius: 12px; position: relative;
+  background: var(--bg3); color: var(--accent-claro); display: grid; place-items: center;
+}
+.quadro-conversas:hover { background: var(--bg4); }
+.quadro-conversas.atual { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-tenue); }
+.quadro-conversas .marca-nova {
+  position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center; border-radius: 9px; background: var(--danger);
+  color: #fff; font-size: 11px; font-weight: 700; border: 2px solid var(--bg0);
+  font-variant-numeric: tabular-nums;
+}
+.trilha-risco { width: 22px; height: 2px; flex: none; border-radius: 1px; background: var(--bg4); margin: 3px 0; }
+
+/* O cabeçalho da coluna no modo conversas não abre menu nenhum — não há servidor para
+   configurar —, então ele não é botão: sem hover e sem seta, para não prometer clique. */
+.cabeca-do-servidor.sem-clique { cursor: default; }
+.marca-conversas { background: var(--bg3); color: var(--accent-claro); display: grid; place-items: center; }
+
+.lista-de-conversas { flex: 1; overflow-y: auto; padding: var(--e3) var(--e2) var(--e5); }
+
+/* Amigos é a primeira linha da coluna: é dela que sai toda conversa nova. */
+.linha-amigos {
+  width: 100%; display: flex; align-items: center; gap: var(--e2);
+  min-height: 38px; padding: 0 var(--e2); border-radius: 8px;
+  color: var(--text2); font-size: 15px; font-weight: 600; text-align: left;
+}
+.linha-amigos:hover { background: var(--bg3); color: var(--text); }
+.linha-amigos.aberta { background: var(--accent-tenue); color: var(--white); }
+.linha-amigos .nome { flex: 1; }
+.linha-amigos svg { flex: none; opacity: .85; }
+
+/* A conversa mostra a última mensagem porque é ela que diz se vale abrir — nome sozinho
+   obrigaria a entrar em cada uma para saber o que aconteceu. */
+.conversa-grande {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 8px; text-align: left; color: var(--text2);
+}
+.conversa-grande:hover { background: var(--bg3); color: var(--text); }
+.conversa-grande.aberta { background: var(--accent-tenue); color: var(--white); }
+.conversa-grande .quem { flex: 1; min-width: 0; line-height: 1.25; }
+.conversa-grande .quem .strong { font-size: 14.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversa-grande .previa { font-size: 12px; color: var(--text3); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linha-amigos .nao-lidas, .conversa-grande .nao-lidas {
+  min-width: 18px; height: 18px; padding: 0 5px; flex: none;
+  display: grid; place-items: center; border-radius: 9px; background: var(--danger);
+  color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+/* A tela de amigos. Largura limitada: a coluna do palco fica larga sem a lista de
+   pessoas, e uma linha de 1.100 px põe o nome numa ponta e o botão na outra. */
+.tela-amigos { flex: 1; overflow-y: auto; padding: var(--e4) var(--e5) var(--e5); }
+.tela-amigos > * { max-width: 880px; }
+.adicionar-amigo { display: grid; gap: 7px; max-width: 620px; margin-bottom: var(--e5); }
+.adicionar-amigo .rotulo {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text3);
+}
+.adicionar-amigo .linha { display: flex; gap: var(--e2); }
+.adicionar-amigo input { flex: 1; }
+
+.linha-de-amigo {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 9px 8px; border-radius: 8px; color: var(--text2); text-align: left;
+  border-top: 1px solid var(--line);
+}
+.linha-de-amigo:hover { background: var(--bg3); }
+.linha-de-amigo .quem { flex: 1; min-width: 0; line-height: 1.25;
+  display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.linha-de-amigo .quem .strong { font-size: 14.5px; }
+.acoes-do-amigo { display: flex; gap: 6px; flex: none; }
+
+/* Botão de linha: menor que o `.primary`, que é de decisão de tela. */
+.botao-miudo {
+  padding: 7px 12px; border-radius: 8px; background: var(--bg3);
+  color: var(--white); font-size: 12.5px; font-weight: 600;
+}
+.botao-miudo:hover:not(:disabled) { background: var(--bg4); }
+.botao-miudo.sim { background: var(--accent); color: #fff; }
+.botao-miudo.sim:hover:not(:disabled) { background: var(--accent-h); }
+/* Vermelho de TEXTO até o clique que arma; cheio só quando desfazer É a ação — é a
+   mesma escada do desistir do xadrez e do apagar mensagem. */
+.botao-miudo.nao { background: none; color: #ff8a90; }
+.botao-miudo.nao:hover:not(:disabled) { background: rgba(224,72,82,.14); }
+.botao-miudo.armado { background: var(--danger); color: #fff; }
+
+/* Amizade desfeita: a conversa continua sendo lida e o campo é que fecha. A frase fica
+   colada na barra de escrever, no lugar do "está digitando" — é ali que a pessoa vai
+   procurar o motivo de o campo não responder. */
+.chat-travado {
+  margin: 0 var(--e5) var(--e2); padding: 8px 10px; font-size: 12.5px;
+  color: var(--warn); background: rgba(224,162,51,.1);
+  border: 1px solid rgba(224,162,51,.32); border-radius: 10px;
+}
+
+/* O botão principal do cartão do perfil: falar com a pessoa é o que mais se faz com ela. */
+.perfil-mandar {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 11px 16px; border-radius: 10px;
+  background: var(--accent); color: #fff; font-weight: 650; font-size: 14px;
+}
+.perfil-mandar:hover:not(:disabled) { background: var(--accent-h); }
+/* Pedir amizade ainda não é falar: fica em cinza, para o cheio marcar só o que já é. */
+.perfil-mandar.convite { background: var(--bg3); color: var(--white); }
+.perfil-mandar.convite:hover:not(:disabled) { background: var(--bg4); }
+
+@media (max-width: 1100px) {
+  .app.sem-pessoas { grid-template-columns: 240px 1fr 60px; }
+}

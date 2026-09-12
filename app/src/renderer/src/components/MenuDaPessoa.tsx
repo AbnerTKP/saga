@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } from '../api';
+import { COMO_SE_LE, PODE_CLICAR, type ComAPessoa } from '../amizade';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { type Enquadramentos } from '../enquadramento';
@@ -22,7 +23,14 @@ export type PessoaNaCall = {
   idExibido?: string | null;
 };
 
-export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose, deOutroServidor }: {
+export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose, deOutroServidor, amizade, onAmizade }: {
+  /**
+   * O que dá para fazer com esta pessoa do lado da AMIZADE — ver amizade.ts. Vem de fora
+   * porque quem sabe quem é seu amigo é o app inteiro, não este menu.
+   */
+  amizade?: ComAPessoa | null;
+  /** Mandar mensagem, ou mandar o pedido de amizade. Quem decide qual é `amizade`. */
+  onAmizade?: (acao: ComAPessoa) => void;
   pessoa: PessoaNaCall;
   eu: Membro;
   /**
@@ -118,6 +126,20 @@ export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao,
 
       {deOutroServidor && !souEu && (
         <div className="menu-nota muted small">Esta call é de {deOutroServidor}. Para moderar, abra {deOutroServidor}.</div>
+      )}
+
+      {/* Falar com alguém não é moderar alguém: o bloco é próprio, e vem primeiro porque
+          é o que mais se faz. Numa conta sem amizade nenhuma ele é a única coisa aqui. */}
+      {amizade && onAmizade && COMO_SE_LE[amizade] && (
+        <div className="menu-acoes">
+          <button
+            disabled={ocupado || !PODE_CLICAR[amizade]}
+            title={amizade === 'esperando' ? 'Ele ainda não respondeu' : undefined}
+            onClick={async () => { onAmizade(amizade); onClose(); }}
+          >
+            {COMO_SE_LE[amizade]}
+          </button>
+        </div>
       )}
 
       {(posso('mutar') || posso('desconectar') || posso('timeout') || posso('expulsar') || posso('banir') || posso('cargo')) && (

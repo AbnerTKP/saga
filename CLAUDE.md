@@ -100,7 +100,8 @@ porque escrever log também precisa de memória.
 ```
 index.mjs        tabela de rotas: lê o corpo, chama, responde. Não sabe SQL.
 *.mjs            a REGRA: permissoes, cargos, membros, salas, mensagens, sons,
-                 servidores, contas, notas, presenca, plataforma. Não sabem de HTTP.
+                 servidores, contas, notas, presenca, plataforma, amigos, conversas.
+                 Não sabem de HTTP.
 repositorios/    o SQL, um arquivo por TABELA. Não sabem de regra.
 banco.mjs        esquema e migrações — o único fora de repositorios/ que escreve SQL.
 ```
@@ -833,6 +834,70 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **O chat só te leva ao fim se você já estiver no fim.** Rolar para baixo a cada novidade
   é o certo enquanto se lê o fim; quem subiu para procurar uma coisa de ontem não pode ser
   puxado de volta porque alguém começou a digitar.
+- **A conversa privada é da CONTA, e só existe entre AMIGOS.** Ela não é de servidor
+  nenhum: sair do servidor onde vocês se conheceram não apaga o que foi dito, e o mesmo par
+  tem UMA conversa, não uma por servidor. Por isso quem fala nela aparece como conta —
+  apelido e foto —, sem cargo, sem nome exibido e sem identificador: os três pertencem ao
+  vínculo com um servidor, e aqui não há um. O `SELECT` é o MESMO do chat das salas com o
+  servidor nulo, e é isso que faz o nome cair no apelido sozinho.
+- **A amizade é a porta, e pedir é bater nela.** Saber o apelido de alguém não abre nada:
+  manda um pedido, e quem abre é o outro. É a mesma regra do convite de servidor ("saber o
+  número de um servidor alheio não abre porta"), com a porta sendo a pessoa e não o lugar.
+  **Quem pediu não aceita o próprio pedido** — senão bastava pedir e aceitar sozinho, que é
+  exatamente o que a amizade fecha. **Pedidos cruzados viram amizade na hora**: dois
+  pedidos esperando um ao outro nunca se resolveriam.
+- **A amizade é uma linha por PAR, com os ids ordenados** (`a` é sempre o menor), e quem
+  pediu fica numa COLUNA. Guardando uma linha por direção, A→B e B→A podiam existir ao
+  mesmo tempo: duas verdades sobre o mesmo par. Recusar e desfazer APAGAM a linha — quem
+  recusou hoje pode aceitar amanhã, e uma tabela que só cresce guardaria cada não para
+  sempre sem ninguém nunca ler.
+- **A amizade é perguntada a CADA mensagem, não só ao abrir a conversa.** É o que o dono
+  pediu: mensagem só entre amigos. Desfazer a amizade com a janela aberta fecha o campo de
+  escrever na volta seguinte da busca, **sem apagar a conversa** — o que foi dito continua
+  lá, e destruir o registro dos dois por decisão de um seria outra coisa. No app,
+  `podeEscrever` nem é guardado com a conversa: sai de quem é seu amigo AGORA.
+- **Numa conversa privada não há moderação: cada um apaga o que DISSE.** Não existe cargo
+  entre duas pessoas, e "quem está acima" — que sustenta toda a moderação do resto do app
+  — não quer dizer nada ali. Nem o dono do servidor apaga o que o outro disse.
+- **Uma mensagem é de uma SALA ou de uma CONVERSA, e é o banco que garante isso.** Duas
+  tabelas de mensagem seriam escrever duas vezes tudo o que uma mensagem sabe fazer —
+  anexo, GIF, apagar com hora, contagem de não lidas —, e a segunda envelheceria em
+  silêncio, que foi o que o SQL espalhado por treze arquivos ensinou. Então `mensagens`
+  ganhou `conversa_id`, `sala_id` passou a aceitar nulo e um `CHECK` recusa a linha sem
+  dono e a linha com dois donos. Relaxar um NOT NULL no SQLite é RECONSTRUIR a tabela:
+  medido antes de escrever, com dados dentro — 4 mensagens (com anexo, apagada e sem
+  autor) entram e saem idênticas campo a campo, `foreign_key_check` vazio, índices
+  refeitos, cascata intacta, as duas buscas usando índice. `banco.test.mjs` roda essa
+  migração contra dados de novo a cada `pnpm test`.
+- **O modo conversas troca a COLUNA, não o servidor.** Foi a escolha do dono entre três
+  desenhos renderizados com o `styles.css` de verdade: as conversas na trilha (redondo é
+  pessoa, quadrado é servidor), uma seção "Conversas" acima das salas, e este — o botão no
+  topo da trilha que troca a coluna inteira, como no Discord. O servidor aberto continua o
+  mesmo por baixo, **a call continua tocando** (o painel dela diz de qual servidor é a
+  sala), e voltar é um clique no quadrado. A lista de pessoas some junto: ela é do
+  servidor, e ali não há um na tela.
+- **Amigos é a primeira linha da coluna, e a única porta de uma conversa nova.** Adicionar
+  é pelo APELIDO — é o que a pessoa sabe de cor e o que é global; o nome exibido é de um
+  servidor e não serve para achar conta nenhuma. Do menu e do cartão de quem já está na
+  sua frente, o pedido vai pelo ID, pelo mesmo motivo. As três seções (pedidos, esperando,
+  amigos) existem porque são três coisas diferentes de fazer.
+- **"Mandar mensagem" não é moderar: no menu da pessoa ela tem bloco próprio, e vem
+  primeiro.** Falar com alguém é o que mais se faz; banir é o que menos se quer errar. No
+  cartão do perfil ela é o botão cheio, e "Adicionar amigo" fica em cinza — pedir ainda não
+  é falar.
+- **As conversas e os pedidos vêm de carona na busca de salas**, como o xadrez e o "está
+  digitando": é a busca que toda tela já faz. Elas são da CONTA e não daquele servidor —
+  vão ali porque é o batimento do app, não porque pertençam a ele. Uma consequência
+  honesta: **quem não está em servidor nenhum não alcança as conversas**, porque essa busca
+  exige um. Para cinco amigos num servidor isso não aparece; num app sem servidor, apareceria.
+  E, como tudo o que viaja entre app e servidor, isto tem versão dos dois lados: **app novo
+  com servidor antigo não mostra conversa nenhuma** — o `/rooms` não manda o campo, a lista
+  fica vazia e a tela de amigos não carrega. Publicar o servidor junto é o que liga a coisa.
+- **Mensagem privada vira aviso no canto, e não som.** Ela é dirigida a VOCÊ, então avisa
+  mesmo com a janela noutro lugar — mas a que está aberta na tela não avisa, porque você
+  está lendo. Quem decide é a comparação com a ÚLTIMA mensagem que cada conversa tinha, e
+  não o contador de não lidas: o contador também sobe quando o marcador anda noutra
+  máquina, e daria aviso sem mensagem nenhuma por trás (`amizade.ts`, puro e testado).
 - **A barra de escrever é UMA caixa**, com o anexar dentro à esquerda e o GIF e o enviar
   dentro à direita; quem acende ao receber o cursor é a caixa (`:focus-within`), não o
   campo. Eram quatro coisas soltas na mesma linha e nada dizia que formavam um lugar de
@@ -1285,7 +1350,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (330) + app (204), segundos, sem nada externo
+pnpm test        # servidor (360) + app (214), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1343,6 +1408,15 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
 - **O volume do soundboard mexendo no som de verdade.** Está medido que o som do
   soundboard chega reconhecível (a fonte `unknown`, com o nome junto) e que o desenho da
   chave fecha; ouvir o som de outra pessoa mais baixo, numa call, não foi exercido.
+- **A conversa privada entre duas pessoas de verdade.** O que está medido, no app de
+  verdade e em janela escondida contra um servidor local: entrar, abrir as conversas, a
+  tela de amigos com as três seções, aceitar um pedido, abrir a conversa pelo botão do
+  amigo e pelo cartão do perfil, mandar mensagem e vê-la na tela, a prévia e o "não lidas"
+  na coluna da esquerda, a lista de pessoas sumindo no modo conversas, e o clique no
+  quadrado devolvendo o servidor com as salas — tudo conferido também em imagem. **Não
+  foram exercidos**: duas pessoas em dois computadores (o aviso de mensagem nova chegando
+  do outro lado, o "está digitando" de verdade), anexo e GIF dentro de uma conversa, e a
+  amizade desfeita com a janela do outro aberta.
 - **A lista de quem está assistindo, numa call de verdade.** O que está medido é o
   mecanismo — o atributo indo e voltando por um LiveKit de verdade, com o mesmo
   `livekit-client` do app, e o desenho conferido em imagem. Duas pessoas numa call, uma

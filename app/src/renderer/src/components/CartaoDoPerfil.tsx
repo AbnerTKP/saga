@@ -6,6 +6,7 @@ import { Nome } from './Nome';
 import { VerImagem } from './VerImagem';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import { useFecharComEsc } from '../useFechar';
+import { COMO_SE_LE, PODE_CLICAR, type ComAPessoa } from '../amizade';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -22,7 +23,10 @@ const desde = (t: number | null | undefined) => {
  *
  * O enquadramento que ela escolheu vale aqui também — é a mesma imagem, vista de perto.
  */
-export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onVolume, onClose }: {
+export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onVolume, onClose, amizade, onAmizade }: {
+  /** O que dá para fazer com esta pessoa do lado da amizade — ver amizade.ts. */
+  amizade?: ComAPessoa | null;
+  onAmizade?: (acao: ComAPessoa) => void;
   pessoa: PessoaNaCall;
   /**
    * De que servidor são o cargo e o "desde quando". Foto, banner e Berserk são da conta e
@@ -119,6 +123,19 @@ export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onV
                 <div><dt>Cargo em {servidorNome}</dt><dd>{pessoa.cargo?.nome ?? 'Sem cargo'}</dd></div>
               )}
             </dl>
+
+            {/* O que se faz com uma pessoa, antes de qualquer ajuste: falar com ela. Só
+                entre amigos — quem ainda não é ganha o pedido, que é o que abre a porta. */}
+            {amizade && onAmizade && COMO_SE_LE[amizade] && (
+              <button
+                className={`perfil-mandar ${amizade === 'conversar' ? '' : 'convite'}`}
+                disabled={!PODE_CLICAR[amizade]}
+                onClick={() => { onAmizade(amizade); onClose(); }}
+              >
+                <Icon name={amizade === 'conversar' ? 'texto' : 'pessoas'} size={17} />
+                {COMO_SE_LE[amizade]}
+              </button>
+            )}
 
             {/* O volume mora aqui porque é sobre esta pessoa e vale só para MIM — não é
                 moderação, e não depende de cargo nenhum. Ele viveu só no menu do botão

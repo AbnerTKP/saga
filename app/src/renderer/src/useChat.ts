@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, avisarQueDigito, apagarMensagem,
-  type Digitando, type Mensagem,
+  type Digitando, type Mensagem, type Onde,
 } from './api';
 import { aoDespertar } from './despertar';
 
@@ -18,8 +18,26 @@ const INTERVALO = 2000;
  */
 const AVISAR_A_CADA = 3000;
 
-/** Chat de uma sala. As mensagens moram no servidor, então sobrevivem a todo mundo sair. */
-export function useChat(salaId: number | null) {
+/**
+ * O chat de um LUGAR: uma sala de um servidor, ou uma conversa privada.
+ *
+ * O mesmo laço serve os dois porque a resposta do servidor é a mesma — só muda `sala=`
+ * para `conversa=`. Uma segunda cópia disto para a conversa privada seria uma segunda
+ * implementação do apagar, do "está digitando" e da busca do que chegou, e a segunda
+ * envelheceria em silêncio.
+ *
+ * A dependência do efeito é a CHAVE do lugar (`s12`, `c3`), e não o objeto: `{sala: 12}`
+ * nasce de novo a cada desenho, e com ele o laço reiniciaria a cada volta — o mesmo
+ * defeito que fez a busca de `/servidor` rodar 4.204 vezes em 10 s.
+ */
+export const chaveDoLugar = (onde: Onde | null) =>
+  (!onde ? null : 'sala' in onde ? `s${onde.sala}` : `c${onde.conversa}`);
+
+export function useChat(onde: Onde | null) {
+  const chave = chaveDoLugar(onde);
+  // O lugar em referência: o efeito depende da chave, mas precisa do objeto para pedir.
+  const lugar = useRef(onde);
+  lugar.current = onde;
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [digitando, setDigitando] = useState<Digitando[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -34,14 +52,15 @@ export function useChat(salaId: number | null) {
     setDigitando([]);
     ultima.current = 0;
     apagadasDesde.current = 0;
-    // A primeira tecla numa sala nova avisa na hora, sem herdar o relógio da anterior.
+    // A primeira tecla num lugar novo avisa na hora, sem herdar o relógio do anterior.
     ultimoAviso.current = 0;
-    if (!salaId) return;
+    const aqui = lugar.current;
+    if (!aqui) return;
 
     let vivo = true;
     const buscar = async () => {
       try {
-        const r = await lerMensagens(salaId, ultima.current || undefined, apagadasDesde.current || undefined);
+        const r = await lerMensagens(aqui, ultima.current || undefined, apagadasDesde.current || undefined);
         if (!vivo) return;
         // Servidor antigo não manda o campo: aí ninguém aparece digitando, e nada quebra.
         setDigitando(r.digitando ?? []);
@@ -68,7 +87,7 @@ export function useChat(salaId: number | null) {
     // vez de esperar a próxima volta de um relógio que pode ter passado minutos parado.
     const pararDeDespertar = aoDespertar(buscar);
     return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
-  }, [salaId]);
+  }, [chave]);
 
   // Quem acabou de escrever não pode esperar a próxima busca para se ver na tela.
   const mostrarJa = useCallback((m: Mensagem) => {
@@ -85,48 +104,52 @@ export function useChat(salaId: number | null) {
    * parou — e desistir de escrever é justamente a hora em que ninguém avisa nada.
    */
   const contarQueDigito = useCallback(() => {
-    if (!salaId) return;
+    const aqui = lugar.current;
+    if (!aqui) return;
     const agora = Date.now();
     if (agora - ultimoAviso.current < AVISAR_A_CADA) return;
     ultimoAviso.current = agora;
     // Servidor antigo responde 404 aqui. Não é assunto de ninguém: a frase simplesmente
     // não aparece do outro lado.
-    avisarQueDigito(salaId).catch(() => undefined);
-  }, [salaId]);
+    avisarQueDigito(aqui).catch(() => undefined);
+  }, [chave]);
 
   // Mandou: o servidor já tira a frase, e o relógio zera para a próxima tecla avisar logo.
   const mandou = useCallback(() => { ultimoAviso.current = 0; }, []);
 
   const enviar = useCallback(async (texto: string) => {
-    if (!salaId) return;
+    const aqui = lugar.current;
+    if (!aqui) return;
     const limpo = texto.trim();
     if (!limpo) return;
     try {
-      mostrarJa(await enviarMensagem(salaId, limpo));
+      mostrarJa(await enviarMensagem(aqui, limpo));
       mandou();
     } catch (e) {
       setErro((e as Error).message);
     }
-  }, [salaId, mostrarJa, mandou]);
+  }, [chave, mostrarJa, mandou]);
 
   const enviarGif = useCallback(async (url: string) => {
-    if (!salaId) return;
+    const aqui = lugar.current;
+    if (!aqui) return;
     // Deixa o erro subir: quem abriu o seletor de GIF precisa vê-lo lá dentro.
-    mostrarJa(await enviarGifNoChat(salaId, url));
+    mostrarJa(await enviarGifNoChat(aqui, url));
     mandou();
-  }, [salaId, mostrarJa, mandou]);
+  }, [chave, mostrarJa, mandou]);
 
   const enviarArquivo = useCallback(async (
     arquivo: File,
     texto = '',
     aoProgredir?: (fracao: number) => void,
   ) => {
-    if (!salaId) return;
+    const aqui = lugar.current;
+    if (!aqui) return;
     // O erro sobe para quem chamou: é lá, ao lado do arquivo escolhido, que ele precisa
     // aparecer — e não numa tarja no alto, longe do que a pessoa estava fazendo.
-    mostrarJa(await enviarArquivoNoChat(salaId, arquivo, texto, aoProgredir));
+    mostrarJa(await enviarArquivoNoChat(aqui, arquivo, texto, aoProgredir));
     mandou();
-  }, [salaId, mostrarJa, mandou]);
+  }, [chave, mostrarJa, mandou]);
 
   /**
    * Apaga uma mensagem. Sai desta tela na hora; as outras ficam sabendo na busca delas. O

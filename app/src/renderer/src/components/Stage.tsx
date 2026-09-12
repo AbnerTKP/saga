@@ -7,7 +7,7 @@ import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
 import { ControleDeVolume } from './ControleDeVolume';
-import type { Digitando, Mensagem, RoomInfo } from '../api';
+import type { ConversaAberta, Digitando, Mensagem, RoomInfo } from '../api';
 import type { LiveNoChat } from '../lives';
 import { identidadeDe } from '../pessoas';
 import type { PessoaNaCall } from './MenuDaPessoa';
@@ -201,7 +201,15 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos }: {
+  /**
+   * A conversa privada aberta. Ela toma o lugar da sala no palco: o chat é o MESMO — mesmo
+   * anexo, mesmo GIF, mesmo apagar no botão direito —, e o que muda é o cabeçalho, que
+   * mostra a pessoa em vez do nome da sala.
+   */
+  conversa?: ConversaAberta | null;
+  /** A tela de amigos, quando ela é o que está aberto. Ela traz o próprio cabeçalho. */
+  telaDeAmigos?: ReactNode;
   rm: RM;
   /** Quem foi visto nas calls do servidor DA CALL: os rostos do palco são de lá. */
   pessoas: Map<string, PessoaNaCall>;
@@ -352,6 +360,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
     </>
   ) : null;
 
+  // A tela de amigos é uma tela de conta, não de servidor: ela traz o próprio cabeçalho e
+  // não tem call nem sala em volta.
+  if (telaDeAmigos) {
+    return <main className="stage">{telaDeAmigos}</main>;
+  }
+
   // A partida toma o palco inteiro: é a tela da dupla, sem a faixa da call e sem o resto da
   // sala em volta. Quem sai dela para ler o chat leva a faixa da partida junto.
   if (jogo) {
@@ -366,8 +380,20 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   return (
     <main className="stage">
       <header className="stage-head">
-        <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
-        <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
+        {conversa ? (
+          <>
+            {/* A pessoa no lugar do nome da sala: numa conversa privada é ela o lugar. */}
+            <Avatar nome={conversa.com.nome} foto={conversa.com.foto}
+              enquadramento={conversa.com.enquadramento?.foto} status={conversa.com.status} />
+            <span className="strong">{conversa.com.nome}</span>
+            <span className="muted small">só vocês dois</span>
+          </>
+        ) : (
+          <>
+            <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
+            <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
+          </>
+        )}
       </header>
 
       {/* Estando na voz de uma sala e lendo outra, a call fica à mostra aqui em cima: quem
@@ -392,7 +418,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       {/* Chat é da sala de chat, e só dela. Ele já morou dentro da sala de voz, dividindo
           espaço com a transmissão — as duas coisas ficavam apertadas e nenhuma inteira.
           Quem está na voz e abre o chat não perde a live: ela vira o quadro flutuante. */}
-      {salaAberta?.tipo === 'texto' ? (
+      {conversa || salaAberta?.tipo === 'texto' ? (
         <div className="stage-body so-chat">
           <Chat
             mensagens={chat.mensagens}
@@ -403,7 +429,13 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             onEnviarArquivo={chat.enviarArquivo}
             onDigitar={chat.contarQueDigito}
             onVerImagem={setImagemAberta}
-            sala={salaAberta.name}
+            sala={conversa ? conversa.com.nome : salaAberta!.name}
+            chave={conversa ? `c${conversa.id}` : `s${salaAberta!.id}`}
+            emConversa={!!conversa}
+            // Amizade desfeita: a conversa continua sendo lida, e o campo é que fecha.
+            bloqueio={conversa && !conversa.podeEscrever
+              ? 'Vocês não são mais amigos. Só dá para mandar mensagem para amigos.'
+              : null}
             meuId={meuId}
             podeApagar={podeApagar}
             onApagar={chat.apagar}

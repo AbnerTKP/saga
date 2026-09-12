@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 import { abrirBanco, garantirServidor, garantirCargos, MIGRACOES } from './banco.mjs';
 
 // As migrações são registradas pela POSIÇÃO na lista. Se alguém inserir uma no meio,
@@ -54,6 +55,12 @@ const IMPRESSOES = [
   '736605861bd8',  // 41 coluna apagada_por em mensagens
   '8b80fe8fe26d',  // 42 índice das mensagens apagadas
   'a481cf46ecbf',  // 43 todo cargo que já existia passa a poder convidar
+  'f4956d3de868',  // 44 amizades
+  'f662e6ee6ae3',  // 45 índice de amizades (quem me chamou)
+  'c6e3e0e2aadd',  // 46 conversas
+  '8807ab302e98',  // 47 conversa_pessoas
+  'e179f2754686',  // 48 índice de conversa_pessoas
+  'fdc7af335ba5',  // 49 mensagens: de uma sala OU de uma conversa (a tabela é refeita)
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -73,7 +80,51 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['cargos', 'categorias', 'convites', 'membros', 'mensagens', 'migracoes', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+  assert.deepEqual(tabelas, ['amizades', 'cargos', 'categorias', 'conversa_pessoas', 'conversas', 'convites', 'membros', 'mensagens', 'migracoes', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'usuarios']);
+});
+
+test('refazer a tabela de mensagens não perde o que já foi dito', () => {
+  // Relaxar um NOT NULL no SQLite é RECONSTRUIR a tabela, e reconstruir tabela é a
+  // migração mais perigosa que existe: ela copia dados. Aqui ela roda contra um banco com
+  // conversa dentro — mensagem com anexo, mensagem apagada e mensagem sem autor —, e o
+  // que se confere é que saiu idêntico ao que entrou.
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  const refazer = MIGRACOES.findIndex((sql) => sql.includes('mensagens_nova'));
+  assert.ok(refazer > 0, 'a migração que refaz mensagens sumiu');
+
+  for (const sql of MIGRACOES.slice(0, refazer)) db.exec(sql);
+  db.prepare("INSERT INTO servidores (nome, criado_em) VALUES ('CORNUME', 1)").run();
+  db.prepare("INSERT INTO salas (servidor_id, nome, ordem) VALUES (1, 'Geral', 0)").run();
+  db.prepare("INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES ('TKP','tkp','x',1)").run();
+  const inserir = db.prepare(`INSERT INTO mensagens (sala_id, usuario_id, texto, arquivo, arquivo_nome, arquivo_bytes, criado_em, apagada_em, apagada_por)
+                              VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  inserir.run(1, 'oi', null, null, null, 1000, null, null);
+  inserir.run(1, 'com anexo', 'abc.bin', 'foto.png', 123, 2000, null, null);
+  inserir.run(1, '', null, null, null, 3000, 3500, 1);        // apagada
+  inserir.run(null, 'da Saga', null, null, null, 4000, null, null);  // sem autor
+
+  // As duas listas se montam do MESMO jeito antes de comparar: a tabela nova tem as
+  // colunas noutra ordem, e comparar JSON cru acusaria diferença onde não há nenhuma.
+  const arrumadas = () => db.prepare('SELECT * FROM mensagens ORDER BY id').all()
+    .map((m) => Object.entries({ ...m, conversa_id: m.conversa_id ?? null })
+      .sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(';'));
+  const antes = arrumadas();
+
+  db.exec('BEGIN');
+  db.exec(MIGRACOES[refazer]);
+  db.exec('COMMIT');
+
+  assert.deepEqual(arrumadas(), antes, 'a reconstrução mexeu no que já estava escrito');
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.equal(db.prepare('PRAGMA integrity_check').all()[0].integrity_check, 'ok');
+
+  // A regra "uma mensagem mora num lugar só" passa a ser do BANCO, e não da boa vontade
+  // de quem escreve o INSERT.
+  const recusa = (sql) => assert.throws(() => db.exec(sql), /CHECK/);
+  recusa("INSERT INTO mensagens (texto, criado_em) VALUES ('lugar nenhum', 1)");
+  db.prepare('INSERT INTO conversas (criada_em) VALUES (1)').run();
+  recusa("INSERT INTO mensagens (sala_id, conversa_id, texto, criado_em) VALUES (1, 1, 'os dois', 1)");
 });
 
 test('as colunas acrescentadas depois existem e têm padrão seguro', () => {

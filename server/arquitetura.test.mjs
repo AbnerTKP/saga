@@ -68,6 +68,9 @@ test('cada repositório é de UMA tabela', () => {
     'sons.mjs': ['usuarios', 'membros'],
     'salas.mjs': ['categorias'],
     'servidores.mjs': ['membros'],
+    // Conversa e participantes nascem juntos: uma conversa sem ninguém dentro é uma linha
+    // quebrada, e criar as duas coisas em lugares diferentes é abrir essa porta.
+    'conversas.mjs': ['conversa_pessoas'],
   };
   const escrevendoFora = [];
   for (const arquivo of readdirSync(join(AQUI, 'repositorios')).filter((f) => f.endsWith('.mjs'))) {

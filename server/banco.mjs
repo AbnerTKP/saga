@@ -225,6 +225,81 @@ export const MIGRACOES = [
       SET permissoes = json_insert(CASE WHEN json_valid(permissoes) THEN permissoes ELSE '[]' END,
                                    '$[#]', 'convidar')
     WHERE permissoes NOT LIKE '%"convidar"%'`,
+
+  // Amizade. A conversa privada só existe entre amigos, e amigo só com pedido aceito —
+  // saber o apelido de alguém dá o direito de BATER na porta, não o de entrar.
+  //
+  // A linha é UMA por par, com os ids ordenados (`a` é sempre o menor): uma amizade é de
+  // duas pessoas, não de uma para a outra. Guardando uma linha por direção, A→B e B→A
+  // podiam existir ao mesmo tempo — dois pedidos cruzados que nunca viravam amizade, e
+  // duas verdades sobre o mesmo par. Quem pediu fica na COLUNA `pedido_de`, que é a única
+  // coisa que tem direção aqui.
+  `CREATE TABLE amizades (
+     a          INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+     b          INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+     pedido_de  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+     estado     TEXT    NOT NULL DEFAULT 'pedido',
+     criada_em  INTEGER NOT NULL,
+     aceita_em  INTEGER,
+     PRIMARY KEY (a, b)
+   )`,
+  // A chave primária já indexa quem procura por `a`; quem procura por `b` — "quem me
+  // chamou?" — precisaria varrer a tabela inteira sem isto.
+  `CREATE INDEX amizades_b ON amizades(b)`,
+
+  // A conversa privada. Ela é da CONTA e não de servidor nenhum: sair do servidor onde
+  // vocês se conheceram não apaga o que foi dito. Por isso não mora em `salas`, que
+  // pertencem a um servidor.
+  //
+  // A tabela de pessoas é separada, com uma linha por participante, e não duas colunas:
+  // é o que permitirá conversa de três sem migrar o que já existe.
+  `CREATE TABLE conversas (id INTEGER PRIMARY KEY, criada_em INTEGER NOT NULL)`,
+  `CREATE TABLE conversa_pessoas (
+     conversa_id INTEGER NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
+     usuario_id  INTEGER NOT NULL REFERENCES usuarios(id)  ON DELETE CASCADE,
+     PRIMARY KEY (conversa_id, usuario_id)
+   )`,
+  `CREATE INDEX conversa_pessoas_usuario ON conversa_pessoas(usuario_id)`,
+
+  // Uma mensagem passa a ser de uma SALA ou de uma CONVERSA.
+  //
+  // Duas tabelas de mensagem seriam escrever duas vezes tudo o que uma mensagem sabe
+  // fazer — anexo, GIF, apagar com hora, contagem de não lidas — e a segunda
+  // envelheceria em silêncio, que foi o que o SQL espalhado por treze arquivos ensinou.
+  // Então a coluna nova entra aqui, e `sala_id` passa a aceitar nulo.
+  //
+  // Relaxar um NOT NULL no SQLite é RECONSTRUIR a tabela: não há ALTER COLUMN. O `CHECK`
+  // é o que impede a linha sem dono e a linha com dois donos — a regra de que uma
+  // mensagem mora num lugar só passa a ser do banco, e não da boa vontade de quem
+  // escreve o INSERT. Medido antes de escrever isto, com dados dentro: 4 mensagens entram
+  // e saem idênticas campo a campo, `foreign_key_check` vazio, os índices refeitos, a
+  // cascata de apagar a sala intacta, e as duas buscas usando índice.
+  `CREATE TABLE mensagens_nova (
+     id            INTEGER PRIMARY KEY,
+     sala_id       INTEGER REFERENCES salas(id)     ON DELETE CASCADE,
+     conversa_id   INTEGER REFERENCES conversas(id) ON DELETE CASCADE,
+     usuario_id    INTEGER REFERENCES usuarios(id)  ON DELETE SET NULL,
+     texto         TEXT    NOT NULL,
+     criado_em     INTEGER NOT NULL,
+     imagem        TEXT,
+     arquivo       TEXT,
+     arquivo_nome  TEXT,
+     arquivo_bytes INTEGER,
+     apagada_em    INTEGER,
+     apagada_por   INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     CHECK ((sala_id IS NULL) <> (conversa_id IS NULL))
+   );
+   INSERT INTO mensagens_nova (id, sala_id, conversa_id, usuario_id, texto, criado_em,
+                               imagem, arquivo, arquivo_nome, arquivo_bytes, apagada_em, apagada_por)
+        SELECT id, sala_id, NULL, usuario_id, texto, criado_em,
+               imagem, arquivo, arquivo_nome, arquivo_bytes, apagada_em, apagada_por
+          FROM mensagens;
+   DROP TABLE mensagens;
+   ALTER TABLE mensagens_nova RENAME TO mensagens;
+   CREATE INDEX mensagens_sala ON mensagens(sala_id, id);
+   CREATE INDEX mensagens_conversa ON mensagens(conversa_id, id);
+   CREATE INDEX mensagens_apagadas ON mensagens(sala_id, apagada_em) WHERE apagada_em IS NOT NULL;
+   CREATE INDEX mensagens_apagadas_conversa ON mensagens(conversa_id, apagada_em) WHERE apagada_em IS NOT NULL`,
 ];
 
 export function abrirBanco(caminho) {

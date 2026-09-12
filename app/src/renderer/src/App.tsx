@@ -9,6 +9,7 @@ import {
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
+  abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde,
 } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
@@ -21,7 +22,9 @@ import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
 import { CartaoDoPerfil } from './components/CartaoDoPerfil';
-import { lerGuardado, guardar, marcarLido, paraParametro, type Marcadores } from './leituras';
+import { lerGuardado, guardar, marcarLido, paraParametro, ONDE, type Marcadores } from './leituras';
+import { comAPessoa, conversasComNovidade, ultimasVistas, type ComAPessoa } from './amizade';
+import { TelaDeAmigos } from './components/TelaDeAmigos';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
@@ -116,7 +119,20 @@ export function App() {
   // O som do convite. A regra de não empilhar som é a mesma dos outros avisos (avisos.ts).
   const tocarAviso = useRef(criarAvisos(ARQUIVOS)).current;
   const conhecidos = useRef<Conhecidos>(new Map());
-  const [lidas, setLidas] = useState<Marcadores>(lerGuardado);
+  const [lidas, setLidas] = useState<Marcadores>(() => lerGuardado());
+  /**
+   * As conversas privadas, e o modo que as mostra.
+   *
+   * Elas são da CONTA: não trocam quando você troca de servidor, e por isso não levam
+   * etiqueta de servidor como as salas, os cargos e as pessoas. O que o modo faz é trocar
+   * a COLUNA da esquerda — o servidor aberto continua o mesmo por baixo, e voltar para ele
+   * é um clique no quadrado, sem recarregar nada.
+   */
+  const [modoConversas, setModoConversas] = useState(false);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [amigos, setAmigos] = useState<{ pedidos: number; ids: number[] }>({ pedidos: 0, ids: [] });
+  const [conversaAberta, setConversaAberta] = useState<ConversaAberta | null>(null);
+  const [lidasDeConversa, setLidasDeConversa] = useState<Marcadores>(() => lerGuardado(ONDE.conversas));
   const notas = useAvisos();
   const [perfilAberto, setPerfilAberto] = useState<PessoaAberta | null>(null);
   // Os cargos que dá para atribuir pelo menu, e quem faz parte. Vêm com o servidor, não com
@@ -291,6 +307,21 @@ export function App() {
   // uma sala como lida não derruba e recria esse intervalo a cada mensagem.
   const lidasRef = useRef(lidas);
   useEffect(() => { lidasRef.current = lidas; guardar(lidas); }, [lidas]);
+  const lidasDeConversaRef = useRef(lidasDeConversa);
+  useEffect(() => {
+    lidasDeConversaRef.current = lidasDeConversa;
+    guardar(lidasDeConversa, ONDE.conversas);
+  }, [lidasDeConversa]);
+  /**
+   * A última mensagem que cada conversa tinha na volta anterior da busca.
+   *
+   * É com isto que se sabe que chegou coisa nova, e não com o contador de não lidas — ver
+   * `conversasComNovidade`. Em referência porque o aviso acontece DENTRO da busca, e um
+   * estado aqui faria o efeito nascer de novo a cada resposta.
+   */
+  const conversasVistas = useRef<Map<number, number> | null>(null);
+  const conversaAbertaRef = useRef<number | null>(null);
+  conversaAbertaRef.current = modoConversas ? conversaAberta?.id ?? null : null;
 
   // Quem está em cada sala
   useEffect(() => {
@@ -300,7 +331,9 @@ export function App() {
     const tick = async () => {
       try {
         // O pedido diz de que servidor fala, porque a resposta vai ser guardada como dele.
-        const lista = await buscarSalas(paraParametro(lidasRef.current), servidorId);
+        const lista = await buscarSalas(
+          paraParametro(lidasRef.current), servidorId, paraParametro(lidasDeConversaRef.current),
+        );
         if (!vivo) return;
         // Resposta de OUTRO servidor: o aberto não é mais seu.
         if (lista.servidorId && lista.servidorId !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
@@ -308,6 +341,18 @@ export function App() {
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
         setJogos({ servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] });
+        // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
+        // elas são da conta. Servidor antigo não manda o campo — aí não há conversa
+        // nenhuma na tela e nada quebra, como o "está digitando".
+        const daConta = lista.conversas ?? [];
+        setConversas(daConta);
+        setAmigos(lista.amigos ?? { pedidos: 0, ids: [] });
+        // Mensagem privada é dirigida a VOCÊ: ela avisa mesmo com a janela noutro lugar.
+        // A que está aberta na tela não avisa — você está lendo.
+        for (const c of conversasComNovidade(conversasVistas.current, daConta, conversaAbertaRef.current)) {
+          avisarRef.current('info', `${c.com.nome} te mandou uma mensagem.`);
+        }
+        conversasVistas.current = ultimasVistas(daConta);
         setPollError(null);
       } catch (e) {
         if (!vivo) return;
@@ -586,7 +631,75 @@ export function App() {
   }, [pedido, notas]);
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
-  const chat = useChat(salaAberta?.id ?? null);
+
+  /**
+   * Quem é seu amigo AGORA, pela busca de salas: é isso que decide o que o menu e o
+   * cartão de uma pessoa oferecem, e o que mantém o campo de escrever aberto.
+   */
+  const idsDosAmigos = new Set(amigos.ids);
+  /**
+   * A conversa aberta, com o `podeEscrever` recontado do que vale agora.
+   *
+   * Ele não fica guardado com a conversa de propósito: a amizade pode acabar com a janela
+   * aberta, e o campo tem de fechar na volta seguinte da busca sem ninguém reabrir a tela.
+   */
+  const conversaNaTela = modoConversas && conversaAberta
+    ? { ...conversaAberta, podeEscrever: idsDosAmigos.has(conversaAberta.com.id) }
+    : null;
+
+  /** O lugar que está sendo lido: uma sala do servidor, ou uma conversa privada. */
+  const ondeEstouLendo: Onde | null = conversaNaTela
+    ? { conversa: conversaNaTela.id }
+    : (!modoConversas && salaAberta ? { sala: salaAberta.id } : null);
+  const chat = useChat(ondeEstouLendo);
+
+  /** Entra no modo conversas sem mexer no servidor aberto — voltar é um clique. */
+  const abrirConversas = useCallback(() => {
+    setModoConversas(true);
+    setJogoAberto(null);
+  }, []);
+
+  /** Abre a conversa com alguém: da tela de amigos, do menu da pessoa ou do cartão. */
+  const conversarCom = useCallback(async (pessoaId: number) => {
+    try {
+      setConversaAberta(await abrirConversa(pessoaId));
+      setModoConversas(true);
+      setJogoAberto(null);
+    } catch (e) {
+      notas.mostrarFalha(e, 'Conversa');
+    }
+  }, [notas]);
+
+  /** Uma conversa escolhida na lista da esquerda. */
+  const abrirConversaDaLista = useCallback((id: number) => {
+    const c = conversas.find((x) => x.id === id);
+    if (!c) return;
+    // `podeEscrever` é recontado no desenho, a partir de quem é seu amigo agora.
+    setConversaAberta({ id: c.id, com: c.com, podeEscrever: true });
+    setModoConversas(true);
+    setJogoAberto(null);
+  }, [conversas]);
+
+  /**
+   * O botão de amizade, seja no menu do botão direito ou no cartão do perfil: as duas
+   * telas oferecem a mesma coisa e caem aqui, para não haver duas regras.
+   */
+  const agirNaAmizade = useCallback(async (pessoaId: number | undefined, acao: ComAPessoa) => {
+    if (!pessoaId) return;
+    if (acao === 'conversar') { await conversarCom(pessoaId); return; }
+    // Responder um pedido é na tela de amigos: é lá que se vê de quem ele é e desde quando.
+    if (acao === 'responder') { setConversaAberta(null); abrirConversas(); return; }
+    if (acao !== 'adicionar') return;
+    try {
+      const r = await pedirAmizade({ alvo: pessoaId });
+      notas.mostrar('info', r.estado === 'amigos'
+        ? `${r.amigo.nome} já tinha te chamado: vocês agora são amigos.`
+        : `Pedido de amizade enviado para ${r.amigo.nome}.`);
+      recarregarServidor();
+    } catch (e) {
+      notas.mostrarFalha(e, 'Amizade');
+    }
+  }, [conversarCom, abrirConversas, notas, recarregarServidor]);
 
   /**
    * Se quem lê pode apagar esta mensagem — espelho da regra do servidor, só para o botão
@@ -716,10 +829,19 @@ export function App() {
   // abrir quanto quando chega mensagem com ela já aberta.
   const ultimaNaTela = chat.mensagens.at(-1)?.id ?? 0;
   useEffect(() => {
-    if (salaAberta?.tipo === 'texto' && ultimaNaTela) {
+    if (!modoConversas && salaAberta?.tipo === 'texto' && ultimaNaTela) {
       setLidas((m) => marcarLido(m, salaAberta.id, ultimaNaTela));
     }
-  }, [salaAberta?.id, salaAberta?.tipo, ultimaNaTela]);
+  }, [salaAberta?.id, salaAberta?.tipo, ultimaNaTela, modoConversas]);
+
+  // O mesmo para a conversa privada aberta, no marcador dela — que é guardado à parte:
+  // juntos, a sala 3 e a conversa 3 seriam a mesma chave.
+  const conversaNaTelaId = conversaNaTela?.id ?? null;
+  useEffect(() => {
+    if (conversaNaTelaId && ultimaNaTela) {
+      setLidasDeConversa((m) => marcarLido(m, conversaNaTelaId, ultimaNaTela));
+    }
+  }, [conversaNaTelaId, ultimaNaTela]);
 
   // Mudou a sua foto, o seu nome ou o do servidor: a lista da direita e a trilha mostram na
   // hora, sem esperar a busca de 10 s.
@@ -848,7 +970,9 @@ export function App() {
           <span>Saga</span>
         </div>
       )}
-    <div className="app">
+    {/* Sem a lista de pessoas, a coluna dela sai da grade: no modo conversas não há
+        servidor aberto para ter gente. */}
+    <div className={`app ${modoConversas ? 'sem-pessoas' : ''}`}>
       <Sidebar
         rooms={rooms}
         categorias={categorias}
@@ -883,15 +1007,26 @@ export function App() {
         onStatus={escolherStatus}
         onSoundboard={() => setSoundboard(true)}
         onLogout={logout}
+        modoConversas={modoConversas}
+        conversas={conversas}
+        conversaAbertaId={conversaNaTela?.id ?? null}
+        emAmigos={modoConversas && !conversaNaTela}
+        pedidos={amigos.pedidos}
+        onAbrirConversa={abrirConversaDaLista}
+        onAbrirAmigos={() => { setConversaAberta(null); abrirConversas(); }}
       />
       <Stage
         rm={rm}
         // O palco é da call, e a call pode ser de outro servidor.
         pessoas={vistosEm(conhecidos.current, rm.salaDaVoz?.servidorId)}
         onPessoa={abrirMenu}
-        salaAberta={salaAberta}
+        salaAberta={modoConversas ? null : salaAberta}
         servidorId={servidor.id}
         onVoltarAVoz={abrirPalcoDaVoz}
+        conversa={conversaNaTela}
+        telaDeAmigos={modoConversas && !conversaNaTela ? (
+          <TelaDeAmigos onConversar={conversarCom} onMudou={recarregarServidor} />
+        ) : undefined}
         chat={chat}
         meuId={eu.id}
         podeApagar={podeApagar}
@@ -971,6 +1106,9 @@ export function App() {
           onClose={() => setSoundboard(false)}
         />
       )}
+      {/* A lista de pessoas é do SERVIDOR aberto. No modo conversas não há um: a coluna
+          sai inteira, em vez de mostrar gente que não tem nada com o que está na tela. */}
+      {!modoConversas && (
       <ListaDeMembros
         membros={membrosDoServidor}
         cargos={cargos}
@@ -984,11 +1122,17 @@ export function App() {
         // objeto aqui é como as duas versões do cartão nasceram.
         onPessoa={(m, em, tipo) => abrirMenu(identidadeDe(m.id), m.nome, em, tipo)}
       />
+      )}
 
       <TrilhaDeServidores
         servidores={sessao.servidores.length ? sessao.servidores : [servidor]}
         atual={servidor.id}
-        onEscolher={trocarDeServidor}
+        modoConversas={modoConversas}
+        // Um número só: mensagens privadas por ler mais pedidos de amizade esperando.
+        aviso={conversas.reduce((n, c) => n + c.naoLidas, 0) + amigos.pedidos}
+        onConversas={abrirConversas}
+        // Clicar num servidor SAI do modo conversas: é ele que você está abrindo.
+        onEscolher={(id) => { setModoConversas(false); if (id !== servidor.id) trocarDeServidor(id); }}
         // Botão direito noutro servidor: troca primeiro e só então abre — o painel lê
         // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
         onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
@@ -1007,6 +1151,8 @@ export function App() {
           onAcao={async (acao, extra) => {
             if (menu.pessoa.usuarioId !== undefined) await moderarPeloMenu(menu.pessoa.usuarioId, acao, extra);
           }}
+          amizade={comAPessoa(menu.pessoa.usuarioId, { euId: eu.id, amigos: idsDosAmigos })}
+          onAmizade={(acao) => agirNaAmizade(menu.pessoa.usuarioId, acao)}
           onVerPerfil={() => setPerfilAberto({ pessoa: menu.pessoa, servidorId: menu.servidorId, servidorNome: menu.servidorNome })}
           onClose={() => setMenu(null)}
         />
@@ -1019,6 +1165,8 @@ export function App() {
           souEu={perfilAberto.pessoa.usuarioId === eu.id}
           volume={rm.volumeDe(perfilAberto.pessoa.identity)}
           onVolume={(v) => rm.definirVolume(perfilAberto.pessoa.identity, v)}
+          amizade={comAPessoa(perfilAberto.pessoa.usuarioId, { euId: eu.id, amigos: idsDosAmigos })}
+          onAmizade={(acao) => agirNaAmizade(perfilAberto.pessoa.usuarioId, acao)}
           onClose={() => setPerfilAberto(null)}
         />
       )}

@@ -132,7 +132,18 @@ function LinhaDaLive({ live, naMinhaSala, assistindo, onAssistir }: {
 export function Chat({
   mensagens, digitando, erro, onEnviar, onEnviarGif, onEnviarArquivo, onDigitar, onVerImagem,
   sala, meuId, onPessoa, lives = [], assistindo, onAssistir, salaDaVozId, podeApagar, onApagar,
+  chave, emConversa = false, bloqueio = null,
 }: {
+  /**
+   * O LUGAR, para os efeitos que precisam saber que ele trocou (o cursor no campo, o menu
+   * aberto). É `s12`/`c3`, e não o nome: uma sala e uma conversa podem ter o mesmo nome, e
+   * aí trocar de uma para a outra não seria trocar de lugar nenhum.
+   */
+  chave?: string | null;
+  /** Numa conversa privada o campo fala com uma pessoa, não com uma sala. */
+  emConversa?: boolean;
+  /** Por que não dá para escrever agora — hoje, só "vocês não são mais amigos". */
+  bloqueio?: string | null;
   /** Se quem lê pode apagar esta mensagem — ver apagar.ts. */
   podeApagar?: (m: Mensagem) => boolean;
   /** Apaga. O erro sobe para a confirmação, que fica aberta com ele. */
@@ -206,12 +217,16 @@ export function Chat({
    * fazia falta noutro lugar. A dep é o NOME da sala, não a lista de mensagens — senão
    * cada mensagem que chega roubaria o cursor de volta no meio de uma frase.
    */
-  useEffect(() => { if (sala) campo.current?.focus(); }, [sala]);
+  const lugar = chave ?? sala;
+  useEffect(() => { if (sala) campo.current?.focus(); }, [lugar]);
 
-  // Trocou de sala: o menu e a confirmação eram de uma mensagem que já não está na tela.
-  useEffect(() => { setMenuDaMensagem(null); setApagando(null); }, [sala]);
+  // Trocou de lugar: o menu e a confirmação eram de uma mensagem que já não está na tela.
+  useEffect(() => { setMenuDaMensagem(null); setApagando(null); }, [lugar]);
 
   const semSala = !sala;
+  // Travado é diferente de não ter lugar: a conversa está aberta e é lida normalmente —
+  // o que fechou foi o campo de escrever.
+  const travado = semSala || !!bloqueio;
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
@@ -242,7 +257,7 @@ export function Chat({
   const soltar = (e: React.DragEvent) => {
     e.preventDefault();
     setArrastando(false);
-    if (semSala) return;
+    if (travado) return;
     const a = e.dataTransfer.files?.[0];
     if (a) { setAnexo(a); setErroDoAnexo(null); }
   };
@@ -252,7 +267,7 @@ export function Chat({
   return (
     <div
       className={`chat ${arrastando ? 'recebendo-arquivo' : ''}`}
-      onDragOver={(e) => { if (!semSala) { e.preventDefault(); setArrastando(true); } }}
+      onDragOver={(e) => { if (!travado) { e.preventDefault(); setArrastando(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setArrastando(false); }}
       onDrop={soltar}
     >
@@ -269,7 +284,9 @@ export function Chat({
         {erro && <div className="error" style={{ margin: '8px 16px' }}>{erro}</div>}
         {!erro && mensagens.length === 0 && (
           <div className="muted small pad">
-            {semSala ? 'Escolha uma sala à esquerda.' : 'Ninguém falou nada aqui ainda.'}
+            {semSala ? 'Escolha uma sala à esquerda.'
+              : emConversa ? `Ninguém falou nada ainda. Diga oi para ${sala}.`
+              : 'Ninguém falou nada aqui ainda.'}
           </div>
         )}
         {mensagens.map((m, i) => {
@@ -360,6 +377,8 @@ export function Chat({
         </div>
       )}
 
+      {bloqueio && <div className="chat-travado">{bloqueio}</div>}
+
       {anexo && (
         <div className={`anexo-pendente ${erroDoAnexo ? 'com-erro' : ''}`}>
           <span className="anexo-icone"><Icon name="anexo" size={18} /></span>
@@ -406,7 +425,7 @@ export function Chat({
           type="button"
           className="icon anexar"
           title="Anexar um arquivo (ou arraste para cá)"
-          disabled={semSala || progresso !== null}
+          disabled={travado || progresso !== null}
           onClick={() => campoDeArquivo.current?.click()}
         >
           <Icon name="mais" size={22} />
@@ -419,8 +438,13 @@ export function Chat({
             // Só quando há o que escrever: apagar o que se escreveu não é digitar.
             if (e.target.value.trim()) onDigitar();
           }}
-          placeholder={semSala ? 'Escolha uma sala' : anexo ? 'Escreva algo junto, se quiser' : `Mensagem em #${sala}`}
-          disabled={semSala || progresso !== null}
+          placeholder={
+            semSala ? 'Escolha uma sala'
+            : bloqueio ? 'Vocês não são mais amigos'
+            : anexo ? 'Escreva algo junto, se quiser'
+            : emConversa ? `Mensagem para ${sala}` : `Mensagem em #${sala}`
+          }
+          disabled={travado || progresso !== null}
           maxLength={2000}
         />
         {/* `rotulo-gif`, e não `gif`: `gif` já era a classe do QUADRADINHO da busca, com
@@ -431,14 +455,14 @@ export function Chat({
           type="button"
           className="rotulo-gif"
           title="Mandar um GIF"
-          disabled={semSala}
+          disabled={travado}
           onClick={() => setGifAberto(true)}
         >
           GIF
         </button>
         <button
           className="enviar"
-          disabled={semSala || progresso !== null || (!texto.trim() && !anexo)}
+          disabled={travado || progresso !== null || (!texto.trim() && !anexo)}
           title={anexo ? 'Enviar o arquivo' : 'Enviar'}
         >
           <Icon name="send" size={17} />

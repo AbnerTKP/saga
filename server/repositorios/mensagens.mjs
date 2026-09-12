@@ -30,11 +30,15 @@ export const ultimas = (db, servidorId, salaId, quantas) =>
   db.prepare(`${SELECT} WHERE m.sala_id = ? AND m.apagada_em IS NULL ORDER BY m.id DESC LIMIT ?`)
     .all(servidorId, salaId, quantas).reverse();
 
-export function inserir(db, { salaId, usuarioId, texto, imagem, arquivo, criadoEm }) {
+/**
+ * Uma mensagem mora numa SALA ou numa CONVERSA, nunca nas duas e nunca em nenhuma — quem
+ * garante isso é o `CHECK` do esquema, e não a boa vontade de quem chama.
+ */
+export function inserir(db, { salaId = null, conversaId = null, usuarioId, texto, imagem, arquivo, criadoEm }) {
   const info = db.prepare(
-    `INSERT INTO mensagens (sala_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, criado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(salaId, usuarioId, texto, imagem,
+    `INSERT INTO mensagens (sala_id, conversa_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(salaId, conversaId, usuarioId, texto, imagem,
         arquivo?.nomeNoDisco ?? null, arquivo?.nome ?? null, arquivo?.bytes ?? null, criadoEm);
   return Number(info.lastInsertRowid);
 }
@@ -53,9 +57,10 @@ export const inserirDaSaga = (db, { salaId, texto, criadoEm }) =>
   db.prepare('INSERT INTO mensagens (sala_id, usuario_id, texto, criado_em) VALUES (?, NULL, ?, ?)')
     .run(salaId, texto, criadoEm);
 
-/** A mensagem crua, para decidir quem pode apagá-la: de que sala é, quem escreveu. */
+/** A mensagem crua, para decidir quem pode apagá-la: de onde é, e quem escreveu. */
 export const buscar = (db, id) =>
-  db.prepare('SELECT id, sala_id, usuario_id, apagada_em FROM mensagens WHERE id = ?').get(Number(id)) ?? null;
+  db.prepare('SELECT id, sala_id, conversa_id, usuario_id, apagada_em FROM mensagens WHERE id = ?')
+    .get(Number(id)) ?? null;
 
 /** Tira o conteúdo e anota quando e por quem. A linha fica, vazia — ver o cabeçalho. */
 export const apagar = (db, id, { porQuem, quando }) =>
@@ -69,3 +74,26 @@ export const apagar = (db, id, { porQuem, quando }) =>
 export const apagadasDesde = (db, salaId, desde) =>
   db.prepare('SELECT id FROM mensagens WHERE sala_id = ? AND apagada_em >= ?')
     .all(Number(salaId), Number(desde)).map((m) => m.id);
+
+// --- conversa privada --------------------------------------------------------
+//
+// O MESMO `SELECT`, com o servidor nulo. Isso não é economia de linhas: é o que faz a
+// conversa privada mostrar a CONTA — sem servidor, o `JOIN` com `membros` não casa com
+// vínculo nenhum, o nome cai no apelido e o identificador vem nulo. Que é exatamente o
+// certo: cargo, nome exibido e identificador pertencem a um servidor, e aqui não há um.
+
+export const daConversaDepoisDe = (db, conversaId, id, quantas) =>
+  db.prepare(`${SELECT} WHERE m.conversa_id = ? AND m.id > ? AND m.apagada_em IS NULL ORDER BY m.id LIMIT ?`)
+    .all(null, Number(conversaId), Number(id), quantas);
+
+export const ultimasDaConversa = (db, conversaId, quantas) =>
+  db.prepare(`${SELECT} WHERE m.conversa_id = ? AND m.apagada_em IS NULL ORDER BY m.id DESC LIMIT ?`)
+    .all(null, Number(conversaId), quantas).reverse();
+
+export const contarDaConversaDepoisDe = (db, conversaId, desdeId, exceto) =>
+  db.prepare('SELECT count(*) c FROM mensagens WHERE conversa_id = ? AND id > ? AND usuario_id IS NOT ? AND apagada_em IS NULL')
+    .get(Number(conversaId), Number(desdeId) || 0, exceto ?? null).c;
+
+export const apagadasDaConversaDesde = (db, conversaId, desde) =>
+  db.prepare('SELECT id FROM mensagens WHERE conversa_id = ? AND apagada_em >= ?')
+    .all(Number(conversaId), Number(desde)).map((m) => m.id);

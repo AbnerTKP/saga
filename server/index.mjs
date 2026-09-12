@@ -18,6 +18,8 @@ import * as plataforma from './plataforma.mjs';
 import * as notas from './notas.mjs';
 import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
+import * as amigos from './amigos.mjs';
+import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import * as servidoresM from './servidores.mjs';
@@ -326,6 +328,29 @@ function exigirSessao(req) {
 }
 
 /**
+ * A conta, e o servidor aberto QUANDO houver um.
+ *
+ * Existe por causa de apagar mensagem: o app manda o id da mensagem e mais nada, então o
+ * mesmo caminho atende a sala (que precisa do servidor para saber se você a vê) e a
+ * conversa privada (que não tem servidor nenhum). Exigir servidor aqui deixaria quem não
+ * está em nenhum sem conseguir apagar o que ele mesmo disse numa conversa.
+ */
+function contaEServidorSeHouver(req) {
+  const usuario = exigirConta(req);
+  if (servidoresM.meusServidores(db, usuario.id).length === 0) return { sid: null, quem: usuario };
+  const { sid, membro } = exigirMembro(req);
+  return { sid, quem: membro };
+}
+
+/**
+ * A chave do "está digitando" de uma conversa.
+ *
+ * O registro guarda por LUGAR, e a sala 3 e a conversa 3 são lugares diferentes — sem o
+ * prefixo, quem escrevesse numa apareceria escrevendo na outra.
+ */
+const chaveDaConversa = (id) => `c${Number(id)}`;
+
+/**
  * A lista de salas do LiveKit, lembrada por um segundo.
  *
  * Toda pesquisa do app pedia esta lista UMA VEZ POR SALA, dentro de um `for` com `await`:
@@ -590,11 +615,27 @@ const ROTAS = {
     // As mesas de xadrez vão de carona pelo mesmo motivo do "está digitando": o convite para
     // uma partida precisa chegar a quem está em qualquer tela, e esta é a busca que toda tela
     // já faz. Só as deste servidor, e os convites são os de quem perguntou.
+    //
+    // As conversas privadas vêm de carona pela mesma razão, e é o que faz a lista da
+    // esquerda no modo conversas se atualizar sozinha sem uma terceira busca. Elas são da
+    // CONTA e não deste servidor — vão aqui porque esta é a busca que toda tela já faz,
+    // não porque pertençam a ele. `amigos` é só o número de pedidos esperando resposta:
+    // a lista inteira é da tela de amigos, mas o aviso precisa aparecer com ela fechada.
+    const lidasDasConversas = mensagens.lerMarcadores(
+      new URL(req.url, 'http://x').searchParams.get('lidasConversas'),
+    );
+    const daAmizade = amigos.listar(db, eu);
     return {
       servidorId: sid,
       rooms: salas,
       categorias: categoriasM.listarCategorias(db, sid),
       jogos: mesas.resumo(naMesa(sid, eu)),
+      conversas: conversas.minhas(db, eu, lidasDasConversas),
+      // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
+      // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
+      // quem ainda não é. Sem isso o app teria de perguntar de novo a cada clique, ou
+      // manter uma terceira busca só para saber quem é quem.
+      amigos: { pedidos: daAmizade.recebidos.length, ids: daAmizade.amigos.map((a) => a.id) },
     };
   },
 
@@ -678,9 +719,29 @@ const ROTAS = {
   },
 
   'GET /mensagens': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
     const q = new URL(req.url, 'http://x').searchParams;
     const depoisDe = q.get('depoisDe');
+
+    /**
+     * Conversa privada: mesma porta, mesma resposta, e nenhum servidor no caminho — ela é
+     * da conta. O app só troca `sala=` por `conversa=`, e é por isso que o chat da tela é
+     * o mesmo componente com os mesmos avisos de quem está digitando e do que sumiu.
+     */
+    if (q.get('conversa')) {
+      const usuario = exigirConta(req);
+      const agora = Date.now();
+      const id = q.get('conversa');
+      return {
+        mensagens: conversas.listarMensagens(db, usuario, id, {
+          depoisDe: depoisDe ? Number(depoisDe) : undefined,
+        }),
+        digitando: digitando.quemEsta(chaveDaConversa(id), { exceto: usuario.id }),
+        apagadas: conversas.apagadasDesde(db, usuario, id, q.get('apagadasDesde')),
+        agora,
+      };
+    }
+
+    const { sid, membro: eu } = exigirMembro(req);
     // Anotado ANTES de ler: uma mensagem apagada entre a leitura e a resposta entra na
     // próxima pergunta, em vez de sumir no vão entre as duas.
     const agora = Date.now();
@@ -700,10 +761,12 @@ const ROTAS = {
     };
   },
 
+  // Vale para os dois lugares: na sala, a regra de sempre (a própria, ou a de alguém
+  // abaixo com a permissão); na conversa privada, só a própria — lá não há moderação.
   'POST /mensagens/apagar': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
+    const { sid, quem } = contaEServidorSeHouver(req);
     const { id } = await lerCorpo(req);
-    return mensagens.apagarMensagem(db, sid, eu, id);
+    return mensagens.apagarMensagem(db, sid, quem, id);
   },
 
   /**
@@ -711,8 +774,15 @@ const ROTAS = {
    * tecla, que é o que faria disto o novo `vista_em`. Nada é gravado: ver digitando.mjs.
    */
   'POST /digitando': async (req) => {
+    const { sala, conversa } = await lerCorpo(req);
+    // Na conversa privada não há castigo nem sala para conferir: basta ser dela.
+    if (conversa) {
+      const usuario = exigirConta(req);
+      const { podeEscrever } = conversas.ver(db, usuario, conversa);
+      if (podeEscrever) digitando.avisar(chaveDaConversa(conversa), { id: usuario.id, nome: usuario.apelido });
+      return { ok: true };
+    }
     const { sid, membro: eu } = exigirMembro(req);
-    const { sala } = await lerCorpo(req);
     const daqui = salasM.salaVisivel(db, sid, eu, sala);
     if (!daqui || daqui.tipo !== 'texto') throw new ErroDeConta('Essa sala não existe, ou é de voz.', 400);
     // Quem está de castigo não vai conseguir mandar: anunciar que está escrevendo
@@ -722,10 +792,17 @@ const ROTAS = {
   },
 
   'POST /mensagens': async (req) => {
+    const { sala, texto, conversa } = await lerCorpo(req);
+    // Conversa privada: a amizade é conferida a cada mensagem, dentro de `conversas.enviar`.
+    if (conversa) {
+      const usuario = exigirConta(req);
+      const mensagem = conversas.enviar(db, usuario, conversa, texto);
+      digitando.parou(chaveDaConversa(conversa), usuario.id);
+      return { mensagem };
+    }
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
-    const { sala, texto } = await lerCorpo(req);
     const mensagem = mensagens.enviarMensagem(db, sid, eu, sala, texto);
     // A frase sai na hora: "Fulano está digitando" logo abaixo da mensagem que o Fulano
     // acabou de mandar é o pior momento possível para ela ainda estar na tela.
@@ -752,13 +829,18 @@ const ROTAS = {
   },
 
   'POST /mensagens/gif': async (req) => {
+    const { sala, url, conversa } = await lerCorpo(req);
+    const guardar = async () => salvarImagem(ARQUIVOS, await baixarGif(url, LIMITES.chat), 'chat');
+    if (conversa) {
+      const usuario = exigirConta(req);
+      const mensagem = conversas.enviar(db, usuario, conversa, '', await guardar());
+      digitando.parou(chaveDaConversa(conversa), usuario.id);
+      return { mensagem };
+    }
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
-    const { sala, url } = await lerCorpo(req);
-    const bruto = await baixarGif(url, LIMITES.chat);
-    const nome = salvarImagem(ARQUIVOS, bruto, 'chat');
-    const mensagem = mensagens.enviarMensagem(db, sid, eu, sala, '', nome);
+    const mensagem = mensagens.enviarMensagem(db, sid, eu, sala, '', await guardar());
     pararDeDigitar(sid, eu.id, sala);
     return { mensagem };
   },
@@ -767,20 +849,75 @@ const ROTAS = {
   // som. E o nome que a pessoa escolheu NÃO vai para o disco: lá ele é o hash com `.bin`,
   // e é por isso que nada aqui pode ser servido como página nem como script.
   'POST /mensagens/arquivo': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    const barrado = membros.impedimento(eu);
-    if (barrado) throw new ErroDeConta(barrado, 403);
     const q = new URL(req.url, 'http://x').searchParams;
+    const conversa = q.get('conversa');
+    // Quem pode mandar é conferido ANTES de ler os bytes: recusar depois de subir 200 MB
+    // é o pior jeito possível de dizer não.
+    const { sid, quem } = conversa
+      ? { sid: null, quem: exigirConta(req) }
+      : (({ sid: s, membro }) => ({ sid: s, quem: membro }))(exigirMembro(req));
+    if (conversa) {
+      if (!conversas.ver(db, quem, conversa).podeEscrever) {
+        throw new ErroDeConta('Vocês não são mais amigos. Só dá para mandar mensagem para amigos.', 403);
+      }
+    } else {
+      const barrado = membros.impedimento(quem);
+      if (barrado) throw new ErroDeConta(barrado, 403);
+    }
     // Em FLUXO, direto para o disco: um arquivo de 200 MB juntado na memória estouraria o
     // teto do contêiner, e falta de memória já derrubou a máquina inteira uma vez.
     const guardado = await salvarArquivoEmFluxo(ARQUIVOS, req, LIMITES.arquivo, 'O arquivo');
-    const mensagem = mensagens.enviarMensagem(db, sid, eu, q.get('sala'), q.get('texto') ?? '', null, {
+    const anexo = {
       nomeNoDisco: guardado.nome,
       nome: nomeDeArquivoLimpo(q.get('nome')),
       bytes: guardado.bytes,
-    });
-    pararDeDigitar(sid, eu.id, q.get('sala'));
+    };
+    if (conversa) {
+      const mensagem = conversas.enviar(db, quem, conversa, q.get('texto') ?? '', null, anexo);
+      digitando.parou(chaveDaConversa(conversa), quem.id);
+      return { mensagem };
+    }
+    const mensagem = mensagens.enviarMensagem(db, sid, quem, q.get('sala'), q.get('texto') ?? '', null, anexo);
+    pararDeDigitar(sid, quem.id, q.get('sala'));
     return { mensagem };
+  },
+
+  // --- amigos e conversas privadas ---------------------------------------------
+  //
+  // Nenhuma destas rotas pede servidor: amizade e conversa são da CONTA, que é o que
+  // existe acima dos servidores. Por isso `exigirConta` e não `exigirMembro` — quem não
+  // faz parte de servidor nenhum continua tendo amigos, e continua podendo responder.
+
+  'GET /amigos': async (req) => amigos.listar(db, exigirConta(req)),
+
+  // Pelo APELIDO: é o que a pessoa sabe de cor, e é global. Id é número que ninguém
+  // decora, e nome exibido é de um servidor.
+  'POST /amigos/pedir': async (req) => {
+    const eu = exigirConta(req);
+    // `apelido` vem da tela de amigos (digitado); `alvo` vem do menu de quem já está na
+    // sua frente. Os dois caem na mesma regra.
+    const { apelido, alvo } = await lerCorpo(req);
+    return amigos.pedir(db, eu, { apelido, alvo });
+  },
+
+  'POST /amigos/responder': async (req) => {
+    const eu = exigirConta(req);
+    const { alvo, aceitar } = await lerCorpo(req);
+    return amigos.responder(db, eu, alvo, !!aceitar);
+  },
+
+  // Cancela o pedido que você mandou, ou desfaz a amizade. A conversa não é apagada: o
+  // que foi dito continua lá, e o que fecha é o campo de escrever.
+  'POST /amigos/desfazer': async (req) => {
+    const eu = exigirConta(req);
+    const { alvo } = await lerCorpo(req);
+    return amigos.desfazer(db, eu, alvo);
+  },
+
+  'POST /conversas/abrir': async (req) => {
+    const eu = exigirConta(req);
+    const { alvo } = await lerCorpo(req);
+    return { conversa: conversas.abrir(db, eu, alvo) };
   },
 
   // --- xadrez -----------------------------------------------------------------

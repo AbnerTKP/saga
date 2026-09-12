@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Categoria, Membro, RoomInfo, Servidor } from '../api';
+import type { Categoria, Conversa, Membro, RoomInfo, Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { contaDaIdentidade, identidadeDe } from '../pessoas';
 import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
@@ -18,7 +18,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -59,6 +59,20 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   statusEscolhido: Status;
   onStatus: (s: Status) => void;
+  /**
+   * A coluna virou a das CONVERSAS: no lugar do servidor e das salas, os amigos e as
+   * conversas privadas. É um modo, e não uma seção a mais, porque conversa não é de
+   * servidor nenhum — misturá-la com as salas do servidor aberto diria o contrário.
+   */
+  modoConversas: boolean;
+  conversas: Conversa[];
+  conversaAbertaId: number | null;
+  /** A tela de amigos está aberta: a linha de cima acende, como uma sala aberta. */
+  emAmigos: boolean;
+  /** Quantos pedidos de amizade esperam resposta. Zero não desenha nada. */
+  pedidos: number;
+  onAbrirConversa: (id: number) => void;
+  onAbrirAmigos: () => void;
 }) {
   const connected = rm.status !== 'idle';
   const isMac = window.desktop.platform === 'darwin';
@@ -221,6 +235,171 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       ? (rm.espectadores.get(quemTransmite.identity) ?? []).map((e) => e.nome)
       : lives.find((l) => l.identity === quemTransmite.identity && l.salaId === salaDoCartao.id)?.espectadores ?? [];
 
+  /**
+   * O que fica embaixo da coluna, valha ela o servidor ou as conversas: a call e você.
+   *
+   * Nenhum dos dois é do servidor — a voz atravessa servidor desde que "olhar não é
+   * sair", e a conta é o que existe acima deles. Por isso os dois desenhos da barra
+   * dividem estas peças em vez de terem cada um a sua, que envelheceria separada.
+   */
+  const painelDaCall = connected && (
+    <div className="voice-panel" ref={painelDaVoz}>
+      <div className="voice-status">
+        <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
+        <div className="voice-texto">
+          <div className="strong">{rm.status === 'connected' ? 'Voz conectada' : rm.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}</div>
+          {/* Com a voz noutro servidor, dizer só o nome da sala esconde metade do
+              fato: "Geral" de qual? */}
+          <div className="small muted">
+            {rm.salaDaVoz?.nome}
+            {rm.salaDaVoz && rm.salaDaVoz.servidorId !== servidor.id && ` · em ${rm.salaDaVoz.servidorNome}`}
+          </div>
+        </div>
+        {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
+      </div>
+      <div className="voice-actions">
+        <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
+        <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
+        <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
+        {/* Os jogos moram aqui porque é daqui que se chama gente: o lobby chama
+            primeiro quem está na call. */}
+        <button className={menuDeJogos ? 'on' : ''} data-abre-jogos onClick={abrirJogos}
+          title={minhaPartida ? 'Jogos — você tem uma mesa aberta' : 'Jogos'}>
+          <Icon name="controle" />
+        </button>
+        <button className="danger" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
+      </div>
+    </div>
+  );
+
+  const painelDeQuemSouEu = (
+    <div className="user-panel">
+      {/* O seu status fica junto de você, e é onde a mão procura: clicar no seu nome
+          abre a escolha. Antes não havia lugar nenhum para isso. */}
+      <button className="eu-status" onClick={() => setEscolhendoStatus((v) => !v)} title="Mudar seu status">
+        <Avatar nome={eu.nome} foto={eu.foto} enquadramento={eu.enquadramento?.foto}
+          tamanho="big" status={statusEscolhido} />
+      </button>
+      <div className="uname">
+        <button className="strong nome-clicavel" title="Mudar seu status"
+          onClick={() => setEscolhendoStatus((v) => !v)}>
+          <Nome membro={eu} />
+        </button>
+        <span className="muted small">{COMO_SE_LE[statusEscolhido]}</span>
+      </div>
+      {escolhendoStatus && (
+        <div className="escolher-status" onMouseLeave={() => setEscolhendoStatus(false)}>
+          {(['online', 'ausente', 'ocupado'] as Status[]).map((s) => (
+            <button key={s} className={s === statusEscolhido ? 'atual' : ''}
+              onClick={() => { onStatus(s); setEscolhendoStatus(false); }}>
+              <span className={`presenca ${s}`} />
+              <span className="quem">
+                <span className="strong">{COMO_SE_LE[s]}</span>
+                <span className="muted small">{EXPLICACAO[s]}</span>
+              </span>
+            </button>
+          ))}
+          <div className="menu-risco" />
+          {/* Sair vive aqui porque é sobre você, e porque cada botão a mais na linha
+              de baixo rouba o espaço do seu nome — foi o que o atropelou. O painel da
+              Saga morava aqui junto e foi para a engrenagem: menu de status não é
+              lugar de painel de administração, e ele ficou impossível de achar. */}
+          <button onClick={onLogout}>
+            <span className="quem"><span className="strong">Sair da conta</span></span>
+          </button>
+        </div>
+      )}
+      <div className="user-actions">
+        <button className={!rm.micOn && connected ? 'off' : ''} onClick={rm.toggleMic} disabled={!connected || rm.deafened} title="Mutar microfone">
+          <Icon name={rm.micOn || !connected ? 'mic' : 'micOff'} />
+        </button>
+        <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
+          <Icon name={rm.deafened ? 'headOff' : 'head'} />
+        </button>
+        {/* A engrenagem é "as suas coisas": perfil, microfone, câmera. As do servidor
+            ficam no nome dele, lá em cima, e no botão direito do quadrado à direita. */}
+        <button onClick={onSettings} title="Sua conta: perfil, microfone e câmera"><Icon name="gear" /></button>
+      </div>
+    </div>
+  );
+
+  const menuDeJogosAberto = menuDeJogos && (
+    <MenuDeJogos
+      em={menuDeJogos}
+      minha={minhaPartida}
+      onXadrez={onXadrez}
+      onClose={() => setMenuDeJogos(null)}
+    />
+  );
+
+  /**
+   * No modo conversas a coluna inteira troca: no lugar do servidor e das salas, os seus
+   * amigos e as suas conversas. O que fica embaixo — a call e você — não muda, porque
+   * nenhum dos dois é do servidor: a voz continua tocando enquanto você lê uma conversa,
+   * e é por isso que o painel dela diz de qual servidor é a sala.
+   */
+  if (modoConversas) {
+    return (
+      <aside className="sidebar">
+        <div className={`sidebar-head ${isMac ? 'mac' : ''}`}>
+          <span className="cabeca-do-servidor sem-clique">
+            <span className="avatar big marca-conversas"><Icon name="texto" size={18} /></span>
+            <span className="nome-do-servidor">Conversas</span>
+          </span>
+          {pollError && <span className="dot-warn" title={pollError} />}
+        </div>
+
+        <div className="lista-de-conversas">
+          <button
+            className={`linha-amigos ${emAmigos ? 'aberta' : ''}`}
+            title="Seus amigos, e onde se adiciona alguém"
+            onClick={onAbrirAmigos}
+          >
+            <Icon name="pessoas" size={19} />
+            <span className="nome">Amigos</span>
+            {pedidos > 0 && (
+              <span className="nao-lidas" title={`${pedidos} ${pedidos === 1 ? 'pedido esperando' : 'pedidos esperando'}`}>
+                {pedidos}
+              </span>
+            )}
+          </button>
+
+          {conversas.length > 0 && <div className="cabecalho-de-categoria"><span>Conversas</span></div>}
+          {conversas.map((c) => (
+            <button
+              key={c.id}
+              className={`conversa-grande ${conversaAbertaId === c.id ? 'aberta' : ''}`}
+              onClick={() => onAbrirConversa(c.id)}
+              title={c.com.nome}
+            >
+              <Avatar nome={c.com.nome} foto={c.com.foto} enquadramento={c.com.enquadramento?.foto}
+                tamanho="big" status={c.com.status} />
+              <span className="quem">
+                <span className="strong">{c.com.nome}</span>
+                {/* Sem nada dito ainda, a segunda linha fica vazia em vez de inventar
+                    texto: a conversa acabou de nascer, e é isso que ela tem a dizer. */}
+                <span className="previa">{c.previa ?? ''}</span>
+              </span>
+              {c.naoLidas > 0 && (
+                <span className="nao-lidas">{c.naoLidas > 99 ? '99+' : c.naoLidas}</span>
+              )}
+            </button>
+          ))}
+
+          {conversas.length === 0 && (
+            <div className="muted small pad">
+              Nenhuma conversa ainda. Em <strong>Amigos</strong>, adicione alguém pelo apelido.
+            </div>
+          )}
+        </div>
+
+        {painelDaCall}
+        {painelDeQuemSouEu}
+        {menuDeJogosAberto}
+      </aside>
+    );
+  }
+
   return (
     <aside className="sidebar">
       {/* O nome do servidor é onde você está: ganha a foto dele, peso de título e uma
@@ -379,93 +558,11 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
         )}
       </div>
 
-      {connected && (
-        <div className="voice-panel" ref={painelDaVoz}>
-          <div className="voice-status">
-            <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
-            <div className="voice-texto">
-              <div className="strong">{rm.status === 'connected' ? 'Voz conectada' : rm.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}</div>
-              {/* Com a voz noutro servidor, dizer só o nome da sala esconde metade do
-                  fato: "Geral" de qual? */}
-              <div className="small muted">
-                {rm.salaDaVoz?.nome}
-                {rm.salaDaVoz && rm.salaDaVoz.servidorId !== servidor.id && ` · em ${rm.salaDaVoz.servidorNome}`}
-              </div>
-            </div>
-            {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
-          </div>
-          <div className="voice-actions">
-            <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
-            <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
-            <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
-            {/* Os jogos moram aqui porque é daqui que se chama gente: o lobby chama
-                primeiro quem está na call. */}
-            <button className={menuDeJogos ? 'on' : ''} data-abre-jogos onClick={abrirJogos}
-              title={minhaPartida ? 'Jogos — você tem uma mesa aberta' : 'Jogos'}>
-              <Icon name="controle" />
-            </button>
-            <button className="danger" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
-          </div>
-        </div>
-      )}
+      {painelDaCall}
 
-      <div className="user-panel">
-        {/* O seu status fica junto de você, e é onde a mão procura: clicar no seu nome
-            abre a escolha. Antes não havia lugar nenhum para isso. */}
-        <button className="eu-status" onClick={() => setEscolhendoStatus((v) => !v)} title="Mudar seu status">
-          <Avatar nome={eu.nome} foto={eu.foto} enquadramento={eu.enquadramento?.foto}
-            tamanho="big" status={statusEscolhido} />
-        </button>
-        <div className="uname">
-          <button className="strong nome-clicavel" title="Mudar seu status"
-            onClick={() => setEscolhendoStatus((v) => !v)}>
-            <Nome membro={eu} />
-          </button>
-          <span className="muted small">{COMO_SE_LE[statusEscolhido]}</span>
-        </div>
-        {escolhendoStatus && (
-          <div className="escolher-status" onMouseLeave={() => setEscolhendoStatus(false)}>
-            {(['online', 'ausente', 'ocupado'] as Status[]).map((s) => (
-              <button key={s} className={s === statusEscolhido ? 'atual' : ''}
-                onClick={() => { onStatus(s); setEscolhendoStatus(false); }}>
-                <span className={`presenca ${s}`} />
-                <span className="quem">
-                  <span className="strong">{COMO_SE_LE[s]}</span>
-                  <span className="muted small">{EXPLICACAO[s]}</span>
-                </span>
-              </button>
-            ))}
-            <div className="menu-risco" />
-            {/* Sair vive aqui porque é sobre você, e porque cada botão a mais na linha
-                de baixo rouba o espaço do seu nome — foi o que o atropelou. O painel da
-                Saga morava aqui junto e foi para a engrenagem: menu de status não é
-                lugar de painel de administração, e ele ficou impossível de achar. */}
-            <button onClick={onLogout}>
-              <span className="quem"><span className="strong">Sair da conta</span></span>
-            </button>
-          </div>
-        )}
-        <div className="user-actions">
-          <button className={!rm.micOn && connected ? 'off' : ''} onClick={rm.toggleMic} disabled={!connected || rm.deafened} title="Mutar microfone">
-            <Icon name={rm.micOn || !connected ? 'mic' : 'micOff'} />
-          </button>
-          <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">
-            <Icon name={rm.deafened ? 'headOff' : 'head'} />
-          </button>
-          {/* A engrenagem é "as suas coisas": perfil, microfone, câmera. As do servidor
-              ficam no nome dele, lá em cima, e no botão direito do quadrado à direita. */}
-          <button onClick={onSettings} title="Sua conta: perfil, microfone e câmera"><Icon name="gear" /></button>
-        </div>
-      </div>
+      {painelDeQuemSouEu}
 
-      {menuDeJogos && (
-        <MenuDeJogos
-          em={menuDeJogos}
-          minha={minhaPartida}
-          onXadrez={onXadrez}
-          onClose={() => setMenuDeJogos(null)}
-        />
-      )}
+      {menuDeJogosAberto}
 
       {cartao && salaDoCartao && quemTransmite && acaoDoCartao && (
         <CartaoDaLive
