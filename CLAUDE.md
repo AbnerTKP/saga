@@ -893,6 +893,20 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   E, como tudo o que viaja entre app e servidor, isto tem versão dos dois lados: **app novo
   com servidor antigo não mostra conversa nenhuma** — o `/rooms` não manda o campo, a lista
   fica vazia e a tela de amigos não carrega. Publicar o servidor junto é o que liga a coisa.
+- **O que é do SERVIDOR não entra na conversa privada — e a primeira coisa que entrou foi
+  a linha da live.** Ela conta o que está acontecendo nas salas de voz do servidor aberto,
+  e o chat da conversa é o mesmo componente do chat das salas: bastou passar a lista.
+  Resultado, na máquina do dono, minutos depois de publicar: ele entrou num servidor novo
+  pelo convite de um amigo e a conversa privada com esse amigo listou **todas as telas no
+  ar de lá**, com "Entrar e assistir". Reproduzido no app de verdade (LiveKit local, uma
+  tela publicada pelo `@livekit/rtc-node`): a mesma linha aparecia nos dois lugares; depois
+  do conserto, aparece na sala de texto e não aparece na conversa. O quadro flutuante da
+  live continua nos dois, porque aquele é o que VOCÊ escolheu assistir — a diferença é
+  entre o que é seu e o que é do servidor. **A mesma família tinha um segundo caso**:
+  `podeApagarMensagem` deixava quem modera o servidor apagar a fala do amigo DENTRO da
+  conversa dos dois — e o servidor recusava com 403, que é o pior dos dois mundos (o botão
+  aparece e não funciona). Ao pendurar uma tela nova no que já existe, a pergunta é o que
+  aquilo carrega junto sem dizer.
 - **Mensagem privada vira aviso no canto, e não som.** Ela é dirigida a VOCÊ, então avisa
   mesmo com a janela noutro lugar — mas a que está aberta na tela não avisa, porque você
   está lendo. Quem decide é a comparação com a ÚLTIMA mensagem que cada conversa tinha, e

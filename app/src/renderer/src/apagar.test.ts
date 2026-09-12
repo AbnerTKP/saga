@@ -28,3 +28,14 @@ test('a dos outros pede a permissão e só alcança quem está abaixo', () => {
 test('as notas da versão, ninguém — nem o dono', () => {
   assert.equal(podeApagarMensagem(DONO, null, { minha: false, daSaga: true }), false);
 });
+
+test('na conversa privada, cada um apaga só o que disse', () => {
+  // Não há cargo entre duas pessoas: nem quem criou o servidor alcança a fala do outro
+  // ali dentro. Sem isto o botão aparecia e o servidor recusava com 403.
+  const privada = { daSaga: false, privada: true };
+  assert.equal(podeApagarMensagem(DONO, MEMBRO, { minha: true, ...privada }), true);
+  assert.equal(podeApagarMensagem(DONO, MEMBRO, { minha: false, ...privada }), false);
+  assert.equal(podeApagarMensagem(FAXINA, MEMBRO, { minha: false, ...privada }), false);
+  // Fora da conversa, a regra de sempre continua valendo.
+  assert.equal(podeApagarMensagem(FAXINA, MEMBRO, { minha: false, daSaga: false }), true);
+});

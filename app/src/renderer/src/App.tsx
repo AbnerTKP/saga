@@ -713,8 +713,14 @@ export function App() {
     const eu = sessao?.eu;
     if (!eu) return false;
     const autor = m.autorId ? membrosDoServidor.find((p) => p.id === m.autorId) ?? null : null;
-    return podeApagarMensagem(eu, autor, { minha: m.autorId === eu.id, daSaga: salaAberta?.papel === 'notas' });
-  }, [sessao?.eu, membrosDoServidor, salaAberta?.papel]);
+    return podeApagarMensagem(eu, autor, {
+      minha: m.autorId === eu.id,
+      daSaga: salaAberta?.papel === 'notas',
+      // Numa conversa privada não há cargo entre duas pessoas: cada um apaga só o que
+      // disse. Sem isto, quem modera o servidor ganhava um botão que o servidor recusa.
+      privada: !!conversaNaTela,
+    });
+  }, [sessao?.eu, membrosDoServidor, salaAberta?.papel, conversaNaTela]);
 
   /**
    * As telas no ar, para a conversa avisar quem começou a transmitir.

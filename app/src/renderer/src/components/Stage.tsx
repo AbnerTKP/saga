@@ -17,6 +17,9 @@ import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
 
+/** Vazia e sempre a mesma: uma lista nova a cada desenho remontaria o chat à toa. */
+const SEM_LIVES: LiveNoChat[] = [];
+
 /**
  * Quem está assistindo a esta transmissão.
  *
@@ -440,9 +443,15 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             podeApagar={podeApagar}
             onApagar={chat.apagar}
             onPessoa={(id, nome, em, tipo) => onPessoa(identidadeDe(id), nome, em, tipo)}
-            lives={lives}
+            // A linha "fulano está compartilhando a tela" conta o que acontece nas salas
+            // de voz do SERVIDOR. Numa conversa privada — que não é de servidor nenhum —
+            // ela é assunto de outro lugar caindo dentro da conversa de duas pessoas: foi
+            // o que apareceu ao entrar num servidor novo, com as telas de lá listadas no
+            // chat privado. O quadro flutuante da live continua, porque aquele é o que
+            // VOCÊ escolheu assistir.
+            lives={conversa ? SEM_LIVES : lives}
             assistindo={rm.assistindo}
-            onAssistir={onAssistirLive}
+            onAssistir={conversa ? undefined : onAssistirLive}
             salaDaVozId={rm.salaDaVoz?.id ?? null}
           />
         </div>
