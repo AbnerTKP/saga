@@ -1020,7 +1020,8 @@ export function App() {
           servidor dividia a linha com eles — e um nome grande no alto da janela é lido
           como o nome do programa, não como onde você está. A faixa devolve o lugar dos
           botões à janela e diz quem é o app; o servidor desce para dentro da barra, que
-          é o lugar dele. No Windows não existe: lá a barra de título é do sistema. */}
+          é o lugar dele. No Windows ela não existe aqui: lá a barra inteira, com os
+          botões, é a `BarraDaJanela`, montada em main.tsx acima de todas as telas. */}
       {window.desktop.platform === 'darwin' && (
         <div className="faixa-da-janela">
           <img src={logo} alt="" width={17} height={17} />

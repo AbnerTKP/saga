@@ -655,6 +655,20 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   com ela, `promessa resolveu`. A tela cheia da v0.18.0 nunca funcionou em versão nenhuma.
 - **Região de arraste engole clique de tudo que é desenhado por cima.** Qualquer coisa
   flutuante precisa de `-webkit-app-region: no-drag`.
+- **No Windows a barra da janela é do app; no Mac, continua a do sistema.** A do Windows
+  era a branca do sistema, a única coisa na tela que não era da Saga. O dono escolheu entre
+  três desenhos renderizados: a faixa de 34 px (logo e "Saga") com os três botões da altura
+  inteira, colados na borda, e o fechar em vermelho cheio — maximizada, o canto da tela É o
+  fechar. O Mac ficou de fora de propósito: lá o uso já é o dos botões do sistema, e igualar
+  os dois não era o pedido. `titleBarStyle: 'hidden'` sem `titleBarOverlay` tira a barra e
+  mantém borda de esticar, sombra e encaixe; os botões falam com o processo principal, e o
+  do meio escuta `maximize`/`unmaximize`, porque dois cliques na faixa também maximizam.
+  **A barra mora em `main.tsx`, acima de TODA tela** — atualização, entrada, tela inicial
+  —, e não dentro do `App`: numa tela sem ela a janela ficaria sem fechar. Pelo mesmo motivo
+  ela fica acima da escada de camadas (45), e o que cobre a tela inteira começa abaixo dela
+  por `--topo-da-janela` (o fundo dos painéis, a altura máxima do painel, o X do ver
+  imagem): com um painel aberto, a barra do sistema continuava ali para fechar. O menu de
+  layouts do Windows 11 ao parar o mouse no maximizar se perde; Win+Z continua.
 - **A escada das camadas mora num lugar só, comentada em `.modal-back`.** O painel estava
   em `z-index: 10`, ABAIXO de tudo que flutua — o quadro da live (15), o aviso de versão
   (20), a pilha de avisos (21). Com uma live no canto ou um aviso na tela, pedaços do
@@ -1556,6 +1570,14 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   é o arquivo tocando no app de verdade, com o CSP de verdade e a saída muda. Clicar no
   microfone numa call e ouvir, e começar a compartilhar e ouvir o "live", precisa de
   LiveKit e de ouvido, e não foi exercido.
+- **A barra da janela no Windows de verdade.** O que está medido é o app compilado numa
+  janela escondida aqui no Mac, com a plataforma fingida de Windows: a barra de 34 px nas
+  telas, os três botões de 46x33 colados no canto, a faixa arrastável e os botões não, o
+  clique em cada um chamando minimizar, maximizar e fechar, o botão do meio virando
+  "Restaurar", e o fundo de um painel começando abaixo dela. **Nada disso foi exercido
+  numa janela Windows**: arrastar pela faixa, dois cliques maximizando, encaixar no topo e
+  nas laterais, esticar pelas bordas, a janela maximizada sem sobrar borda, e o fechar no
+  canto da tela.
 - **O overlay por cima de um jogo de verdade.** O que está medido, no app de verdade e em
   janela escondida, é o mecanismo inteiro: a janela abrindo acima de tudo e fora da barra
   de tarefas, os quadros chegando a 1280x720, travar e destravar, esticar pela quina, o

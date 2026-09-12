@@ -33,6 +33,26 @@ html, body, #root { height: 100%; margin: 0; }
   letter-spacing: .01em;
 }
 .faixa-da-janela img { border-radius: 4px; opacity: .9; }
+
+/* A barra da janela no Windows: a mesma faixa do Mac, com os três botões nossos na ponta.
+   Botões da altura inteira e colados na borda — maximizada, o canto da tela é o fechar.
+   Ela fica ACIMA da escada de camadas (ver `.modal-back`): com um painel aberto a barra
+   do sistema continuava ali para minimizar e fechar, e esta tem de continuar também. Por
+   isso tudo o que cobre a tela inteira começa abaixo dela, por `--topo-da-janela`. */
+.janela-propria { --topo-da-janela: 34px; display: flex; flex-direction: column; height: 100%; }
+.corpo-da-janela { flex: 1; min-height: 0; }
+.barra-da-janela {
+  flex: none; height: 34px; display: flex; align-items: center; gap: 7px;
+  padding-left: 12px; background: var(--bg0); border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag; color: var(--text3); font-size: 12px; font-weight: 600;
+  letter-spacing: .01em; position: relative; z-index: 45;
+}
+.barra-da-janela img { border-radius: 4px; opacity: .9; }
+.barra-da-janela-botoes { margin-left: auto; display: flex; height: 100%; -webkit-app-region: no-drag; }
+.barra-da-janela-botoes button { width: 46px; height: 100%; display: grid; place-items: center; color: var(--text2); }
+.barra-da-janela-botoes button:hover { background: var(--bg3); color: var(--white); }
+/* Vermelho cheio só aqui: é o gesto que todo mundo no Windows reconhece como "fechar". */
+.barra-da-janela-botoes .fechar:hover { background: var(--danger); color: #fff; }
 .app-raiz > .app { flex: 1; min-height: 0; }
 body { background: var(--bg0); color: var(--text); font: 15px/1.4 -apple-system, 'Segoe UI', system-ui, sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; user-select: none; }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
@@ -517,7 +537,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 /* Visualizador: a imagem inteira, sem corte, com o fundo bem escuro para ela mandar. */
 .ver-imagem { background: rgba(0,0,0,.85); z-index: 30; }   /* ver a escada em .modal-back */
 .ver-imagem img { max-width: 92vw; max-height: 88vh; border-radius: 8px; box-shadow: 0 12px 48px rgba(0,0,0,.6); }
-.ver-imagem-fechar { position: fixed; top: 16px; right: 16px; width: 36px; height: 36px;
+.ver-imagem-fechar { position: fixed; top: calc(16px + var(--topo-da-janela, 0px)); right: 16px; width: 36px; height: 36px;
   display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,.5); color: var(--white); }
 .ver-imagem-fechar:hover { background: rgba(255,255,255,.15); }
 .ver-imagem-legenda { position: fixed; bottom: 20px; color: var(--text2); font-size: 13px; }
@@ -538,8 +558,8 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    O painel estava em 10, abaixo de TUDO: com uma live no quadro flutuante ou um aviso de
    versão no canto, pedaços do painel viravam decoração — o clique ia para a camada de
    cima e o botão "simplesmente não funcionava". */
-.modal-back { -webkit-app-region: no-drag; position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 25; }
-.modal { width: 720px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); background: var(--bg2); border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+.modal-back { -webkit-app-region: no-drag; position: fixed; inset: var(--topo-da-janela, 0px) 0 0 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 25; }
+.modal { width: 720px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px - var(--topo-da-janela, 0px)); background: var(--bg2); border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 .modal.small { width: 440px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; font-size: 17px; }
 .modal-head .icon { color: var(--text2); width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; }
@@ -645,7 +665,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 /* ---- avulsos ---- */
 
-.carregando { display: grid; place-items: center; height: 100vh; color: #b5bac1; }
+.carregando { display: grid; place-items: center; height: 100%; color: #b5bac1; }
 
 /* Discreta de propósito: serve para conferir a versão, não para ser lida. */
 .marca-versao {
