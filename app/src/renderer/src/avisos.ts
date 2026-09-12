@@ -4,7 +4,11 @@
 // Só as regras moram aqui, sem tocar em arquivo nem em `Audio`: é o que permite testar
 // "não empilhar som" sem navegador. Os arquivos ficam em `sons/index.ts`.
 
-export type Aviso = 'entrou' | 'saiu' | 'live' | 'convite';
+export type Aviso =
+  // acontecimentos da call e da Saga
+  | 'entrou' | 'saiu' | 'live' | 'convite' | 'mensagem' | 'lance' | 'fimDaPartida'
+  // o que você acabou de fazer: confirmação, não notícia
+  | 'liveEntrou' | 'liveSaiu' | 'micLigou' | 'micMutou';
 
 /** Baixo de propósito: aviso que assusta é aviso que a pessoa desliga. */
 export const VOLUME_DO_AVISO = 0.45;

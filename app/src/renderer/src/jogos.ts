@@ -73,3 +73,30 @@ export function quemChamar(membros: Membro[], o: {
     online: outros.filter((m) => !o.naCall.has(m.id) && (m.status ?? 'offline') !== 'offline').map(comSituacao),
   };
 }
+
+/**
+ * O que a mesa tem a dizer entre uma busca e a seguinte, para quem está com a partida
+ * FORA da tela — que é justamente quem precisa de som.
+ *
+ * Sai do resumo que vem na busca de salas, e não da tela do jogo: o lance do outro tem de
+ * chegar enquanto você lê o chat, e a tela do jogo só existe quando ela está aberta.
+ *
+ * - `lance`  — o outro jogou, e a vez passou a ser sua. O seu próprio lance não toca nada:
+ *              você acabou de fazê-lo, e o tabuleiro já respondeu.
+ * - `fim`    — a partida acabou (mate, desistência, tempo, empate).
+ *
+ * Na primeira busca não toca nada: abrir o app não é acontecer. Mesa diferente também
+ * não — a revanche é outra partida, e o começo dela não é um lance.
+ */
+export function oQueTocarNaMesa(
+  antes: ResumoDaMesa | null,
+  agora: ResumoDaMesa | null,
+  euId: number,
+): 'lance' | 'fim' | null {
+  if (!antes || !agora || antes.id !== agora.id) return null;
+  if (antes.estado === 'jogando' && agora.estado === 'fim') return 'fim';
+  if (antes.estado !== 'jogando' || agora.estado !== 'jogando') return null;
+  const minhaCor = agora.brancas === euId ? 'w' : agora.pretas === euId ? 'b' : null;
+  if (!minhaCor || agora.vez !== minhaCor || antes.vez === agora.vez) return null;
+  return 'lance';
+}

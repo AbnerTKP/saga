@@ -443,9 +443,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   const toggleMic = useCallback(async () => {
     if (deafenedRef.current) return;
-    await lp().setMicrophoneEnabled(!lp().isMicrophoneEnabled).catch((e: Error) => setError(`Microfone: ${e.message}`));
+    const ligando = !lp().isMicrophoneEnabled;
+    await lp().setMicrophoneEnabled(ligando).catch((e: Error) => setError(`Microfone: ${e.message}`));
+    // O som sai do que o microfone FICOU, e não do que foi pedido: falhar em adquirir o
+    // dispositivo — headset ocupado, permissão negada — deixaria um "ligou" mentindo.
+    // Claro ao ligar, escuro ao mutar, como na live.
+    tocarAviso(lp().isMicrophoneEnabled ? 'micLigou' : 'micMutou', deafenedRef.current);
     bump();
-  }, [room]);
+  }, [room, tocarAviso]);
 
   const toggleCam = useCallback(async () => {
     await lp().setCameraEnabled(!lp().isCameraEnabled).catch((e: Error) => setError(`Câmera: ${e.message}`));
@@ -797,6 +802,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    * e por isso continua listando quem não está sendo recebido.
    */
   const assistir = useCallback((identity: string | null) => {
+    // Entrar numa live é claro; sair, escuro. Trocar de uma live para outra é entrar —
+    // e clicar de novo na mesma não toca nada, porque nada mudou.
+    const antes = assistindoRef.current;
+    if (identity !== antes) tocarAviso(identity ? 'liveEntrou' : 'liveSaiu', deafenedRef.current);
     assistindoRef.current = identity;
     setAssistindoState(identity);
     anunciar();
@@ -810,7 +819,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     }
     aplicarAudio();
     bump();
-  }, [room, aplicarAudio, anunciar]);
+  }, [room, aplicarAudio, anunciar, tocarAviso]);
 
   const volumeDe = useCallback((identity: string) => volumes.current.get(identity) ?? 1, []);
 

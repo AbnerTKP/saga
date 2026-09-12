@@ -11,7 +11,7 @@ import {
   abrirMesa, agirNaMesa, type ConviteDeJogo,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde,
 } from './api';
-import { ehMinhaVez, jogandoAgora, minhaMesa, type ResumoDaMesa } from './jogos';
+import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
 import { ARQUIVOS } from './sons';
 import { TelaDoXadrez } from './components/TelaDoXadrez';
@@ -351,6 +351,9 @@ export function App() {
         // A que está aberta na tela não avisa — você está lendo.
         for (const c of conversasComNovidade(conversasVistas.current, daConta, conversaAbertaRef.current)) {
           avisarRef.current('info', `${c.com.nome} te mandou uma mensagem.`);
+          // O som avisa quem está de fone com a janela noutro lugar; o recado na tela,
+          // quem está olhando. Um sino curto, diferente do convite de jogo de propósito.
+          tocarAviso('mensagem', rm.deafened);
         }
         conversasVistas.current = ultimasVistas(daConta);
         setPollError(null);
@@ -786,6 +789,19 @@ export function App() {
     conviteTocado.current = convite.mesa;
     tocarAviso('convite', rm.deafened);
   }, [convite?.mesa, rm.deafened, tocarAviso]);
+
+  /**
+   * O lance do outro e o fim da partida tocam mesmo com o tabuleiro fora da tela — que é
+   * quando o som serve para alguma coisa. Sai da busca de salas, como o convite; a regra
+   * de o quê tocar é pura e testada (`oQueTocarNaMesa`).
+   */
+  const mesaAnterior = useRef<ResumoDaMesa | null>(null);
+  useEffect(() => {
+    if (!sessao?.eu) return;
+    const aviso = oQueTocarNaMesa(mesaAnterior.current, minhaMesaAgora, sessao.eu.id);
+    mesaAnterior.current = minhaMesaAgora;
+    if (aviso) tocarAviso(aviso === 'lance' ? 'lance' : 'fimDaPartida', rm.deafened);
+  }, [minhaMesaAgora, sessao?.eu?.id, rm.deafened, tocarAviso]);
 
   /** Abre uma partida na tela — a sua, ou a de quem está jogando, como plateia. */
   const abrirPartida = useCallback((mesaId: number) => {

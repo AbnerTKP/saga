@@ -1074,9 +1074,33 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   de fone; o recado na tela avisa quem está com a janela noutro lugar — que é justamente
   quando você não vê a lista lateral. Sala em que você não está não vira aviso.
 - **GIF no chat não é do Turbo.** O que o Turbo destrava é a imagem animada no perfil.
-- **Os sons de aviso vão dentro do app.** São 30 KB; aviso que precisa ser baixado chega
+- **Os sons de aviso vão dentro do app.** São ~95 KB; aviso que precisa ser baixado chega
   depois do fato. O mesmo som não repete em menos de 400 ms, senão três pessoas entrando
   juntas viram ruído.
+- **Os sons são FEITOS aqui, com ffmpeg, e a família é uma só:** senoides curtas com
+  decaimento, entre 400 e 1400 Hz, pico a -3 dB. `/tmp` não guarda nada — quem os gera de
+  novo é o mesmo caminho de sempre (`aevalsrc` com envelope, `libopus` a 96k, num `.ogg`),
+  e o que separa um som bom de um estalo são duas medidas:
+  - **a nota não pode ser cortada antes de o decaimento morrer.** Cortar em 10% de
+    amplitude é um clique, e ele aparece no espectrograma como um risco vertical de cima a
+    baixo que o `entrou.ogg` não tem. A duração de cada nota sai do decaimento dela
+    (`8/decaimento`), nunca de um número escrito à mão.
+  - **o ganho não é fixo: mede-se o pico e aplica-se o que falta.** A soma das parciais
+    nunca chega a 1,0, então um `volume=-3.5dB` fixo entregou a primeira leva inteira 4 dB
+    abaixo da família — cada som num nível diferente.
+- **Entrar é CLARO, sair é ESCURO — e vale para a live e para o microfone.** Foi o pedido
+  do dono, e virou a regra do par: na live, si5 → mi6 subindo contra mi5 → si4 descendo
+  (com a oitava abaixo, que é o que dá peso); no microfone, o mesmo gesto mais curto e
+  6 dB mais baixo. Mais baixo porque **confirmação não é notícia**: mutar e desmutar tocam
+  o dia inteiro e só respondem ao que a sua mão acabou de fazer. E o que toca sai do que o
+  microfone FICOU, não do que foi pedido: falhar em adquirir o dispositivo deixaria um
+  "ligou" mentindo.
+- **A mensagem privada é um sino, e o convite de xadrez são duas notas.** Os dois chegam
+  pelo canto da tela e precisam ser distinguíveis de ouvido, sem olhar. O **lance** do
+  outro é madeira e não nota — estalo de ruído com um baque grave —, e fica 4 dB abaixo
+  dos avisos porque toca a cada jogada. Ele sai da busca de salas, e não da tela do jogo:
+  o som existe justamente para quem está com o tabuleiro fora da tela (`oQueTocarNaMesa`,
+  puro e testado — o seu próprio lance não toca nada, e quem assiste não ouve nenhum).
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
 - **O xadrez é da DUPLA, e cada dupla joga na SUA tela.** Foi a correção do dono, duas
