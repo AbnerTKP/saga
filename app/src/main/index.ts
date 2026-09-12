@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor, dialog, globalShortcut, screen } from 'electron';
 import { join, dirname } from 'node:path';
 import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu } from './inicio';
+import {
+  ATALHO_PADRAO, atalhoAceito, encaixarNaTela, gravar as gravarOverlay, ler as lerOverlay,
+  type Retangulo,
+} from './overlay';
 
 /**
  * O app se chamava "Cantinho do Vorcaro" e passou a se chamar "Saga".
@@ -152,6 +156,120 @@ function ligarNaPrimeiraVez() {
   }
 }
 
+
+/**
+ * O overlay da live: a janela que fica por cima do jogo.
+ *
+ * Ela é aberta pela PRÓPRIA tela, com `window.open`, e não daqui. O motivo é o vídeo: a
+ * faixa da live mora no renderer, e uma `MediaStreamTrack` não é transferível entre
+ * janelas — medido, `postMessage` recusa com `DataCloneError`. O que atravessa é o
+ * `ReadableStream` de quadros do `MediaStreamTrackProcessor`, e para transferi-lo é
+ * preciso que uma janela tenha a outra na mão, o que só o `window.open` dá. Aqui ficam as
+ * coisas que só o processo principal pode fazer: pôr a janela acima de tudo, deixar o
+ * clique atravessar para o jogo, e o atalho global que destrava.
+ */
+const JANELA_DO_OVERLAY = 'overlay-da-live';
+
+let overlay: BrowserWindow | null = null;
+/** Travado é o estado normal: o overlay existe para ser olhado enquanto se joga. */
+let overlayTravado = true;
+let principal: BrowserWindow | null = null;
+
+const telas = (): Retangulo[] => screen.getAllDisplays().map((d) => d.bounds);
+
+/**
+ * Travar é `setIgnoreMouseEvents`: o clique, a mira e o teclado vão todos para o jogo.
+ *
+ * `forward: true` mantém o movimento do mouse chegando à página mesmo travado — sem isso
+ * o overlay não saberia sequer que o ponteiro passou por cima, e destravar teria de ser
+ * sempre às cegas.
+ */
+function travarOverlay(travado: boolean) {
+  overlayTravado = travado;
+  if (!overlay || overlay.isDestroyed()) return;
+  overlay.setIgnoreMouseEvents(travado, { forward: true });
+  overlay.webContents.send('overlay:travado', travado);
+  if (principal && !principal.isDestroyed()) principal.webContents.send('overlay:travado', travado);
+}
+
+/** O que ficou anotado, para a janela voltar onde estava na próxima vez. */
+function anotarDoOverlay(mudanca: { bounds?: Retangulo; atalho?: string }) {
+  const pasta = app.getPath('userData');
+  gravarOverlay(pasta, { ...lerOverlay(pasta), ...mudanca });
+}
+
+/**
+ * O atalho que trava e destrava, e que precisa funcionar com o JOGO na frente — por isso
+ * é global, e não uma tecla da janela. Devolve o que FICOU: outro programa pode já estar
+ * com ele, e uma tela que afirma o que não aconteceu é pior que uma que diz "não deu".
+ */
+function registrarAtalho(texto: string): string | null {
+  globalShortcut.unregisterAll();
+  const aceito = atalhoAceito(texto) ?? ATALHO_PADRAO;
+  try {
+    const deu = globalShortcut.register(aceito, () => travarOverlay(!overlayTravado));
+    if (!deu) registrar('aviso', 'overlay', `o atalho ${aceito} já é de outro programa`);
+    return deu ? aceito : null;
+  } catch (e) {
+    registrar('erro', 'overlay', `atalho ${aceito}: ${(e as Error).message}`);
+    return null;
+  }
+}
+
+/** As opções da janela do overlay. Sem moldura, sem sombra e sem barra de tarefas: ela é
+    um pedaço de imagem por cima do jogo, não um programa a mais na sua barra. */
+function opcoesDoOverlay(): Electron.BrowserWindowConstructorOptions {
+  const guardado = lerOverlay(app.getPath('userData'));
+  const bounds = encaixarNaTela(guardado.bounds, telas(), screen.getPrimaryDisplay().bounds);
+  return {
+    ...bounds,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    backgroundColor: '#00000000',
+    // Nasce escondida e aparece SEM roubar o foco: quem está jogando não pode perder o
+    // jogo porque a live abriu.
+    show: false,
+    title: 'Live',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required',
+    },
+  };
+}
+
+/** Tudo o que só se pode fazer daqui, depois de a janela nascer. */
+function prepararOverlay(janela: BrowserWindow) {
+  overlay = janela;
+  // 'screen-saver' é o degrau acima do que qualquer janela comum alcança; sem ele o
+  // overlay some atrás do jogo assim que o jogo ganha o foco.
+  janela.setAlwaysOnTop(true, 'screen-saver');
+  // No Mac, tela cheia é um espaço PRÓPRIO: sem isto o overlay fica no espaço de trás.
+  janela.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  travarOverlay(true);
+  janela.once('ready-to-show', () => janela.showInactive());
+  const anotar = () => { if (!janela.isDestroyed()) anotarDoOverlay({ bounds: janela.getBounds() }); };
+  janela.on('moved', anotar);
+  janela.on('resized', anotar);
+  janela.on('closed', () => {
+    overlay = null;
+    globalShortcut.unregisterAll();
+    if (principal && !principal.isDestroyed()) principal.webContents.send('overlay:fechou');
+  });
+  registrarAtalho(lerOverlay(app.getPath('userData')).atalho);
+  registrar('info', 'overlay', `aberto em ${JSON.stringify(janela.getBounds())}`);
+}
+
 function createWindow() {
   // Quem abriu a Saga: a pessoa, ou o arranque do sistema? No Windows a resposta vem no
   // argumento gravado na entrada de arranque; no Mac, do próprio sistema.
@@ -214,9 +332,27 @@ function createWindow() {
     win.focus();
   };
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  principal = win;
+
+  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    // A única janela nossa que se abre da tela é o overlay da live; todo o resto é link,
+    // e link abre no navegador da pessoa.
+    if (frameName === JANELA_DO_OVERLAY) {
+      return { action: 'allow', overrideBrowserWindowOptions: opcoesDoOverlay() };
+    }
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  win.webContents.on('did-create-window', (janela, { frameName }) => {
+    if (frameName === JANELA_DO_OVERLAY) prepararOverlay(janela);
+  });
+
+  // Fechando a Saga, o overlay vai junto: uma imagem por cima do jogo sem app por trás
+  // não tem como ser fechada — não tem moldura nem entrada na barra de tarefas.
+  win.on('closed', () => {
+    if (overlay && !overlay.isDestroyed()) overlay.close();
+    if (principal === win) principal = null;
   });
 
   /**
@@ -385,6 +521,49 @@ app.whenReady().then(async () => {
     }
   });
 
+  /**
+   * O overlay: travar, redimensionar, fechar e trocar o atalho.
+   *
+   * Mover a janela não passa por aqui — quem arrasta é a região `-webkit-app-region: drag`
+   * da própria página, que é o caminho nativo. Redimensionar, sim: numa janela sem moldura
+   * não há borda para agarrar, então as quinas do overlay mandam o tamanho pedido.
+   */
+  ipcMain.handle('overlay:travar', (_e, travado: boolean) => {
+    travarOverlay(!!travado);
+    return overlayTravado;
+  });
+
+  ipcMain.handle('overlay:estado', () => ({
+    aberto: !!overlay && !overlay.isDestroyed(),
+    travado: overlayTravado,
+    atalho: lerOverlay(app.getPath('userData')).atalho,
+  }));
+
+  ipcMain.handle('overlay:redimensionar', (_e, pedido: Retangulo) => {
+    if (!overlay || overlay.isDestroyed()) return null;
+    // Passa pela mesma régua de sempre: nada de sumir num monitor que não existe mais.
+    const bounds = encaixarNaTela(pedido, telas(), screen.getPrimaryDisplay().bounds);
+    overlay.setBounds(bounds);
+    anotarDoOverlay({ bounds });
+    return bounds;
+  });
+
+  ipcMain.handle('overlay:fechar', () => {
+    if (overlay && !overlay.isDestroyed()) overlay.close();
+  });
+
+  /** Devolve o atalho que FICOU valendo, que pode não ser o pedido: outro programa pode
+      já estar com ele. */
+  ipcMain.handle('overlay:atalho', (_e, texto: string) => {
+    const aceito = atalhoAceito(texto);
+    if (!aceito) return { atalho: lerOverlay(app.getPath('userData')).atalho, valeu: false };
+    anotarDoOverlay({ atalho: aceito });
+    // Só há atalho registrado enquanto o overlay existe; sem ele, fica anotado para a
+    // próxima abertura.
+    const ficou = overlay && !overlay.isDestroyed() ? registrarAtalho(aceito) : aceito;
+    return { atalho: aceito, valeu: ficou === aceito };
+  });
+
   ipcMain.handle('app:version', () => app.getVersion());
 
   // Abrir junto com o sistema. `disponivel` é falso em desenvolvimento: ali o executável é
@@ -421,6 +600,10 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+// Atalho global é do sistema inteiro: deixá-lo registrado depois de sair tiraria a tecla
+// de quem ficou.
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

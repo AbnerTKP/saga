@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Live</title>
+    <!--
+      O overlay não busca nada de fora: os quadros da live chegam pela janela do app, por
+      postMessage. Por isso aqui o CSP é mais apertado que o da tela principal — nem
+      imagem, nem som, nem conexão nenhuma.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none';" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/overlay.tsx"></script>
+  </body>
+</html>

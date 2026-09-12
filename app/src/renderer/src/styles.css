@@ -573,7 +573,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    vários, e fica por cima do quadro flutuante da live — sem isto, o vão entre um aviso e
    outro, e toda a área vazia à esquerda deles, comem o clique do que está por baixo.
    Foi assim que o botão de expandir da live ficava inclicável enquanto houvesse aviso. */
-.avisos { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: 72px;
+.avisos { -webkit-app-region: no-drag; position: fixed; right: 16px; bottom: var(--avisos-fundo, 72px);
   display: flex; flex-direction: column-reverse; gap: 8px; z-index: 40; max-width: min(420px, calc(100vw - 32px));
   pointer-events: none; }
 .aviso { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
@@ -1112,10 +1112,79 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .mini-live-controles .volume-mudo { width: 26px; height: 26px; }
 .mini-live-icone { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 6px; color: var(--text); }
 .mini-live-icone:hover { background: var(--bg3); color: var(--white); }
-/* Com o quadro flutuante aberto, os avisos do canto sobem para cima dele: nasciam por cima
-   dos controles do quadro e cobriam justamente o "Sair" — visto na foto, não no código. O
-   quadro tem ~226 px de altura a partir dos 84 px do fundo. */
-body:has(.mini-live) .avisos { bottom: 322px; }
+/* Com o quadro flutuante no canto de baixo à direita, os avisos sobem para cima dele:
+   nasciam por cima dos controles do quadro e cobriam justamente o "Sair" — visto na foto,
+   não no código. A medida era chumbada em 322 px, de quando o quadro só podia estar num
+   lugar e num tamanho; hoje ele anda e estica, então quem escreve `--avisos-fundo` é o
+   próprio quadro, e só enquanto ele estiver NAQUELE canto (ver QuadroFlutuante.tsx). */
+
+/* A alça é a barra de baixo, como a barra de título de qualquer janela. A imagem continua
+   sendo imagem: clique mostra, dois cliques abrem em tela cheia. */
+.mini-live-controles { cursor: grab; }
+.mini-live-controles button, .mini-live-controles input { cursor: pointer; }
+.mini-live.movendo { user-select: none; box-shadow: 0 16px 40px rgba(0,0,0,.65); }
+.mini-live.movendo .mini-live-controles { cursor: grabbing; }
+.mini-live .mini-live-icone.ligado { background: var(--accent-tenue); color: var(--accent-claro); }
+
+/* As quinas de esticar. Não têm tinta: quem as anuncia é o cursor, porque um quadro de
+   vídeo com quatro marcas nos cantos vira moldura de editor de imagem. 16 px é o que a
+   mão acerta sem mirar. */
+.quadro-quina { position: absolute; width: 16px; height: 16px; z-index: 2; }
+.quadro-quina.nw { left: 0; top: 0; cursor: nwse-resize; }
+.quadro-quina.ne { right: 0; top: 0; cursor: nesw-resize; }
+.quadro-quina.sw { left: 0; bottom: 0; cursor: nesw-resize; }
+.quadro-quina.se { right: 0; bottom: 0; cursor: nwse-resize; }
+
+/* O campo que ESCUTA a combinação de teclas, em "Sua conta". Parece um campo porque é um
+   campo — mas é um botão, para receber foco e teclado sem aceitar texto digitado. */
+.campo-atalho { width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px;
+  background: var(--bg0); border: 1px solid var(--line); color: var(--white);
+  font-size: 14px; font-weight: 600; letter-spacing: .02em; }
+.campo-atalho:hover { border-color: var(--bg4); }
+.campo-atalho.ouvindo { border-color: var(--accent); color: var(--accent-claro);
+  font-weight: 500; letter-spacing: 0; }
+
+/* ------------------------------------------------------------------------------------
+   O overlay da live: a janela por cima do jogo.
+
+   Ela é outra PÁGINA (overlay.html), numa janela sem moldura e sem fundo. O que se desenha
+   aqui é só a imagem e um selo dizendo de quem ela é — foi o desenho que o dono escolheu
+   entre três, renderizados antes do código. Travada, ela deixa o clique atravessar para o
+   jogo; destravada, ganha a moldura de acento, as quinas e os botões.
+   ------------------------------------------------------------------------------------ */
+.overlay { position: fixed; inset: 0; overflow: hidden; border-radius: 8px;
+  background: #000; -webkit-app-region: drag; }
+/* Travada, a janela nem recebe clique — mas o cursor de arraste apareceria mesmo assim
+   sobre o jogo em algumas máquinas. */
+.overlay.travado { -webkit-app-region: no-drag; }
+.overlay.destravado { outline: 2px solid var(--accent); outline-offset: -2px; }
+.overlay-imagem { display: block; width: 100%; height: 100%; object-fit: contain; }
+.overlay-esperando { position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--text3); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+/* O selo: pequeno, embaixo à esquerda, com o fundo escuro para sobreviver a uma cena
+   clara. É a única coisa que diz de quem é a tela enquanto se joga. */
+.overlay-selo { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center;
+  gap: 5px; max-width: calc(100% - 90px); padding: 3px 8px; border-radius: 999px;
+  background: rgba(10,12,16,.72); font-size: 11px; font-weight: 600; color: #fff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.overlay-selo .ponto { width: 5px; height: 5px; flex: none; border-radius: 50%; background: var(--danger); }
+.overlay-controles { -webkit-app-region: no-drag; position: absolute; right: 8px; bottom: 8px;
+  display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 8px;
+  background: rgba(10,12,16,.78); }
+.overlay-icone { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: #dfe5ef; }
+.overlay-icone:hover { background: rgba(255,255,255,.14); color: #fff; }
+.overlay-icone.ligado { color: var(--accent-claro); }
+.overlay-dica { position: absolute; right: 8px; top: 8px; padding: 2px 7px; border-radius: 999px;
+  background: rgba(63,127,224,.9); font-size: 10px; font-weight: 700; color: #fff;
+  letter-spacing: .03em; pointer-events: none; }
+/* As quinas da janela sem moldura: não há borda do sistema para agarrar, então elas são a
+   borda. Maiores que as do quadro de dentro do app — aqui a janela é pequena e a mão está
+   no meio de um jogo. */
+.overlay-quina { -webkit-app-region: no-drag; position: absolute; width: 18px; height: 18px; }
+.overlay-quina.nw { left: 0; top: 0; cursor: nwse-resize; }
+.overlay-quina.ne { right: 0; top: 0; cursor: nesw-resize; }
+.overlay-quina.sw { left: 0; bottom: 0; cursor: nesw-resize; }
+.overlay-quina.se { right: 0; bottom: 0; cursor: nwse-resize; }
 
 /* O cartão da live na barra lateral, flutuando à direita da barra, na altura de quem
    transmite. Fica no degrau dos menus (35) e fora da região de arraste — sem isso, o clique

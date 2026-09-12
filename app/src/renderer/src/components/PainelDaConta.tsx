@@ -10,6 +10,7 @@ import { EscolherImagem } from './EscolherImagem';
 import { BlocosDaSaga } from './PainelDaSaga';
 import type { AberturaComOSistema } from '../desktop';
 import { useFecharComEsc } from '../useFechar';
+import { atalhoDoEvento, comoSeLe } from '../atalho';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const APARELHOS: Record<Kind, string> = {
@@ -23,6 +24,61 @@ const SISTEMAS: Record<string, { nome: string; encolhida: string }> = {
 };
 // Sem inventar para o que não conhecemos.
 const OUTRO_SISTEMA = { nome: 'o sistema', encolhida: '' };
+
+
+/**
+ * O atalho que trava e destrava a live por cima do jogo.
+ *
+ * O campo ESCUTA em vez de aceitar texto: "ctrl shift o" escrito à mão não é nada para o
+ * atalho global, e o erro só apareceria com o jogo aberto — longe daqui. E o que fica na
+ * tela é o que o SISTEMA aceitou: outro programa pode já estar com a combinação, e nesse
+ * caso o certo é dizer, não fingir que deu.
+ */
+function AtalhoDoOverlay() {
+  const [atalho, setAtalho] = useState('');
+  const [ouvindo, setOuvindo] = useState(false);
+  const [recusado, setRecusado] = useState<string | null>(null);
+  const mac = window.desktop.platform === 'darwin';
+
+  useEffect(() => {
+    window.desktop.overlay.estado().then((e) => setAtalho(e.atalho)).catch(() => undefined);
+  }, []);
+
+  const teclou = async (e: React.KeyboardEvent) => {
+    e.preventDefault();
+    if (e.key === 'Escape') { setOuvindo(false); return; }
+    const novo = atalhoDoEvento(e);
+    if (!novo) return;                                  // ainda está no meio de apertar
+    setOuvindo(false);
+    setRecusado(null);
+    const r = await window.desktop.overlay.definirAtalho(novo);
+    setAtalho(r.atalho);
+    if (!r.valeu) setRecusado(novo);
+  };
+
+  return (
+    <div className="form">
+      <label>
+        Atalho para travar e destravar
+        <button
+          type="button"
+          className={`campo-atalho ${ouvindo ? 'ouvindo' : ''}`}
+          onClick={() => { setOuvindo(true); setRecusado(null); }}
+          onBlur={() => setOuvindo(false)}
+          onKeyDown={teclou}
+        >
+          {ouvindo ? 'aperte a combinação…' : (atalho ? comoSeLe(atalho, mac) : '—')}
+        </button>
+        <small className="muted">
+          Travado, o overlay é só de olhar: o clique, a mira e o teclado vão todos para o
+          jogo. Destravado, dá para arrastá-lo, esticá-lo pelas quinas e mexer no som dele.
+          O atalho é do sistema inteiro, então funciona com o jogo na frente.
+          {recusado && ` ${comoSeLe(recusado, mac)} já é de outro programa — continua valendo o de cima.`}
+        </small>
+      </label>
+    </div>
+  );
+}
 
 /**
  * Tudo que é seu, num lugar só, atrás da engrenagem.
@@ -243,6 +299,16 @@ export function PainelDaConta({
               {respostaDoInicio === 'erro' && ' Não deu para saber como está agora.'}
               {abertura && !abertura.disponivel && ' Só vale no app instalado.'}
             </p>
+          </section>
+
+          <section className="painel-bloco">
+            <h3>A live por cima do jogo</h3>
+            <p className="muted small">
+              Assistindo a uma transmissão, o botão do quadrado com a seta manda a imagem
+              para fora da Saga, numa janela que fica acima de tudo — dá para jogar e
+              assistir na mesma tela. O som continua saindo pela Saga.
+            </p>
+            <AtalhoDoOverlay />
           </section>
 
           {donoDaSaga && <BlocosDaSaga meuId={eu.id} />}

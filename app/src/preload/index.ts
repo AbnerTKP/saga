@@ -38,6 +38,36 @@ const desktop = {
   /** Devolve como FICOU no sistema, que pode não ser o que foi pedido. */
   definirAberturaComOSistema: (ligado: boolean): Promise<{ disponivel: boolean; ligado: boolean }> =>
     ipcRenderer.invoke('inicio:definir', ligado),
+
+  /**
+   * O overlay da live — a janela que fica por cima do jogo.
+   *
+   * Abrir e fechar a janela é da TELA (`window.open`), porque só de lá se consegue mandar
+   * os quadros do vídeo para dentro dela. O que passa por aqui é o que só o processo
+   * principal pode fazer: deixar o clique atravessar para o jogo, mudar o tamanho de uma
+   * janela sem moldura, e o atalho global que trava e destrava.
+   */
+  overlay: {
+    travar: (travado: boolean): Promise<boolean> => ipcRenderer.invoke('overlay:travar', travado),
+    estado: (): Promise<{ aberto: boolean; travado: boolean; atalho: string }> =>
+      ipcRenderer.invoke('overlay:estado'),
+    redimensionar: (b: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('overlay:redimensionar', b),
+    fechar: () => ipcRenderer.invoke('overlay:fechar'),
+    /** Devolve o atalho que FICOU valendo: outro programa pode já estar com ele. */
+    definirAtalho: (texto: string): Promise<{ atalho: string; valeu: boolean }> =>
+      ipcRenderer.invoke('overlay:atalho', texto),
+    aoTravar: (cb: (travado: boolean) => void) => {
+      const ouvir = (_e: unknown, travado: boolean) => cb(travado);
+      ipcRenderer.on('overlay:travado', ouvir);
+      return () => { ipcRenderer.off('overlay:travado', ouvir); };
+    },
+    aoFechar: (cb: () => void) => {
+      const ouvir = () => cb();
+      ipcRenderer.on('overlay:fechou', ouvir);
+      return () => { ipcRenderer.off('overlay:fechou', ouvir); };
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('desktop', desktop);

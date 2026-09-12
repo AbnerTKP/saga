@@ -982,8 +982,21 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     if (ehSurdo) surdos.add(p.identity);
   }
 
+  /**
+   * A transmissão que está no palco — a que você escolheu ver.
+   *
+   * Ela nasce aqui, e não na tela, porque hoje TRÊS lugares perguntam a mesma coisa: o
+   * palco, o quadro flutuante e o overlay por cima do jogo. A mesma consulta nascendo em
+   * cada um é o defeito que o cartão de perfil já teve — e aqui daria pior: cada lugar
+   * podia acabar mostrando uma live diferente.
+   */
+  const liveNoPalco = tiles.find(
+    (t) => t.source === Track.Source.ScreenShare && t.participant.identity === assistindo,
+  ) ?? null;
+
   return {
     room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened, surdos,
+    liveNoPalco,
     falando: falandoAgora,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,

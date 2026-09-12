@@ -936,6 +936,62 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   sala de voz, dividindo espaço com a transmissão — as duas ficavam apertadas, e chat não é
   da sala de voz, é da sala de chat. Quem está na voz e abre o chat não perde a live: ela
   vira um quadro flutuante no canto, que abre em tela cheia com dois cliques.
+- **A live sai da Saga por uma JANELA, e a imagem vai por quadros.** Jogo em tela cheia
+  tapa o app inteiro: o quadro flutuante resolve "estou no chat", não "estou jogando". A
+  janela do overlay fica acima de tudo (`alwaysOnTop` no nível `screen-saver`, e
+  `visibleOnAllWorkspaces` com `visibleOnFullScreen`, que no Mac é o que a faz existir no
+  espaço do jogo). O caminho para a imagem chegar lá foi medido, não deduzido, com o
+  Electron deste projeto:
+
+  | caminho | resultado |
+  |---|---|
+  | `documentPictureInPicture` | não existe — é API de navegador, não do Electron |
+  | transferir a `MediaStreamTrack` | `DataCloneError: does not have a transferable type` |
+  | `MediaStreamTrackProcessor` + `ReadableStream` transferível | **26 quadros/s a 1280x720** |
+
+  E ler os quadros não tira a imagem de quem já a exibe: com a mesma faixa num `<video>` e
+  num processador ao mesmo tempo, o vídeo recebeu 61 quadros nos mesmos 2 s em que o
+  processador leu 61 — é o que faz a live continuar no palco enquanto está por cima do
+  jogo. Vale o terceiro: o stream de `VideoFrame` é transferível, então os quadros atravessam
+  sem codificar nada — o mesmo quadro que já estava na memória. E é por isso que quem abre
+  a janela é a TELA (`window.open`), não o processo principal: só quem tem a outra janela
+  na mão consegue transferir o stream para dentro dela. Entrar de novo no LiveKit não era
+  opção — mesma identidade derruba a conexão anterior, e identidade nova põe um fantasma
+  na lista de todo mundo. **O som não vai junto**: ele continua saindo pela Saga, que é
+  onde mora o volume da live; duas saídas tocariam a mesma coisa.
+- **O overlay nasce TRAVADO, e travado quer dizer que o clique atravessa.**
+  `setIgnoreMouseEvents(true, { forward: true })`: clique, mira e teclado vão todos para o
+  jogo, e o `forward` mantém o movimento do mouse chegando à página — sem ele, a janela
+  não saberia nem que o ponteiro passou. Quem destrava é um atalho GLOBAL (Ctrl+Shift+O
+  de fábrica, trocável em "Sua conta"), porque uma tecla da janela não chega a quem está
+  com o jogo na frente. O campo do atalho ESCUTA a combinação em vez de aceitar texto, e
+  o que fica escrito é o que o sistema aceitou: `globalShortcut.register` devolve falso
+  quando outro programa já tem a tecla, e afirmar o que não aconteceu é pior que dizer
+  "não deu". `atalhoAceito` recusa o que faria o `register` LANÇAR, no meio de abrir a
+  janela — o erro apareceria a três camadas de distância.
+- **Do overlay só se vê a imagem e um selo com o nome.** Foi a escolha do dono entre três
+  desenhos renderizados antes do código: sem nada por cima, com uma barrinha fixa no alto,
+  e este — selo pequeno no canto, que não gasta altura nenhuma. Travado, o selo é a única
+  coisa que diz de quem é a tela; destravado, entram a moldura de acento, as quinas de
+  esticar e os botões de som e fechar. Medido no app de verdade, em janela escondida, com
+  o processo principal do build: travado, 0 quinas e 0 botões; destravado, 4 e 2; os
+  quadros chegando a 1280x720; esticar e reabrir voltando no mesmo canto e tamanho.
+  **Numa call de verdade, por cima de um jogo de verdade, não foi exercido.**
+- **O quadro flutuante se arrasta pela BARRA e se estica pelas quinas.** Ele nascia
+  chumbado no canto de baixo à direita, e chumbado ele tapa justamente o que estiver ali —
+  o fim da conversa, o campo de escrever. A alça é a barra de controles, como a barra de
+  título de qualquer janela: a imagem continua sendo imagem (clique mostra, dois cliques
+  abrem em tela cheia) e os botões dentro da barra continuam sendo botões. O que se guarda
+  não é um par de pixels: é um POUSO — a distância do canto mais PRÓXIMO, com o lado junto
+  (`flutuante.ts`, puro e testado). Guardando "a 900 px da esquerda", quem encostou o
+  quadro na direita o veria no meio do nada depois de esticar a janela; guardando "colado
+  na direita", ele continua colado. A regra dos avisos do canto era 322 px chumbados no
+  CSS, de quando o quadro só podia estar num lugar e num tamanho — hoje quem escreve
+  `--avisos-fundo` é o próprio quadro, e só enquanto ele estiver NAQUELE canto.
+- **A live que está no palco é uma pergunta só, em `useRoom`.** Três lugares perguntam a
+  mesma coisa agora — o palco, o quadro flutuante e o overlay —, e a conta nascendo em
+  cada um é o defeito que o cartão de perfil já teve. Aqui daria pior: cada lugar podia
+  acabar mostrando uma live diferente.
 - **O identificador é do DONO DA SAGA, e de mais ninguém.** A intenção é que ele apareça
   junto do nome em TODO servidor: definir o de alguém é mexer em como a pessoa é vista na
   Saga inteira, e isso não cabe ao cargo mais alto de UM servidor — nem a quem criou aquele
@@ -1388,7 +1444,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (360) + app (214), segundos, sem nada externo
+pnpm test        # servidor (360) + app (254), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1481,6 +1537,16 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   pessoa vista antes na call de outro. O caminho do palco — voz no CORNUME, olhos no
   "teste", clique em alguém da call — mostrando o cargo do CORNUME e o menu sem moderação
   está nos testes de `pessoas.ts` e no typecheck; numa call de verdade, não foi exercido.
+- **O overlay por cima de um jogo de verdade.** O que está medido, no app de verdade e em
+  janela escondida, é o mecanismo inteiro: a janela abrindo acima de tudo e fora da barra
+  de tarefas, os quadros chegando a 1280x720, travar e destravar, esticar pela quina, o
+  atalho sendo aceito e recusado, o botão de som falando com o app, fechar avisando o app,
+  e reabrir no mesmo canto e tamanho. **Não foi exercido**: um jogo na frente. Jogo em
+  **tela cheia exclusiva** no Windows tapa qualquer janela, overlay incluído — o caminho
+  ali é jogar em janela sem borda, que é como quase todo jogo roda hoje. No Mac, o espaço
+  próprio da tela cheia está coberto pela chamada de `visibleOnAllWorkspaces`, mas isso
+  também não foi visto acontecendo. E a live por trás disso tudo vem de uma call de
+  verdade, com duas pessoas, que não foi exercida.
 - **O xadrez entre duas pessoas de verdade.** O que está medido, na janela escondida contra
   um servidor local, é o caminho inteiro com o adversário e a plateia agindo por HTTP: a
   mesa abrindo em 0,1 s, o convite chegando ao outro em 20 ms e ao canto da tela em 1,7 s, o

@@ -53,7 +53,33 @@ declare global {
       aberturaComOSistema: () => Promise<AberturaComOSistema>;
       /** Liga ou desliga, e devolve como FICOU no sistema — não o que foi pedido. */
       definirAberturaComOSistema: (ligado: boolean) => Promise<AberturaComOSistema>;
+      /** O overlay da live: o que só o processo principal pode fazer com aquela janela. */
+      overlay: {
+        travar: (travado: boolean) => Promise<boolean>;
+        estado: () => Promise<EstadoDoOverlay>;
+        redimensionar: (b: { x: number; y: number; width: number; height: number }) => Promise<unknown>;
+        fechar: () => Promise<void>;
+        /** Devolve o atalho que FICOU valendo: outro programa pode já estar com ele. */
+        definirAtalho: (texto: string) => Promise<{ atalho: string; valeu: boolean }>;
+        aoTravar: (cb: (travado: boolean) => void) => () => void;
+        aoFechar: (cb: () => void) => () => void;
+      };
     };
   }
+
+  /**
+   * Os quadros de uma faixa de vídeo, um a um, como um `ReadableStream` — e é ele que
+   * atravessa para a janela do overlay. A tipagem do TypeScript ainda não conhece a API
+   * (ela é do WebCodecs), mas o Chromium do Electron 39 conhece: medido, 26 quadros por
+   * segundo a 1280x720 entre duas janelas.
+   */
+  class MediaStreamTrackProcessor {
+    constructor(init: { track: MediaStreamTrack; maxBufferSize?: number });
+    readable: ReadableStream<VideoFrame>;
+  }
 }
+
+/** O overlay está aberto? travado? e com qual atalho? */
+export type EstadoDoOverlay = { aberto: boolean; travado: boolean; atalho: string };
+
 export {};

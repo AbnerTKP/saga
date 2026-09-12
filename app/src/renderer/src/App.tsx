@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import logo from './marca.png';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar, baterPresenca,
@@ -53,6 +53,8 @@ import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
+import { useOverlayDaLive } from './useOverlayDaLive';
+import { alternarMudo } from './volume';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -169,6 +171,37 @@ export function App() {
     [notas.mostrar],
   );
   const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem);
+
+  /**
+   * A live por cima do jogo.
+   *
+   * Ele mora aqui, e não dentro do palco, porque a janela tem de sobreviver a trocar de
+   * sala, de servidor e de tela: quem está jogando pôs a live num canto e não vai querer
+   * que ela feche sozinha porque você clicou no chat. Quem manda embora é o botão dela, o
+   * botão do quadro flutuante, ou o app fechando.
+   */
+  const quemTransmite = rm.liveNoPalco
+    ? (rm.liveNoPalco.participant.name || rm.liveNoPalco.participant.identity)
+    : null;
+  const identidadeDaLive = rm.liveNoPalco?.participant.identity ?? null;
+  const volumeDaLive = identidadeDaLive ? rm.volumeDaTelaDe(identidadeDaLive) : 1;
+  // O que estava antes do mudo, para devolver o som ao volume de antes e não a 100% —
+  // é a regra de `alternarMudo`, a mesma do botão de mudo do palco.
+  const volumeAntesDoMudo = useRef(1);
+  const somDaLive = useMemo(() => ({
+    mudo: volumeDaLive === 0,
+    alternarMudo: () => {
+      if (!identidadeDaLive) return;
+      const r = alternarMudo(volumeDaLive, volumeAntesDoMudo.current);
+      volumeAntesDoMudo.current = r.guardado;
+      rm.definirVolumeDaTela(identidadeDaLive, r.volume);
+    },
+  }), [identidadeDaLive, volumeDaLive, rm.definirVolumeDaTela]);
+  const overlayDaLive = useOverlayDaLive(
+    rm.liveNoPalco?.track.mediaStreamTrack ?? null,
+    quemTransmite,
+    somDaLive,
+  );
 
   // O que vale para o servidor ABERTO: só as listas etiquetadas com ele.
   const servidorAberto = sessao?.servidor?.id ?? null;
@@ -1039,6 +1072,7 @@ export function App() {
       />
       <Stage
         rm={rm}
+        overlay={overlayDaLive}
         // O palco é da call, e a call pode ser de outro servidor.
         pessoas={vistosEm(conhecidos.current, rm.salaDaVoz?.servidorId)}
         onPessoa={abrirMenu}

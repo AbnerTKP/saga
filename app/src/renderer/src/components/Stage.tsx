@@ -7,12 +7,14 @@ import { VerImagem } from './VerImagem';
 import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
 import { ControleDeVolume } from './ControleDeVolume';
+import { QuadroFlutuante } from './QuadroFlutuante';
 import type { ConversaAberta, Digitando, Mensagem, RoomInfo } from '../api';
 import type { LiveNoChat } from '../lives';
 import { identidadeDe } from '../pessoas';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { Espectador } from '../espectadores';
 import type { Enquadramento } from '../enquadramento';
+import type { OverlayDaLive } from '../useOverlayDaLive';
 import { anotar } from '../registro';
 
 type RM = ReturnType<typeof useRoom>;
@@ -106,6 +108,9 @@ type ControlesDaLive = {
   preencher: boolean;
   onPreencher: (v: boolean) => void;
   onSair: () => void;
+  /** A janela por cima do jogo. Sai daqui na prévia da PRÓPRIA tela: pôr a sua imagem por
+      cima do seu jogo é um espelho dentro do espelho. */
+  overlay?: OverlayDaLive;
 };
 
 function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
@@ -189,6 +194,18 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
             >
               <Icon name="aspecto" size={20} />
             </button>
+            {controles.overlay?.disponivel && (
+              <button
+                type="button"
+                className={`controles-icone ${controles.overlay.aberto ? 'ligado' : ''}`}
+                title={controles.overlay.aberto
+                  ? 'Tirar a live de cima do jogo'
+                  : 'Pôr a live por cima do jogo — ela fica acima de tudo, inclusive do jogo'}
+                onClick={() => (controles.overlay!.aberto ? controles.overlay!.fechar() : controles.overlay!.abrir())}
+              >
+                <Icon name="paraFora" size={20} />
+              </button>
+            )}
             <button type="button" className="controles-icone" title="Tela cheia (dois cliques também)" onClick={telaCheia}>
               <Icon name="expandir" size={20} />
             </button>
@@ -204,7 +221,7 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay }: {
   /**
    * A conversa privada aberta. Ela toma o lugar da sala no palco: o chat é o MESMO — mesmo
    * anexo, mesmo GIF, mesmo apagar no botão direito —, e o que muda é o cabeçalho, que
@@ -256,6 +273,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   jogo?: (live: ReactNode | null) => ReactNode;
   /** A sua partida, quando você saiu dela para ler outra coisa. */
   faixaDaPartida?: ReactNode;
+  /** A janela da live por cima do jogo: abrir, fechar e saber se está aberta. */
+  overlay: OverlayDaLive;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [imagemAberta, setImagemAberta] = useState<string | null>(null);
@@ -281,8 +300,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
    * A escolha vale para imagem E som: a que está no palco é a que se vê e a única que se
    * ouve. Sem escolha, silêncio — que é o que audivel.ts já dizia.
    */
-  const screens = rm.tiles.filter((t) => t.source === Track.Source.ScreenShare);
-  const liveNoPalco = screens.find((t) => t.participant.identity === rm.assistindo) ?? null;
+  const liveNoPalco = rm.liveNoPalco;
   const focusTile = liveNoPalco ?? rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
@@ -320,6 +338,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       preencher,
       onPreencher: trocarPreencher,
       onSair: () => rm.assistir(null),
+      overlay: t.local ? undefined : overlay,
     };
   };
 
@@ -349,6 +368,16 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             largura={56}
             porcentagem={false}
           />
+        )}
+        {overlay.disponivel && (
+          <button
+            type="button"
+            className={`mini-live-icone ${overlay.aberto ? 'ligado' : ''}`}
+            title={overlay.aberto ? 'Tirar a live de cima do jogo' : 'Pôr a live por cima do jogo'}
+            onClick={() => (overlay.aberto ? overlay.fechar() : overlay.abrir())}
+          >
+            <Icon name="paraFora" size={17} />
+          </button>
         )}
         {onVoltarAVoz && (
           <button type="button" className="mini-live-icone" title="Voltar ao palco" onClick={onVoltarAVoz}>
@@ -586,7 +615,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       {/* Abriu o chat com uma live rodando: ela continua aqui, pequena, com os controles
           fixos embaixo — volume, voltar ao palco e sair. Eram um "voltar" e um X soltos no
           alto, e o volume só existia no botão direito. */}
-      {salaAberta?.tipo === 'texto' && quadroDaLive && <div className="mini-live">{quadroDaLive}</div>}
+      {salaAberta?.tipo === 'texto' && quadroDaLive && <QuadroFlutuante>{quadroDaLive}</QuadroFlutuante>}
       {imagemAberta && <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />}
     </main>
   );

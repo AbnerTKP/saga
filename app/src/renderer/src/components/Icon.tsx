@@ -44,6 +44,10 @@ const paths: Record<string, string> = {
   // Uma pessoa com um "+": convidar. É gente que chega, não um objeto que se cria — por
   // isso não é o `mais` genérico.
   convidar: 'M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+  // Um quadro com a seta saindo dele: mandar a live para FORA da Saga, por cima do jogo.
+  // É o mesmo desenho que todo mundo reconhece como "abrir noutra janela" — aqui não é
+  // hora de inventar símbolo, ele vive a 17 px na barra do quadro flutuante.
+  paraFora: 'M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.6l-9.8 9.8 1.4 1.4L19 6.4V10h2V3h-7z',
   // Seta saindo por uma porta: sair do servidor.
   sair: 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z',
 };
