@@ -300,7 +300,27 @@ export const MIGRACOES = [
    CREATE INDEX mensagens_conversa ON mensagens(conversa_id, id);
    CREATE INDEX mensagens_apagadas ON mensagens(sala_id, apagada_em) WHERE apagada_em IS NOT NULL;
    CREATE INDEX mensagens_apagadas_conversa ON mensagens(conversa_id, apagada_em) WHERE apagada_em IS NOT NULL`,
-
+  // Os relatos de erro e as ideias de melhoria, do botão "Relatar". São da SAGA e não de um
+  // servidor: o dono da Saga é quem decide o que vale, num painel que ainda será construído.
+  // `usuario_id` aceita nulo porque dá para relatar sem ter entrado — o erro que impede de
+  // entrar é justamente o que mais precisa chegar. `estado` e `decidido_*` já nascem aqui
+  // para o painel não precisar de migração no dia em que existir.
+  `CREATE TABLE relatos (
+     id            INTEGER PRIMARY KEY,
+     usuario_id    INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     tipo          TEXT    NOT NULL CHECK (tipo IN ('erro', 'melhoria')),
+     texto         TEXT    NOT NULL,
+     contexto      TEXT    NOT NULL,
+     registro      TEXT,
+     estado        TEXT    NOT NULL DEFAULT 'novo' CHECK (estado IN ('novo', 'aceito', 'recusado', 'feito')),
+     decidido_por  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     decidido_em   INTEGER,
+     criado_em     INTEGER NOT NULL
+   )`,
+  `CREATE INDEX relatos_estado ON relatos(estado, criado_em)`,
+  // As duas de `relatos` vieram ANTES de `recuperacoes`, embora escritas depois: foram elas
+  // que chegaram primeiro à produção (posições 50 e 51, em 13/09/2026), e migração vale pela
+  // posição — `recuperacoes` na 50 seria dada por aplicada e nunca criaria a tabela.
   // Recuperar a senha. As contas não têm e-mail, então quem atesta que a pessoa é a pessoa
   // é o dono da Saga: ele gera um código, manda por fora, e com ele a pessoa escolhe a senha
   // nova. Uma linha por conta, porque gerar outro substitui o anterior. O código é guardado

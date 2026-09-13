@@ -10,6 +10,7 @@ import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { ResumoDaMesa } from './jogos';
 import type { CodigoDoCarro } from './corrida';
+import type { CorpoDoRelato } from './relato';
 
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
@@ -538,6 +539,15 @@ export const verMesa = async (id: number, servidorId: number) =>
 /** Uma ação na mesa. Fechar não devolve mesa nenhuma: ela deixou de existir. */
 export const agirNaMesa = async (id: number, a: AcaoNaMesa, servidorId: number) =>
   (await pedir<{ mesa?: Mesa; ok?: true }>('POST', '/jogos/mesa', { id, ...a }, servidorId)).mesa ?? null;
+
+// --- relatos ---------------------------------------------------------------------
+
+/**
+ * Manda um relato de erro ou ideia de melhoria. Vai com a sessão quando há uma, e sem ela
+ * também — o servidor aceita, com teto, porque o erro que impede de entrar é o que mais precisa chegar.
+ */
+export const enviarRelato = (corpo: CorpoDoRelato) =>
+  pedir<{ relato: { id: number } }>('POST', '/relatos', corpo);
 
 // --- Fórmula 1 ------------------------------------------------------------------
 

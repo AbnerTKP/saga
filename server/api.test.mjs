@@ -1642,3 +1642,21 @@ test('fórmula 1 pela rede: abrir, chamar, o convite no /rooms, sentar, largar, 
   assert.equal(fim.corpo.grid.estado, 'fim');
   assert.deepEqual((await noGrid(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
 });
+
+// --- relatos -----------------------------------------------------------------------
+
+test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {
+  const quem = (await cadastrar('relato_quem')).corpo;
+  const comConta = await chamar('POST', '/relatos', {
+    sessao: quem.token, corpo: { tipo: 'melhoria', texto: 'um botão de pular a intro', contexto: { versao: '0.50.0', tela: 'Fórmula 1' } },
+  });
+  assert.equal(comConta.status, 200, JSON.stringify(comConta.corpo));
+  assert.ok(comConta.corpo.relato.id > 0);
+
+  // O erro que impede de entrar também chega: sem sessão nenhuma.
+  const semConta = await chamar('POST', '/relatos', { corpo: { tipo: 'erro', texto: 'a tela de login não sai do lugar' } });
+  assert.equal(semConta.status, 200, JSON.stringify(semConta.corpo));
+
+  const invalido = await chamar('POST', '/relatos', { sessao: quem.token, corpo: { tipo: 'erro', texto: '' } });
+  assert.equal(invalido.status, 400);
+});

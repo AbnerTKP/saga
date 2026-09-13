@@ -22,6 +22,8 @@ import { FaixaDaPartida } from './components/FaixaDaPartida';
 import { TelaDaCorrida } from './components/TelaDaCorrida';
 import { ConviteDeCorrida } from './components/ConviteDeCorrida';
 import type { Aviso } from './avisos';
+import { BotaoDeRelatar, EVENTO_DO_AVISO } from './components/Relatar';
+import { anotarOnde, descreverTela } from './relato';
 import { useRoom, type SalaDaVoz } from './useRoom';
 import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
@@ -415,6 +417,7 @@ export function App() {
     setDadosDoServidor(null);
     setJogos(null);
     setCorridas(null);
+    setConviteDeCorridaRespondido(null);
     setJogoAberto(null);
     setModoConversas(false);
     setConversaAberta(null);
@@ -752,6 +755,25 @@ export function App() {
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
 
+  // O botão Relatar mora na faixa da janela, fora do App no Windows: ele não pergunta onde a
+  // pessoa está — o App anota a cada troca, e o relato leva junto (ver relato.ts).
+  const telaDoRelato = descreverTela({
+    logado: !!sessao, semServidor: !!sessao && (!sessao.servidor || !sessao.eu),
+    jogo: jogoAberto?.tipo ?? null, conversas: modoConversas, sala: salaAberta?.name ?? null,
+  });
+  const servidorDoRelato = sessao?.servidor?.nome ?? null;
+  useEffect(() => { anotarOnde(telaDoRelato, servidorDoRelato); }, [telaDoRelato, servidorDoRelato]);
+
+  // O "recebido" do relato sai pela mesma pilha de avisos do resto do app.
+  useEffect(() => {
+    const ouvir = (e: Event) => {
+      const { tipo, texto } = (e as CustomEvent<{ tipo: 'sucesso' | 'erro'; texto: string }>).detail;
+      notas.mostrar(tipo, texto);
+    };
+    window.addEventListener(EVENTO_DO_AVISO, ouvir);
+    return () => window.removeEventListener(EVENTO_DO_AVISO, ouvir);
+  }, [notas.mostrar]);
+
   /**
    * Quem é seu amigo AGORA, pela busca de salas: é isso que decide o que o menu e o
    * cartão de uma pessoa oferecem, e o que mantém o campo de escrever aberto.
@@ -1078,6 +1100,7 @@ export function App() {
           <div className="faixa-da-janela">
             <img src={logo} alt="" width={17} height={17} />
             <span>Saga</span>
+            <BotaoDeRelatar />
           </div>
         )}
         {sessao.eu ? (
@@ -1161,6 +1184,7 @@ export function App() {
         <div className="faixa-da-janela">
           <img src={logo} alt="" width={17} height={17} />
           <span>Saga</span>
+          <BotaoDeRelatar />
         </div>
       )}
     {/* Sem a lista de pessoas, a coluna dela sai da grade: no modo conversas não há

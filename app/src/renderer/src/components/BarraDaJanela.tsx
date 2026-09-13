@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import logo from '../marca.png';
+import { BotaoDeRelatar } from './Relatar';
 
 /**
  * A barra da janela no Windows — a do sistema saiu, e esta entra no lugar.
@@ -27,6 +28,7 @@ export function BarraDaJanela() {
     <div className="barra-da-janela">
       <img src={logo} alt="" width={17} height={17} />
       <span>Saga</span>
+      <BotaoDeRelatar />
       <div className="barra-da-janela-botoes">
         <button title="Minimizar" aria-label="Minimizar" onClick={() => window.desktop.janela.minimizar()}>
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>

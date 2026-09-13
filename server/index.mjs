@@ -19,6 +19,7 @@ import * as notas from './notas.mjs';
 import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as amigos from './amigos.mjs';
+import { relatar } from './relatos.mjs';
 import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
@@ -1043,6 +1044,14 @@ const ROTAS = {
   'POST /jogos/mesa': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return mesas.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // --- relatos -----------------------------------------------------------------
+  // O botão "Relatar". Aceita pedido sem sessão: o erro que impede de entrar é justamente o que
+  // mais precisa chegar — ver o teto de quem não tem conta em relatos.mjs.
+  'POST /relatos': async (req) => {
+    const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
+    return { relato: relatar(db, usuario, await lerCorpo(req)) };
   },
 
   // --- Fórmula 1 ---------------------------------------------------------------

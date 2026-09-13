@@ -1867,3 +1867,27 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
   .corrida-assento-textos { gap: 6px; }
   .corrida-piloto-nome { font-size: 14px; }
 }
+
+/* ---- Relatar ----
+   O botão mora na faixa do alto da janela, a opção B escolhida pelo dono: cinza apagado, do
+   tamanho do texto da faixa, e acende só com o mouse. Ele é `no-drag`: a faixa inteira arrasta
+   a janela, e sem isso o clique viraria arrastar. */
+.relatar-faixa { -webkit-app-region: no-drag; margin-left: auto; margin-right: 10px; display: flex;
+  align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text3); }
+.relatar-faixa:hover { background: var(--bg3); color: var(--white); }
+/* No Windows os três botões da janela já empurram para a direita: o Relatar fica logo antes deles. */
+.barra-da-janela .relatar-faixa { margin-right: 6px; }
+.barra-da-janela .relatar-faixa + .barra-da-janela-botoes { margin-left: 0; }
+
+.form.relato { padding-top: 0; }
+.relato-tipos { display: flex; gap: 6px; }
+.relato-tipo { flex: 1; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+  background: var(--bg3); color: var(--text); text-align: center; }
+.relato-tipo:hover { background: var(--bg4); }
+.relato-tipo.escolhido { background: var(--accent-tenue); color: var(--white); box-shadow: inset 0 0 0 1px var(--accent); }
+.relato-texto { width: 100%; min-height: 120px; resize: none; font-family: inherit; font-size: 14.5px;
+  line-height: 1.45; text-transform: none; font-weight: 400; color: var(--white); background: var(--bg0);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; outline: none; }
+.relato-texto:focus { border-color: var(--accent); }
+.relato-contexto { font-size: 12px; color: var(--text3); line-height: 1.45; }

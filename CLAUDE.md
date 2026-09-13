@@ -126,6 +126,12 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
 - **Migrações são registradas pela posição na lista.** Nunca editar, remover ou inserir no
   meio — só acrescentar no fim. Inserir no meio já derrubou a produção; `banco.test.mjs`
   trava a ordem por impressão digital.
+  **Com duas pessoas mexendo, "o fim" é o fim da PRODUÇÃO, não o do seu ramo.** Em
+  13/09/2026 a `relatos` (duas migrações) e a `recuperacoes` (uma) foram escritas em paralelo,
+  as duas "no fim", ambas na posição 50. A `relatos` subiu primeiro; ao juntar os ramos, a
+  `recuperacoes` foi para a 52. Na ordem de escrita, a produção a daria por aplicada e a tabela
+  nunca existiria — sem erro nenhum. Antes de juntar migrações, pergunte à produção
+  (`SELECT n FROM migracoes`) o que ela já tem.
 - **O `Dockerfile` leva TUDO e o `.dockerignore` diz o que fica; `*.mjs` não pega
   subpasta.** Listar arquivo por arquivo já derrubou o servidor duas vezes; o glob
   consertou aquilo e derrubou uma TERCEIRA, do jeito novo: nasceu a pasta `repositorios/`,
@@ -1409,6 +1415,22 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
   do teste leva `mute-audio`.
 
+- **O botão "Relatar" mora na faixa do alto da janela.** Foi a escolha do dono (opção B) entre
+  três posições fotografadas no app de verdade: pé da trilha, barra da conta e esta. A faixa
+  está em quase toda tela e é quase vazia, então o botão fica à mão sem pesar — cinza apagado,
+  acende com o mouse. No Windows ele está na `BarraDaJanela`, acima de TODA tela, inclusive a
+  de entrar; no Mac a faixa só existe dentro do app, e **a tela de entrar do Mac fica sem o
+  botão**. Por isso a caixa não pergunta nada ao `App`: o `App` ANOTA onde a pessoa está
+  (`relato.ts`), e o relato leva junto.
+- **Os relatos são da SAGA e esperam o painel do dono.** Tabela `relatos`, com `estado`
+  (novo, aceito, recusado, feito) e `decidido_por`/`decidido_em` já criados, para o painel não
+  precisar de migração no dia em que existir. Hoje só se escreve: ninguém lê pelo app, e nenhum
+  amigo vê o relato de outro. **Relatar não exige conta** — o erro que impede de entrar é o que
+  mais precisa chegar —, e o teto é de 10 por hora por conta e de 30 por hora para TODOS os sem
+  conta somados. Não é por IP: o freio por IP já trancou o grupo inteiro atrás do mesmo roteador.
+  O registro de erros vai só no erro, marcado por padrão, cortado aos últimos 60 mil
+  caracteres — o `lerCorpo` derruba pedido acima de 100 mil.
+
 ## A limitação que caiu sem ser atacada
 
 Numa das cinco máquinas (Windows 11 25H2, headset USB Logitech como único dispositivo de
@@ -1635,7 +1657,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (398) + app (304), segundos, sem nada externo
+pnpm test        # servidor (417) + app (320), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
