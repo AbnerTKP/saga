@@ -1189,7 +1189,9 @@ export function App() {
       )}
     {/* Sem a lista de pessoas, a coluna dela sai da grade: no modo conversas não há
         servidor aberto para ter gente. */}
-    <div className={`app ${modoConversas ? 'sem-pessoas' : ''}`}>
+    {/* A corrida também tira a lista de pessoas: a pista precisa da largura, e foi a escolha do
+        dono no desenho — o placar por cima da pista já diz quem está correndo. */}
+    <div className={`app ${modoConversas || jogoAberto?.tipo === 'corrida' ? 'sem-pessoas' : ''}`}>
       <Sidebar
         rooms={rooms}
         categorias={categorias}
@@ -1353,7 +1355,7 @@ export function App() {
       )}
       {/* A lista de pessoas é do SERVIDOR aberto. No modo conversas não há um: a coluna
           sai inteira, em vez de mostrar gente que não tem nada com o que está na tela. */}
-      {!modoConversas && (
+      {!modoConversas && jogoAberto?.tipo !== 'corrida' && (
       <ListaDeMembros
         membros={membrosDoServidor}
         cargos={cargos}

@@ -552,9 +552,10 @@ export const enviarRelato = (corpo: CorpoDoRelato) =>
 // --- Fórmula 1 ------------------------------------------------------------------
 
 /** Um grid visto da busca de salas: quem abriu e quem está sentado. */
-export type ResumoDoGrid = { id: number; estado: EstadoDoGrid; anfitriao: number; pilotos: number[]; voltas: number };
+/** `pista` só vem de servidor que já conhece as pistas; sem ela, é Interlagos. */
+export type ResumoDoGrid = { id: number; estado: EstadoDoGrid; anfitriao: number; pilotos: number[]; voltas: number; pista?: string };
 export type EstadoDoGrid = 'grid' | 'correndo' | 'fim';
-export type ConviteDeCorrida = { grid: number; de: PessoaDaMesa; voltas: number; pilotos: number };
+export type ConviteDeCorrida = { grid: number; de: PessoaDaMesa; voltas: number; pista?: string; pilotos: number };
 export type CorridasNoServidor = { grids: ResumoDoGrid[]; convites: ConviteDeCorrida[] };
 
 export type Grid = {
@@ -562,6 +563,8 @@ export type Grid = {
   estado: EstadoDoGrid;
   anfitriao: PessoaDaMesa;
   voltas: number;
+  /** Uma das pistas de `pista.ts`; servidor antigo não manda, e aí é Interlagos. */
+  pista?: string;
   /** Os oito, sempre na ordem de `CARROS`. */
   assentos: { carro: CodigoDoCarro; pessoa: PessoaDaMesa | null }[];
   chamados: PessoaDaMesa[];
@@ -570,7 +573,8 @@ export type Grid = {
   ordem: CodigoDoCarro[];
   /** Quando as luzes apagam, no relógio do servidor. */
   largadaEm: number | null;
-  chegadas: { pessoa: PessoaDaMesa; carro: CodigoDoCarro; tempo: number; melhorVolta: number | null }[];
+  /** `tempo` já vem com a punição somada; `punicao` diz quanto dela é punição. */
+  chegadas: { pessoa: PessoaDaMesa; carro: CodigoDoCarro; tempo: number; punicao?: number; melhorVolta: number | null }[];
   abandonos: number[];
   plateia: PessoaDaMesa[];
   meuCarro: CodigoDoCarro | null;
@@ -582,9 +586,9 @@ export type Grid = {
 
 export type AcaoNoGrid =
   | { acao: 'sentar'; carro: CodigoDoCarro }
-  | { acao: 'configurar'; voltas: number }
+  | { acao: 'configurar'; voltas?: number; pista?: string }
   | { acao: 'chamar' | 'cancelarConvite'; alvo: number }
-  | { acao: 'chegada'; tempo: number; melhorVolta: number | null }
+  | { acao: 'chegada'; tempo: number; melhorVolta: number | null; punicao: number }
   | { acao: 'levantar' | 'recusar' | 'largar' | 'abandonar' | 'correrDeNovo' | 'fechar' };
 
 /** Como a mesa: o pedido vai ao servidor DO GRID, nunca ao aberto. */

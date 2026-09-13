@@ -1,4 +1,5 @@
 import type { ConviteDeCorrida as Convite } from '../api';
+import { definicao } from '../pista';
 import { Avatar } from './Avatar';
 
 /**
@@ -17,7 +18,7 @@ export function ConviteDeCorrida({ convite, ocupado, onCorrer, onRecusar }: {
       <div className="convite-de-jogo-corpo">
         <div className="convite-de-jogo-texto">
           <span className="strong">{convite.de.nome} te chamou para correr</span>
-          <span className="muted">Fórmula 1 · {convite.voltas} voltas · {convite.pilotos} de 8 no grid</span>
+          <span className="muted">{definicao(convite.pista ?? 'interlagos').nome} · {convite.voltas} voltas · {convite.pilotos} de 8 no grid</span>
         </div>
         <div className="convite-de-jogo-botoes">
           <button type="button" className="primary sm" disabled={ocupado} onClick={onCorrer}>Correr</button>

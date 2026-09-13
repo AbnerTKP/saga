@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  criarGrids, ESPERA_DA_LARGADA, DEPOIS_DO_VENCEDOR, TETO_POR_VOLTA, VOLTA_MINIMA, PLATEIA, ESQUECIDO, ABANDONADO,
+  criarGrids, ESPERA_DA_LARGADA, DEPOIS_DO_VENCEDOR, TETO_POR_VOLTA, VOLTA_MINIMA, PLATEIA, ESQUECIDO, ABANDONADO, PISTAS,
 } from './corridas.mjs';
 import { ErroDeConta } from './contas.mjs';
 
@@ -49,6 +49,25 @@ test('abrir um grid: oito carros vazios, e abrir de novo devolve o mesmo', () =>
   assert.equal(t.grids.abrir(t.como(TKP)).id, grid.id);
   assert.equal(t.grids.tamanho, 1);
   assert.throws(() => t.grids.abrir(t.como(JUNINHO), { voltas: 7 }), recusa(400, /3, 5 ou 10/));
+  assert.throws(() => t.grids.abrir(t.como(JUNINHO), { pista: 'nurburgring' }), recusa(400, /pista não existe/));
+  // Sem dizer a pista, é Interlagos.
+  assert.equal(grid.pista, 'interlagos');
+  assert.equal(t.grids.abrir(t.como(RAFA), { pista: 'monaco' }).pista, 'monaco');
+});
+
+test('a pista: só quem abriu escolhe, só entre as seis, e pedido meio errado não muda nada', () => {
+  const t = montar();
+  const { id } = t.grids.abrir(t.como(TKP));
+  assert.deepEqual(PISTAS, ['interlagos', 'monza', 'monaco', 'spa', 'bahrein', 'vegas']);
+  let { grid } = t.agir(TKP, id, 'configurar', { pista: 'vegas' });
+  assert.equal(grid.pista, 'vegas');
+  assert.equal(grid.voltas, 5);
+  assert.throws(() => t.agir(JUNINHO, id, 'configurar', { pista: 'spa' }), recusa(403));
+  assert.throws(() => t.agir(TKP, id, 'configurar', { pista: 'spa', voltas: 7 }), recusa(400));
+  assert.throws(() => t.agir(TKP, id, 'configurar', {}), recusa(400));
+  ({ grid } = t.agir(TKP, id, 'configurar', { voltas: 3 }));
+  assert.equal(grid.pista, 'vegas');
+  assert.deepEqual(t.grids.resumo(t.como(TKP)).grids.map((g) => g.pista), ['vegas']);
 });
 
 test('sentar: um carro por pessoa, uma pessoa por carro', () => {
@@ -121,6 +140,18 @@ test('chegada: o tempo precisa fechar com a largada, e a ordem é a do tempo', (
   // Chegada repetida ou atrasada não quebra nada.
   ({ grid } = t.agir(TKP, id, 'chegada', { tempo: 58_000 }));
   assert.equal(grid.chegadas[0].tempo, 58_200);
+});
+
+test('chegada com punição: os segundos são somados, e a bandeirada é a do tempo com eles', () => {
+  const t = montar();
+  const id = largado(t);
+  t.passar(60_000);
+  assert.throws(() => t.agir(TKP, id, 'chegada', { tempo: 58_200, punicao: -3000 }), recusa(400, /punição/));
+  assert.throws(() => t.agir(TKP, id, 'chegada', { tempo: 58_200, punicao: 'muito' }), recusa(400, /punição/));
+  // TKP cruzou primeiro, mas cortou duas vezes: +6 s o põem atrás de Juninho.
+  t.agir(TKP, id, 'chegada', { tempo: 58_200, punicao: 6000 });
+  const { grid } = t.agir(JUNINHO, id, 'chegada', { tempo: 59_500 });
+  assert.deepEqual(grid.chegadas.map((c) => [c.pessoa.nome, c.tempo, c.punicao]), [['Juninho', 59_500, 0], ['TKP', 64_200, 6000]]);
 });
 
 test('o fim vem quando todos resolvem, quando o vencedor espera demais, ou pelo teto', () => {

@@ -1393,21 +1393,70 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   poria a latência no volante de todo mundo. Cada um empurra o próprio carro para fora do
   outro, pela posição que recebeu dele, e perde velocidade só no que ia contra — por isso a
   batida parece a mesma nas duas telas. A regra toda (`corrida.ts`) é pura e testada,
-  inclusive uma corrida de três voltas com piloto automático; é quem pilota que diz o tempo de
-  chegada, e o servidor só recusa conta impossível (antes da largada, ou volta de menos de
-  4 s). Entre amigos isso basta; contra trapaça, não.
+  inclusive duas voltas de piloto automático em cada uma das seis pistas; é quem pilota que diz
+  o tempo de chegada e a punição, e o servidor só recusa conta impossível (antes da largada,
+  volta de menos de 15 s, punição negativa). Entre amigos isso basta; contra trapaça, não.
 - **O relógio da corrida é o do SERVIDOR.** O app guarda a MAIOR diferença entre o `agora` das
   respostas e o próprio relógio — a resposta chega sempre depois de escrita, então a
   diferença só erra para menos. Com ele, as luzes apagam juntas em todas as telas e as fotos
   dos outros carros são desenhadas 110 ms no passado, entre duas que chegaram.
-- **O desenho da corrida foi escolhido pelo dono entre três**: a pista inteira com a
-  classificação na coluna (e não câmera seguindo o carro), nas cores da casa (e não grama e
-  asfalto); vagas que sobram ficam VAZIAS, sem robô; os carros BATEM; quem não corre assiste;
-  e a pista é espaçada — 84 de largura para um carro de 18. Os pilotos são os de 2026 das
-  quatro equipes pedidas, e os carros são desenho próprio só com as cores, sem logo.
-- **A pista gira um quarto de volta quando o quadro está em pé.** Numa janela de 1200 px, com
-  a coluna ao lado, o quadro fica alto e a pista deitada virava um desenho pequeno no meio do
-  vazio — visto na imagem, não no código. Só o desenho gira: o volante é do carro.
+- **A primeira Fórmula 1 foi recusada, e o que caiu foi justamente a escolha "da casa".** Na
+  v0.50.0 o dono tinha escolhido, entre três desenhos, a pista inteira na tela com as cores do
+  app (fundo escuro, zebras azuis) e a classificação na coluna. Jogado, veio: *"ficou péssimo,
+  eu posso sair da pista, cortar caminho, não tem bandeira, a pista está feia, toda azul o
+  fundo, a pista maior, modelos diferentes de pista"*. As cores da casa servem para o app, não
+  para um jogo — e uma imagem estática do desenho não mostrava nada disso: a pista inteira na
+  tela deixava o carro com 20 px, e sem muro o meio do mapa era atalho. O redesenho saiu de
+  imagens do MOTOR de verdade (não de SVG à mão), e o dono escolheu: **câmera seguindo o carro
+  SEM girar** (recusou a que gira mesmo sabendo que a seta esquerda continua sendo a esquerda
+  do carro), **placar por cima da pista** e a **lista de pessoas fora** enquanto a corrida está
+  aberta, **as seis pistas**, e **punição somada no fim**. Vagas vazias sem robô, carros que
+  batem e plateia continuam das escolhas de antes.
+- **As pistas são traçados de verdade** (`pistas/tracados.ts`, do levantamento aberto
+  bacinger/f1-circuits, MIT — o aviso da licença vai no arquivo e em `LICENCA-f1-circuits.md`):
+  Interlagos, Monza, Mônaco, Spa, Bahrein e Las Vegas, no sentido certo e começando na linha.
+  O traçado é ENCOLHIDO (`k`, unidades por metro) para a volta dar uns 35 s — o piloto
+  automático dos testes faz de 32 a 38 s —, e a LARGURA não encolhe: 110, umas seis larguras
+  de carro. Encolher sem estreitar tem um preço que ficou: **as chicanes de Monza são suaves**.
+  Medido: a reta pela Rettifilo nem sai do asfalto. Os dados têm um ponto a cada ~46 m, a
+  chicane cabe entre dois, e nem escala maior nem amaciar menos a devolveram — só desenhando a
+  chicane à mão. Mônaco usa `k` maior porque, no 3,6, a reta dos boxes e a Piscine ficavam a
+  102 do eixo uma da outra, com a pista de 96: sem espaço nem para o muro.
+- **Tudo em volta sai do traçado, e a física lê a MESMA pista que o desenho.** Zebra por
+  dentro no ápice e por fora na saída, brita por fora (escape asfaltado e pintado no deserto,
+  muro colado na rua), placas de 150/100/50, postos de fiscal, boxes do lado com mais espaço,
+  arquibancadas onde o chão inteiro cabe, árvores, prédios, mar e túnel — com sorteio de
+  semente, então é a mesma pista em todo computador. `pista.ts` é puro e testado.
+- **O muro existe para o atalho não existir.** Cada lado tem um muro no fim do escape, e onde
+  dois trechos passam perto mas longe na volta, um muro no meio deles. Do lado de dentro de um
+  grampo o limite do escape dá um laço; os pontos do laço saem e o buraco é fechado por uma
+  reta quando ela não encosta no asfalto — muro com buraco é atalho. O teste que segura isso
+  (`pista.test.ts`) é o que interessa: **entre dois trechos perto no mapa e longe na volta,
+  sempre há muro**. Ele pegou dois defeitos na primeira passada (um muro atravessando o
+  asfalto em Interlagos e a reta dos boxes de Mônaco sem nada separando da Piscine). Pedaço de
+  muro é sempre curto (≤ 15), porque a física acha o muro perto do carro pelo meio de cada
+  pedaço: um pedaço longo teria a ponta encostando no carro e o meio longe demais para contar.
+- **Cortar caminho soma 3 s no fim, e o que decide é o caminho, não o chão.** O carro está
+  FORA quando o centro passou 10 da borda (as quatro rodas além da linha branca). Voltando, se
+  avançou na pista mais do que andou lá fora — e a sobra passa de 30 —, cortou. Medido nas seis
+  pistas: cortar uma chicane pela reta ganha de 40 a 150; pegar zebra e grama por dentro de uma
+  curva, de 10 a 15. A punição anda com a posição (`pu`) e vai na chegada (`punicao`); o
+  servidor soma e ordena a bandeirada pelo tempo com ela, e a torre mostra "+3 s". Correndo, a
+  punição ainda não reordena ninguém — foi a opção A do dono, a da F1. Grama segura o carro em
+  55% da máxima, brita em 25%, e o muro tira o que ia contra ele e deixa escorregar.
+- **As bandeiras são uma regra só** (`bandeiras.ts`, pura e testada), na ordem do que importa:
+  quadriculada, preta e branca (4 s depois do corte), amarela (carro parado a até 1.800 à
+  frente; na largada não, porque todo mundo está devagar), azul (quem vai te dar volta a até
+  450 atrás) e verde (valendo). O fiscal do posto mais perto balança a amarela, e a quadriculada
+  aparece na mureta dos boxes desde a primeira chegada.
+- **A diferença na torre é de cronometragem, não de distância** (`cronometro.ts`): marcas a cada
+  250 e a hora em que cada carro passou por cada uma; a diferença é a da última marca que os
+  dois passaram. Distância dividida por velocidade erraria justamente nas curvas.
+- **A câmera não gira e o zoom é fixo, e é isso que deixa o mundo pronto em ladrilhos.** O mundo
+  parado é desenhado em quadrados de 512 px e guardado (`Ladrilhos`); cada quadro cola os que
+  aparecem, faz no máximo dois que faltam (quatro antes da largada) e desenha por cima só o
+  que se mexe. Medido no app escondido, nas seis cenas: 60 quadros por segundo, o pior quadro
+  com 19 a 28 ms (é quando nasce ladrilho novo). Em máquina fraca e no Windows, não medido.
 - **O motor não é arquivo: é sintetizado ao vivo** (`motor.ts`), porque muda de tom a cada
   quadro. Só o SEU ronca. Luz, largada, batida e vitória são `.ogg` da família de sempre.
 - **Teste escondido tem de ser MUDO.** Na primeira rodada da corrida o app de teste tocou luzes
@@ -1657,7 +1706,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (417) + app (320), segundos, sem nada externo
+pnpm test        # servidor (419) + app (335), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1810,10 +1859,14 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   em imagem. **Não foram exercidos**: duas pessoas em dois computadores, o som do convite
   tocando, e uma partida inteira até o mate ou até o tempo acabar.
 - **A Fórmula 1 entre pessoas de verdade.** O que está medido, na janela escondida e MUDA contra
-  servidor e LiveKit locais, com um segundo piloto automático pelo `@livekit/rtc-node` usando o
-  mesmo motor: menu de jogos, grid, sentar, as luzes, a largada, o meu carro andando no teclado,
-  o carro do outro desenhado pela rede (527 posições minhas chegaram a ele numa corrida de
-  31 s), batidas, a bandeirada no servidor, abandonar, a faixa de volta, o pódio, a volta mais
-  rápida e o correr de novo — conferido em imagem. **Não foram exercidos**: dois computadores
-  com gente pilotando, a batida vista dos dois lados, o convite no canto, os sons de ouvido
-  (o teste era mudo de propósito) e uma corrida com oito carros.
+  servidor e LiveKit locais, com dois pilotos automáticos pelo `@livekit/rtc-node` usando a
+  mesma física: a escolha da pista pela tela, a largada, corridas inteiras de 3 voltas
+  assistindo (Mônaco, Las Vegas e Interlagos) e pilotando (Monza e Bahrein, com o meu carro
+  guiado por teclas que um terceiro piloto automático mandava), a bandeira verde, a amarela com
+  um carro parado, a preta e branca e os +3 s ao cortar a T1 do Bahrein, a punição somada no
+  pódio, a torre, o mapinha, a velocidade e o tempo da volta — conferido em imagem, a 60
+  quadros. **Não foram exercidos**: gente pilotando no teclado (o volante de verdade, a
+  sensação de freada e de curva), dois computadores, a bandeira azul numa corrida (só no teste
+  da regra), o convite no canto, os sons de ouvido, uma corrida com oito carros e máquina fraca
+  ou Windows. App novo com servidor antigo corre sempre em Interlagos, com a escolha da pista
+  apagada; app antigo e novo na mesma corrida veriam pistas diferentes.

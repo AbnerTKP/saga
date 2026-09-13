@@ -17,6 +17,11 @@ import { ErroDeConta } from './contas.mjs';
 /** Os oito carros, na ordem do grid da tela: equipe por equipe. Os códigos são protocolo. */
 export const CARROS = ['VER', 'HAD', 'LEC', 'HAM', 'NOR', 'PIA', 'RUS', 'ANT'];
 export const VOLTAS = [3, 5, 10];
+/**
+ * As pistas, com o traçado de verdade de cada uma. O desenho e a física moram no app
+ * (`pista.ts`); aqui é só o nome que anda entre os dois, e é protocolo — só se acrescenta.
+ */
+export const PISTAS = ['interlagos', 'monza', 'monaco', 'spa', 'bahrein', 'vegas'];
 
 /** Da ordem de largar até as luzes apagarem: o tempo de todo mundo abrir a pista e ver as cinco luzes. */
 export const ESPERA_DA_LARGADA = 7000;
@@ -24,8 +29,13 @@ export const ESPERA_DA_LARGADA = 7000;
 export const DEPOIS_DO_VENCEDOR = 60_000;
 /** Nenhuma volta leva mais que isto, nem com o carro parado na grama: é o teto de uma corrida sem chegada. */
 export const TETO_POR_VOLTA = 3 * 60_000;
-/** Nenhuma volta leva menos que isto: chegada mais rápida é conta errada, e não vale. */
-export const VOLTA_MINIMA = 4000;
+/**
+ * Nenhuma volta leva menos que isto: chegada mais rápida é conta errada, e não vale. O piloto
+ * automático dos testes do app, que faz a trajetória sem errar, leva de 32 a 38 s por volta.
+ */
+export const VOLTA_MINIMA = 15_000;
+/** Punição maior que isto é conta errada: seriam dezenas de cortes. */
+export const PUNICAO_MAXIMA = 10 * 60_000;
 
 export const PLATEIA = 6000;
 /** Grid parado ou corrida acabada, sem ninguém mexer há isto: some. */
@@ -38,6 +48,11 @@ const naoExiste = () => new ErroDeConta('Esse grid não existe mais.', 404);
 function validarVoltas(voltas) {
   if (!VOLTAS.includes(voltas)) throw new ErroDeConta('A corrida é de 3, 5 ou 10 voltas.', 400);
   return voltas;
+}
+
+function validarPista(pista) {
+  if (!PISTAS.includes(pista)) throw new ErroDeConta('Essa pista não existe.', 400);
+  return pista;
 }
 
 /** O carro em que a pessoa está sentada, ou null. */
@@ -130,10 +145,15 @@ export function criarGrids({
       if (carro) grid.assentos.delete(carro);
     },
 
-    configurar(grid, ctx, { voltas }) {
+    configurar(grid, ctx, { voltas, pista }) {
       soNoGrid(grid);
       soAnfitriao(grid, ctx);
-      grid.voltas = validarVoltas(voltas);
+      if (voltas === undefined && pista === undefined) throw new ErroDeConta('Nada para mudar.', 400);
+      // Confere tudo antes de mudar qualquer coisa: pedido meio certo não muda meio grid.
+      if (voltas !== undefined) validarVoltas(voltas);
+      if (pista !== undefined) validarPista(pista);
+      if (voltas !== undefined) grid.voltas = voltas;
+      if (pista !== undefined) grid.pista = pista;
     },
 
     chamar(grid, ctx, { alvo }) {
@@ -185,7 +205,7 @@ export function criarGrids({
       });
     },
 
-    chegada(grid, ctx, { tempo, melhorVolta = null }, agora) {
+    chegada(grid, ctx, { tempo, melhorVolta = null, punicao = 0 }, agora) {
       // Chegada depois do fim — alguém terminou no último segundo e a resposta atrasou — não é
       // erro de quem chegou: a tela dele recebe o grid como ficou.
       if (grid.estado === 'fim') return;
@@ -198,8 +218,15 @@ export function criarGrids({
       if (!Number.isFinite(t) || t < grid.voltas * VOLTA_MINIMA || t > agora - grid.largadaEm + 3000) {
         throw new ErroDeConta('Esse tempo de chegada não fecha com a largada.', 400);
       }
+      // A punição por cortar caminho também é conta de quem pilota, e é SOMADA aqui: a ordem da
+      // bandeirada é a do tempo com ela. App antigo não manda, e fica sem.
+      const pu = Number(punicao);
+      if (!Number.isFinite(pu) || pu < 0 || pu > PUNICAO_MAXIMA) throw new ErroDeConta('Essa punição não fecha.', 400);
       const melhor = Number(melhorVolta);
-      grid.chegadas.set(ctx.eu, { tempo: Math.round(t), melhorVolta: Number.isFinite(melhor) && melhor > 0 ? Math.round(melhor) : null });
+      grid.chegadas.set(ctx.eu, {
+        tempo: Math.round(t), punicao: Math.round(pu),
+        melhorVolta: Number.isFinite(melhor) && melhor > 0 ? Math.round(melhor) : null,
+      });
       if (grid.primeiraChegadaEm === null) grid.primeiraChegadaEm = agora;
       conferirFim(grid, agora);
     },
@@ -235,14 +262,16 @@ export function criarGrids({
 
   function verGrid(grid, ctx, agora) {
     const quem = (id) => ctx.pessoa(id);
+    // `tempo` já vem com a punição: é por ele que se ordena e é ele que a tela mostra.
     const chegadas = [...grid.chegadas.entries()]
-      .map(([id, c]) => ({ pessoa: quem(id), carro: carroDe(grid, id), tempo: c.tempo, melhorVolta: c.melhorVolta }))
+      .map(([id, c]) => ({ pessoa: quem(id), carro: carroDe(grid, id), tempo: c.tempo + c.punicao, punicao: c.punicao, melhorVolta: c.melhorVolta }))
       .sort((a, b) => a.tempo - b.tempo);
     return {
       id: grid.id,
       estado: grid.estado,
       anfitriao: quem(grid.anfitriao),
       voltas: grid.voltas,
+      pista: grid.pista,
       assentos: CARROS.map((carro) => {
         const id = grid.assentos.get(carro);
         return { carro, pessoa: id === undefined ? null : quem(id) };
@@ -278,19 +307,21 @@ export function criarGrids({
           anfitriao: g.anfitriao,
           pilotos: [...g.assentos.values()],
           voltas: g.voltas,
+          pista: g.pista,
         })),
         convites: livre
           ? daqui.filter((g) => g.estado === 'grid' && g.chamados.has(ctx.eu)).map((g) => ({
-            grid: g.id, de: ctx.pessoa(g.anfitriao), voltas: g.voltas, pilotos: g.assentos.size,
+            grid: g.id, de: ctx.pessoa(g.anfitriao), voltas: g.voltas, pista: g.pista, pilotos: g.assentos.size,
           }))
           : [],
       };
     },
 
-    abrir(ctx, { voltas = 5 } = {}) {
+    abrir(ctx, { voltas = 5, pista = PISTAS[0] } = {}) {
       const agora = relogio();
       faxina(agora);
       validarVoltas(voltas);
+      validarPista(pista);
       // Um grid seu por servidor: abrir de novo devolve o que já está aberto, em vez de
       // espalhar grids vazios pelo servidor a cada clique no menu.
       const meu = [...grids.values()].find((g) => g.sid === ctx.sid && g.anfitriao === ctx.eu);
@@ -302,6 +333,7 @@ export function criarGrids({
         estado: 'grid',
         anfitriao: ctx.eu,
         voltas,
+        pista,
         assentos: new Map(),
         chamados: new Set(),
         recusaram: new Set(),
