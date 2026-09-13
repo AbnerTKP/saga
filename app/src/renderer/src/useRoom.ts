@@ -10,6 +10,7 @@ import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
+import { useMicrofone } from './useMicrofone';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -28,9 +29,11 @@ import {
   VideoPresets,
   VideoPreset,
   type LocalParticipant,
+  type LocalAudioTrack,
   AudioPresets,
   type AudioCaptureOptions,
   type RemoteTrackPublication,
+  type LocalTrackPublication,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
 } from 'livekit-client';
@@ -127,7 +130,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const [, bump] = useReducer((x: number) => x + 1, 0);
   /** Quem está falando agora, medido do som e não perguntado ao servidor — ver niveis.ts. */
   const [falandoAgora, setFalandoAgora] = useState<Set<string>>(new Set());
-  const medidores = useRef(new Map<string, { an: AnalyserNode; buf: Float32Array<ArrayBuffer>; pico: number }>());
+  const medidores = useRef(new Map<string, { an: AnalyserNode; buf: Float32Array<ArrayBuffer>; pico: number; faixa: MediaStreamTrack }>());
   const ctxDosNiveis = useRef<AudioContext | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [salaDaVoz, setSalaDaVoz] = useState<SalaDaVoz | null>(null);
@@ -258,6 +261,12 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return r;
   }, []);
 
+  // Supressão de ruído e sensibilidade. Os eventos da sala que ele precisa chegam pelo
+  // efeito de baixo, pela referência — ver o comentário de `aoPublicar` em useMicrofone.
+  const microfone = useMicrofone(room);
+  const microfoneRef = useRef(microfone);
+  microfoneRef.current = microfone;
+
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
   const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS, undefined,
     (qual, e) => anotar('erro', 'som', `o aviso "${qual}" não tocou: ${(e as Error)?.message ?? e}`)), []);
@@ -374,8 +383,9 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
       })
       .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
-      .on(RoomEvent.TrackMuted, bump)
-      .on(RoomEvent.TrackUnmuted, bump)
+      .on(RoomEvent.TrackMuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
+      .on(RoomEvent.TrackUnmuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
+      .on(RoomEvent.ActiveDeviceChanged, () => microfoneRef.current.eventos.trocouDeMicrofone())
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
         // Transmissão que começa não entra sozinha: ela aparece apagada na lista, e só
@@ -385,8 +395,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
-      .on(RoomEvent.LocalTrackPublished, bump)
-      .on(RoomEvent.LocalTrackUnpublished, bump)
+      .on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => { microfoneRef.current.eventos.aoPublicar(pub); bump(); })
+      .on(RoomEvent.LocalTrackUnpublished, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.ConnectionQualityChanged, bump)
       .on(RoomEvent.MediaDevicesError, onError);
 
@@ -910,13 +920,20 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
       for (const p of [sala.localParticipant, ...sala.remoteParticipants.values()]) {
         vivos.add(p.identity);
-        const faixa = p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+        // A MINHA voz se mede depois do corte: é o que os outros ouvem. Medindo o cru, o
+        // anel acenderia com a TV de casa que o corte acabou de tirar da call.
+        const minha = p === sala.localParticipant
+          ? (p.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined)?.getProcessor()?.processedTrack
+          : undefined;
+        const faixa = minha ?? p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
         // Microfone desligado é silêncio, e silêncio não acende: quem está mutado não
         // pode aparecer falando por causa da sustentação do último pico.
         if (!faixa || !p.isMicrophoneEnabled) { medidores.current.delete(p.identity); continue; }
 
         let m = medidores.current.get(p.identity);
-        if (!m || m.an.context.state === 'closed') {
+        // Faixa trocada (outro microfone, o corte montado depois) é medidor novo: o velho
+        // ficaria lendo uma faixa que já não vai para lugar nenhum.
+        if (!m || m.an.context.state === 'closed' || m.faixa !== faixa) {
           // Isto só funciona porque `onSubscribed` prende um <audio> em toda faixa que
           // chega: no Chromium a faixa remota não entrega amostra nenhuma se ninguém a
           // estiver consumindo. Medido — sem o <audio>, o medidor lê zero PARA SEMPRE, e
@@ -925,7 +942,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           const an = ctx.createAnalyser();
           an.fftSize = 512;
           fonte.connect(an);
-          m = { an, buf: new Float32Array(an.fftSize), pico: 0 };
+          m = { an, buf: new Float32Array(an.fftSize), pico: 0, faixa };
           medidores.current.set(p.identity, m);
         }
         m.an.getFloatTimeDomainData(m.buf);
@@ -1012,5 +1029,6 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
     lives, assistir, assistindo, espectadores, caiuDaCall,
     volumeDaTelaDe, definirVolumeDaTela,
+    microfone,
   };
 }

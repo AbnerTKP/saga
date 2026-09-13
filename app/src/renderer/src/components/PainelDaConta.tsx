@@ -7,6 +7,8 @@ import { lerQualidadeGuardada, guardarQualidade } from '../useRoom';
 import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from '../qualidades';
 import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
+import { BlocoDoMicrofone } from './AjustesDoMicrofone';
+import type { MicrofoneDaCall } from '../useMicrofone';
 import { BlocosDaSaga } from './PainelDaSaga';
 import type { AberturaComOSistema } from '../desktop';
 import { useFecharComEsc } from '../useFechar';
@@ -90,10 +92,12 @@ function AtalhoDoOverlay() {
  * agora é isso e o resto de você.
  */
 export function PainelDaConta({
-  eu, room, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
+  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
 }: {
   eu: Membro;
   room: Room;
+  /** Supressão de ruído e sensibilidade — o mesmo ajuste do botão direito no microfone. */
+  microfone: MicrofoneDaCall;
   /**
    * O servidor aberto, ou null quando não há nenhum.
    *
@@ -253,9 +257,10 @@ export function PainelDaConta({
                   </select>
                 </label>
               ))}
-              <p className="muted small">Cancelamento de eco e supressão de ruído ficam sempre ligados.</p>
             </div>
           </section>
+
+          <BlocoDoMicrofone microfone={microfone} />
 
           <section className="painel-bloco">
             <h3>Soundboard</h3>

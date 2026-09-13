@@ -10,6 +10,9 @@ importers:
 
   app:
     dependencies:
+      '@sapphi-red/web-noise-suppressor':
+        specifier: 0.4.0
+        version: 0.4.0
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@7.2.0)
@@ -763,6 +766,9 @@ packages:
     resolution: {integrity: sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w==}
     cpu: [x64]
     os: [win32]
+
+  '@sapphi-red/web-noise-suppressor@0.4.0':
+    resolution: {integrity: sha512-vkBEL/VDkbeP3qqSRQFRtPLGa19a38JUzO6J0r5D/MQSumrlERy671DAMaETgY6etXjDCoJcD7JBIaXnuGVtVw==}
 
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
@@ -2603,6 +2609,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.63.1':
     optional: true
+
+  '@sapphi-red/web-noise-suppressor@0.4.0': {}
 
   '@sindresorhus/is@4.6.0': {}
 

@@ -978,6 +978,7 @@ export function App() {
           <PainelDaConta
             eu={sessao.eu}
             room={rm.room}
+            microfone={rm.microfone}
             souBerserk={sessao.eu.turbo}
             donoDaSaga={!!sessao.eu.donoDaSaga}
             volumeDoSoundboard={rm.volumeDoSoundboard}
@@ -1132,6 +1133,7 @@ export function App() {
         <PainelDaConta
           eu={eu}
           room={rm.room}
+          microfone={rm.microfone}
           servidorNome={servidor.nome}
           souBerserk={eu.turbo}
           donoDaSaga={!!eu.donoDaSaga}

@@ -9,6 +9,7 @@ import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
+import { CartaoDoMicrofone } from './AjustesDoMicrofone';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { Sinal } from './Sinal';
@@ -83,6 +84,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   const [alvo, setAlvo] = useState<Alvo | null>(null);
   const [fechadas, setFechadas] = useState<Set<number>>(new Set());
   const [escolhendoStatus, setEscolhendoStatus] = useState(false);
+  const [ajustandoMicrofone, setAjustandoMicrofone] = useState(false);
   // O menu dos jogos abre ACIMA do painel de voz, na largura da barra: as medidas saem do
   // painel de verdade, não de um número escrito aqui que envelhece quando ele muda.
   const painelDaVoz = useRef<HTMLDivElement>(null);
@@ -309,8 +311,22 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
           </button>
         </div>
       )}
+      {ajustandoMicrofone && (
+        <CartaoDoMicrofone
+          microfone={rm.microfone}
+          onMaisAjustes={() => { setAjustandoMicrofone(false); onSettings(); }}
+          onClose={() => setAjustandoMicrofone(false)}
+        />
+      )}
       <div className="user-actions">
-        <button className={!rm.micOn && connected ? 'off' : ''} onClick={rm.toggleMic} disabled={!connected || rm.deafened} title="Mutar microfone">
+        {/* Botão direito: supressão de ruído e sensibilidade, sem sair da call. Ele não é
+            `disabled` fora dela — botão desabilitado não recebe o botão direito — e ajustar
+            antes de entrar vale tanto quanto durante. */}
+        <button className={!rm.micOn && connected ? 'off' : ''} data-abre-microfone
+          aria-disabled={!connected || rm.deafened}
+          onClick={() => { if (connected && !rm.deafened) rm.toggleMic(); }}
+          onContextMenu={(e) => { e.preventDefault(); setAjustandoMicrofone((v) => !v); }}
+          title="Mutar microfone — botão direito: ruído e sensibilidade">
           <Icon name={rm.micOn || !connected ? 'mic' : 'micOff'} />
         </button>
         <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title="Ensurdecer">

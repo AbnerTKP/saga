@@ -1051,6 +1051,50 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   de verdade: os dois atributos viajam juntos, o outro app lê os dois, e o SERVIDOR também
   os enxerga no `listParticipants` — que é o que faz a marca valer também nas salas em que
   você não está (`verParticipante`, testado).
+- **O barulho de casa se tira em QUEM FALA, e por isso nasce ligado.** Supressão de ruído e
+  sensibilidade agem no seu microfone antes de ele sair: quem ouve a casa de um amigo não
+  tem ajuste nenhum que resolva, é o amigo quem precisa da versão nova. Por isso o padrão
+  é Forte com "Ajustar sozinha" (`AJUSTES_PADRAO`, testado) — desligado, só funcionaria
+  para quem abrisse a tela. O desenho foi o escolhido pelo dono entre três: um bloco em
+  "Sua conta" e o botão direito no microfone abrindo um cartão igual ao do status, para
+  ajustar no meio da call. O microfone deixou de ser `disabled` fora da call — botão
+  desabilitado não recebe o botão direito —, e ficou só com a mesma cara.
+- **Supressão e sensibilidade fazem coisas diferentes, e as duas foram medidas.** Numa
+  mistura de voz sintetizada com barulho, pelo caminho de verdade e medindo o que CHEGA a
+  um segundo participante por um LiveKit local: com o corte aberto, o Forte (RNNoise)
+  levou ventilador de −36 a −70/−87 dB e o Padrão, a −40; a voz chegou igual nos dois
+  (−14). Mas o RNNoise mal toca em teclado (−29 → −34) e deixa voz de TV onde está —
+  voz é voz. Quem tira TV e teclado é o CORTE, nas suas pausas: pelo mesmo caminho, o
+  trecho só de TV chegou a −105 dB. O texto da tela diz isso e não promete teclado.
+- **O filtro é o RNNoise, e não o GTCRN do mesmo pacote.** O GTCRN tirou muito mais teclado
+  (−29 → −70), mas processa em blocos quatro vezes mais pesados (14 s de áudio em ~640 ms
+  contra ~180 ms, neste Mac): numa máquina mais fraca o bloco passa do tempo que o áudio
+  tem, e a voz picota — pior que o barulho. Isso não foi medido em máquina fraca; foi o
+  risco que decidiu.
+- **O filtro precisa de `'wasm-unsafe-eval'` no CSP, e sem ele EMUDECE em vez de dar erro.**
+  Medido: WebAssembly recusado, a saída do RNNoise ficou em −120 dB com a voz a −14 — e ele
+  devolve silêncio também enquanto carrega. Por isso quem escolhe a fonte é
+  `microfone.worklet.ts`: o som cru vale até o filtro entregar a primeira amostra, e cru
+  com som por 4 s sem nada do filtro é falha — medido com o CSP sem a liberação, a voz
+  passou inteira e o estado virou "falhou" em 4,5 s, com aviso na tela e no registro.
+  O processador de áudio vai como `?worker&url`, que o Vite empacota com a regra de
+  `sensibilidade.ts` dentro e emite como ARQUIVO: embutido como `data:` o CSP o recusaria,
+  a mesma armadilha dos sons.
+- **O corte automático ouve a SUA voz, não só o ambiente — e isso veio de uma medida que
+  falhou.** A primeira versão punha o corte acima do barulho da casa (mínimo dos últimos
+  5 s). Pelo caminho de verdade a TV passou inteira: TV tem pausas, na pausa o "barulho"
+  some, e o corte desceu a −70. Hoje o corte fica também até 14 dB abaixo da sua fala
+  lembrada, que esquece 0,02 dB por segundo — números escolhidos numa varredura (a tabela
+  está em `sensibilidade.ts`): TV 20 dB abaixo de você fica de fora por mais de 4 min de
+  silêncio seu; 15 dB abaixo, volta em 24 s, e é o caso do ajuste à mão. TV mais alta que
+  a sua voz, nenhuma régua de volume separa. Antes de você falar a primeira vez, a TV passa.
+- **O anel de "falando" mede a minha voz DEPOIS do corte.** Medindo o cru, ele acenderia
+  com a TV que o corte acabou de tirar da call. E o medidor agora é refeito quando a faixa
+  muda — antes ele só era criado uma vez por pessoa, e trocar de microfone o deixava
+  lendo uma faixa que não ia mais para lugar nenhum.
+- **Os eventos da sala do microfone entram pelo efeito do `useRoom`.** Ele limpa TODOS os
+  ouvintes da sala quando se refaz (`removeAllListeners`); um ouvinte registrado à parte
+  sumiria calado e o microfone voltaria a ir cru sem erro nenhum.
 - **O soundboard vai numa faixa própria**, não misturado ao microfone: tocar não depende
   de microfone ligado, e mutar alguém não muta os sons dele.
 - **O volume do soundboard é um só, de quem OUVE, e mora nas configurações.** Um só porque
@@ -1473,7 +1517,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (360) + app (259), segundos, sem nada externo
+pnpm test        # servidor (360) + app (274), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1570,6 +1614,15 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   é o arquivo tocando no app de verdade, com o CSP de verdade e a saída muda. Clicar no
   microfone numa call e ouvir, e começar a compartilhar e ouvir o "live", precisa de
   LiveKit e de ouvido, e não foi exercido.
+- **A supressão de ruído com microfone e casa de verdade.** O que está medido é o caminho
+  inteiro com áudio sintetizado (voz do `say`, ruído rosa, uma TV feita de outra voz e
+  cliques de teclado) entrando como faixa de microfone, e o que chega a um segundo
+  participante por um LiveKit local; e, no app compilado em janela escondida contra
+  servidor e LiveKit locais, o cartão do botão direito dentro e fora da call, o bloco de
+  "Sua conta", ajustar à mão e trocar para Padrão. **Não foram exercidos**: voz humana num
+  microfone de verdade (a fidelidade medida é com voz sintetizada), barulho de casa de
+  verdade, o Forte em Windows e em máquina fraca, trocar de microfone com a call aberta, e
+  um amigo dizendo que parou de ouvir a TV.
 - **A barra da janela no Windows de verdade.** O que está medido é o app compilado numa
   janela escondida aqui no Mac, com a plataforma fingida de Windows: a barra de 34 px nas
   telas, os três botões de 46x33 colados no canto, a faixa arrastável e os botões não, o
