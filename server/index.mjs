@@ -22,6 +22,7 @@ import * as amigos from './amigos.mjs';
 import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
+import { criarGrids } from './corridas.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
@@ -72,6 +73,9 @@ const digitando = criarRegistroDeDigitacao();
 // As mesas de xadrez, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
 // Publicar o servidor com alguém jogando apaga a partida dele — ver jogos.mjs.
 const mesas = criarMesas();
+// Os grids de Fórmula 1, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as corridas.
+// A corrida em si anda pelo LiveKit, não por aqui — ver corridas.mjs.
+const grids = criarGrids();
 // O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
 // só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
@@ -702,6 +706,9 @@ const ROTAS = {
       rooms: salas,
       categorias: categoriasM.listarCategorias(db, sid),
       jogos: mesas.resumo(naMesa(sid, eu)),
+      // Os grids de Fórmula 1 vão pela mesma carona, e pelo mesmo motivo do xadrez: o convite
+      // tem de chegar a quem está em qualquer tela.
+      corridas: grids.resumo(naMesa(sid, eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
@@ -1036,6 +1043,38 @@ const ROTAS = {
   'POST /jogos/mesa': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return mesas.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // --- Fórmula 1 ---------------------------------------------------------------
+  // O grid é do servidor do pedido, como a mesa. A corrida anda pelo LiveKit numa sala só
+  // dela; aqui ficam os lugares, a largada e a chegada.
+  'POST /corridas/abrir': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return { grid: grids.abrir(naMesa(sid, eu), await lerCorpo(req)) };
+  },
+
+  'GET /corridas/grid': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    return { grid: grids.ver(naMesa(sid, eu), id) };
+  },
+
+  'POST /corridas/grid': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return grids.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // O passe da sala da corrida. Sem microfone, câmera nem tela: só dados. Quem assiste entra
+  // para LER as posições; publicar é só de quem está sentado num carro.
+  'POST /corridas/token': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { id } = await lerCorpo(req);
+    const { sala, piloto } = grids.salaDaCorrida(naMesa(sid, eu), id);
+    const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
+    at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: piloto });
+    return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
   'POST /token': async (req) => {

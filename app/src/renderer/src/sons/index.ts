@@ -27,9 +27,19 @@ import mensagem from './mensagem.ogg';
 // abaixo dos avisos porque toca a cada jogada do outro.
 import lance from './lance.ogg';
 import fimDaPartida from './fim-da-partida.ogg';
+// A corrida, da mesma família e do mesmo jeito. A LUZ é a nota curta de cada luz que acende; a
+// LARGADA, mais aguda e com a oitava embaixo, é o apagar das cinco. A BATIDA é a madeira do
+// lance mais pesada — ruído curto com um baque em 62 Hz. A VITÓRIA é dó, mi, sol subindo e o
+// dó de cima sustentado. O motor NÃO é arquivo: é sintetizado ao vivo pela velocidade, em
+// `motor.ts`, porque um som que muda de tom a cada quadro não cabe num .ogg.
+import luz from './luz.ogg';
+import largada from './largada.ogg';
+import batida from './batida.ogg';
+import vitoria from './vitoria.ogg';
 import type { Aviso } from '../avisos';
 
 export const ARQUIVOS: Record<Aviso, string> = {
   entrou, saiu, live, convite,
   liveEntrou, liveSaiu, micLigou, micMutou, mensagem, lance, fimDaPartida,
+  luz, largada, batida, vitoria,
 };

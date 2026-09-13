@@ -1592,3 +1592,53 @@ test('/eu/senha pede a senha atual: errada é 403 sem derrubar ninguém, certa d
   assert.equal(entrou.status, 200);
   semSegredo([errada, curta, certa, entrou]);
 });
+
+// --- Fórmula 1 ------------------------------------------------------------------
+
+test('fórmula 1 pela rede: abrir, chamar, o convite no /rooms, sentar, largar, o passe só de dados e o número noutro servidor', async () => {
+  const tkp = (await cadastrar('f1_tkp')).corpo;
+  const juninho = (await cadastrar('f1_juninho')).corpo;
+  const tava = (await cadastrar('f1_tava')).corpo;
+  const casa = tkp.servidor.id;
+  const noGrid = (sessao, corpo) => chamar('POST', '/corridas/grid', { sessao, servidor: casa, corpo });
+
+  const aberto = await chamar('POST', '/corridas/abrir', { sessao: tkp.token, servidor: casa, corpo: { voltas: 3 } });
+  assert.equal(aberto.status, 200, JSON.stringify(aberto.corpo));
+  const { id } = aberto.corpo.grid;
+  assert.equal(aberto.corpo.grid.assentos.length, 8);
+
+  assert.equal((await noGrid(tkp.token, { id, acao: 'chamar', alvo: juninho.eu.id })).status, 200);
+  const doConvidado = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo.corridas;
+  assert.deepEqual(doConvidado.convites.map((c) => [c.grid, c.de.id, c.voltas]), [[id, tkp.eu.id, 3]]);
+
+  assert.equal((await noGrid(tkp.token, { id, acao: 'sentar', carro: 'VER' })).status, 200);
+  const sentou = await noGrid(juninho.token, { id, acao: 'sentar', carro: 'LEC' });
+  assert.equal(sentou.corpo.grid.meuCarro, 'LEC');
+  assert.equal((await noGrid(tava.token, { id, acao: 'sentar', carro: 'VER' })).status, 409);
+
+  const largou = await noGrid(tkp.token, { id, acao: 'largar' });
+  assert.equal(largou.status, 200, JSON.stringify(largou.corpo));
+  assert.equal(largou.corpo.grid.estado, 'correndo');
+
+  // O passe da corrida: sala própria, sem publicar áudio nem vídeo; dados só de quem pilota.
+  const grantDe = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).video;
+  const doPiloto = await chamar('POST', '/corridas/token', { sessao: juninho.token, servidor: casa, corpo: { id } });
+  assert.equal(doPiloto.status, 200, JSON.stringify(doPiloto.corpo));
+  const g = grantDe(doPiloto.corpo.token);
+  assert.match(g.room, /^corrida-[0-9a-f]+-1$/);
+  assert.equal(g.canPublish, false);
+  assert.equal(g.canPublishData, true);
+  const daPlateia = await chamar('POST', '/corridas/token', { sessao: tava.token, servidor: casa, corpo: { id } });
+  assert.equal(grantDe(daPlateia.corpo.token).room, g.room);
+  assert.equal(grantDe(daPlateia.corpo.token).canPublishData, false);
+
+  const outro = (await chamar('POST', '/servidores/criar', { sessao: tava.token, corpo: { nome: 'Autódromo' } })).corpo.servidor;
+  assert.equal((await chamar('GET', `/corridas/grid?id=${id}`, { sessao: tava.token, servidor: outro.id })).status, 404);
+  assert.equal((await chamar('POST', '/corridas/token', { sessao: tava.token, servidor: outro.id, corpo: { id } })).status, 404);
+
+  assert.equal((await noGrid(tkp.token, { id, acao: 'fechar' })).status, 409);
+  await noGrid(tkp.token, { id, acao: 'abandonar' });
+  const fim = await noGrid(juninho.token, { id, acao: 'abandonar' });
+  assert.equal(fim.corpo.grid.estado, 'fim');
+  assert.deepEqual((await noGrid(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
+});

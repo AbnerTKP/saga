@@ -9,6 +9,7 @@ import {
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
+  abrirGrid, agirNoGrid, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde,
 } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
@@ -18,6 +19,9 @@ import { ARQUIVOS } from './sons';
 import { TelaDoXadrez } from './components/TelaDoXadrez';
 import { ConviteDeXadrez } from './components/ConviteDeXadrez';
 import { FaixaDaPartida } from './components/FaixaDaPartida';
+import { TelaDaCorrida } from './components/TelaDaCorrida';
+import { ConviteDeCorrida } from './components/ConviteDeCorrida';
+import type { Aviso } from './avisos';
 import { useRoom, type SalaDaVoz } from './useRoom';
 import { useChat } from './useChat';
 import { useAvisos } from './useAvisos';
@@ -69,6 +73,7 @@ const SEM_CATEGORIAS: Categoria[] = [];
 const SEM_CARGOS: Cargo[] = [];
 const SEM_MEMBROS: Membro[] = [];
 const SEM_MESAS: ResumoDaMesa[] = [];
+const SEM_GRIDS: ResumoDoGrid[] = [];
 
 /** Uma pessoa aberta num cartão ou num menu, com o servidor de que se está falando dela. */
 type PessoaAberta = { pessoa: PessoaNaCall; servidorId: number; servidorNome: string };
@@ -115,8 +120,21 @@ export function App() {
    * servidor não vale no vizinho.
    */
   const [jogos, setJogos] = useState<{ servidorId: number; mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] } | null>(null);
-  /** A partida aberta na tela, com o servidor DELA: é a ele que a tela do jogo pergunta. */
-  const [jogoAberto, setJogoAberto] = useState<{ mesaId: number; servidorId: number } | null>(null);
+  /**
+   * Os grids de Fórmula 1 do servidor aberto e os convites para correr, pela mesma carona e
+   * com a mesma etiqueta de servidor das mesas.
+   */
+  const [corridas, setCorridas] = useState<{ servidorId: number; grids: ResumoDoGrid[]; convites: ConviteParaCorrer[] } | null>(null);
+  /**
+   * O jogo aberta na tela — a partida de xadrez ou o grid da corrida —, com o servidor DELE: é
+   * a ele que a tela do jogo pergunta. Um só por vez, porque os dois tomam o palco inteiro.
+   */
+  const [jogoAberto, setJogoAberto] = useState<
+    | { tipo: 'xadrez'; mesaId: number; servidorId: number }
+    | { tipo: 'corrida'; gridId: number; servidorId: number }
+    | null
+  >(null);
+  const [conviteDeCorridaRespondido, setConviteDeCorridaRespondido] = useState<number | null>(null);
   /** Convite já respondido: sai da tela na hora, sem esperar a busca seguinte confirmar. */
   const [conviteRespondido, setConviteRespondido] = useState<number | null>(null);
   const [respondendoConvite, setRespondendoConvite] = useState(false);
@@ -396,6 +414,7 @@ export function App() {
     setSalasDoServidor(null);
     setDadosDoServidor(null);
     setJogos(null);
+    setCorridas(null);
     setJogoAberto(null);
     setModoConversas(false);
     setConversaAberta(null);
@@ -445,6 +464,8 @@ export function App() {
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
         setJogos({ servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] });
+        // Os grids de Fórmula 1, pelo mesmo caminho. Servidor antigo não manda: não há corrida.
+        setCorridas({ servidorId, grids: lista.corridas?.grids ?? [], convites: lista.corridas?.convites ?? [] });
         // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
         // elas são da conta. Servidor antigo não manda o campo — aí não há conversa
         // nenhuma na tela e nada quebra, como o "está digitando".
@@ -909,19 +930,19 @@ export function App() {
   const abrirPartida = useCallback((mesaId: number) => {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
-    setJogoAberto({ mesaId, servidorId });
+    setJogoAberto({ tipo: 'xadrez', mesaId, servidorId });
   }, [sessao?.servidor?.id]);
 
   /** O item Xadrez do menu de jogos: volta para a sua mesa, ou abre uma e cai no lobby. */
   const abrirXadrez = useCallback(async () => {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
-    if (minhaMesaAgora) { setJogoAberto({ mesaId: minhaMesaAgora.id, servidorId }); return; }
+    if (minhaMesaAgora) { setJogoAberto({ tipo: 'xadrez', mesaId: minhaMesaAgora.id, servidorId }); return; }
     try {
       // Os padrões do desenho: 10 minutos para cada um, peças no sorteio. Os dois se trocam
       // no lobby, que é a tela que abre em seguida.
       const mesa = await abrirMesa(600, 'sorteio', servidorId);
-      setJogoAberto({ mesaId: mesa.id, servidorId });
+      setJogoAberto({ tipo: 'xadrez', mesaId: mesa.id, servidorId });
     } catch (e) { notas.mostrarFalha(e, 'Xadrez'); }
   }, [sessao?.servidor?.id, minhaMesaAgora, notas]);
 
@@ -932,7 +953,7 @@ export function App() {
     try {
       await agirNaMesa(c.mesa, { acao: aceitar ? 'aceitar' : 'recusar' }, servidorId);
       setConviteRespondido(c.mesa);
-      if (aceitar) setJogoAberto({ mesaId: c.mesa, servidorId });
+      if (aceitar) setJogoAberto({ tipo: 'xadrez', mesaId: c.mesa, servidorId });
     } catch (e) {
       // Cancelado, ou você entrou noutra partida no meio: o convite sai da tela do mesmo
       // jeito, senão fica um botão que não faz mais nada.
@@ -942,6 +963,58 @@ export function App() {
       setRespondendoConvite(false);
     }
   }, [jogosDaqui?.servidorId, notas]);
+
+  /**
+   * A Fórmula 1 vista da busca de salas. "O seu grid" é o que você abriu ou em que está
+   * sentado — preferindo a corrida andando; é o que a faixa mostra e o menu reabre. Sem um
+   * seu, o menu leva ao grid que houver no servidor: é assim que se entra para correr ou
+   * para assistir sem ter sido chamado.
+   */
+  const corridasDaqui = corridas?.servidorId === servidorAberto ? corridas : null;
+  const grids = corridasDaqui?.grids ?? SEM_GRIDS;
+  const euIdAgora = sessao?.eu?.id ?? null;
+  const meuGrid = euIdAgora === null ? null
+    : [...grids].sort((a, b) => Number(b.estado === 'correndo') - Number(a.estado === 'correndo'))
+      .find((g) => g.anfitriao === euIdAgora || g.pilotos.includes(euIdAgora)) ?? null;
+  const gridDoServidor = meuGrid ?? grids[0] ?? null;
+  const conviteDeCorrida = corridasDaqui?.convites.find((c) => c.grid !== conviteDeCorridaRespondido) ?? null;
+  const textoDaCorrida = meuGrid
+    ? (meuGrid.estado === 'correndo' ? 'voltar à sua corrida' : 'voltar ao seu grid')
+    : gridDoServidor
+      ? (gridDoServidor.estado === 'correndo' ? `assistir a corrida de ${nomeDoJogador(gridDoServidor.anfitriao)}` : `entrar no grid de ${nomeDoJogador(gridDoServidor.anfitriao)}`)
+      : 'abrir um grid';
+
+  const abrirCorrida = useCallback(async () => {
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
+    if (gridDoServidor) { setJogoAberto({ tipo: 'corrida', gridId: gridDoServidor.id, servidorId }); return; }
+    try {
+      // Cinco voltas, o padrão do desenho; quem abriu troca no grid.
+      const grid = await abrirGrid(5, servidorId);
+      setJogoAberto({ tipo: 'corrida', gridId: grid.id, servidorId });
+    } catch (e) { notas.mostrarFalha(e, 'Fórmula 1'); }
+  }, [sessao?.servidor?.id, gridDoServidor, notas]);
+
+  const responderConviteDeCorrida = useCallback(async (c: ConviteParaCorrer, correr: boolean) => {
+    const servidorId = corridasDaqui?.servidorId;
+    if (!servidorId) return;
+    setConviteDeCorridaRespondido(c.grid);
+    // Correr não responde nada ao servidor: abre o grid, e sentar num carro é a resposta.
+    if (correr) { setJogoAberto({ tipo: 'corrida', gridId: c.grid, servidorId }); return; }
+    try { await agirNoGrid(c.grid, { acao: 'recusar' }, servidorId); } catch (e) { notas.mostrarFalha(e, 'Fórmula 1'); }
+  }, [corridasDaqui?.servidorId, notas]);
+
+  const conviteDeCorridaTocado = useRef<number | null>(null);
+  useEffect(() => {
+    if (!conviteDeCorrida) { conviteDeCorridaTocado.current = null; return; }
+    if (conviteDeCorridaTocado.current === conviteDeCorrida.grid) return;
+    conviteDeCorridaTocado.current = conviteDeCorrida.grid;
+    tocarAviso('convite', rm.deafened);
+  }, [conviteDeCorrida?.grid, rm.deafened, tocarAviso]);
+
+  // Os sons da corrida saem pela mesma regra dos avisos — o mesmo som não empilha —, e o fone
+  // desligado cala todos.
+  const tocarNaCorrida = useCallback((qual: Aviso) => { tocarAviso(qual, rm.deafened); }, [tocarAviso, rm.deafened]);
 
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
@@ -1114,6 +1187,8 @@ export function App() {
         minhaPartida={minhaMesaAgora?.estado ?? null}
         onPartida={abrirPartida}
         onXadrez={abrirXadrez}
+        textoDaCorrida={textoDaCorrida}
+        onCorrida={abrirCorrida}
         // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
         // aqui" sobre um lugar que não é o que se está vendo.
         salaAbertaId={jogoAberto ? null : salaAbertaId}
@@ -1155,7 +1230,21 @@ export function App() {
         onAssistirLive={assistirLive}
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro.
-        jogo={jogoAberto ? (live) => (
+        jogo={jogoAberto?.tipo === 'corrida' ? (live) => (
+          <TelaDaCorrida
+            key={`corrida-${jogoAberto.gridId}`}
+            gridId={jogoAberto.gridId}
+            servidorId={jogoAberto.servidorId}
+            euId={eu.id}
+            membros={membrosDoServidor}
+            naCall={naMinhaCall}
+            surdo={rm.deafened}
+            tocar={tocarNaCorrida}
+            live={live}
+            onFechar={() => setJogoAberto(null)}
+            onAviso={notas.mostrar}
+          />
+        ) : jogoAberto?.tipo === 'xadrez' ? (live) => (
           <TelaDoXadrez
             key={jogoAberto.mesaId}
             mesaId={jogoAberto.mesaId}
@@ -1169,7 +1258,17 @@ export function App() {
             onAviso={notas.mostrar}
           />
         ) : undefined}
-        faixaDaPartida={minhaMesaAgora && !jogoAberto ? (
+        faixaDaPartida={meuGrid && !jogoAberto ? (
+          <FaixaDaPartida
+            jogo="Fórmula 1"
+            estado={meuGrid.estado === 'grid' ? 'lobby' : meuGrid.estado === 'correndo' ? 'jogando' : 'fim'}
+            titulo={meuGrid.estado === 'grid' ? `grid de ${nomeDoJogador(meuGrid.anfitriao)}` : meuGrid.estado === 'correndo' ? 'corrida andando' : 'bandeirada'}
+            minhaVez={false}
+            outroNome={null}
+            rotulo={meuGrid.estado === 'correndo' ? 'Voltar à pista' : 'Voltar ao grid'}
+            onVoltar={() => setJogoAberto({ tipo: 'corrida', gridId: meuGrid.id, servidorId: servidor.id })}
+          />
+        ) : minhaMesaAgora && !jogoAberto ? (
           <FaixaDaPartida
             estado={minhaMesaAgora.estado}
             titulo={minhaMesaAgora.estado === 'lobby'
@@ -1357,13 +1456,25 @@ export function App() {
         avisos={notas.avisos}
         // O convite para jogar fica na mesma pilha, mas não some sozinho: quem chamou está
         // esperando a resposta.
-        extra={convite && (
-          <ConviteDeXadrez
-            convite={convite}
-            ocupado={respondendoConvite}
-            onJogar={() => responderConvite(convite, true)}
-            onRecusar={() => responderConvite(convite, false)}
-          />
+        extra={(convite || conviteDeCorrida) && (
+          <>
+            {convite && (
+              <ConviteDeXadrez
+                convite={convite}
+                ocupado={respondendoConvite}
+                onJogar={() => responderConvite(convite, true)}
+                onRecusar={() => responderConvite(convite, false)}
+              />
+            )}
+            {conviteDeCorrida && (
+              <ConviteDeCorrida
+                convite={conviteDeCorrida}
+                ocupado={false}
+                onCorrer={() => responderConviteDeCorrida(conviteDeCorrida, true)}
+                onRecusar={() => responderConviteDeCorrida(conviteDeCorrida, false)}
+              />
+            )}
+          </>
         )}
         onFechar={notas.fechar}
         onRegistro={() => setRegistro(true)}

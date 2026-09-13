@@ -25,6 +25,7 @@ test('passado o intervalo, o aviso volta a tocar', () => {
 const ARQUIVOS: Record<Aviso, string> = {
   entrou: 'a', saiu: 'b', live: 'c', convite: 'd', mensagem: 'e', lance: 'f',
   fimDaPartida: 'g', liveEntrou: 'h', liveSaiu: 'i', micLigou: 'j', micMutou: 'k',
+  luz: 'l', largada: 'm', batida: 'n', vitoria: 'o',
 };
 
 test('cada aviso tem o próprio relógio: "entrou" não cala "live"', () => {

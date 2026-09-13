@@ -9,6 +9,7 @@ import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { ResumoDaMesa } from './jogos';
+import type { CodigoDoCarro } from './corrida';
 
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
 
@@ -466,6 +467,7 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
   // dizer coisas que mudam devagar. Servidor antigo não manda nenhum dos dois.
   pedir<{
     servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
+    corridas?: CorridasNoServidor;
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
   }>('GET', `/rooms${comParametros({ lidas, lidasConversas: lidasDeConversa })}`, undefined, servidorId);
 
@@ -536,6 +538,59 @@ export const verMesa = async (id: number, servidorId: number) =>
 /** Uma ação na mesa. Fechar não devolve mesa nenhuma: ela deixou de existir. */
 export const agirNaMesa = async (id: number, a: AcaoNaMesa, servidorId: number) =>
   (await pedir<{ mesa?: Mesa; ok?: true }>('POST', '/jogos/mesa', { id, ...a }, servidorId)).mesa ?? null;
+
+// --- Fórmula 1 ------------------------------------------------------------------
+
+/** Um grid visto da busca de salas: quem abriu e quem está sentado. */
+export type ResumoDoGrid = { id: number; estado: EstadoDoGrid; anfitriao: number; pilotos: number[]; voltas: number };
+export type EstadoDoGrid = 'grid' | 'correndo' | 'fim';
+export type ConviteDeCorrida = { grid: number; de: PessoaDaMesa; voltas: number; pilotos: number };
+export type CorridasNoServidor = { grids: ResumoDoGrid[]; convites: ConviteDeCorrida[] };
+
+export type Grid = {
+  id: number;
+  estado: EstadoDoGrid;
+  anfitriao: PessoaDaMesa;
+  voltas: number;
+  /** Os oito, sempre na ordem de `CARROS`. */
+  assentos: { carro: CodigoDoCarro; pessoa: PessoaDaMesa | null }[];
+  chamados: PessoaDaMesa[];
+  recusaram: number[];
+  /** A ordem de largada, sorteada ao largar: o primeiro é a pole. */
+  ordem: CodigoDoCarro[];
+  /** Quando as luzes apagam, no relógio do servidor. */
+  largadaEm: number | null;
+  chegadas: { pessoa: PessoaDaMesa; carro: CodigoDoCarro; tempo: number; melhorVolta: number | null }[];
+  abandonos: number[];
+  plateia: PessoaDaMesa[];
+  meuCarro: CodigoDoCarro | null;
+  souAnfitriao: boolean;
+  rodada: number;
+  /** A hora do servidor na resposta: é por ela que o app acerta o relógio da corrida. */
+  agora: number;
+};
+
+export type AcaoNoGrid =
+  | { acao: 'sentar'; carro: CodigoDoCarro }
+  | { acao: 'configurar'; voltas: number }
+  | { acao: 'chamar' | 'cancelarConvite'; alvo: number }
+  | { acao: 'chegada'; tempo: number; melhorVolta: number | null }
+  | { acao: 'levantar' | 'recusar' | 'largar' | 'abandonar' | 'correrDeNovo' | 'fechar' };
+
+/** Como a mesa: o pedido vai ao servidor DO GRID, nunca ao aberto. */
+export const abrirGrid = async (voltas: number, servidorId: number) =>
+  (await pedir<{ grid: Grid }>('POST', '/corridas/abrir', { voltas }, servidorId)).grid;
+
+export const verGrid = async (id: number, servidorId: number) =>
+  (await pedir<{ grid: Grid }>('GET', `/corridas/grid?id=${id}`, undefined, servidorId)).grid;
+
+/** Fechar não devolve grid nenhum: ele deixou de existir. */
+export const agirNoGrid = async (id: number, a: AcaoNoGrid, servidorId: number) =>
+  (await pedir<{ grid?: Grid; ok?: true }>('POST', '/corridas/grid', { id, ...a }, servidorId)).grid ?? null;
+
+/** O passe da sala da corrida no LiveKit: só dados, e publicar só se você está sentado. */
+export const pedirTokenDaCorrida = (id: number, servidorId: number) =>
+  pedir<{ url: string; token: string; identity: string }>('POST', '/corridas/token', { id }, servidorId);
 
 /**
  * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.

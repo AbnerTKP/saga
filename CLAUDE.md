@@ -1375,6 +1375,39 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   xadrez). Com a fonte do sistema cada computador desenha um rei diferente, e onde não
   houvesse o desenho o peão sairia como emoji colorido; o CSP não deixa buscar fonte de
   fora, e o resto do arquivo não é preciso.
+- **A corrida de Fórmula 1 não passa pelo HTTP: anda pelo canal de dados do LiveKit.** Posição
+  a vinte vezes por segundo, de até oito carros, seriam dezenas de pedidos por segundo numa VPS
+  de um núcleo — a mesma que sofreu com a busca de salas. Então o servidor (`corridas.mjs`,
+  na memória como as mesas do xadrez) cuida só do que muda devagar e precisa de árbitro: os
+  lugares, a hora da largada e a chegada. A corrida mora numa sala do LiveKit SÓ DELA
+  (`corrida-<nome>-<rodada>`), com passe sem áudio nem vídeo, e publicar dados é só de quem
+  está sentado — quem assiste entra para ler. A sala muda a cada largada, para ninguém
+  pendurado na anterior virar fantasma na seguinte.
+- **Cada app simula o PRÓPRIO carro, e a batida é resolvida dos dois lados.** Árbitro central
+  poria a latência no volante de todo mundo. Cada um empurra o próprio carro para fora do
+  outro, pela posição que recebeu dele, e perde velocidade só no que ia contra — por isso a
+  batida parece a mesma nas duas telas. A regra toda (`corrida.ts`) é pura e testada,
+  inclusive uma corrida de três voltas com piloto automático; é quem pilota que diz o tempo de
+  chegada, e o servidor só recusa conta impossível (antes da largada, ou volta de menos de
+  4 s). Entre amigos isso basta; contra trapaça, não.
+- **O relógio da corrida é o do SERVIDOR.** O app guarda a MAIOR diferença entre o `agora` das
+  respostas e o próprio relógio — a resposta chega sempre depois de escrita, então a
+  diferença só erra para menos. Com ele, as luzes apagam juntas em todas as telas e as fotos
+  dos outros carros são desenhadas 110 ms no passado, entre duas que chegaram.
+- **O desenho da corrida foi escolhido pelo dono entre três**: a pista inteira com a
+  classificação na coluna (e não câmera seguindo o carro), nas cores da casa (e não grama e
+  asfalto); vagas que sobram ficam VAZIAS, sem robô; os carros BATEM; quem não corre assiste;
+  e a pista é espaçada — 84 de largura para um carro de 18. Os pilotos são os de 2026 das
+  quatro equipes pedidas, e os carros são desenho próprio só com as cores, sem logo.
+- **A pista gira um quarto de volta quando o quadro está em pé.** Numa janela de 1200 px, com
+  a coluna ao lado, o quadro fica alto e a pista deitada virava um desenho pequeno no meio do
+  vazio — visto na imagem, não no código. Só o desenho gira: o volante é do carro.
+- **O motor não é arquivo: é sintetizado ao vivo** (`motor.ts`), porque muda de tom a cada
+  quadro. Só o SEU ronca. Luz, largada, batida e vitória são `.ogg` da família de sempre.
+- **Teste escondido tem de ser MUDO.** Na primeira rodada da corrida o app de teste tocou luzes
+  e motor pelos alto-falantes do dono — com ele ao vivo na Saga, e a live levou o som junto:
+  o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
+  do teste leva `mute-audio`.
 
 ## A limitação que caiu sem ser atacada
 
@@ -1754,3 +1787,11 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   chat, o controle na barra e na lista, a desistência e a revanche — tudo conferido também
   em imagem. **Não foram exercidos**: duas pessoas em dois computadores, o som do convite
   tocando, e uma partida inteira até o mate ou até o tempo acabar.
+- **A Fórmula 1 entre pessoas de verdade.** O que está medido, na janela escondida e MUDA contra
+  servidor e LiveKit locais, com um segundo piloto automático pelo `@livekit/rtc-node` usando o
+  mesmo motor: menu de jogos, grid, sentar, as luzes, a largada, o meu carro andando no teclado,
+  o carro do outro desenhado pela rede (527 posições minhas chegaram a ele numa corrida de
+  31 s), batidas, a bandeirada no servidor, abandonar, a faixa de volta, o pódio, a volta mais
+  rápida e o correr de novo — conferido em imagem. **Não foram exercidos**: dois computadores
+  com gente pilotando, a batida vista dos dois lados, o convite no canto, os sons de ouvido
+  (o teste era mudo de propósito) e uma corrida com oito carros.

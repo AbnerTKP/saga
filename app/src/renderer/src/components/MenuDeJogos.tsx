@@ -1,16 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { useFecharComEsc } from '../useFechar';
 import { Peca } from './Tabuleiro';
+import { CarroDesenho } from './DesenhoDaCorrida';
 
 /**
- * Os jogos, abertos pelo controle do painel de voz. Por enquanto só o xadrez — e, com uma
- * mesa sua de pé, o mesmo item leva de volta a ela em vez de abrir outra.
+ * Os jogos, abertos pelo controle do painel de voz: o xadrez e a Fórmula 1. Com uma mesa ou um
+ * grid seu de pé, o item leva de volta a ele em vez de abrir outro.
  */
-export function MenuDeJogos({ em, minha, onXadrez, onClose }: {
+export function MenuDeJogos({ em, minha, corrida, onXadrez, onCorrida, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
   minha: 'lobby' | 'jogando' | 'fim' | null;
+  /** O que o item da Fórmula 1 diz embaixo do nome: abrir, voltar ao seu grid, ou assistir. */
+  corrida: string;
   onXadrez: () => void;
+  onCorrida: () => void;
   onClose: () => void;
 }) {
   useFecharComEsc(onClose);
@@ -36,6 +40,13 @@ export function MenuDeJogos({ em, minha, onXadrez, onClose }: {
           <span className="muted small">
             {minha === 'jogando' ? 'voltar à sua partida' : minha ? 'voltar à sua mesa' : 'abrir uma mesa e chamar alguém'}
           </span>
+        </span>
+      </button>
+      <button type="button" className="menu-de-jogos-item" onClick={() => { onCorrida(); onClose(); }}>
+        <span className="carro-no-quadrado"><CarroDesenho carro="VER" largura={32} /></span>
+        <span className="menu-de-jogos-textos">
+          <span className="strong">Fórmula 1</span>
+          <span className="muted small">{corrida}</span>
         </span>
       </button>
     </div>
