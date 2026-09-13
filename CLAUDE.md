@@ -311,6 +311,11 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
     mesma propriedade.
   - **Nunca 401.** No app, 401 quer dizer "a sessão caiu" e desloga. Por isso a recusa da
     recuperação é 400, e senha atual errada ao trocar a senha em "Sua conta" é 403.
+  - **Nem para a própria conta, nem para a de outro dono.** A própria, porque quem sabe a
+    senha troca em "Sua conta", e o código derrubaria as sessões do dono. A de outro dono,
+    porque com mais de um dono da Saga o código de um entraria na conta do outro — decisão
+    do dono em 13/09/2026, ao dar a administração a mais uma pessoa. O botão some das duas,
+    e o servidor recusa com 403 antes de conferir a senha (`plataforma.test.mjs`).
   - **Recuperar derruba TODAS as sessões e já entra**: quem tinha a senha antiga,
     inclusive um invasor, sai, e sai também das calls (sem esperar o LiveKit: um LiveKit
     lento prenderia a resposta com o código já gasto). Trocar logado derruba as OUTRAS
@@ -1740,7 +1745,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (419) + app (335), segundos, sem nada externo
+pnpm test        # servidor (437) + app (364), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

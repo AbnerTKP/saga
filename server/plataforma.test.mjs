@@ -132,6 +132,22 @@ test('o dono não gera código para a própria conta, nem com a senha certa', ()
   assert.equal(db.prepare('SELECT count(*) c FROM recuperacoes').get().c, 0);
 });
 
+test('um dono da Saga não gera código para a conta de outro dono', () => {
+  // Com dois donos, o código de um entraria na conta do outro: quem manda na Saga não pode
+  // ter a conta ao alcance de quem manda igual. Decisão de 13/09/2026, ao dar a administração
+  // a mais alguém. Para conta que não é de dono, nada muda.
+  const { db, cria } = cenario();
+  const abner = cria('abner', true), tava = cria('tava1'), bruno = cria('bruno');
+  garantirDonoDaSaga(db, 'abner');
+  db.prepare('UPDATE usuarios SET dono = 1 WHERE id = ?').run(tava.id);
+  for (const [quem, alvo] of [[tava, abner], [abner, tava]]) {
+    assert.throws(() => emitirRecuperacao(db, quem.id, alvo.id, 'segredo123'),
+      (e) => e.status === 403 && /dono da Saga/.test(e.message), `${quem.apelido} gerou para ${alvo.apelido}`);
+  }
+  assert.equal(db.prepare('SELECT count(*) c FROM recuperacoes').get().c, 0);
+  assert.ok(emitirRecuperacao(db, tava.id, bruno.id, 'segredo123').codigo, 'para quem não é dono, o segundo dono gera');
+});
+
 test('o código sai uma vez, e a lista de contas mostra só até quando ele vale', () => {
   const { db, cria } = cenario();
   const abner = cria('abner', true), bruno = cria('bruno');

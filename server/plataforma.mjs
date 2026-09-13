@@ -86,11 +86,20 @@ export function definirBerserk(db, quemId, alvoId, ligado) {
  * E não serve para a PRÓPRIA conta. Quem sabe a senha troca em "Sua conta"; quem não sabe e
  * usa o código derruba todas as sessões do único dono da Saga — e sem sessão de dono ninguém
  * gera código para ele, então a volta seria só pela VPS.
+ *
+ * Nem para a conta de OUTRO dono. Com mais de um dono da Saga, o código de um entraria na
+ * conta do outro: quem manda na Saga não pode ter a conta ao alcance de quem manda igual.
+ * Decisão do dono em 13/09/2026, ao dar a administração a mais alguém.
  */
 export function emitirRecuperacao(db, quemId, alvoId, senhaDoDono) {
   exigirDonoDaSaga(db, quemId);
   if (Number(alvoId) === Number(quemId)) {
     throw new ErroDeConta('A sua senha se troca em Sua conta, com a senha atual.', 403);
+  }
+  // Antes da senha: a lista de contas já diz quem é dono, e não há por que gastar um scrypt
+  // num pedido que vai ser recusado de qualquer jeito.
+  if (usuarios.ehDono(db, alvoId)) {
+    throw new ErroDeConta('Conta de dono da Saga não recebe código: a senha dela se troca em Sua conta.', 403);
   }
   if (!senhaConfere(senhaDoDono, usuarios.buscarPorId(db, quemId)?.senha_hash)) {
     throw new ErroDeConta('A sua senha não confere.', 403);

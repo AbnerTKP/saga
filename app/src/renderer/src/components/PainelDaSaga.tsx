@@ -148,8 +148,10 @@ export function BlocosDaSaga({ meuId, ativa = true }: {
           const jaTemCodigo = !!gerado || pendenteAte !== null;
           const pedido = pedindo?.id === c.id ? pedindo : null;
           // A PRÓPRIA conta não tem código: quem sabe a senha troca em "Sua conta", e o código
-          // derrubaria todas as sessões do único dono da Saga. O servidor também recusa.
+          // derrubaria todas as sessões do único dono da Saga. Nem a de OUTRO dono: o código de
+          // um entraria na conta do outro. O servidor recusa as duas.
           const souEu = c.id === meuId;
+          const semCodigo = souEu || c.dono;
           return (
           <div key={c.id} className={`conta-da-saga ${c.berserk ? 'berserk' : ''} ${gerado || pedido ? 'com-codigo-de-senha' : ''}`}>
             <Avatar nome={c.apelido} foto={c.foto} tamanho="big" />
@@ -164,7 +166,7 @@ export function BlocosDaSaga({ meuId, ativa = true }: {
                 {pendenteAte !== null && ` · código pendente até ${hora(pendenteAte)}`}
               </div>
             </div>
-            {!souEu && (
+            {!semCodigo && (
               <button
                 className="conta-botao-codigo"
                 disabled={ocupado === c.id || !!pedido}
