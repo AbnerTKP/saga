@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { derrubouASessao, lerResposta } from './resposta.ts';
+import { derrubouASessao, lerResposta, rotaQueNaoExiste } from './resposta.ts';
+
+test('rota que não existe é o 404 genérico do roteador, e só ele', () => {
+  // É o sinal de servidor antigo, que a administração e a recuperação de senha explicam.
+  assert.equal(rotaQueNaoExiste(404, 'não encontrado'), true);
+  assert.equal(rotaQueNaoExiste(404, 'Essa conta não existe.'), false, 'o 404 com motivo é resposta de verdade');
+  assert.equal(rotaQueNaoExiste(500, 'não encontrado'), false);
+});
 
 test('resposta boa passa com os dados', () => {
   const r = lerResposta(true, 200, { cargos: [], membros: [] });

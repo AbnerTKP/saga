@@ -43,3 +43,15 @@ export function lerResposta(ok: boolean, status: number, dados: unknown): Leitur
  */
 export const derrubouASessao = (erro: unknown): boolean =>
   ehObjeto(erro) && (erro as { status?: unknown }).status === 401;
+
+/**
+ * A rota não existe NESTE servidor: é o 404 genérico do roteador, "não encontrado".
+ *
+ * App e servidor sobem separados, e o app novo pergunta por rota que o servidor antigo não
+ * tem. Cada tela explica isso com a sua frase — a recuperação de senha e a administração —,
+ * mas QUAL resposta é essa se decide aqui, uma vez: a regra estava escrita igual nos dois
+ * módulos, e se o texto do roteador (`index.mjs`) mudar, ela muda num lugar só. O 404 que
+ * vem com motivo ("Essa conta não existe.") é resposta de verdade, e não entra.
+ */
+export const rotaQueNaoExiste = (status: number, mensagem: string): boolean =>
+  status === 404 && mensagem === 'não encontrado';

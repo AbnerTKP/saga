@@ -13,15 +13,25 @@ const hora = (t: number) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-d
 const PRAZO_DE_COPIAR = 3000;
 
 /**
- * O que o dono da Saga decide, como bloco — não como janela.
+ * O que o dono da Saga decide sobre as CONTAS, como bloco — não como janela.
  *
  * Viveu numa janela própria, escondida no menu de status, e o dono precisou perguntar
- * onde ficava. Hoje mora em "Sua conta", atrás da engrenagem, que é justamente o lugar
- * do que existe ACIMA dos servidores: a conta, o Berserk e isto. Fora das configurações
- * de servidor nenhum, de propósito: dentro do CARDUME, o Berserk pareceria uma distinção
- * do CARDUME, e ele vale em todos.
+ * onde ficava. Depois morou em "Sua conta", atrás da engrenagem. Hoje mora na aba Contas
+ * da administração da Saga, ao lado de todos os servidores: o Berserk é uma distinção que
+ * vale na Saga inteira, e é lá que o dono olha a Saga inteira. "Sua conta" é sobre você, e
+ * ficou só com a porta. Continua fora das configurações de servidor nenhum, de propósito:
+ * dentro do CARDUME, o Berserk pareceria uma distinção do CARDUME, e ele vale em todos.
  */
-export function BlocosDaSaga({ meuId }: { meuId: number }) {
+export function BlocosDaSaga({ meuId, ativa = true }: {
+  meuId: number;
+  /**
+   * Se o bloco está à vista. Na administração ele fica montado com a aba escondida — para o
+   * código de senha não sumir ao trocar de aba —, e montado ele buscaria as contas uma vez só,
+   * ao abrir a administração: voltar à aba mostraria o Berserk de quando ela abriu, enquanto
+   * a aba vizinha se atualiza sozinha. Ficar à vista busca de novo.
+   */
+  ativa?: boolean;
+}) {
   const [contas, setContas] = useState<ContaDaSaga[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<number | null>(null);
@@ -38,9 +48,16 @@ export function BlocosDaSaga({ meuId }: { meuId: number }) {
   // outro — não pode escrever "Copiado" nem "Não consegui" sobre a da tela.
   const tentativas = useRef<Record<number, number>>({});
 
+  // Busca ao ficar à vista, e não só ao montar — ver `ativa`. O que é da tela (o código gerado,
+  // a cópia, o pedido em curso) é estado à parte e sobrevive à busca nova.
   useEffect(() => {
-    contasDaSaga().then(setContas).catch((e) => setErro((e as Error).message));
-  }, []);
+    if (!ativa) return;
+    let vivo = true;
+    contasDaSaga()
+      .then((c) => { if (vivo) setContas(c); })
+      .catch((e) => { if (vivo) setErro((e as Error).message); });
+    return () => { vivo = false; };
+  }, [ativa]);
 
   const alternar = async (c: ContaDaSaga) => {
     setErro(null); setOcupado(c.id);

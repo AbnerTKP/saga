@@ -9,7 +9,7 @@ import { Icon } from './Icon';
  * servidor nenhum. Ele fica separado por um risco justamente para dizer isso — daí para
  * baixo é "onde eu estou", e ali em cima é "com quem eu falo".
  */
-export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, onConfigurar, modoConversas, aviso, onConversas }: {
+export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, onConfigurar, modoConversas, aviso, onConversas, onAdministracao }: {
   servidores: Servidor[];
   atual: number;
   onEscolher: (id: number) => void;
@@ -26,6 +26,8 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
    */
   aviso: number;
   onConversas: () => void;
+  /** A administração da Saga. Só vem para o dono da Saga; sem ela, a porta não existe. */
+  onAdministracao?: () => void;
 }) {
   return (
     <nav className="trilha" aria-label="Servidores">
@@ -58,6 +60,19 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
       })}
 
       <button className="quadro-servidor acao" title="Entrar com um convite ou criar um servidor" onClick={onConfigurar}>+</button>
+
+      {/* A administração mora na trilha, e não num menu. O painel da Saga já morou escondido
+          no menu de status, e o dono teve de perguntar onde ficava; um quadrado a mais na
+          fila dos servidores fica onde a mão já procura "os servidores todos". */}
+      {onAdministracao && (
+        <button
+          className="quadro-servidor acao adm-porta"
+          title="Administração da Saga — todos os servidores"
+          onClick={onAdministracao}
+        >
+          <Icon name="grade" size={18} />
+        </button>
+      )}
     </nav>
   );
 }

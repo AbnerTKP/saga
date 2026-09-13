@@ -18,5 +18,16 @@ export const doServidor = (db, servidorId) =>
   db.prepare('SELECT codigo, criado_em, expira_em, usos, max_usos FROM convites WHERE servidor_id = ? ORDER BY criado_em DESC')
     .all(servidorId);
 
+/**
+ * Quantos ainda abrem a porta: sem prazo ou dentro dele, e sem teto ou abaixo dele. Só o
+ * número — o código não sai desta leitura, porque quem conta convites não precisa da chave.
+ */
+export const quantosAtivos = (db, servidorId, agora) =>
+  db.prepare(`
+    SELECT count(*) c FROM convites
+     WHERE servidor_id = ?
+       AND (expira_em IS NULL OR expira_em > ?)
+       AND (max_usos IS NULL OR usos < max_usos)`).get(servidorId, Number(agora)).c;
+
 export const contarUso = (db, codigo) =>
   db.prepare('UPDATE convites SET usos = usos + 1 WHERE codigo = ?').run(codigo);

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verParticipante, FONTE, ATRIBUTO_SURDO, ATRIBUTO_ASSISTINDO } from './participantes.mjs';
+import {
+  verParticipante, FONTE, ATRIBUTO_SURDO, ATRIBUTO_ASSISTINDO,
+  salaNoLiveKit, salaDoLiveKit, emCallPorSalaDe,
+} from './participantes.mjs';
 
 // Monta um participante como o LiveKit devolve, só com o que a função lê.
 const pessoa = (nome, faixas) => ({ identity: `${nome}#a1b2`, name: nome, tracks: faixas });
@@ -91,4 +94,28 @@ test('quem não escolheu transmissão nenhuma vem como null, e não como texto v
   assert.equal(verParticipante(pessoa('Abner', [])).assistindo, null);
   const largou = { ...pessoa('Bruno', []), attributes: { [ATRIBUTO_ASSISTINDO]: '' } };
   assert.equal(verParticipante(largou).assistindo, null, 'largar de assistir vira vazio, não sumiço');
+});
+
+test('o nome da sala no LiveKit vai e volta pelo id', () => {
+  assert.equal(salaNoLiveKit({ id: 7 }), 'sala-7');
+  assert.equal(salaDoLiveKit(salaNoLiveKit({ id: 7 })), 7);
+  assert.equal(salaDoLiveKit('sala-12'), 12);
+});
+
+test('o que não saiu de salaNoLiveKit não é sala nossa', () => {
+  // Uma sala de medição, um nome à mão, um id que a ida nunca escreveria.
+  for (const nome of ['sala-0', 'sala-012', 'sala-12x', 'sala-', 'medicao', '', null, undefined]) {
+    assert.equal(salaDoLiveKit(nome), null, `${JSON.stringify(nome)} virou sala`);
+  }
+});
+
+test('quantos há em call por sala sai da lista do LiveKit, e só das salas nossas', () => {
+  const vivas = [
+    { name: 'sala-7', numParticipants: 2 },
+    { name: 'medicao', numParticipants: 5 },
+    { name: 'sala-9', numParticipants: 0 },
+  ];
+  assert.deepEqual([...emCallPorSalaDe(vivas)], [[7, 2], [9, 0]]);
+  // O LiveKit fora do ar chega como lista vazia: ninguém em call, e não erro.
+  assert.deepEqual([...emCallPorSalaDe([])], []);
 });

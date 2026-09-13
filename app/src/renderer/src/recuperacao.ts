@@ -6,6 +6,7 @@
  * O código são 8 letras e dígitos, mostrados como XXXX-XXXX. O servidor ignora maiúsculas,
  * espaços e hífens; o campo daqui só deixa o que se digita com a cara do que chegou.
  */
+import { rotaQueNaoExiste } from './resposta.ts';
 
 const TAMANHO = 8;
 
@@ -92,12 +93,12 @@ export function codigoDepoisDeColar(valor: string, inicio: number, fim: number, 
  * O que dizer quando o pedido falha.
  *
  * App e servidor sobem separados: app novo contra servidor antigo pergunta por uma rota que
- * lá não existe, e o roteador responde o 404 genérico dele, "não encontrado". Mostrado cru,
- * isso se leria como "a sua conta não foi encontrada" — justo para quem já não consegue
+ * lá não existe (`rotaQueNaoExiste`, em resposta.ts). Mostrado cru, o "não encontrado" do
+ * roteador se leria como "a sua conta não foi encontrada" — justo para quem já não consegue
  * entrar. O outro 404, "Essa conta não existe.", é resposta de verdade e passa como veio.
  */
 export function explicarFalha(status: number, mensagem: string): string {
-  if (status === 404 && mensagem === 'não encontrado') {
+  if (rotaQueNaoExiste(status, mensagem)) {
     return 'O servidor ainda não sabe fazer isso: ele precisa ser atualizado.';
   }
   return mensagem;

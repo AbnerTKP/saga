@@ -19,6 +19,10 @@ export const listar = (db, servidorId) =>
               (s.categoria_id IS NOT NULL), c.ordem, c.id, s.ordem, s.id`)
     .all(servidorId);
 
+/** Só o que se conta, de todas as salas da Saga de uma vez — para a administração. */
+export const resumoDeTodas = (db) =>
+  db.prepare('SELECT id, servidor_id, tipo, privada, papel FROM salas').all();
+
 export const buscar = (db, servidorId, id) =>
   db.prepare('SELECT id, nome, tipo, ordem, papel, privada, categoria_id AS categoriaId FROM salas WHERE servidor_id = ? AND id = ?')
     .get(servidorId, Number(id)) ?? null;

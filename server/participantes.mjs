@@ -49,3 +49,36 @@ export function verParticipante(p) {
     assistindo: p.attributes?.[ATRIBUTO_ASSISTINDO] || null,
   };
 }
+
+// --- o nome da sala no LiveKit -----------------------------------------------
+//
+// Mora aqui, e não em index.mjs, para ter teste: index.mjs sobe o servidor ao ser importado,
+// e o api.test aponta o LiveKit para uma porta morta. Com a volta devolvendo sempre null,
+// "Em call" daria 0 em todo servidor da administração e a suíte continuaria verde.
+
+// A sala do LiveKit é identificada pelo id, não pelo nome: dois servidores com uma sala
+// "Geral" cairiam na mesma conversa se fosse pelo nome.
+export const salaNoLiveKit = (sala) => `sala-${sala.id}`;
+
+// E o caminho de volta, para quem lê a lista do LiveKit e precisa saber de que sala é cada
+// uma. Mora colado à ida para o formato do nome existir num lugar só; o que não saiu de
+// `salaNoLiveKit` — uma sala de medição, por exemplo — não é sala nossa, e vira null.
+export const salaDoLiveKit = (nome) => {
+  const m = /^sala-([1-9]\d*)$/.exec(String(nome ?? ''));
+  return m ? Number(m[1]) : null;
+};
+
+/**
+ * Quantos há em cada sala, pelo id: é o que a administração soma por servidor.
+ *
+ * Sai da mesma lista lembrada do /rooms, que já traz a contagem de cada sala — perguntar
+ * sala a sala ao LiveKit é o que já comeu um terço do núcleo desta VPS.
+ */
+export function emCallPorSalaDe(vivas) {
+  const porSala = new Map();
+  for (const r of vivas ?? []) {
+    const id = salaDoLiveKit(r.name);
+    if (id !== null) porSala.set(id, Number(r.numParticipants) || 0);
+  }
+  return porSala;
+}

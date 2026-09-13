@@ -1347,6 +1347,88 @@ test('xadrez: só se chama quem é do servidor e não foi banido, e sem sessão 
   }
 });
 
+// --- administração da Saga ------------------------------------------------------
+
+test('a administração não abre sem sessão', async () => {
+  assert.equal((await chamar('GET', '/saga/servidores')).status, 401);
+  assert.equal((await chamar('GET', '/saga/servidor?id=1')).status, 401);
+});
+
+test('quem não é dono da Saga recebe 403 nas duas rotas, mesmo sem servidor nenhum', async () => {
+  // As rotas não passam por `exigirMembro`: o dono da Saga pode não estar em servidor
+  // algum. Por isso quem não é dono e também não está em lugar nenhum tem de ouvir
+  // "isto é do dono", e não "você não faz parte de nenhum servidor".
+  await criarConta('nina_adm');
+  const nina = await sessaoDe('nina_adm');
+  for (const rota of ['/saga/servidores', '/saga/servidor?id=1']) {
+    const r = await chamar('GET', rota, { sessao: nina.token });
+    assert.equal(r.status, 403, rota);
+    assert.match(r.corpo.error, /dono da Saga/);
+  }
+});
+
+test('o dono da Saga vê na lista um servidor de que não faz parte', async () => {
+  await criarConta('otavio_adm');
+  const otavio = await sessaoDe('otavio_adm');
+  const criado = await chamar('POST', '/servidores/criar', { sessao: otavio.token, corpo: { nome: 'Toca do Otávio' } });
+  assert.equal(criado.status, 200, JSON.stringify(criado.corpo));
+
+  // Mandar num servidor não é mandar na Saga.
+  assert.equal((await chamar('GET', '/saga/servidores', { sessao: otavio.token })).status, 403);
+
+  const dono = await sessaoDe('abner');
+  const r = await chamar('GET', '/saga/servidores', { sessao: dono.token });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const toca = r.corpo.servidores.find((s) => s.id === criado.corpo.servidor.id);
+  assert.ok(toca, 'o servidor alheio não apareceu na lista');
+  assert.equal(toca.souMembro, false);
+  assert.equal(toca.criador.apelido, 'otavio_adm');
+  assert.equal(toca.pessoas, 1);
+  assert.ok(r.corpo.servidores.some((s) => s.souMembro), 'o de casa, que é dele, devia vir como dele');
+});
+
+test('o detalhe traz as pessoas como o /servidor as mostra, as salas, e nada da conversa', async () => {
+  const dono = await sessaoDe('abner');
+  const otavio = await sessaoDe('otavio_adm');
+  const toca = (await chamar('GET', '/servidores', { sessao: otavio.token })).corpo.servidores
+    .find((s) => s.nome === 'Toca do Otávio');
+  const avisos = (await chamar('GET', '/rooms', { sessao: otavio.token, servidor: toca.id })).corpo.rooms
+    .find((s) => s.name === 'Avisos');
+  const envio = await chamar('POST', '/mensagens', {
+    sessao: otavio.token, servidor: toca.id, corpo: { sala: avisos.id, texto: 'o que se fala na toca fica na toca' },
+  });
+  assert.equal(envio.status, 200, JSON.stringify(envio.corpo));
+  const convite = await chamar('POST', '/servidores/convite', { sessao: otavio.token, servidor: toca.id, corpo: {} });
+  assert.equal(convite.status, 200, JSON.stringify(convite.corpo));
+
+  const r = await chamar('GET', `/saga/servidor?id=${toca.id}`, { sessao: dono.token });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const { servidor } = r.corpo;
+
+  // O MESMO verMembro de GET /servidor: a pessoa não pode ter um formato em cada rota.
+  const comoOServidorMostra = (await chamar('GET', '/servidor', { sessao: otavio.token, servidor: toca.id })).corpo.membros;
+  assert.deepEqual(servidor.membros, comoOServidorMostra);
+
+  assert.deepEqual(servidor.salas.map((s) => `${s.nome}:${s.tipo}`), ['Geral:voz', 'Avisos:texto']);
+  assert.ok(servidor.salas.every((s) => Array.isArray(s.naCall)), 'toda sala leva quem está na call');
+  assert.equal(servidor.salas.find((s) => s.id === avisos.id).mensagens.total, 1);
+  assert.equal(servidor.convitesAtivos, 1);
+  assert.equal(servidor.souMembro, false);
+
+  const tudo = JSON.stringify(r.corpo);
+  assert.ok(!tudo.includes('fica na toca'), 'o texto da mensagem vazou');
+  assert.ok(!tudo.includes(convite.corpo.convite.codigo), 'o código do convite vazou');
+});
+
+test('servidor que não existe, ou número que nem é número, dá 404', async () => {
+  const dono = await sessaoDe('abner');
+  for (const rota of ['/saga/servidor?id=abc', '/saga/servidor?id=999999', '/saga/servidor']) {
+    const r = await chamar('GET', rota, { sessao: dono.token });
+    assert.equal(r.status, 404, rota);
+    assert.match(r.corpo.error, /não existe/);
+  }
+});
+
 // --- recuperar e trocar a senha -------------------------------------------------
 //
 // Só com contas destes testes: `sessaoDe` guarda a sessão por apelido, e trocar a senha de

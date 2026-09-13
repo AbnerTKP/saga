@@ -1334,7 +1334,6 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .primary.destrutivo:focus-visible { outline: 2px solid rgba(224,72,82,.55); outline-offset: 2px; }
 
 /* Painel de quem cuida da Saga. */
-.botao-da-saga { color: var(--accent-claro) !important; }
 .contas-da-saga { display: grid; gap: var(--e2); margin-top: var(--e3); }
 .conta-da-saga { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3);
   background: var(--bg1); border: 1px solid var(--line); border-radius: 10px; }
@@ -1960,3 +1959,161 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
   border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; outline: none; }
 .relato-texto:focus { border-color: var(--accent); }
 .relato-contexto { font-size: 12px; color: var(--text3); line-height: 1.45; }
+
+/* ---- administração da Saga ---- */
+/* O dono da Saga vendo TODOS os servidores, inclusive os de que não faz parte: como estão
+   montados, nunca a conversa. Tudo com prefixo `adm-` — nome de classe curto é variável
+   global, e `.aviso`, por exemplo, já é a pilha de avisos do canto. */
+
+/* A porta na trilha: contorno cheio, e não tracejado como o "+". Ela não junta servidor
+   nenhum; abre a vista de todos. */
+.quadro-servidor.adm-porta { border-style: solid; }
+
+/* Alto FIXO, e não só limitado: com `max-height` o painel mudaria de tamanho a cada servidor
+   escolhido, e a lista da esquerda pularia junto. */
+.modal.administracao { width: min(72rem, 94vw); height: 86vh; }
+.administracao .tabs { flex: none; }
+.adm-contagem { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--bg3);
+  color: var(--text2); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tabs button.active .adm-contagem { background: var(--accent-tenue); color: var(--accent-claro); }
+
+/* Cada coluna rola sozinha: descer pelas pessoas de um servidor não leva a lista embora. */
+.adm-colunas { flex: 1; min-height: 0; display: grid; grid-template-columns: 17rem 1fr; }
+.adm-lista, .adm-detalhe { min-height: 0; overflow-y: auto; }
+.adm-lista { border-right: 1px solid var(--line); padding: 0 var(--e2) var(--e3); }
+/* A busca fica presa no alto da coluna: é para quando a lista já não se acha de olho. */
+.adm-busca { position: sticky; top: 0; z-index: 1; padding: var(--e3) 0 var(--e2); background: var(--bg2); }
+.adm-busca input { width: 100%; padding: 8px 10px; font-size: 13.5px; }
+
+.adm-linha { width: 100%; display: flex; align-items: center; gap: var(--e3); padding: var(--e2);
+  border-radius: 8px; text-align: left; color: var(--text); }
+.adm-linha:hover { background: var(--bg3); }
+.adm-linha.escolhido { background: var(--accent-tenue); }
+/* A mesma cara do quadrado da trilha, sem ser botão: a linha inteira já é. */
+.adm-quadro { width: 38px; height: 38px; flex: none; border-radius: 8px; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg3); color: var(--white);
+  font-size: 12.5px; font-weight: 700; }
+.adm-quadro img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.adm-linha:hover .adm-quadro { background: var(--bg4); }
+.adm-quadro-grande { width: 64px; height: 64px; border-radius: 14px; font-size: 22px; }
+.adm-linha-texto { flex: 1; min-width: 0; display: grid; gap: 1px; line-height: 1.25; }
+.adm-linha-nome, .adm-linha-numeros { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-linha-nome { font-size: 14px; font-weight: 600; color: var(--white); }
+.adm-linha-numeros { font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.adm-linha-voce { font-size: 11px; font-weight: 600; color: var(--accent-claro); }
+/* Verde, como o "na call" do cartão de perfil: tem gente lá agora. */
+.adm-selo-call { flex: none; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: rgba(46,163,106,.16); color: #57d98a; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.adm-estado { display: grid; gap: var(--e2); justify-items: start; margin: 0; padding: var(--e4) var(--e1); }
+.adm-detalhe > .adm-estado { padding: var(--e5) 18px; }
+.adm-estado p { margin: 0; }
+.adm-botao { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  color: var(--accent-claro); border: 1px solid var(--accent); }
+.adm-botao:hover { background: var(--accent-tenue); }
+/* Já carregou uma vez e a volta falhou: o que está na tela ainda vale — é da última busca —,
+   então o aviso é uma linha, e não a tela inteira dizendo que não há nada. */
+.adm-falha-discreta { margin: var(--e3) 18px 0; font-size: 12px; line-height: 1.4; color: var(--warn); }
+.adm-lista .adm-falha-discreta { margin: 0 var(--e1) var(--e2); }
+
+/* Nome comprido corta com reticências em vez de empurrar a linha. O nome do Berserk é um
+   gradiente recortado no texto e só obedece ao corte do pai sendo caixa — ver `.uname`. */
+.adm-corta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-corta .nome-berserk { display: inline-block; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+.adm-topo { padding: var(--e4) 18px var(--e3); }
+.adm-banner { height: 110px; margin-bottom: var(--e3); border-radius: 10px; overflow: hidden; background: var(--bg4); }
+.adm-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.adm-identidade { display: flex; align-items: center; gap: var(--e4); flex-wrap: wrap; }
+.adm-identidade-texto { flex: 1; min-width: 12rem; display: grid; gap: 2px; }
+.adm-nome { display: flex; align-items: baseline; gap: var(--e2); min-width: 0;
+  font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--white); }
+.adm-id { flex: none; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--text3);
+  font-variant-numeric: tabular-nums; }
+.adm-voce { display: flex; align-items: center; gap: var(--e2); flex: none; }
+
+.adm-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2);
+  padding: 0 18px var(--e4); }
+.adm-numero { display: grid; gap: 2px; align-content: start; min-width: 0; padding: var(--e3);
+  background: var(--bg1); border: 1px solid var(--line); border-radius: 10px; }
+.adm-numero-rotulo { font-size: 10.5px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-numero-valor { font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--white);
+  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-numero-extra { font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A primeira seção vem depois dos números, e sem o risco ela colava neles. */
+.adm-detalhe .painel-bloco:first-of-type { border-top: 1px solid var(--line); }
+.adm-grupo + .adm-grupo { margin-top: var(--e3); }
+
+.adm-call + .adm-call { margin-top: var(--e3); }
+.adm-call-sala { display: flex; align-items: center; gap: 6px; min-width: 0; margin-bottom: var(--e2);
+  font-size: 13.5px; font-weight: 600; color: var(--white); }
+.adm-call-sala svg { flex: none; color: var(--text3); }
+.adm-call-gente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.adm-call-gente li { display: flex; align-items: center; gap: 7px; max-width: 16rem; min-width: 0;
+  padding: 3px 10px 3px 3px; border-radius: 999px; background: var(--bg1);
+  border: 1px solid var(--line); font-size: 13px; color: var(--text); }
+.adm-icone { display: flex; flex: none; color: var(--text3); }
+.adm-icone-tela { color: #ff8a90; }
+
+.adm-pessoas, .adm-salas, .adm-cargos { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.adm-pessoa, .adm-sala, .adm-cargo { min-width: 0; padding: 6px 8px; border-radius: 8px; }
+.adm-pessoa:hover, .adm-sala:hover, .adm-cargo:hover { background: var(--bg1); }
+.adm-pessoa { display: flex; align-items: center; gap: 10px; }
+.adm-pessoa.adm-banido { opacity: .7; }
+/* O anel da bolinha de presença é da cor do fundo — e o fundo aqui é o do painel. */
+.adm-pessoa .presenca { border-color: var(--bg2); }
+.adm-pessoa:hover .presenca { border-color: var(--bg1); }
+.adm-pessoa-quem { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.adm-pessoa-nome { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 14px; }
+/* Faltando espaço, o apelido cede antes do nome: o nome é o que se procura. */
+.adm-pessoa-nome > .strong { flex: 0 1 auto; }
+.adm-apelido { flex: 0 3 auto; font-size: 12px; color: var(--text3); white-space: nowrap; }
+.adm-selos { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.adm-selos .selo-berserk { margin-left: 0; }
+.adm-selo { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 999px;
+  background: var(--bg4); color: var(--text2); font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.adm-selo-casa { background: var(--accent-tenue); color: var(--accent-claro); }
+.adm-selo-ok { background: rgba(46,163,106,.16); color: #57d98a; }
+.adm-selo-aviso { background: rgba(224,162,51,.14); color: var(--warn); }
+
+.adm-sala { display: flex; align-items: flex-start; gap: var(--e2); }
+.adm-sala .tipo-da-sala { line-height: 20px; }
+.adm-sala-quem { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.adm-sala-nome { display: flex; align-items: center; gap: 6px; min-width: 0; line-height: 20px;
+  font-size: 14px; font-weight: 600; color: var(--white); }
+.adm-sala-nome .adm-selo { flex: none; }
+.adm-tranca { display: flex; flex: none; color: var(--text3); }
+
+.adm-cargo { display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap; }
+.adm-cargo-nome { flex: 1 1 8rem; font-weight: 600; color: var(--white); }
+.adm-cargo-dado { flex: none; font-size: 12px; color: var(--text2); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+
+.adm-rodape { display: grid; gap: 4px; margin: var(--e2) 18px var(--e5); padding-top: var(--e3);
+  border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; color: var(--text3); }
+.adm-rodape p { margin: 0; }
+/* O escolhido que a busca escondeu: continua no alto da lista, e diz por que está ali. */
+.adm-linha-fora { font-size: 11px; font-weight: 600; color: var(--text3); }
+/* O nome ao lado do identificador: a etiqueta fica inteira e é o NOME que corta. Sem isto, o
+   nome Berserk — uma caixa, por causa do gradiente recortado no texto — sumia INTEIRO ao
+   passar um pixel da largura, porque os 100% dele não descontam a etiqueta que vem antes, e
+   sobravam a etiqueta e as reticências. `:last-child`, e não `.nome-berserk`, para o nome
+   comum não perder as reticências. */
+.adm-nome-membro { display: flex; align-items: baseline; }
+.adm-nome-membro > .id-do-membro { flex: none; }
+.adm-nome-membro > :last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Janela estreita: uma coluna só, a lista em cima e limitada, o servidor escolhido embaixo.
+   Não é 900: esse é o mínimo da janela do app (minWidth), e ali as duas colunas ainda cabem
+   — 17rem de lista e ~570 px de detalhe. Na quebra em 900, a janela no mínimo empilhava sempre. */
+@media (max-width: 760px) {
+  .adm-colunas { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .adm-lista { max-height: 35vh; border-right: none; border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 640px) {
+  .adm-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

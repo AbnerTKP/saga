@@ -766,6 +766,74 @@ export const definirBerserk = async (alvo: number, berserk: boolean) =>
 export const emitirRecuperacao = (alvo: number, senha: string) =>
   pedir<{ codigo: string; expiraEm: number; conta: ContaDaSaga }>('POST', '/saga/recuperacao', { alvo, senha });
 
+/**
+ * Um servidor visto da administração da Saga — todos, inclusive os de que o dono da Saga não
+ * faz parte. Estrutura e números, nunca conversa: texto de mensagem, imagem, anexo e código
+ * de convite não saem nestas rotas.
+ */
+export type ServidorDaSaga = {
+  id: number;
+  nome: string;
+  foto: string | null;
+  criadoEm: number;
+  /** Nulo no servidor semeado pelo `.env`, que nasce sem dono. */
+  criador: { id: number; apelido: string; foto: string | null } | null;
+  /** Vínculos não banidos. */
+  pessoas: number;
+  banidos: number;
+  /** Não banidos cuja presença de VERDADE não é offline — status sem sinal recente não conta. */
+  online: number;
+  /** Gente nas salas de voz deste servidor, pelo LiveKit. */
+  emCall: number;
+  salas: { voz: number; texto: number; privadas: number };
+  /** Só as não apagadas e fora da sala de notas: nota de versão não é servidor ativo. */
+  mensagens: { total: number; ultimos7Dias: number; ultimaEm: number | null };
+  /** Quem pergunta tem vínculo não banido aqui. */
+  souMembro: boolean;
+};
+
+export type SalaDaSaga = {
+  id: number; nome: string; tipo: TipoDeSala; papel: string | null;
+  privada: boolean; categoriaId: number | null;
+  /** Os cargos que a veem; vazio quando ela não é privada. */
+  cargos: number[];
+  /** Desta sala, não apagadas. Sala de voz vem com zero e sem data. */
+  mensagens: { total: number; ultimaEm: number | null };
+  /** Quem está nela agora. Só sala de voz; a de texto vem vazia. */
+  naCall: RoomParticipant[];
+};
+
+export type CargoDaSaga = {
+  id: number; nome: string; cor: string | null; nivel: number;
+  permissoes: string[];
+  /** Vínculos não banidos que vestem este cargo. */
+  pessoas: number;
+};
+
+/**
+ * O servidor escolhido, por inteiro. Os números do resumo são os MESMOS da lista — saem da
+ * mesma conta no servidor —, menos `salas`: aqui ela é a lista de salas, e não a contagem.
+ * As duas moram no mesmo nome, e a do detalhe vence.
+ */
+export type DetalheDoServidorDaSaga = Omit<ServidorDaSaga, 'salas'> & {
+  banner: string | null;
+  categorias: Categoria[];
+  /** Todas, inclusive as privadas, na ordem da barra. */
+  salas: SalaDaSaga[];
+  cargos: CargoDaSaga[];
+  /** O formato de `GET /servidor`, banidos inclusive — quem separa é a tela. */
+  membros: Membro[];
+  /** Só a contagem: código de convite é chave de porta. */
+  convitesAtivos: number;
+  sons: number;
+};
+
+export const servidoresDaSaga = async () =>
+  (await pedir<{ servidores: ServidorDaSaga[] }>('GET', '/saga/servidores')).servidores;
+
+export const servidorDaSaga = async (id: number) =>
+  (await pedir<{ servidor: DetalheDoServidorDaSaga }>('GET', `/saga/servidor?id=${id}`)).servidor;
+
 /** Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. */
 export const baterPresenca = async (status?: string) =>
   (await pedir<{ status: string }>('POST', '/eu/presenca', status ? { status } : {})).status;

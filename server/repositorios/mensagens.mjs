@@ -70,6 +70,38 @@ export const apagar = (db, id, { porQuem, quando }) =>
                WHERE id = ? AND apagada_em IS NULL`)
     .run(quando, porQuem, Number(id));
 
+// --- números, para a administração da Saga --------------------------------------
+//
+// Só contagem e hora: nenhuma destas leituras toca `texto`, `imagem` ou `arquivo`. A
+// administração mostra como o servidor está montado, não a conversa — e o jeito de isso
+// não vazar por descuido lá em cima é a coluna nem sair daqui.
+
+/**
+ * Por servidor: quantas, quantas desde `desde`, e a hora da última.
+ *
+ * Fora as apagadas e as de sala com PAPEL: a sala de notas é a Saga falando, e uma nota de
+ * versão faria o servidor de casa parecer ativo sem ninguém ter escrito nada.
+ */
+export const resumoPorServidor = (db, desde) =>
+  db.prepare(`
+    SELECT s.servidor_id,
+           count(*) AS total,
+           count(CASE WHEN m.criado_em >= ? THEN 1 END) AS ultimos_7_dias,
+           max(m.criado_em) AS ultima_em
+      FROM mensagens m
+      JOIN salas s ON s.id = m.sala_id
+     WHERE m.apagada_em IS NULL AND s.papel IS NULL
+     GROUP BY s.servidor_id`).all(Number(desde));
+
+/** Por sala de um servidor: quantas e a hora da última, sem as apagadas. */
+export const resumoPorSala = (db, servidorId) =>
+  db.prepare(`
+    SELECT m.sala_id, count(*) AS total, max(m.criado_em) AS ultima_em
+      FROM mensagens m
+      JOIN salas s ON s.id = m.sala_id
+     WHERE s.servidor_id = ? AND m.apagada_em IS NULL
+     GROUP BY m.sala_id`).all(servidorId);
+
 /** As apagadas a partir de um instante — `>=`, porque repetir um id não custa nada e perder custa. */
 export const apagadasDesde = (db, salaId, desde) =>
   db.prepare('SELECT id FROM mensagens WHERE sala_id = ? AND apagada_em >= ?')

@@ -33,6 +33,21 @@ export const quemCriou = (db, id) =>
 export const definirQuemCriou = (db, id, usuarioId) =>
   db.prepare('UPDATE servidores SET criado_por = ? WHERE id = ?').run(usuarioId, id);
 
+// --- a administração da Saga, que vê todos ----------------------------------
+
+/** O servidor com quem o criou ao lado: a administração mostra os dois juntos. */
+const COM_CRIADOR = `
+  SELECT s.*, u.apelido AS criador_apelido, u.foto AS criador_foto
+    FROM servidores s
+    LEFT JOIN usuarios u ON u.id = s.criado_por`;
+
+/** TODOS, inclusive os de que quem pergunta não faz parte. Por id: quem ordena para ler é a tela. */
+export const todos = (db) =>
+  db.prepare(`${COM_CRIADOR} ORDER BY s.id`).all();
+
+export const buscarComCriador = (db, id) =>
+  db.prepare(`${COM_CRIADOR} WHERE s.id = ?`).get(Number(id)) ?? null;
+
 /** Os servidores de que a pessoa faz parte, sem os que a baniram. */
 export const doUsuario = (db, usuarioId) =>
   db.prepare(`

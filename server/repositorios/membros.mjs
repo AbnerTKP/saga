@@ -48,6 +48,19 @@ export const temAlgumVinculo = (db, usuarioId) =>
 export const qualquerServidor = (db, usuarioId) =>
   db.prepare('SELECT servidor_id FROM membros WHERE usuario_id = ? LIMIT 1').get(usuarioId)?.servidor_id ?? null;
 
+/**
+ * Todos os vínculos da Saga, com o sinal de vida da conta — para a administração contar
+ * gente, banidos e quem está online sem perguntar servidor a servidor.
+ *
+ * Vem o `status` e o `visto_em` crus, e não "está online": essa regra é de `presenca.mjs`,
+ * e reescrevê-la aqui em SQL faria as duas contas divergirem no primeiro ajuste.
+ */
+export const vinculosComPresenca = (db) =>
+  db.prepare(`
+    SELECT m.servidor_id, m.usuario_id, m.banido_em, m.cargo_id, u.status, u.visto_em
+      FROM membros m
+      JOIN usuarios u ON u.id = m.usuario_id`).all();
+
 /** Se a pessoa já tem vínculo aqui, e se ele está banido. Para o convite decidir. */
 export const situacao = (db, servidorId, usuarioId) =>
   db.prepare('SELECT banido_em FROM membros WHERE servidor_id = ? AND usuario_id = ?')

@@ -18,6 +18,9 @@ export const listar = (db, servidorId) =>
 export const buscar = (db, servidorId, id) =>
   db.prepare(`${SELECT} WHERE s.servidor_id = ? AND s.id = ?`).get(servidorId, Number(id)) ?? null;
 
+export const quantos = (db, servidorId) =>
+  db.prepare('SELECT count(*) c FROM sons WHERE servidor_id = ?').get(servidorId).c;
+
 export const temONome = (db, servidorId, nome) =>
   !!db.prepare('SELECT 1 FROM sons WHERE servidor_id = ? AND nome = ? COLLATE NOCASE').get(servidorId, nome);
 

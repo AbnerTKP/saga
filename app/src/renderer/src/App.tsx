@@ -55,6 +55,7 @@ import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
+import { Administracao } from './components/Administracao';
 import { livesNasSalas, type LiveNoChat } from './lives';
 import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm, type Conhecidos } from './pessoas';
 import { podeApagarMensagem } from './apagar';
@@ -110,6 +111,8 @@ export function App() {
   const [convidando, setConvidando] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
   const [registro, setRegistro] = useState(false);
+  // A administração da Saga: todos os servidores e as contas. A porta só existe para o dono.
+  const [administracao, setAdministracao] = useState(false);
   // Qual aba abrir: quem clicou em "criar" não quer chegar na de convite.
   const [novoServidor, setNovoServidor] = useState<'criar' | 'entrar' | null>(null);
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
@@ -429,6 +432,7 @@ export function App() {
     setSalaAbertaId(null);
     setDevices(false);
     setPainel(false);
+    setAdministracao(false);
     setConvidando(false);
     setSoundboard(false);
     setPicker(false);
@@ -1142,8 +1146,17 @@ export function App() {
             onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
             onEu={atualizarEu}
             onRegistro={() => { setDevices(false); setRegistro(true); }}
-            // O Berserk dado pelo painel da Saga aparece na lista ao fechar, e não em 10 s.
-            onClose={() => { setDevices(false); recarregarServidor(); }}
+            onAdministracao={() => { setDevices(false); setAdministracao(true); }}
+            onClose={() => setDevices(false)}
+          />
+        )}
+        {/* Sem servidor não há trilha: a porta da administração, aqui, é o botão em "Sua conta". */}
+        {administracao && sessao.eu?.donoDaSaga && (
+          <Administracao
+            meuId={sessao.eu.id}
+            onAbrirServidor={(id) => { setAdministracao(false); trocarDeServidor(id); }}
+            // O Berserk dado na aba Contas aparece na lista ao fechar, e não em 10 s.
+            onClose={() => { setAdministracao(false); recarregarServidor(); }}
           />
         )}
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
@@ -1327,7 +1340,25 @@ export function App() {
           onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
           onEu={atualizarEu}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
+          onAdministracao={() => { setDevices(false); setAdministracao(true); }}
           onClose={() => setDevices(false)}
+        />
+      )}
+      {/* Só para o dono, conferido AQUI e não só na porta: o estado `administracao` é do App,
+          que não remonta ao trocar de conta. Sem isto, a sessão que caía com a administração
+          aberta a deixava aberta para a próxima conta que entrasse naquela janela. */}
+      {administracao && eu.donoDaSaga && (
+        <Administracao
+          meuId={eu.id}
+          // Abre no servidor de onde se veio, e não no primeiro em ordem alfabética.
+          inicial={servidor.id}
+          // "Abrir" o servidor que já está aberto não troca: trocar para ele mesmo relê a
+          // sessão, e isso fecha a sala que se estava lendo. Mas recarrega, como o fechar —
+          // senão o Berserk dado na aba Contas levaria 10 s para aparecer na lista. E sai do
+          // modo conversas, como o clique na trilha: é o servidor que se está abrindo.
+          onAbrirServidor={(id) => { setAdministracao(false); setModoConversas(false); if (id !== servidor.id) trocarDeServidor(id); else recarregarServidor(); }}
+          // O Berserk dado na aba Contas aparece na lista da direita ao fechar, e não em 10 s.
+          onClose={() => { setAdministracao(false); recarregarServidor(); }}
         />
       )}
       {painel && (
@@ -1384,6 +1415,8 @@ export function App() {
         // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
         onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
         onConfigurar={() => setNovoServidor('entrar')}
+        // Só o dono da Saga recebe a porta; para os outros ela não existe.
+        onAdministracao={eu.donoDaSaga ? () => setAdministracao(true) : undefined}
       />
 
       {menu && (

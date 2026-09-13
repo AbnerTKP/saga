@@ -25,7 +25,7 @@ import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import { criarGrids } from './corridas.mjs';
 import * as servidoresM from './servidores.mjs';
-import { verParticipante } from './participantes.mjs';
+import { verParticipante, salaNoLiveKit, emCallPorSalaDe } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
 import * as tabelaDeUsuarios from './repositorios/usuarios.mjs';
 import * as tabelaDeMembros from './repositorios/membros.mjs';
@@ -85,9 +85,8 @@ const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INI
 // moderação encontra a pessoa dentro da sala.
 const identidadeDe = (usuarioId) => `u${usuarioId}`;
 
-// A sala do LiveKit é identificada pelo id, não pelo nome: dois servidores com uma sala
-// "Geral" cairiam na mesma conversa se fosse pelo nome.
-const salaNoLiveKit = (sala) => `sala-${sala.id}`;
+// O nome da sala no LiveKit (`salaNoLiveKit`) e o caminho de volta moram em participantes.mjs,
+// onde têm teste — daqui, que sobe o servidor ao ser importado, não teriam.
 const idDaIdentidade = (identity) => Number(String(identity).replace(/^u/, '')) || null;
 
 const CORS = {
@@ -816,6 +815,42 @@ const ROTAS = {
     const emitido = plataforma.emitirRecuperacao(db, eu.id, alvo, senha);
     console.log(`recuperação: código emitido para ${emitido.conta.apelido} por ${eu.apelido}`);
     return emitido;
+  },
+
+  /**
+   * A administração: todos os servidores da Saga, inclusive os de que o dono não faz parte.
+   *
+   * Sem `exigirMembro` e sem `x-servidor`: o dono da Saga pode não estar em servidor
+   * nenhum. E o dono é conferido ANTES de ir ao LiveKit — quem não é dono não põe este
+   * processo para perguntar nada lá, e o 403 não depende de o LiveKit estar de pé.
+   */
+  'GET /saga/servidores': async (req) => {
+    const eu = exigirConta(req);
+    plataforma.exigirDonoDaSaga(db, eu.id);
+    const vivas = await salasVivas();
+    return { servidores: plataforma.listarServidores(db, eu.id, { emCallPorSala: emCallPorSalaDe(vivas) }) };
+  },
+
+  'GET /saga/servidor': async (req) => {
+    const eu = exigirConta(req);
+    plataforma.exigirDonoDaSaga(db, eu.id);
+    const vivas = await salasVivas();
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    const detalhe = plataforma.verServidorDaSaga(db, eu.id, id, { emCallPorSala: emCallPorSalaDe(vivas) });
+    return {
+      servidor: {
+        ...detalhe,
+        // Quem está em cada call e as pessoas entram aqui, e não em plataforma.mjs, porque
+        // `participantesDaSala` e `verMembro` moram aqui — e são os MESMOS do /rooms e do
+        // /servidor: a pessoa não pode ter um formato em cada tela.
+        salas: await Promise.all(detalhe.salas.map(async (s) => ({
+          ...s,
+          naCall: s.tipo === 'voz' ? await participantesDaSala(detalhe.id, s, vivas) : [],
+        }))),
+        // Os banidos vêm junto: a tela os separa, e a seção deles precisa de quem baniu e quando.
+        membros: membros.listarMembros(db, detalhe.id).map(verMembro),
+      },
+    };
   },
 
   'POST /categorias/ordem': async (req) => {

@@ -11,7 +11,6 @@ import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocoDoMicrofone } from './AjustesDoMicrofone';
 import type { MicrofoneDaCall } from '../useMicrofone';
-import { BlocosDaSaga } from './PainelDaSaga';
 import type { AberturaComOSistema } from '../desktop';
 import { useFecharComEsc } from '../useFechar';
 import { atalhoDoEvento, comoSeLe } from '../atalho';
@@ -94,7 +93,7 @@ function AtalhoDoOverlay() {
  * agora é isso e o resto de você.
  */
 export function PainelDaConta({
-  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onClose,
+  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onAdministracao, onClose,
 }: {
   eu: Membro;
   room: Room;
@@ -111,13 +110,15 @@ export function PainelDaConta({
   servidorNome?: string | null;
   /** 1080p e 60 quadros são do Berserk; sem ele, só 720p a 30. */
   souBerserk: boolean;
-  /** Só o dono da Saga vê o que vale em todos os servidores. */
+  /** Só o dono da Saga vê a porta da administração. */
   donoDaSaga: boolean;
   /** Quanto alto os sons do soundboard chegam AQUI — os seus e os dos outros. */
   volumeDoSoundboard: number;
   onVolumeDoSoundboard: (v: number) => void;
   onEu: (m: Membro) => void;
   onRegistro: () => void;
+  /** Quem chamou fecha a conta e abre a administração: dois painéis empilhados seriam dois Esc. */
+  onAdministracao: () => void;
   onClose: () => void;
 }) {
   // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
@@ -374,7 +375,23 @@ export function PainelDaConta({
             <AtalhoDoOverlay />
           </section>
 
-          {donoDaSaga && <BlocosDaSaga meuId={eu.id} />}
+          {/* O Berserk e o código de senha moravam aqui e foram para a aba Contas da
+              administração, junto dos servidores todos: é lá que o dono olha a Saga inteira.
+              Aqui fica a porta — e ela importa, porque quem não está em servidor nenhum não tem
+              trilha onde achar a outra. A frase diz o que mudou de lugar: o dono aprendeu a gerar
+              o código de senha aqui. */}
+          {donoDaSaga && (
+            <section className="painel-bloco">
+              <h3>Administração da Saga</h3>
+              <p className="muted small">
+                Todos os servidores e as contas — o Berserk e o código de senha — num lugar só.
+                Também abre pelo quadrado da grade na trilha.
+              </p>
+              <div className="linha-campo">
+                <button type="button" onClick={onAdministracao}>Abrir a administração</button>
+              </div>
+            </section>
+          )}
 
           <section className="painel-bloco">
             <h3>Quando alguma coisa der errado</h3>

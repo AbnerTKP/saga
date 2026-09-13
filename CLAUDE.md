@@ -1592,10 +1592,44 @@ a gente não conhece.
   microfone, câmera, registro de erros) e o servidor se configura pelo nome dele, no topo,
   ou pelo botão direito no quadrado à direita. Botão direito noutro servidor troca ANTES
   de abrir: o painel lê o servidor da sessão ao montar.
-- **O painel da Saga é um bloco de "Sua conta", não uma janela.** Morava numa janela
-  própria escondida no menu de status, e o dono teve de perguntar onde ficava. Menu de
-  status não é lugar de painel de administração; a engrenagem é o que existe acima dos
-  servidores, que é exatamente o que o Berserk é.
+- **A administração da Saga abre por uma porta na trilha que só o dono vê.** O painel da
+  Saga já morou numa janela escondida no menu de status, e o dono teve de perguntar onde
+  ficava; depois virou um bloco de "Sua conta", apertado para uma lista de servidores e que
+  apertaria mais quando chegar o gerenciar. Hoje é um quadrado com a grade abaixo do "+" —
+  contorno cheio, porque o tracejado do "+" quer dizer juntar — e um botão em "Sua conta",
+  que é a porta de quem não tem trilha (a tela inicial). O Berserk e o código de senha foram
+  junto, para a aba Contas. Essa aba fica MONTADA, com `hidden`, e não num ternário:
+  desmontada, levava embora o código de senha recém-gerado, que aparece uma vez só. E ela
+  só se desenha para o dono, conferido no próprio `App`, e é esquecida em `esquecerAConta`:
+  o `App` não remonta ao trocar de conta, e a administração aberta passaria para a próxima.
+- **A administração mostra como os servidores estão MONTADOS, nunca a conversa.** Decisão do
+  dono em 11/09/2026: o dono da Saga vê todos os servidores, inclusive os de que não faz
+  parte — pessoas, cargos, salas (as privadas também, com cadeado e quem vê), quem está em
+  call e QUANTAS mensagens —, mas texto, imagem e anexo não saem das rotas, e o código de
+  convite também não: código é chave de porta, e ver não é entrar. A conversa privada entre
+  amigos não é de servidor nenhum e fica fora de toda conta. `plataforma.test.mjs` tranca as
+  três — o texto, o código e a conversa privada —, e `api.test.mjs` tranca o texto e o código
+  na rota do detalhe, procurando os dois no JSON inteiro; imagem e anexo não saem porque as
+  leituras da administração nem pedem essas colunas. A
+  conta do servidor ignora a sala de notas — senão uma nota de versão faria o servidor de
+  casa parecer ativo —, e os números da lista e do detalhe saem de uma função só
+  (`resumoDoServidor`). Hoje é só ver; a tela é de linhas e seções para os botões de
+  gerenciar caberem depois sem refazê-la.
+- **Na administração, busca que recebe 401, 403 ou 404 para de repetir.** São respostas que
+  não passam sozinhas, e cada falha vira uma linha no registro de erros, que é feito para
+  circular no grupo. Medido com o app novo contra o servidor da v0.44.0, que não tem as
+  rotas: 2 linhas em 25 s — a segunda é o StrictMode do desenvolvimento montando o efeito
+  duas vezes —, contra 4 com a busca repetindo, e a tela dizendo que "ela chega quando o
+  servidor for publicado". **App novo com servidor antigo não tem administração**: os dois
+  sobem juntos. A lista é por nome, estável, porque se atualiza de 10 em 10 s e ordenar por
+  atividade faria as linhas pularem debaixo do mouse; ela abre no servidor aberto no app, e
+  o escolhido que a busca esconde continua na lista, marcado "fora da busca".
+- **O nome da sala no LiveKit mora em `participantes.mjs`, onde tem teste.** A administração
+  soma quem está em call pelo caminho de volta (`sala-12` → 12), e a ida (`salaNoLiveKit`)
+  morava em `index.mjs`, que sobe o servidor ao ser importado — ali nenhuma das duas teria
+  teste. Como o api.test aponta o LiveKit para uma porta morta, uma volta que devolvesse
+  sempre null deixaria "Em call" em 0 em todo servidor com a suíte inteira verde: medido
+  numa cópia, com as duas ainda em `index.mjs`.
 - **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas
   fontes têm relógios diferentes — a busca anda de 4 em 4 segundos e ainda espera o
   LiveKit esquecer quem saiu —, e trocar de sala me punha nas DUAS até ela alcançar. Sobre
@@ -1743,7 +1777,8 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   por HTTP contra o servidor de verdade (`api.test.mjs`), as regras em `contas.test.mjs`,
   cada garantia quebrada de propósito numa cópia até um teste falhar, e as telas com os
   componentes reais e o `styles.css`, só que com `fetch` e ponte falsos. Não foi
-  exercido: gerar o código em "Sua conta", no bloco "Berserk e senha"; copiar pela ponte do
+  exercido: gerar o código no bloco "Berserk e senha" — que hoje mora na aba Contas da
+  administração da Saga, e não mais em "Sua conta", onde o dono aprovou as telas; copiar pela ponte do
   processo principal (`log:copiar`); usar o código noutra máquina e já entrar; ver a outra
   sessão cair e sair da call; a tela inicial sem servidor voltando ao login pelo sinal de
   vida; outra conta entrando depois naquele computador sem nada da anterior na tela, nem
@@ -1870,3 +1905,11 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   da regra), o convite no canto, os sons de ouvido, uma corrida com oito carros e máquina fraca
   ou Windows. App novo com servidor antigo corre sempre em Interlagos, com a escolha da pista
   apagada; app antigo e novo na mesma corrida veriam pistas diferentes.
+- **A administração da Saga com gente de verdade em call, e contra a produção.** O que está
+  medido, na janela escondida contra um servidor local num cenário parecido com a produção
+  (CORNUME e CARDUME, banido, sala privada com e sem cargo, sala de notas), é a tela
+  inteira: a porta só para o dono, a lista e o detalhe, a busca, a aba Contas, a janela de
+  900 px, e nenhum texto de mensagem na resposta nem na tela. "Em call" e "Em call agora"
+  vieram de um LiveKit FALSO — as respostas de `ListRooms` e `ListParticipants` escritas à
+  mão —, e não do LiveKit da produção. **Não foram exercidos**: a administração contra o
+  servidor e o LiveKit de produção, com as pessoas de verdade, e o Windows.
