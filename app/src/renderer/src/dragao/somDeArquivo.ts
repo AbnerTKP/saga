@@ -5,9 +5,9 @@
  *
  * Tocam por `<audio>`, e não pela Web Audio: a página vem de `file://`, e buscar o arquivo para
  * decodificar esbarraria no esquema. Os níveis foram acertados no próprio arquivo: estouro da
- * transformação a -14 LUFS, disparos a -15, soco e chute com pico a -4 dB e média perto de -16,
- * carga, teletransporte e rajada mais baixos, porque tocam o tempo todo. Soco e chute têm várias
- * gravações e se revezam: o mesmo estalo dez vezes seguidas cansa o ouvido.
+ * transformação a -14 LUFS, disparos a -15, soco e chute com média perto de -16,5, defesa a -19,
+ * a aura de carregar ki a -21 (em laço, por baixo da luta). Soco, chute e defesa têm várias
+ * gravações e são sorteadas: o mesmo estalo dez vezes seguidas cansa o ouvido.
  */
 import grito from './sons/grito.ogg';
 import transformacao from './sons/transformacao.ogg';
@@ -23,6 +23,20 @@ import soco3 from './sons/soco-3.ogg';
 import soco4 from './sons/soco-4.ogg';
 import chute1 from './sons/chute-1.ogg';
 import chute2 from './sons/chute-2.ogg';
+import soco5 from './sons/soco-5.ogg';
+import soco6 from './sons/soco-6.ogg';
+import soco7 from './sons/soco-7.ogg';
+import soco8 from './sons/soco-8.ogg';
+import soco9 from './sons/soco-9.ogg';
+import chute3 from './sons/chute-3.ogg';
+import chute4 from './sons/chute-4.ogg';
+import chute5 from './sons/chute-5.ogg';
+import defesa1 from './sons/defesa-1.ogg';
+import defesa2 from './sons/defesa-2.ogg';
+import defesa3 from './sons/defesa-3.ogg';
+import defesa4 from './sons/defesa-4.ogg';
+import forte1 from './sons/forte-1.ogg';
+import auraKi from './sons/aura-ki.ogg';
 import rajada1 from './sons/rajada-1.ogg';
 import rajada2 from './sons/rajada-2.ogg';
 import type { SomGravado } from './ouvidos.ts';
@@ -32,8 +46,16 @@ const ARQUIVOS: Record<SomGravado, string[]> = {
   grito: [grito], transformacao: [transformacao], teletransporte: [teletransporte],
   'raio-carga': [raioCarga], 'raio-disparo': [raioDisparo],
   'dedo-carga': [dedoCarga], 'dedo-picole': [dedoPicole], 'dedo-geladeira': [dedoGeladeira],
-  'golpe-soco': [soco1, soco2, soco3, soco4], 'golpe-chute': [chute1, chute2], 'disparo-ki': [rajada1, rajada2],
+  'golpe-soco': [soco1, soco2, soco3, soco4, soco5, soco6, soco7, soco8, soco9],
+  'golpe-chute': [chute1, chute2, chute3, chute4, chute5],
+  'golpe-defesa': [defesa1, defesa2, defesa3, defesa4],
+  'golpe-forte': [forte1],
+  'disparo-ki': [rajada1, rajada2],
+  'aura-ki': [auraKi],
 };
+
+/** Os que tocam em laço enquanto a ação dura (a aura de quem carrega ki). */
+const EM_LACO = new Set<SomGravado>(['aura-ki']);
 
 export const ehGravado = (som: string): som is SomGravado => som in ARQUIVOS;
 
@@ -50,10 +72,15 @@ export function criarSonsGravados(volumeInicial = 1) {
     tocar(som: SomGravado, chave?: string) {
       if (volume <= 0) return;
       const lista = ARQUIVOS[som];
-      const i = (vez.get(som) ?? 0) % lista.length;
-      vez.set(som, i + 1);
+      // sorteio sem repetir o anterior: com nove socos, ninguém percebe a ordem, e dois iguais
+      // seguidos é justamente o que se percebe
+      const anterior = vez.get(som) ?? -1;
+      let i = Math.floor(Math.random() * lista.length);
+      if (lista.length > 1 && i === anterior) i = (i + 1) % lista.length;
+      vez.set(som, i);
       const audio = new Audio(lista[i]);
       audio.volume = volume;
+      audio.loop = EM_LACO.has(som);
       if (chave) { longos.get(chave)?.pause(); longos.set(chave, audio); }
       audio.play().catch((e) => anotar('erro', 'som', `o som "${som}" da luta não tocou: ${(e as Error)?.message ?? e}`));
     },

@@ -1572,14 +1572,37 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   contra jogador** — "esqueça a IA do computador" — e mandou terminar e publicar sem depender
   dele. Controles simples, a arena no molde do grid da Fórmula 1 e o convite no mesmo cartão
   foram decisões tomadas por padrão da casa, não escolhidas por ele.
-- **A arte não é desenhada pixel a pixel: é um esqueleto rasterizado** (`boneco.ts`,
-  `raster.ts`). Cada lutador é o mesmo boneco com proporção, roupa e cabeça próprias; cada
-  peça vira máscara com contorno de 1 px por fora (vizinhança de QUATRO — a de oito engrossa
-  a diagonal e denuncia desenho de programa) e faixa de sombra do lado oposto à luz. É o que
-  deixa quatro lutadores com dezenas de poses caberem em código. A tela é 384x216 ampliada sem
-  suavizar; o sprite é desenhado uma vez por pose e guardado (`animacoes.ts`). As poses de
-  golpe são escritas na medida do Goiaba e esticadas para o corpo de cada um; o tempo de cada
-  pose sai das fichas, então mexer no início de um soco move a pose junto.
+- **Os lutadores são o sprite do zip, pixel a pixel** (`dragao/pixel/`). O dono mandou um Goku
+  32x32 feito numa ferramenta de pixel art e, depois de ver o estilo imitado, corrigiu: *"eu
+  queria literalmente que você utilizasse o modelo do zip"*, e que os outros fossem gerados a
+  partir do Goku parado. O Goiaba parado É o zip (o teste confere pixel por pixel); as poses de
+  luta saem de PEÇAS recortadas dele (cabeça, tronco, pernas), mexidas de pixel em pixel, e de
+  CARIMBOS de braço e perna pintados nas mesmas letras e paleta (`carimbos.ts`, `poses.ts`).
+  Cada pixel carrega o seu MATERIAL — pele, cabelo, camisa, manga, mão, faixa, calça, bota,
+  sola —, e é isso que faz os outros três: vestem o corpo do Goiaba trocando a rampa de cada
+  material pelo brilho (`vestirPecas`), então o salpicado do zip continua, só que azul, roxo ou
+  branco, e trazem cabeças e enfeites próprios (armadura, capa, rabo) num arquivo cada, que se
+  registra ao ser importado (`registrarPixel`; `todos.ts` importa os três). A arte de 48x40 é
+  ampliada 3x sem suavizar, com o pé na âncora do sprite de antes, e o resto do jogo não sabe a
+  diferença. **O boneco de esqueleto continua no código como reserva** (`boneco.ts`,
+  `raster.ts`, `personagens/`): lutador sem pixel cai nele sem erro nenhum — por isso o teste
+  exige pixel dos quatro. A tela é 384x216 ampliada sem suavizar; o sprite é montado uma vez por
+  pose e guardado (`animacoes.ts`), e o tempo de cada pose sai das fichas. **Saiu cru, com pressa
+  pedida pelo dono**: a capa do Picolé pendurada é um bloco branco, o cabelo do Vegetal é quadrado
+  demais e a forma dourada dele não tem a chama mais alta, a Geladeira não tem as placas do peito,
+  e as caras de grito e dor dos três são as do Goiaba mal adaptadas.
+- **A segunda cor (Goiaba contra Goiaba) gira a roupa pelo MATERIAL, não pela cor.** Pela cor,
+  o cabelo escuro do zip tem matiz o bastante para girar, e o Goiaba do espelho saía de cabelo
+  verde — visto na imagem de uma luta de verdade. Pele, cabelo, olho e o que usa a rampa da pele
+  (o braço do Picolé) ficam.
+- **As caixas de golpe e a altura dos disparos saem do sprite de pixel** (`GOLPES_BASE`, em
+  `fichas.ts`; `PROTOCOLO` 4). As do boneco eram de perna e braço compridos: medido, o punho do
+  zip esticado vai 37 px à frente do pé e o pé do chute também, e a caixa do chute ia a 60 — o
+  chute acertava 20 px antes de encostar. O raio saía na altura do rosto (57 px), com as mãos a
+  40–51. Hoje o soco acerta até 56 px entre os centros e o chute até 58 (o corpo de quem apanha
+  tem uns 20 px do centro à frente), e simulado nos quatro lutadores as duas sequências
+  continuam encadeando até o fim. O Picolé segue com 22% a mais de alcance e a rasteira da
+  Geladeira com o rabo — são o jeito de cada um, não o desenho.
 - **A simulação é inteira e determinística** (`luta.ts`, contra o contrato de `tipos.ts` e
   as fichas de `fichas.ts`): posição em 1/64 de pixel, nada de `Math.random`, relógio ou
   vírgula acumulada, e o estado é objeto simples que `clonar` copia campo a campo. O que o
@@ -1628,14 +1651,12 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   arame preto em volta de cada pedaço era o que dava cara de recorte. Quem sabe o que é contorno
   de FORA é o `bordas` do sprite (e não "é quase preto"), porque os contornos são coloridos: sem
   isso, a silhueta abria onde duas peças se encontram.
-- **O estilo dos lutadores é o do Goku que o dono mandou num zip** (32x32, feito por ferramenta
-  de pixel art): proporção chibi, com a cabeça em ~40% da altura, olho grande de anime, nenhum
-  contorno preto (cada material se contorna com um tom fundo dele mesmo) e sombra de matiz
-  deslocado com `pontilhado` (a passagem em xadrez de 1 px). A arte de antes — heróica, 1,5× e
-  refinada, a da v0.54.0 — está guardada na tag **`arte-esqueleto-v0.54`**, porque ele pediu
-  para poder voltar. As poses de golpe continuam sendo escritas na medida do Goiaba e esticadas
-  pelo tronco, braço e perna de cada um: mexer nessas três medidas do Goiaba muda o gesto dos
-  outros três.
+- **"No estilo do zip" foi lido primeiro como IMITAR o estilo, e não era.** A v0.55.0 saiu com o
+  boneco de esqueleto redesenhado à maneira do zip — chibi, olho grande, contorno colorido,
+  sombra pontilhada — e o dono cobrou o modelo em si. Esse boneco chibi é o que ficou de reserva
+  em `personagens/`; a arte de antes dele — heróica, 1,5× e refinada, a da v0.54.0 — está na tag
+  **`arte-esqueleto-v0.54`**, porque ele pediu para poder voltar. Quando alguém manda um arquivo
+  de referência, perguntar se é para PARECER com ele ou para SER ele custa uma linha.
 - **A transformação é da luta, não de vitrine** (`TRANSFORMACAO`, em `fichas.ts`): tecla P,
   precisa de uma barra e meia de ki e gasta meia; o grito dura 1,1 s e é **invulnerável**.
   Nasceu com 2,5 s e interrompível ("gritar na cara do outro é risco"), e o dono achou demorado:
@@ -1653,7 +1674,15 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   arquivo para decodificar. **Soco, chute e rajada de ki** também são gravações dele, com
   variações que se revezam (quatro socos e dois chutes tirados dos arquivos, duas rajadas tiradas
   do começo de dois trechos de um disparo contínuo, que não tinha disparo isolado dentro);
-  o golpe forte leva junto o baque grave sintetizado, que dá o peso.
+  o golpe forte leva junto o baque grave sintetizado, que dá o peso. Depois veio um pacote de
+  40 sons de luta num arquivo só: separado por silêncio e, sem ouvir, classificado pelas medidas
+  — soco é curto e de ataque seco (pico nos primeiros 70 ms), chute é mais longo e com mais
+  grave, defesa é o estalo mais claro (menos grave em relação ao total). Deu mais cinco socos,
+  três chutes, quatro defesas (a defesa era um estalo sintetizado que ninguém ouvia) e um golpe
+  forte, sorteados sem repetir o anterior e igualados pela média (-16,5 dB; defesa -19). **Se
+  alguma classificação estiver errada é de ouvido, e é do dono.** A aura de carregar ki é o
+  mesmo arquivo do estouro da transformação (md5 igual): o estouro usa o começo, a aura usa o
+  zumbido com raios de 1,8 s a 9,3 s, em laço enquanto a tecla está segurada.
 - **O volume do jogo mora na arena, com um "Testar"** que toca soco, chute, rajada e raio no
   volume escolhido — foi o pedido: regular e ouvir antes de entrar na luta. Vale para os
   gravados e os sintetizados, muda também o que já está tocando, e fica no computador
@@ -1919,7 +1948,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (460) + app (388), segundos, sem nada externo
+pnpm test        # servidor (460) + app (395), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

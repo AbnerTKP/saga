@@ -13,13 +13,15 @@
 import { SPRITE, sprite, type Membro, type Personagem, type Pose } from './boneco.ts';
 import { FICHAS, ehGolpeDeCorpo } from './fichas.ts';
 import { faseDoGolpe } from './luta.ts';
-import { canais, criarQuadro, deCanais, type Quadro } from './quadro.ts';
+import { criarQuadro, girarMatiz, matizELuz, type Quadro } from './quadro.ts';
 import type { P } from './raster.ts';
 import type { EstadoDaLuta, IdDoLutador, Lutador } from './tipos.ts';
 import * as goiabaM from './personagens/goiaba.ts';
 import * as vegetalM from './personagens/vegetal.ts';
 import * as picoleM from './personagens/picole.ts';
 import * as geladeiraM from './personagens/geladeira.ts';
+import { quadroDoPixel } from './pixel/sprites.ts';
+import './pixel/todos.ts';
 
 type Vitrine = { parado: Pose; especial: Pose; vitoria: Pose };
 const PERSONAGENS: Record<IdDoLutador, { p: Personagem; vitrine: Vitrine; disparo?: Pose }> = {
@@ -184,6 +186,12 @@ export function poseAgora(l: Lutador, e: EstadoDaLuta): Quadro_ {
 const VAZIO = criarQuadro(SPRITE.largura, SPRITE.altura);
 const guardados = new Map<string, Quadro>();
 
+/**
+ * O sprite é o de pixel (o modelo do zip) sempre que o lutador tiver um; o boneco de esqueleto fica
+ * de reserva para quem não tiver. O de pixel já vem na segunda cor, pintada pelo MATERIAL — aqui,
+ * pela cor, o cabelo escuro do zip tem matiz o bastante para girar e o Goiaba do espelho saía de
+ * cabelo verde.
+ */
 export function spriteDoLutador(l: Lutador, e: EstadoDaLuta): Quadro {
   const { chave, pose } = poseAgora(l, e);
   if (!pose) return VAZIO;
@@ -191,12 +199,18 @@ export function spriteDoLutador(l: Lutador, e: EstadoDaLuta): Quadro {
   const k = `${l.id}:${l.cor}:${forma}:${chave}`;
   let s = guardados.get(k);
   if (!s) {
-    s = sprite(PERSONAGENS[l.id].p, { ...pose, forma });
-    if (l.cor === 1) segundaCor(s);
+    s = quadroDoPixel(l.id, forma, chave, l.cor) ?? undefined;
+    if (!s) {
+      s = sprite(PERSONAGENS[l.id].p, { ...pose, forma });
+      if (l.cor === 1) segundaCor(s);
+    }
     guardados.set(k, s);
   }
   return s;
 }
+
+/** O lutador parado, de corpo inteiro, para a vitrine da escolha. */
+export const spriteParado = (id: IdDoLutador): Quadro => quadroDoPixel(id, 0, 'parado0') ?? sprite(PERSONAGENS[id].p, PERSONAGENS[id].vitrine.parado);
 
 /**
  * Desenha de antemão as poses que a luta usa, para o primeiro soco de cada um não engasgar o
@@ -239,20 +253,7 @@ function segundaCor(s: Quadro) {
 }
 
 function girar(c: number): number {
-  const [r, g, b] = canais(c);
-  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
-  const l = (max + min) / 2;
-  const d = max - min;
-  if (d < 0.18) return c; // cinza, branco, preto e contorno ficam
-  const s = d / (1 - Math.abs(2 * l - 1));
-  let h = max === r / 255 ? ((g - b) / 255 / d) % 6 : max === g / 255 ? (b - r) / 255 / d + 2 : (r - g) / 255 / d + 4;
-  h *= 60;
-  if (h < 0) h += 360;
+  const [h, l] = matizELuz(c);
   if (h >= 12 && h <= 45 && l > 0.55) return c; // pele
-  const h2 = (h + 150) % 360;
-  const cc = (1 - Math.abs(2 * l - 1)) * Math.min(1, s);
-  const x = cc * (1 - Math.abs(((h2 / 60) % 2) - 1));
-  const m = l - cc / 2;
-  const [r1, g1, b1] = h2 < 60 ? [cc, x, 0] : h2 < 120 ? [x, cc, 0] : h2 < 180 ? [0, cc, x] : h2 < 240 ? [0, x, cc] : h2 < 300 ? [x, 0, cc] : [cc, 0, x];
-  return deCanais(Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255));
+  return girarMatiz(c, 150);
 }

@@ -13,7 +13,7 @@ import { TELA } from './medidas.ts';
 import { SUB, type EstadoDaLuta } from './tipos.ts';
 
 export type SomGravado = 'grito' | 'transformacao' | 'teletransporte' | 'raio-carga' | 'raio-disparo' | 'dedo-carga' | 'dedo-picole' | 'dedo-geladeira'
-  | 'golpe-soco' | 'golpe-chute' | 'disparo-ki';
+  | 'golpe-soco' | 'golpe-chute' | 'golpe-defesa' | 'golpe-forte' | 'disparo-ki' | 'aura-ki';
 
 export type Toque = { som: SomDaLuta | SomGravado; pan: number; /** quem pode ser calado depois */ chave?: string };
 
@@ -31,20 +31,20 @@ export function sonsNovos(e: EstadoDaLuta, vistos: Set<string>): Toque[] & { cal
   e.lutadores.forEach((l, i) => {
     const outro = e.lutadores[1 - i];
     if (l.impactoTipo && e.quadro - l.impactoEm < 4) {
-      // Golpe que entrou é a gravação de soco ou de chute (pelo que o outro está fazendo); o forte
-      // leva junto o baque grave sintetizado, que dá o peso; defendido é o estalo seco de sempre.
+      // Golpe que entrou é uma gravação de soco ou de chute (pelo que o outro está fazendo), o
+      // forte tem a sua, e o defendido também — antes era um estalo sintetizado que ninguém ouvia.
       const chute = outro.acao.startsWith('chute') || outro.acao === 'rasteira';
-      if (l.impactoTipo === 3) novo(`i${i}:${l.impactoEm}`, 'defesa', pan(l.x));
-      else {
-        novo(`i${i}:${l.impactoEm}`, chute ? 'golpe-chute' : 'golpe-soco', pan(l.x));
-        if (l.impactoTipo === 2) novo(`I${i}:${l.impactoEm}`, 'forte', pan(l.x));
-      }
+      const som: SomGravado = l.impactoTipo === 3 ? 'golpe-defesa' : l.impactoTipo === 2 ? 'golpe-forte' : chute ? 'golpe-chute' : 'golpe-soco';
+      novo(`i${i}:${l.impactoEm}`, som, pan(l.x));
     }
     const comeco = e.quadro - l.quadro;
     if (l.acao === 'sumindo' && l.quadro < 3) novo(`s${i}:${comeco}`, 'teletransporte', pan(l.x));
     // O grito vale enquanto ele grita: começou a gritar, toca; parou (virou, ou apanhou), cala.
     if (l.acao === 'transformando') novo(`t${i}:${comeco}`, 'grito', pan(l.x), `grito${i}`);
     else calar.push(`grito${i}`);
+    // A aura com raios enquanto segura o carregar; soltou, cala.
+    if (l.acao === 'carregando') novo(`a${i}:${comeco}`, 'aura-ki', pan(l.x), `aura${i}`);
+    else calar.push(`aura${i}`);
     if (l.forma === 1 && e.quadro - l.formaDesde < 8) novo(`f${i}:${l.formaDesde}`, 'transformacao', pan(l.x));
     // A carga do raio: mãos para trás no Goiaba e no Vegetal, dedos na testa no Picolé. O Raio
     // Congelante da Geladeira sai quase na hora: não tem carga para ouvir.

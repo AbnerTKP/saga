@@ -35,6 +35,33 @@ export const canais = (c: Cor): [number, number, number, number] =>
 export const deCanais = (r: number, g: number, b: number, a = 255): Cor =>
   ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 
+/** O matiz de uma cor e a luz dela (0 a 1), para quem decide o que gira. Cinza tem matiz -1. */
+export function matizELuz(c: Cor): [matiz: number, luz: number] {
+  const [r, g, b] = canais(c);
+  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+  const d = max - min;
+  const l = (max + min) / 2;
+  if (d < 0.18) return [-1, l];
+  let h = max === r / 255 ? ((g - b) / 255 / d) % 6 : max === g / 255 ? (b - r) / 255 / d + 2 : (r - g) / 255 / d + 4;
+  h *= 60;
+  return [h < 0 ? h + 360 : h, l];
+}
+
+/** Gira o matiz mantendo luz e saturação; cinza, branco, preto e contorno ficam como estão. */
+export function girarMatiz(c: Cor, graus: number): Cor {
+  const [h, l] = matizELuz(c);
+  if (h < 0) return c;
+  const [r, g, b] = canais(c);
+  const d = (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h2 = (h + graus) % 360;
+  const cc = (1 - Math.abs(2 * l - 1)) * Math.min(1, s);
+  const x = cc * (1 - Math.abs(((h2 / 60) % 2) - 1));
+  const m = l - cc / 2;
+  const [r1, g1, b1] = h2 < 60 ? [cc, x, 0] : h2 < 120 ? [x, cc, 0] : h2 < 180 ? [0, cc, x] : h2 < 240 ? [0, x, cc] : h2 < 300 ? [x, 0, cc] : [cc, 0, x];
+  return deCanais(Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255));
+}
+
 /** Mistura duas cores opacas: `t` 0 é `a`, 1 é `b`. */
 export function misturar(a: Cor, b: Cor, t: number): Cor {
   const [ar, ag, ab] = canais(a);

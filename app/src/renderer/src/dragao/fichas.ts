@@ -124,17 +124,22 @@ export const ESCALA_DO_COMBO = [100, 90, 80, 70, 60, 50];
 export const DANO_NA_DEFESA = 4;
 export const TEMPO_DO_ROUND = 99;
 
-/** Os golpes de mão e pé do Goiaba, que servem de régua para os outros. */
+/**
+ * Os golpes de mão e pé do Goiaba, que servem de régua para os outros. As caixas saem do sprite de
+ * pixel (3 pixels da tela por pixel do zip, divididos pela `ESCALA`): o punho esticado vai 12
+ * pixels do zip à frente do pé, a uns 13 de altura, e o pé do chute, 12 à frente e baixo. Com as
+ * caixas do boneco antigo, que tinha perna comprida, o chute acertava 20 pixels antes de encostar.
+ */
 const GOLPES_BASE: Ficha['golpes'] = {
-  soco1: { inicio: 4, ativo: 3, volta: 8, dano: 35, atordoa: 15, defendido: 9, altura: 'medio', caixa: [8, 34, 30, 46], empurra: 1.6, encadeia: 'soco2' },
-  soco2: { inicio: 5, ativo: 3, volta: 10, dano: 40, atordoa: 16, defendido: 10, altura: 'medio', caixa: [8, 32, 32, 46], empurra: 1.8, encadeia: 'soco3', avanca: 1 },
-  soco3: { inicio: 8, ativo: 4, volta: 18, dano: 65, atordoa: 0, defendido: 14, altura: 'medio', caixa: [10, 28, 36, 48], empurra: 4, derruba: true, forte: true, avanca: 1.5 },
-  chute1: { inicio: 6, ativo: 4, volta: 13, dano: 50, atordoa: 17, defendido: 11, altura: 'medio', caixa: [10, 18, 40, 34], empurra: 2.2, encadeia: 'chute2' },
-  chute2: { inicio: 10, ativo: 4, volta: 20, dano: 75, atordoa: 0, defendido: 15, altura: 'medio', caixa: [12, 26, 42, 48], empurra: 4.5, derruba: true, forte: true },
-  socoBaixo: { inicio: 4, ativo: 3, volta: 9, dano: 30, atordoa: 13, defendido: 8, altura: 'baixo', caixa: [8, 8, 30, 20], empurra: 1.4 },
-  rasteira: { inicio: 8, ativo: 5, volta: 22, dano: 55, atordoa: 0, defendido: 12, altura: 'baixo', caixa: [10, 0, 46, 10], empurra: 1.5, derruba: true },
+  soco1: { inicio: 4, ativo: 3, volta: 8, dano: 35, atordoa: 15, defendido: 9, altura: 'medio', caixa: [8, 20, 27, 35], empurra: 1.6, encadeia: 'soco2' },
+  soco2: { inicio: 5, ativo: 3, volta: 10, dano: 40, atordoa: 16, defendido: 10, altura: 'medio', caixa: [8, 20, 28, 35], empurra: 1.8, encadeia: 'soco3', avanca: 1 },
+  soco3: { inicio: 8, ativo: 4, volta: 18, dano: 65, atordoa: 0, defendido: 14, altura: 'medio', caixa: [10, 24, 28, 48], empurra: 4, derruba: true, forte: true, avanca: 1.5 },
+  chute1: { inicio: 6, ativo: 4, volta: 13, dano: 50, atordoa: 17, defendido: 11, altura: 'medio', caixa: [10, 6, 28, 22], empurra: 2.2, encadeia: 'chute2' },
+  chute2: { inicio: 10, ativo: 4, volta: 20, dano: 75, atordoa: 0, defendido: 15, altura: 'medio', caixa: [12, 20, 32, 36], empurra: 4.5, derruba: true, forte: true },
+  socoBaixo: { inicio: 4, ativo: 3, volta: 9, dano: 30, atordoa: 13, defendido: 8, altura: 'baixo', caixa: [8, 13, 27, 29], empurra: 1.4 },
+  rasteira: { inicio: 8, ativo: 5, volta: 22, dano: 55, atordoa: 0, defendido: 12, altura: 'baixo', caixa: [10, 0, 34, 10], empurra: 1.5, derruba: true },
   socoAereo: { inicio: 5, ativo: 8, volta: 4, dano: 45, atordoa: 16, defendido: 10, altura: 'aereo', caixa: [6, 18, 28, 36], empurra: 1.8 },
-  chuteAereo: { inicio: 7, ativo: 10, volta: 4, dano: 55, atordoa: 18, defendido: 11, altura: 'aereo', caixa: [4, 2, 36, 22], empurra: 2.2 },
+  chuteAereo: { inicio: 7, ativo: 10, volta: 4, dano: 55, atordoa: 18, defendido: 11, altura: 'aereo', caixa: [4, 0, 26, 15], empurra: 2.2 },
 };
 
 /** Estica (ou encolhe) o alcance dos golpes de um lutador: o Picolé tem braço e perna longos. */
@@ -148,7 +153,7 @@ function comAlcance(golpes: Ficha['golpes'], fator: number, dano = 1): Ficha['go
 
 const RAJADA_BASE: Poder = {
   tipo: 'rajada', inicio: 12, duracao: 150, volta: 16, batidas: 1, intervalo: 1, dano: 40, velocidade: 5,
-  espessura: 6, altura: 38, custo: 25, atordoa: 16,
+  espessura: 6, altura: 31, custo: 25, atordoa: 16,
 };
 
 const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
@@ -158,8 +163,8 @@ const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
     corpo: { meiaLargura: 11, altura: 62, alturaAgachado: 42 },
     golpes: GOLPES_BASE,
     rajada: RAJADA_BASE,
-    especial: { nome: 'Onda Goiabada', tipo: 'onda', inicio: 22, duracao: 40, volta: 22, batidas: 7, intervalo: 6, dano: 18, velocidade: 14, espessura: 9, altura: 38, custo: 100, atordoa: 14, derruba: true },
-    super: { nome: 'Onda Goiabada Máxima', tipo: 'onda', inicio: 14, duracao: 70, volta: 28, batidas: 10, intervalo: 7, dano: 30, velocidade: 16, espessura: 16, altura: 38, custo: 300, atordoa: 16, derruba: true },
+    especial: { nome: 'Onda Goiabada', tipo: 'onda', inicio: 22, duracao: 40, volta: 22, batidas: 7, intervalo: 6, dano: 18, velocidade: 14, espessura: 9, altura: 31, custo: 100, atordoa: 14, derruba: true },
+    super: { nome: 'Onda Goiabada Máxima', tipo: 'onda', inicio: 14, duracao: 70, volta: 28, batidas: 10, intervalo: 7, dano: 30, velocidade: 16, espessura: 16, altura: 31, custo: 300, atordoa: 16, derruba: true },
   },
   vegetal: {
     id: 'vegetal', nome: 'Vegetal', estilo: 'baixo e agressivo',
@@ -167,17 +172,17 @@ const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
     corpo: { meiaLargura: 11, altura: 58, alturaAgachado: 40 },
     golpes: comAlcance(GOLPES_BASE, 1, 1.06),
     rajada: { ...RAJADA_BASE, inicio: 10, velocidade: 5.5 },
-    especial: { nome: 'Canhão de Alho', tipo: 'onda', inicio: 16, duracao: 34, volta: 22, batidas: 6, intervalo: 6, dano: 19, velocidade: 15, espessura: 9, altura: 36, custo: 100, atordoa: 14, derruba: true },
-    super: { nome: 'Canhão de Alho Final', tipo: 'onda', inicio: 12, duracao: 66, volta: 28, batidas: 10, intervalo: 6, dano: 31, velocidade: 17, espessura: 17, altura: 36, custo: 300, atordoa: 16, derruba: true },
+    especial: { nome: 'Canhão de Alho', tipo: 'onda', inicio: 16, duracao: 34, volta: 22, batidas: 6, intervalo: 6, dano: 19, velocidade: 15, espessura: 9, altura: 31, custo: 100, atordoa: 14, derruba: true },
+    super: { nome: 'Canhão de Alho Final', tipo: 'onda', inicio: 12, duracao: 66, volta: 28, batidas: 10, intervalo: 6, dano: 31, velocidade: 17, espessura: 17, altura: 31, custo: 300, atordoa: 16, derruba: true },
   },
   picole: {
     id: 'picole', nome: 'Picolé', estilo: 'alto, alcance longo',
     vida: 1080, andar: 1.3, recuar: 1.1, investida: 3.6, pulo: 6.0,
     corpo: { meiaLargura: 11, altura: 70, alturaAgachado: 46 },
     golpes: comAlcance(GOLPES_BASE, 1.22),
-    rajada: { ...RAJADA_BASE, velocidade: 4.2, dano: 45, altura: 42 },
-    especial: { nome: 'Picolé Espiral', tipo: 'espiral', inicio: 26, duracao: 22, volta: 24, batidas: 1, intervalo: 1, dano: 150, velocidade: 24, espessura: 4, altura: 44, custo: 100, atordoa: 0, derruba: true },
-    super: { nome: 'Picolé Espiral Máximo', tipo: 'espiral', inicio: 18, duracao: 40, volta: 30, batidas: 3, intervalo: 10, dano: 100, velocidade: 26, espessura: 8, altura: 44, custo: 300, atordoa: 18, derruba: true },
+    rajada: { ...RAJADA_BASE, velocidade: 4.2, dano: 45, altura: 31 },
+    especial: { nome: 'Picolé Espiral', tipo: 'espiral', inicio: 26, duracao: 22, volta: 24, batidas: 1, intervalo: 1, dano: 150, velocidade: 24, espessura: 4, altura: 31, custo: 100, atordoa: 0, derruba: true },
+    super: { nome: 'Picolé Espiral Máximo', tipo: 'espiral', inicio: 18, duracao: 40, volta: 30, batidas: 3, intervalo: 10, dano: 100, velocidade: 26, espessura: 8, altura: 31, custo: 300, atordoa: 18, derruba: true },
   },
   geladeira: {
     id: 'geladeira', nome: 'Geladeira', estilo: 'rápido e técnico',
@@ -186,12 +191,12 @@ const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
     golpes: {
       ...comAlcance(GOLPES_BASE, 1, 0.95),
       // o rabo: a rasteira e o chute alcançam mais
-      rasteira: { ...GOLPES_BASE.rasteira, caixa: [10, 0, 54, 10] },
-      chute2: { ...GOLPES_BASE.chute2, caixa: [12, 20, 50, 44] },
+      rasteira: { ...GOLPES_BASE.rasteira, caixa: [10, 0, 40, 10] },
+      chute2: { ...GOLPES_BASE.chute2, caixa: [12, 20, 38, 36] },
     },
-    rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 7, custo: 20, dano: 34, altura: 40 },
-    especial: { nome: 'Raio Congelante', tipo: 'laser', inicio: 10, duracao: 10, volta: 20, batidas: 1, intervalo: 1, dano: 90, velocidade: 400, espessura: 3, altura: 42, custo: 100, atordoa: 0, derruba: true },
-    super: { nome: 'Bola Congelante', tipo: 'bola', inicio: 24, duracao: 200, volta: 26, batidas: 1, intervalo: 1, dano: 280, velocidade: 2.4, espessura: 20, altura: 52, custo: 300, atordoa: 0, derruba: true },
+    rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 7, custo: 20, dano: 34, altura: 31 },
+    especial: { nome: 'Raio Congelante', tipo: 'laser', inicio: 10, duracao: 10, volta: 20, batidas: 1, intervalo: 1, dano: 90, velocidade: 400, espessura: 3, altura: 31, custo: 100, atordoa: 0, derruba: true },
+    super: { nome: 'Bola Congelante', tipo: 'bola', inicio: 24, duracao: 200, volta: 26, batidas: 1, intervalo: 1, dano: 280, velocidade: 2.4, espessura: 20, altura: 40, custo: 300, atordoa: 0, derruba: true },
   },
 };
 

@@ -5,8 +5,7 @@ import { quemChamar } from '../jogos';
 import { contaDaIdentidade } from '../pessoas';
 import { anotar } from '../registro';
 import { volumeGuardado } from '../volume';
-import { personagemDe, preaquecer } from '../dragao/animacoes';
-import { sprite } from '../dragao/boneco';
+import { preaquecer, spriteParado } from '../dragao/animacoes';
 import { desenharCenario } from '../dragao/cenario';
 import { cenarioPronto, desenharLuta, retratoPronto } from '../dragao/desenho';
 import { FICHAS } from '../dragao/fichas';
@@ -20,10 +19,6 @@ import { criarSonsDaLuta } from '../dragao/sons';
 import { criarSonsGravados, ehGravado } from '../dragao/somDeArquivo';
 import { LEGENDA, ouvirTeclado } from '../dragao/teclado';
 import { IDS_DOS_CENARIOS, IDS_DOS_LUTADORES, type EstadoDaLuta, type IdDoCenario, type IdDoLutador } from '../dragao/tipos';
-import * as goiabaM from '../dragao/personagens/goiaba';
-import * as vegetalM from '../dragao/personagens/vegetal';
-import * as picoleM from '../dragao/personagens/picole';
-import * as geladeiraM from '../dragao/personagens/geladeira';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
@@ -31,7 +26,6 @@ const JOGO: Jogo<EstadoDaLuta> = { avancar, clonar, impressao };
 const TOPICO = 'luta';
 /** O volume do jogo neste computador. Prefixo antigo de propósito: é o de todas as chaves da Saga. */
 const CHAVE_DO_VOLUME = 'cantinho.volumeDaLuta';
-const VITRINES = { goiaba: goiabaM.vitrine, vegetal: vegetalM.vitrine, picole: picoleM.vitrine, geladeira: geladeiraM.vitrine };
 const NOMES_DOS_CENARIOS: Record<IdDoCenario, string> = { torneio: 'Torneio', planeta: 'Planeta Verde', ilha: 'Ilha da Tartaruga', canion: 'Cânion' };
 const nomeDoLutador = (id: IdDoLutador) => FICHAS[id].nome;
 
@@ -53,11 +47,11 @@ export function QuadroNaTela({ quadro, chave, className, style, liso }: {
   return <canvas ref={ref} className={className} style={{ imageRendering: liso ? 'auto' : 'pixelated', ...style }} />;
 }
 
-/** O lutador de corpo inteiro, na pose parada da vitrine dele (a do lado 1 olha para a esquerda). */
+/** O lutador de corpo inteiro, parado (o do lado 1 olha para a esquerda). */
 function LutadorDePe({ id, espelhar }: { id: IdDoLutador; espelhar?: boolean }) {
   return (
     <QuadroNaTela chave={`${id}`} className="luta-sprite" style={espelhar ? { transform: 'scaleX(-1)' } : undefined}
-      quadro={() => sprite(personagemDe(id), VITRINES[id].parado)} />
+      quadro={() => spriteParado(id)} />
   );
 }
 
@@ -220,9 +214,11 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair,
     gravados.volume = volume;
     sons.volume = volume;
     gravados.tocar('golpe-soco');
-    setTimeout(() => { gravados.tocar('golpe-chute'); sons.tocar('forte'); }, 320);
-    setTimeout(() => gravados.tocar('disparo-ki'), 720);
-    setTimeout(() => gravados.tocar('raio-disparo'), 1150);
+    setTimeout(() => gravados.tocar('golpe-chute'), 320);
+    setTimeout(() => gravados.tocar('golpe-defesa'), 640);
+    setTimeout(() => { gravados.tocar('golpe-forte'); sons.tocar('forte'); }, 960);
+    setTimeout(() => gravados.tocar('disparo-ki'), 1350);
+    setTimeout(() => gravados.tocar('raio-disparo'), 1750);
   };
   const sentados = arena.lados.filter(Boolean).length;
   const naArena = new Set(arena.lados.flatMap((l) => (l ? [l.pessoa.id] : [])));

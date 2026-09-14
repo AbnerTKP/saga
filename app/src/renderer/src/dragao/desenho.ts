@@ -20,6 +20,7 @@ import { CHAO, TELA } from './medidas.ts';
 import { desenharPlacar, type LadoDoPlacar } from './placar.ts';
 import { colar, cor, criarQuadro, limpar, velar, type Cor, type Quadro } from './quadro.ts';
 import { poseDeRetrato, retratoDe } from './retrato.ts';
+import { retratoDoPixel } from './pixel/sprites.ts';
 import { NOMES_DAS_FORMAS } from './fichas.ts';
 import { SUB, type EstadoDaLuta, type IdDoCenario, type IdDoLutador, type Lutador, type Projetil } from './tipos.ts';
 import { cenarioCanion } from './cenarios/canion.ts';
@@ -39,13 +40,16 @@ export function cenarioPronto(id: IdDoCenario): Cenario {
 }
 
 const retratos = new Map<string, Quadro>();
-/** O retrato do placar, na forma em que o lutador está (o Super Goiabadin aparece dourado lá em cima). */
+/**
+ * O retrato do placar, na forma em que o lutador está (o Super Goiabadin aparece dourado lá em
+ * cima): o do pixel, e o do boneco para quem ainda não tem pixel.
+ */
 export function retratoPronto(id: IdDoLutador, forma: 0 | 1 = 0): Quadro {
   const chave = `${id}:${forma}`;
   let r = retratos.get(chave);
   if (!r) {
     const p = personagemDe(id);
-    r = retratoDe(p, 32, { ...poseDeRetrato(p.corpo), forma });
+    r = retratoDoPixel(id, forma) ?? retratoDe(p, 32, { ...poseDeRetrato(p.corpo), forma });
     retratos.set(chave, r);
   }
   return r;

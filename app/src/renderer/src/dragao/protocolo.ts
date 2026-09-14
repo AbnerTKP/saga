@@ -4,4 +4,4 @@
  * veria outra luta e outro vencedor. Por isso app velho não senta: o servidor recusa e manda
  * atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior.
  */
-export const PROTOCOLO_DA_LUTA = 3; // 3: transformação de 1,1 s e invulnerável
+export const PROTOCOLO_DA_LUTA = 4; // 4: caixas de golpe e altura dos disparos do sprite de pixel
