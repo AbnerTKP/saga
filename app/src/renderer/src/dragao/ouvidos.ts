@@ -12,7 +12,8 @@ import { camera } from './luta.ts';
 import { TELA } from './medidas.ts';
 import { SUB, type EstadoDaLuta } from './tipos.ts';
 
-export type SomGravado = 'grito' | 'transformacao' | 'teletransporte' | 'raio-carga' | 'raio-disparo' | 'dedo-carga' | 'dedo-picole' | 'dedo-geladeira';
+export type SomGravado = 'grito' | 'transformacao' | 'teletransporte' | 'raio-carga' | 'raio-disparo' | 'dedo-carga' | 'dedo-picole' | 'dedo-geladeira'
+  | 'golpe-soco' | 'golpe-chute' | 'disparo-ki';
 
 export type Toque = { som: SomDaLuta | SomGravado; pan: number; /** quem pode ser calado depois */ chave?: string };
 
@@ -30,8 +31,14 @@ export function sonsNovos(e: EstadoDaLuta, vistos: Set<string>): Toque[] & { cal
   e.lutadores.forEach((l, i) => {
     const outro = e.lutadores[1 - i];
     if (l.impactoTipo && e.quadro - l.impactoEm < 4) {
-      const som: SomDaLuta = l.impactoTipo === 3 ? 'defesa' : l.impactoTipo === 2 ? 'forte' : outro.acao.startsWith('chute') || outro.acao === 'rasteira' ? 'chute' : 'soco';
-      novo(`i${i}:${l.impactoEm}`, som, pan(l.x));
+      // Golpe que entrou é a gravação de soco ou de chute (pelo que o outro está fazendo); o forte
+      // leva junto o baque grave sintetizado, que dá o peso; defendido é o estalo seco de sempre.
+      const chute = outro.acao.startsWith('chute') || outro.acao === 'rasteira';
+      if (l.impactoTipo === 3) novo(`i${i}:${l.impactoEm}`, 'defesa', pan(l.x));
+      else {
+        novo(`i${i}:${l.impactoEm}`, chute ? 'golpe-chute' : 'golpe-soco', pan(l.x));
+        if (l.impactoTipo === 2) novo(`I${i}:${l.impactoEm}`, 'forte', pan(l.x));
+      }
     }
     const comeco = e.quadro - l.quadro;
     if (l.acao === 'sumindo' && l.quadro < 3) novo(`s${i}:${comeco}`, 'teletransporte', pan(l.x));
@@ -47,7 +54,7 @@ export function sonsNovos(e: EstadoDaLuta, vistos: Set<string>): Toque[] & { cal
     }
   });
   for (const p of e.projeteis) {
-    const som: Toque['som'] = p.tipo === 'rajada' ? 'rajada' : p.tipo === 'espiral' ? 'dedo-picole' : p.tipo === 'laser' ? 'dedo-geladeira' : 'raio-disparo';
+    const som: Toque['som'] = p.tipo === 'rajada' ? 'disparo-ki' : p.tipo === 'espiral' ? 'dedo-picole' : p.tipo === 'laser' ? 'dedo-geladeira' : 'raio-disparo';
     novo(`p${p.id}`, som, pan(p.x));
   }
   if (e.fase === 'apresentacao' && e.faseQuadro < 10) novo(`r${e.round}`, 'round');

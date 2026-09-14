@@ -4,6 +4,7 @@ import { agirNaArena, pedirTokenDaLuta, verArena, type AcaoNaArena, type Arena, 
 import { quemChamar } from '../jogos';
 import { contaDaIdentidade } from '../pessoas';
 import { anotar } from '../registro';
+import { volumeGuardado } from '../volume';
 import { personagemDe, preaquecer } from '../dragao/animacoes';
 import { sprite } from '../dragao/boneco';
 import { desenharCenario } from '../dragao/cenario';
@@ -28,6 +29,8 @@ import { Icon } from './Icon';
 
 const JOGO: Jogo<EstadoDaLuta> = { avancar, clonar, impressao };
 const TOPICO = 'luta';
+/** O volume do jogo neste computador. Prefixo antigo de propósito: é o de todas as chaves da Saga. */
+const CHAVE_DO_VOLUME = 'cantinho.volumeDaLuta';
 const VITRINES = { goiaba: goiabaM.vitrine, vegetal: vegetalM.vitrine, picole: picoleM.vitrine, geladeira: geladeiraM.vitrine };
 const NOMES_DOS_CENARIOS: Record<IdDoCenario, string> = { torneio: 'Torneio', planeta: 'Planeta Verde', ilha: 'Ilha da Tartaruga', canion: 'Cânion' };
 const nomeDoLutador = (id: IdDoLutador) => FICHAS[id].nome;
@@ -134,6 +137,18 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
     }
   }, [arenaId, servidorId, receber]);
 
+  /**
+   * O volume do jogo, de 0 a 1, guardado neste computador. Passa por `volumeGuardado`: uma chave
+   * vazia viraria `Number('')`, que é zero — o jogo mudo sem ninguém saber por quê.
+   */
+  const [volume, setVolume] = useState(() => {
+    try { return volumeGuardado(localStorage.getItem(CHAVE_DO_VOLUME)); } catch { return 1; }
+  });
+  const mudarVolume = useCallback((v: number) => {
+    setVolume(v);
+    try { localStorage.setItem(CHAVE_DO_VOLUME, String(v)); } catch { /* sem armazenamento, vale só agora */ }
+  }, []);
+
   const [armado, setArmado] = useState(false);
   useEffect(() => {
     if (!armado) return;
@@ -178,11 +193,12 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
         </div>
       ) : arena.estado === 'arena' ? (
         <div className="corrida-area">
-          <ArenaDeEscolha arena={arena} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} onSair={onFechar} />
+          <ArenaDeEscolha arena={arena} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} onSair={onFechar}
+            volume={volume} onVolume={mudarVolume} />
         </div>
       ) : (
         <Luta key={`${arena.id}-${arena.rodada}`} arena={arena} servidorId={servidorId} diferenca={diferenca} surdo={surdo}
-          ocupado={ocupado} live={live} onAgir={agir} onSair={onFechar} />
+          volume={volume} ocupado={ocupado} live={live} onAgir={agir} onSair={onFechar} />
       )}
     </div>
   );
@@ -190,10 +206,24 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
 
 // ---- a arena: quem luta com quem, onde e quantos rounds -----------------------------------------
 
-function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair }: {
+function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair, volume, onVolume }: {
   arena: Arena; euId: number; ocupado: boolean; membros: Membro[]; naCall: Set<number>;
   onAgir: (a: AcaoNaArena) => void; onSair: () => void;
+  volume: number; onVolume: (v: number) => void;
 }) {
+  // O teste de som: um soco, uma rajada e um raio, no volume escolhido — é o que se ouve na luta.
+  const amostra = useRef<{ gravados: ReturnType<typeof criarSonsGravados>; sons: ReturnType<typeof criarSonsDaLuta> } | null>(null);
+  useEffect(() => () => { amostra.current?.gravados.fechar(); amostra.current?.sons.fechar(); }, []);
+  const testarSom = () => {
+    amostra.current ??= { gravados: criarSonsGravados(volume), sons: criarSonsDaLuta(volume) };
+    const { gravados, sons } = amostra.current;
+    gravados.volume = volume;
+    sons.volume = volume;
+    gravados.tocar('golpe-soco');
+    setTimeout(() => { gravados.tocar('golpe-chute'); sons.tocar('forte'); }, 320);
+    setTimeout(() => gravados.tocar('disparo-ki'), 720);
+    setTimeout(() => gravados.tocar('raio-disparo'), 1150);
+  };
   const sentados = arena.lados.filter(Boolean).length;
   const naArena = new Set(arena.lados.flatMap((l) => (l ? [l.pessoa.id] : [])));
   const chamados = new Set(arena.chamados.map((p) => p.id));
@@ -295,6 +325,15 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair 
             ))}
           </div>
         </div>
+        <div className="xadrez-escolha">
+          <label className="xadrez-rotulo" htmlFor="volume-da-luta">Som do jogo</label>
+          <div className="luta-volume">
+            <input id="volume-da-luta" type="range" min={0} max={100} step={5} value={Math.round(volume * 100)}
+              onChange={(e) => onVolume(Number(e.target.value) / 100)} />
+            <span className="luta-volume-numero">{Math.round(volume * 100)}%</span>
+            <button type="button" className="botao-de-linha" disabled={volume <= 0} onClick={testarSom}>Testar</button>
+          </div>
+        </div>
         {arena.souAnfitriao ? (
           <>
             <div className="xadrez-risco" />
@@ -332,11 +371,20 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair 
 
 // ---- a luta ---------------------------------------------------------------------------------
 
-function Luta({ arena, servidorId, diferenca, surdo, ocupado, live, onAgir, onSair }: {
+function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAgir, onSair }: {
   arena: Arena; servidorId: number; diferenca: MutableRefObject<number | null>; surdo: boolean; ocupado: boolean;
-  live?: ReactNode; onAgir: (a: AcaoNaArena) => void; onSair: () => void;
+  volume: number; live?: ReactNode; onAgir: (a: AcaoNaArena) => void; onSair: () => void;
 }) {
   const [l0, l1] = arena.lados;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  /** Os sons desta luta, para o volume mudar o que já existe (eles nascem dentro do laço). */
+  const saidas = useRef<{ sons: ReturnType<typeof criarSonsDaLuta>; gravados: ReturnType<typeof criarSonsGravados> } | null>(null);
+  useEffect(() => {
+    if (!saidas.current) return;
+    saidas.current.sons.volume = volume;
+    saidas.current.gravados.volume = volume;
+  }, [volume]);
   const souLutador = arena.meuLado !== null;
   const inicial = useMemo(() => criarLuta({
     lutadores: [l0?.lutador ?? 'goiaba', l1?.lutador ?? 'goiaba'], cenario: arena.cenario, roundsParaVencer: arena.rounds, semente: arena.semente,
@@ -443,8 +491,9 @@ function Luta({ arena, servidorId, diferenca, surdo, ocupado, live, onAgir, onSa
       : null;
     const plateia = souLutador ? null : new EspectadorDaLuta({ jogo: JOGO, inicial: null, transporte });
     const teclado = souLutador ? ouvirTeclado(window) : null;
-    const sons = criarSonsDaLuta();
-    const gravados = criarSonsGravados();
+    const sons = criarSonsDaLuta(volumeRef.current);
+    const gravados = criarSonsGravados(volumeRef.current);
+    saidas.current = { sons, gravados };
     const vistos = new Set<string>();
     const quadro = criarQuadro(TELA.largura, TELA.altura);
     const imagem = new ImageData(new Uint8ClampedArray(quadro.px.buffer as ArrayBuffer), TELA.largura, TELA.altura);

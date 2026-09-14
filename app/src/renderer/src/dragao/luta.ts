@@ -414,6 +414,8 @@ function decidir(e: EstadoDaLuta, i: 0 | 1, ent: Entrada) {
     l.ki -= TRANSFORMACAO.custo;
     mudar(l, 'transformando');
     l.vx = 0;
+    // o grito não é interrompido: nenhum golpe nem raio acerta quem está se transformando
+    l.invencivel = TRANSFORMACAO.duracao + 2;
     return;
   }
   if ((apertou & BOTAO.SUMIR) && l.ki >= CUSTO_DO_SUMIR) {

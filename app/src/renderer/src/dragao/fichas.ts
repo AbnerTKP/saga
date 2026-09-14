@@ -78,15 +78,15 @@ export type Ficha = {
 };
 
 /**
- * A transformação. Precisa de uma barra e meia de ki e gasta meia; o grito dura dois segundos e
- * meio, e quem apanha no meio perde a transformação e o ki gasto — é o risco de gritar na cara do
- * outro. Transformado, bate e anda mais; o ki escoa (uma barra a cada 10 s) e, zerando, volta ao
- * normal.
+ * A transformação. Precisa de uma barra e meia de ki e gasta meia. O grito dura pouco mais de um
+ * segundo e é INVULNERÁVEL: a primeira versão durava 2,5 s e podia ser interrompida, e o dono
+ * achou demorado — gritar virou esperar apanhar. Transformado, bate e anda mais; o ki escoa (uma
+ * barra a cada 10 s) e, zerando, volta ao normal.
  */
 export const TRANSFORMACAO = {
   kiMinimo: 150,
   custo: 50,
-  duracao: 150,
+  duracao: 66,
   /** Um ponto de ki a cada tantos quadros, enquanto transformado e lutando. */
   escoamento: 6,
   dano: 1.25,

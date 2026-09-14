@@ -2181,3 +2181,7 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 .luta-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: #6fa8dc; display: grid; place-items: center; overflow: hidden; }
 .luta-icone { width: 32px; height: 32px; }
 .luta-capa { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+/* O som do jogo na arena: o volume e o teste, antes de lutar. */
+.luta-volume { display: flex; align-items: center; gap: 8px; }
+.luta-volume input[type="range"] { flex: 1; min-width: 0; padding: 0; border: none; background: none; accent-color: var(--accent); }
+.luta-volume-numero { width: 36px; text-align: right; font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }

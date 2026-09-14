@@ -193,7 +193,7 @@ test('o relógio zerado dá a vitória a quem tem mais vida', () => {
   assert.equal(e.vencedor, 1);
 });
 
-test('transformar pede ki, grita e vira; apanhar no meio perde a transformação', () => {
+test('transformar pede ki, e o grito é invulnerável até virar', () => {
   const e = aoLutar(luta());
   const [a, b] = e.lutadores;
   a.ki = 100;
@@ -204,11 +204,13 @@ test('transformar pede ki, grita e vira; apanhar no meio perde a transformação
   avancar(e, [BOTAO.TRANSFORMAR, 0]);
   assert.equal(a.acao, 'transformando');
   assert.equal(a.ki, 200 - TRANSFORMACAO.custo);
-  // o outro chega e bate no meio do grito
+  // o outro chega e bate no meio do grito: não entra nada
   b.x = a.x + 30 * SUB * 1.5;
-  for (let i = 0; i < 20; i++) avancar(e, [0, i % 2 ? 0 : BOTAO.SOCO]);
-  assert.equal(a.forma, 0, 'interrompido não transforma');
-  assert.notEqual(a.acao, 'transformando');
+  const vida = a.vida;
+  for (let i = 0; i < 40; i++) avancar(e, [0, i % 2 ? 0 : BOTAO.SOCO]);
+  assert.equal(a.vida, vida, 'o grito não apanha');
+  rodar(e, TRANSFORMACAO.duracao + 30);
+  assert.equal(a.forma, 1, 'e vira mesmo com o outro batendo');
 });
 
 test('transformado bate mais forte, o ki escoa e, zerando, volta ao normal', () => {

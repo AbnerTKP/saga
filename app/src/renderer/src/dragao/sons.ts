@@ -101,9 +101,11 @@ const RECEITAS: Record<SomDaLuta, Receita> = {
 /** O mesmo som não toca duas vezes em menos disto: dois quadros refeitos pela rede viram um. */
 const INTERVALO_MINIMO = 0.04;
 
-export function criarSonsDaLuta() {
+export function criarSonsDaLuta(volumeInicial = 1) {
   let ctx: AudioContext | null = null;
   let saida: AudioNode | null = null;
+  let mestre: GainNode | null = null;
+  let volume = volumeInicial;
   const ultimo = new Map<SomDaLuta, number>();
   const garantir = () => {
     if (ctx) return ctx;
@@ -111,14 +113,20 @@ export function criarSonsDaLuta() {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -12;
     comp.ratio.value = 6;
-    const mestre = ctx.createGain();
-    mestre.gain.value = 0.7;
+    mestre = ctx.createGain();
+    mestre.gain.value = 0.7 * volume;
     comp.connect(mestre).connect(ctx.destination);
     saida = comp;
     return ctx;
   };
   return {
+    /** De 0 a 1: o volume do jogo, regulado na arena. */
+    set volume(v: number) {
+      volume = Math.max(0, Math.min(1, v));
+      if (mestre) mestre.gain.value = 0.7 * volume;
+    },
     tocar(som: SomDaLuta, pan = 0) {
+      if (volume <= 0) return;
       const c = garantir();
       if (c.state === 'suspended') void c.resume();
       const t = c.currentTime;

@@ -3,6 +3,11 @@
  * luta de longe, e o especial é o Picolé Espiral (dois dedos na testa carregando, e o braço
  * estendido na hora de soltar).
  *
+ * O desenho segue a arte que o dono mandou: proporção de boneco (a cabeça com o turbante é uns 40%
+ * da altura, tronco curto, perna curta e grossa, mão e sapato grandes), olho grande de anime e
+ * NENHUM contorno preto — cada peça se contorna com um tom fundo dela mesma, e a sombra puxa para
+ * o azul enquanto a luz puxa para o amarelo. O braço continua comprido: é o alcance dele.
+ *
  * A capa é o que dá a silhueta dele, e ela pendura pelo MUNDO, não pelo tronco: quem se inclina
  * leva o ombro junto, mas o pano continua caindo para baixo. `pose.vento` levanta a capa para
  * trás (0 parada, 1 esvoaçando na horizontal), e as dobras da barra andam com ele — animar o
@@ -28,68 +33,83 @@ import type { Forma, P, Tinta } from '../raster.ts';
  */
 export type PoseDoPicole = Pose & { dedosF?: boolean; dedosT?: boolean };
 
-const CONTORNO = cor('#1b1022');
+/** Peça grande: a passagem de sombra e de luz em xadrez, que é o acabamento pintado da referência. */
+const pintada = (t: Tinta): Tinta => ({ ...t, pontilhado: true });
 
 /** O que a transformação troca: a pele, as placas dos braços, os riscos da pele e o olho. */
 type Pele = {
   pele: Tinta; peleAtras: Tinta; placa: Tinta; placaAtras: Tinta;
-  vinco: Cor; vincoAtras: Cor; luz: Cor; esclera: Cor; pupila: Cor; brilho: Cor; boca: Cor;
+  vinco: Cor; vincoAtras: Cor; luz: Cor; sobrancelha: Cor; cilio: Cor;
+  esclera: Cor; iris: Cor; irisBaixo: Cor; brilho: Cor; boca: Cor;
 };
 
+// o contorno da pele verde é musgo fundo, e a sombra dela puxa para o azul-petróleo
+const MUSGO = cor('#17392a');
 const VERDE: Pele = {
-  pele: tinta(cor('#78bf48'), cor('#4b8a33'), CONTORNO, cor('#a8e070'), 2),
-  peleAtras: tinta(cor('#4b8a33'), cor('#346a28'), CONTORNO, undefined, 2),
-  // as placas rosadas são da mesma pele: a borda delas é um rosa escuro, e não o contorno preto
-  placa: { ...tinta(cor('#e3949c'), cor('#b8646f'), CONTORNO, cor('#f6c0c4'), 1), linha: cor('#9a4c5a') },
-  placaAtras: { ...tinta(cor('#b06470'), cor('#8a4a58'), CONTORNO, undefined, 1), linha: cor('#6a3444') },
-  vinco: cor('#3c7a2a'), vincoAtras: cor('#29561f'), luz: cor('#bdec8a'),
-  esclera: cor('#ffffff'), pupila: CONTORNO, brilho: cor('#ffffff'), boca: cor('#2d4a22'),
+  pele: tinta(cor('#7ac24e'), cor('#3c8858'), MUSGO, cor('#d4ee80'), 2),
+  peleAtras: tinta(cor('#4c9255'), cor('#2e684c'), MUSGO, undefined, 2),
+  // as placas rosadas são da mesma pele: sombra arroxeada, luz de pêssego e borda vinho
+  placa: { ...tinta(cor('#ee96a0'), cor('#b05a86'), cor('#56223f'), cor('#ffd4bc'), 1), linha: cor('#8a3a62') },
+  placaAtras: { ...tinta(cor('#b6667e'), cor('#88466a'), cor('#46193a'), undefined, 1), linha: cor('#682a50') },
+  vinco: cor('#2c6a4a'), vincoAtras: cor('#21503c'), luz: cor('#e2f496'),
+  sobrancelha: cor('#1f4a32'), cilio: cor('#10241c'),
+  esclera: cor('#f4f6ea'), iris: cor('#1c1c3a'), irisBaixo: cor('#3f6c8c'), brilho: cor('#ffffff'), boca: cor('#1c3a2a'),
 };
 
-/** O Picolé de Laranja: placas vermelho-tijolo, e o olho aceso em vermelho no lugar do branco. */
+/** O Picolé de Laranja: placas vermelhas, sombra puxando para o vinho e o olho aceso em vermelho. */
+const BRASA = cor('#561b1e');
 const LARANJA: Pele = {
-  pele: tinta(cor('#f08a2a'), cor('#c05a18'), CONTORNO, cor('#ffc070'), 2),
-  peleAtras: tinta(cor('#c05a18'), cor('#8e3f10'), CONTORNO, undefined, 2),
+  pele: tinta(cor('#f49c3c'), cor('#c2503e'), BRASA, cor('#ffdc7a'), 2),
+  peleAtras: tinta(cor('#de7636'), cor('#a8423a'), BRASA, undefined, 2),
   // vermelho vivo e não tijolo escuro: escuro sobre laranja, a placa lia como mancha de pele
-  placa: { ...tinta(cor('#d4432e'), cor('#9c2e20'), CONTORNO, cor('#f07a5a'), 1), linha: cor('#7a2016') },
-  placaAtras: { ...tinta(cor('#9c2e20'), cor('#782418'), CONTORNO, undefined, 1), linha: cor('#561810') },
-  vinco: cor('#a64c12'), vincoAtras: cor('#7a360c'), luz: cor('#ffd49a'),
-  esclera: cor('#ff3c28'), pupila: cor('#5a0a0a'), brilho: cor('#ffc890'), boca: cor('#5a2008'),
+  placa: { ...tinta(cor('#e0442e'), cor('#a0264a'), cor('#480d22'), cor('#ff9460'), 1), linha: cor('#7a1a38') },
+  placaAtras: { ...tinta(cor('#a43032'), cor('#7a1e3c'), cor('#3c0a1c'), undefined, 1), linha: cor('#5a1228') },
+  vinco: cor('#b24a34'), vincoAtras: cor('#86322e'), luz: cor('#ffeaa6'),
+  sobrancelha: cor('#7a2622'), cilio: cor('#3a0c14'),
+  esclera: cor('#fff0dc'), iris: cor('#d01e2a'), irisBaixo: cor('#ff7a3a'), brilho: cor('#fff6c0'), boca: cor('#4a1414'),
 };
 
+// Branco de pano: luz de creme e sombra lavanda, com o contorno cinza-azulado fundo.
+const ARDOSIA = cor('#383b5e');
+const ROXO_FUNDO = cor('#20133c');
 const C = {
-  roxo: tinta(cor('#5b3f9c'), cor('#3b2770'), CONTORNO, cor('#7e62c6'), 2),
-  roxoAtras: tinta(cor('#3b2770'), cor('#281a50'), CONTORNO, undefined, 2),
-  vincoRoxo: cor('#39266e'),
-  vincoRoxoAtras: cor('#231746'),
-  faixa: tinta(cor('#78cdea'), cor('#3f93bf'), CONTORNO, cor('#b4ecfa'), 1),
-  vincoFaixa: cor('#4b9fc9'),
-  sapato: tinta(cor('#8a5431'), cor('#5c3520'), CONTORNO, cor('#b27a4c'), 1),
-  sapatoAtras: tinta(cor('#5c3520'), cor('#3f2416'), CONTORNO, undefined, 1),
-  sola: cor('#c99d70'),
-  solaAtras: cor('#86674c'),
-  branco: tinta(cor('#efebe2'), cor('#b4aec4'), CONTORNO, cor('#ffffff'), 2),
-  brancoAtras: tinta(cor('#bcb6ca'), cor('#8f89a6'), CONTORNO, undefined, 2),
+  roxo: pintada(tinta(cor('#6b4fb8'), cor('#3c2e88'), ROXO_FUNDO, cor('#b08ad8'), 2)),
+  roxoAtras: pintada(tinta(cor('#46358e'), cor('#2b2168'), ROXO_FUNDO, undefined, 2)),
+  vincoRoxo: cor('#3a2b80'),
+  vincoRoxoAtras: cor('#241b58'),
+  faixa: tinta(cor('#72cce6'), cor('#3c82c2'), cor('#1a3262'), cor('#d8f6e6'), 1),
+  vincoFaixa: cor('#4a8ec6'),
+  sapato: tinta(cor('#9c5c38'), cor('#603538'), cor('#2c171c'), cor('#d69e5e'), 1),
+  sapatoAtras: tinta(cor('#673a3a'), cor('#452530'), cor('#2c171c'), undefined, 1),
+  sola: cor('#dcb07c'),
+  solaAtras: cor('#8c6a56'),
+  branco: tinta(cor('#f3efe2'), cor('#b0b0d0'), ARDOSIA, cor('#fffbea'), 2),
+  brancoAtras: tinta(cor('#c4c3da'), cor('#9292b8'), ARDOSIA, undefined, 2),
+  turbante: pintada(tinta(cor('#f3efe2'), cor('#b0b0d0'), ARDOSIA, cor('#fffbea'), 2)),
   // a capa é a maior peça do desenho: com a sombra de 2 px ela ficava chapada como papel
-  capa: tinta(cor('#efebe2'), cor('#b4aec4'), CONTORNO, cor('#ffffff'), 3),
-  dobra: cor('#cdc7d8'),
-  dobraFunda: cor('#9a94b2'),
-  luzPano: cor('#ffffff'),
+  capa: pintada(tinta(cor('#f3efe2'), cor('#b0b0d0'), ARDOSIA, cor('#fffbea'), 3)),
+  dobra: cor('#d2d2e6'),
+  dobraFunda: cor('#9496be'),
+  luzPano: cor('#fffdf2'),
   dente: cor('#ffffff'),
-  goela: cor('#5a1420'),
+  goela: cor('#6a1a30'),
 };
 
+/**
+ * Corpo de boneco: tronco e perna curtos, a cabeça grande logo em cima dos ombros. O braço é o
+ * único osso que não encolheu — é o alcance dele, e as poses de golpe esticam pelo comprimento.
+ */
 export const corpoDoPicole: Corpo = {
-  tronco: 18.5,
-  pescoco: 9.5,
-  bracoSup: 12.5,
-  antebraco: 12,
-  coxa: 15.5,
-  canela: 15,
-  ombroF: [4, 16],
-  ombroT: [-5, 16.5],
-  quadrilF: [2.5, 1],
-  quadrilT: [-3, 1],
+  tronco: 14,
+  pescoco: 10.5,
+  bracoSup: 11.5,
+  antebraco: 11,
+  coxa: 10.5,
+  canela: 10,
+  ombroF: [4.5, 12.5],
+  ombroT: [-4.5, 13],
+  quadrilF: [3, 0.5],
+  quadrilT: [-3.2, 0.5],
 };
 
 /**
@@ -146,7 +166,7 @@ function mancha(p: Pintor, pts: P[], c: Cor) {
 /**
  * Desenho de pixel escrito à mão: cada linha é uma altura (`a`, para cima a partir do `base`), cada
  * letra uma cor, o ponto é vazio, e a quarta coluna cai no `base`. Gira de 90 em 90 graus com a
- * cabeça — girado grau a grau, um olho de três pixels abria buraco ou engordava.
+ * cabeça — girado grau a grau, um olho de poucos pixels abria buraco ou engordava.
  */
 function grade(p: Pintor, e: Esqueleto, base: P, linhas: Record<number, string>, cores: Record<string, Cor>) {
   const r = (Math.round(e.angCabeca / 90) * Math.PI) / 2;
@@ -186,30 +206,24 @@ function braco(p: Pintor, e: Esqueleto, frente: boolean, pl: Pele, forte: boolea
   const pele = frente ? pl.pele : pl.peleAtras;
   const placa = frente ? pl.placa : pl.placaAtras;
   const vinco = frente ? pl.vinco : pl.vincoAtras;
-  // comprido e seco no verde, que é o alcance dele; o laranja engrossa o braço inteiro
+  // comprido no verde, que é o alcance dele; o laranja engrossa o braço inteiro
   const g = forte ? 1.3 : 1;
   const aSup = angulo(ombro, cot);
-  // o braço incha no meio (bíceps na frente do osso, tríceps atrás) e afina no cotovelo e no
-  // pulso: o tubo de raio quase igual é o que fazia dele um cano verde
+  // braço de boneco: roliço, com o ombro redondo e o antebraço engrossando até o punho grande.
+  // Músculo desenhado osso a osso é do corpo comprido, e no boneco virava um nó
   p.peca([
-    { tipo: 'capsula', a: ombro, b: cot, ra: 2.8 * g, rb: 2 * g },
-    { tipo: 'elipse', c: noOsso(ombro, cot, 0.1), rx: 3.3 * g, ry: 3.3 * g },
-    musculo(noOsso(ombro, cot, 0.5, -0.9 * g), 2.2 * g, 4.4, aSup),
-    musculo(noOsso(ombro, cot, 0.44, 0.8 * g), 2.2 * g, 4.6, aSup),
-    { tipo: 'capsula', a: cot, b: noOsso(cot, mao, 0.3), ra: 2.1 * g, rb: 2.7 * g },
-    { tipo: 'capsula', a: noOsso(cot, mao, 0.3), b: mao, ra: 2.7 * g, rb: 1.7 * g },
+    { tipo: 'capsula', a: ombro, b: cot, ra: 3.1 * g, rb: 2.5 * g },
+    { tipo: 'elipse', c: noOsso(ombro, cot, 0.08), rx: 3.6 * g, ry: 3.6 * g },
+    musculo(noOsso(ombro, cot, 0.48, -0.7 * g), 2.5 * g, 4, aSup),
+    { tipo: 'capsula', a: cot, b: noOsso(cot, mao, 0.45), ra: 2.5 * g, rb: 3 * g },
+    { tipo: 'capsula', a: noOsso(cot, mao, 0.45), b: mao, ra: 3 * g, rb: 2.3 * g },
   ], pele);
-  // o fim do deltoide e a dobra do cotovelo
-  risco(p, [noOsso(ombro, cot, 0.2, -2.8 * g), noOsso(ombro, cot, 0.34, -0.8 * g)], vinco);
-  risco(p, [noOsso(ombro, cot, 0.88, -1.8 * g), noOsso(cot, mao, 0.1, -1.4 * g)], vinco);
-  // as placas: no bíceps e no antebraço, com as estrias atravessadas
-  p.peca([lente(ombro, cot, 0.4, 0.9, 0.4 * g, 1.3 * g), lente(cot, mao, 0.08, 0.58, 0.3 * g, 1.25 * g)], placa);
-  for (const s of [0.32, 0.62]) {
-    const ts = 0.4 + 0.5 * s, ta = 0.08 + 0.5 * s;
-    risco(p, [noOsso(ombro, cot, ts - 0.03, -0.9 * g), noOsso(ombro, cot, ts + 0.03, 1.7 * g)], placa.sombra);
-    risco(p, [noOsso(cot, mao, ta - 0.03, -0.95 * g), noOsso(cot, mao, ta + 0.03, 1.55 * g)], placa.sombra);
-  }
-  maoDoPicole(p, e, frente, pele, vinco, forte ? 1.15 : 1);
+  risco(p, [noOsso(ombro, cot, 0.9, -1.8 * g), noOsso(cot, mao, 0.1, -1.4 * g)], vinco);
+  // as placas: no bíceps e no antebraço, com uma estria atravessada em cada
+  p.peca([lente(ombro, cot, 0.38, 0.88, 0.3 * g, 1.5 * g), lente(cot, mao, 0.12, 0.62, 0.2 * g, 1.5 * g)], placa);
+  risco(p, [noOsso(ombro, cot, 0.6, -1.1 * g), noOsso(ombro, cot, 0.66, 1.9 * g)], placa.sombra);
+  risco(p, [noOsso(cot, mao, 0.34, -1.2 * g), noOsso(cot, mao, 0.4, 1.8 * g)], placa.sombra);
+  maoDoPicole(p, e, frente, pele, vinco, forte ? 1.5 : 1.35);
 }
 
 /**
@@ -228,9 +242,9 @@ function maoDoPicole(p: Pintor, e: Esqueleto, frente: boolean, pele: Tinta, vinc
     // punho com o indicador e o médio esticados: um risco no meio faz dos dois dedos um par
     p.peca([
       { tipo: 'capsula', a: em(1, 0.3), b: em(2.2, 0.4), ra: 2.2 * g, rb: 2.2 * g },
-      { tipo: 'capsula', a: em(3, -0.5), b: em(7.4, -0.6), ra: 1.25 * g, rb: 1.05 * g },
+      { tipo: 'capsula', a: em(3, -0.5), b: em(6.2, -0.6), ra: 1.2 * g, rb: 1 * g },
     ], pele);
-    risco(p, [em(4.2, -0.55), em(7.4, -0.6)], vinco);
+    risco(p, [em(3.8, -0.55), em(6.4, -0.6)], vinco);
     risco(p, [em(3.3, 0.9), em(3.3, 2.3)], vinco);
     polegar(em(1.2, -1.9), em(2.8, -1.6));
   } else if ((frente ? pose.maoF : pose.maoT) === 'aberta') {
@@ -243,19 +257,18 @@ function maoDoPicole(p: Pintor, e: Esqueleto, frente: boolean, pele: Tinta, vinc
     risco(p, [em(3.4, 0.6), em(5.8, 0.7)], vinco);
     polegar(em(1, -1.6), em(3.1, -3.4));
   } else {
-    // punho: um bloco maior que o pulso, os nós dos dedos atravessados e dois vãos até a frente
-    p.peca([{ tipo: 'capsula', a: em(1.4, 0.1), b: em(2.6, 0.1), ra: 2.4 * g, rb: 2.4 * g }], pele);
-    risco(p, [em(3.3, -1.9), em(3.3, 2)], vinco);
-    risco(p, [em(3.5, -0.4), em(4.9, -0.4)], vinco);
-    risco(p, [em(3.5, 0.9), em(4.7, 0.9)], vinco);
-    polegar(em(1.4, -2.2), em(3.4, -1.8));
+    // punho: um bloco redondo maior que o pulso, com os nós dos dedos atravessados na frente
+    p.peca([{ tipo: 'capsula', a: em(1.4, 0.1), b: em(2.4, 0.1), ra: 2.4 * g, rb: 2.4 * g }], pele);
+    risco(p, [em(3.1, -1.6), em(3.1, 1.8)], vinco);
+    risco(p, [em(3.4, 0.2), em(4.5, 0.2)], vinco);
+    polegar(em(1.4, -2.2), em(3.2, -1.8));
   }
 }
 
 /**
  * O sapato de sola chata, no referencial do tornozelo: x para a ponta, y para cima, com a sola no
- * chão (3 unidades abaixo do tornozelo, onde a bola do calcanhar do boneco encostava). A sola é a
- * última faixa de baixo, pintada por dentro da peça para não ganhar um segundo contorno.
+ * chão (3 unidades abaixo do tornozelo). Grande e redondo, como o pé de boneco da referência; a
+ * sola é a última faixa de baixo, pintada por dentro da peça para não ganhar um segundo contorno.
  */
 function sapato(p: Pintor, tornozelo: P, ang: number, k: number, frente: boolean) {
   const a = (ang * Math.PI) / 180;
@@ -263,12 +276,12 @@ function sapato(p: Pintor, tornozelo: P, ang: number, k: number, frente: boolean
   const no = (x: number, y: number): P => [tornozelo[0] + (F[0] * x + U[0] * y) * k, tornozelo[1] + (F[1] * x + U[1] * y) * k];
   p.peca([{
     tipo: 'poligono',
-    pts: [no(-2.9, -3), no(-3.2, -0.4), no(-2.4, 2.4), no(1.6, 2.4), no(4.4, 0.6), no(6.8, -0.6), no(8.1, -1.6), no(8, -3)],
+    pts: [no(-3.8, -3), no(-4.3, -0.4), no(-3.2, 2.8), no(1.8, 3.2), no(5.2, 1.4), no(8.2, 0.4), no(9.8, -0.8), no(10, -3)],
   }], frente ? C.sapato : C.sapatoAtras);
   const sola = frente ? C.sola : C.solaAtras;
   for (let y = p.m.y0; y <= p.m.y1; y++) {
     for (let x = p.m.x0; x <= p.m.x1; x++) {
-      if (p.m.tem(x, y) && ((x + 0.5 - tornozelo[0]) * U[0] + (y + 0.5 - tornozelo[1]) * U[1]) / k < -2) pixel(p.q, x, y, sola);
+      if (p.m.tem(x, y) && ((x + 0.5 - tornozelo[0]) * U[0] + (y + 0.5 - tornozelo[1]) * U[1]) / k < -2.2) pixel(p.q, x, y, sola);
     }
   }
 }
@@ -278,21 +291,19 @@ function perna(p: Pintor, e: Esqueleto, frente: boolean) {
   const joelho = frente ? e.joelhoF : e.joelhoT;
   const tornozelo = frente ? e.tornozeloF : e.tornozeloT;
   sapato(p, tornozelo, (frente ? e.pose.peF : e.pose.peT) ?? 0, escalaDe(e), frente);
-  // calça larga que cai em bolsa por cima do sapato
+  // calça larga e curta, que cai em bolsa por cima do sapato: a perna de boneco é quase só pano
   p.peca([
-    { tipo: 'capsula', a: quadril, b: joelho, ra: 5, rb: 4.2 },
-    { tipo: 'capsula', a: joelho, b: noOsso(joelho, tornozelo, 0.58), ra: 4.2, rb: 3.8 },
-    { tipo: 'capsula', a: noOsso(joelho, tornozelo, 0.58), b: noOsso(joelho, tornozelo, 0.76), ra: 3.8, rb: 4.3 },
-    { tipo: 'capsula', a: noOsso(joelho, tornozelo, 0.76), b: noOsso(joelho, tornozelo, 0.84), ra: 4.3, rb: 3.1 },
+    { tipo: 'capsula', a: quadril, b: joelho, ra: 5.6, rb: 4.8 },
+    { tipo: 'capsula', a: joelho, b: noOsso(joelho, tornozelo, 0.5), ra: 4.8, rb: 4.5 },
+    { tipo: 'capsula', a: noOsso(joelho, tornozelo, 0.5), b: noOsso(joelho, tornozelo, 0.76), ra: 4.5, rb: 5 },
+    { tipo: 'capsula', a: noOsso(joelho, tornozelo, 0.76), b: noOsso(joelho, tornozelo, 0.86), ra: 5, rb: 3.8 },
   ], frente ? C.roxo : C.roxoAtras);
   const v = frente ? C.vincoRoxo : C.vincoRoxoAtras;
   const coxa = (t: number, lado: number) => noOsso(quadril, joelho, t, lado);
   const canela = (t: number, lado: number) => noOsso(joelho, tornozelo, t, lado);
-  // o pano junta atrás do joelho num ">", desce da virilha numa dobra comprida e franze na bolsa
-  risco(p, [coxa(0.7, 3.4), coxa(1, 1.4), canela(0.24, 3.2)], v);
-  risco(p, [coxa(0.16, 1.8), coxa(0.6, -2.4)], v);
-  risco(p, [canela(0.62, -3.2), canela(0.76, -0.8)], v);
-  risco(p, [canela(0.7, 3.2), canela(0.84, 1)], v);
+  // o pano junta atrás do joelho num ">" e franze na bolsa
+  risco(p, [coxa(0.62, 3.8), coxa(1, 1.6), canela(0.3, 3.4)], v);
+  risco(p, [canela(0.6, -3.4), canela(0.76, -1)], v);
 }
 
 /**
@@ -312,8 +323,8 @@ function capa(p: Pintor, e: Esqueleto) {
   const vento = Math.max(0, Math.min(1.1, e.pose.vento ?? 0));
   // Presa por baixo das ombreiras, em UNIDADES do corpo. Com `e.corpo.tronco` (que já chega
   // multiplicado) o noTronco escalava duas vezes, e a capa saía flutuando acima dos ombros.
-  const nuca = t(-2.5, corpoDoPicole.tronco + 0.8);
-  const costas = t(-11, corpoDoPicole.tronco - 1.2);
+  const nuca = t(-2.2, corpoDoPicole.tronco + 0.6);
+  const costas = t(-10, corpoDoPicole.tronco - 1.6);
   const PASSOS = 4;
   // uma borda: cada trecho gira um pouco mais que o anterior, e ondula com o vento. O giro para
   // na horizontal: passando dela, a borda de cima cruzava a de baixo e a capa virava um nó
@@ -337,9 +348,9 @@ function capa(p: Pintor, e: Esqueleto) {
   // deitado, o pano embola: inteiro, a barra passava dos joelhos e aparecia entre as pernas
   const embola = 1 - arrasta / 350;
   // a borda de baixo curva menos que a de cima: é o que mantém a barra larga com vento forte,
-  // em vez de as duas se juntarem numa fita
-  const tras = borda(costas, 42 * embola, -16 - vento * 8 - deita * 0.5 + arrasta, 80, 0);
-  const frente = borda(nuca, 38 * embola, -2 - deita + arrasta, 50, 1.3);
+  // em vez de as duas se juntarem numa fita. O pano é curto como a perna do boneco
+  const tras = borda(costas, 34 * embola, -18 - vento * 8 - deita * 0.5 + arrasta, 80, 0);
+  const frente = borda(nuca, 30 * embola, -3 - deita + arrasta, 50, 1.3);
   const baixoTras = tras[PASSOS - 1], baixoFrente = frente[PASSOS - 1];
   // a quina de cima da barra é chanfrada: em ângulo agudo o contorno deixava um fiapo solto
   tras[PASSOS - 1] = noOsso(baixoTras, tras[PASSOS - 2], 0.12);
@@ -351,13 +362,13 @@ function capa(p: Pintor, e: Esqueleto) {
   for (let i = 1; i < 6; i++) barra.push(naBarra(i / 6));
   p.peca([{ tipo: 'poligono', pts: [nuca, costas, ...tras, ...barra, ...[...frente].reverse()] }], C.capa);
   // Dobras com volume: cada uma é uma cunha de sombra que nasce fina perto dos ombros e abre até a
-  // barra, com o fundo mais escuro e um fio de luz do lado da frente, de onde vem a luz. Riscos
-  // soltos diziam "dobra" mas deixavam o pano chapado.
-  for (const s of [0.2, 0.47, 0.74]) {
+  // barra, com um fio de luz do lado da frente, de onde vem a luz. Riscos soltos diziam "dobra"
+  // mas deixavam o pano chapado.
+  for (const s of [0.25, 0.62]) {
     const topo = noOsso(tras[0], frente[0], 0.15 + s * 0.7);
-    mancha(p, [topo, naBarra(s - 0.1), naBarra(s + 0.03)], C.dobra);
-    risco(p, [noOsso(topo, naBarra(s - 0.03), 0.3), naBarra(s - 0.03)], C.dobraFunda);
-    risco(p, [noOsso(topo, naBarra(s + 0.07), 0.35), naBarra(s + 0.07)], C.luzPano);
+    mancha(p, [topo, naBarra(s - 0.12), naBarra(s + 0.04)], C.dobra);
+    risco(p, [noOsso(topo, naBarra(s - 0.04), 0.3), naBarra(s - 0.04)], C.dobraFunda);
+    risco(p, [noOsso(topo, naBarra(s + 0.08), 0.4), naBarra(s + 0.08)], C.luzPano);
   }
 }
 
@@ -366,39 +377,37 @@ function ombreira(p: Pintor, e: Esqueleto, frente: boolean) {
   // em unidades, pelo mesmo motivo da capa: `e.corpo.ombroF` já vem escalado
   const o = frente ? corpoDoPicole.ombroF : corpoDoPicole.ombroT;
   // Almofada redonda EM CIMA do ombro, passando dele para os dois lados: é o que faz o "T" da
-  // silhueta. Foi uma placa reta que saía 8 px para a frente e subia até o pescoço, e como o
-  // rosto dele fica à frente do ombro ela lia como uma tábua branca atravessada debaixo do queixo.
-  // Hoje o alto é chato e desce para a frente, longe do queixo.
+  // silhueta. Ela senta um pouco abaixo da gola e recua para trás do ombro: a cabeça grande do
+  // boneco mora logo acima, e colada no queixo a almofada lia como um babador branco.
   const s = frente ? 1 : -1;
-  const no = (f: number, h: number) => t(o[0] + f * s, o[1] + h);
-  const pts: P[] = [no(-5.6, 0.8), no(-4.2, 3), no(0.6, 3.4), no(4.6, 2.4), no(6, 0.4), no(5.6, -1.6), no(4.2, -2.6), no(-4.6, -2.2), no(-5.8, -1)];
+  const no = (f: number, h: number) => t(o[0] + f * s, o[1] + h - 1.4);
+  const pts: P[] = [no(-6, 0.2), no(-4.6, 1.8), no(-0.2, 2.2), no(3.4, 1.5), no(4.8, -0.2), no(4.4, -2.2), no(3, -3.2), no(-5, -2.8), no(-6.2, -1.6)];
   p.peca([{ tipo: 'poligono', pts }], frente ? C.branco : C.brancoAtras);
   // A almofada tem espessura: o terço de baixo é a borda, num tom abaixo e com o vinco em cima.
   // Toda branca, ela lia como uma nuvem debaixo do queixo.
-  mancha(p, [no(-6, -0.4), no(6.4, 0), no(6.4, -3), no(-6, -3)], frente ? C.dobra : C.brancoAtras.sombra);
-  risco(p, [no(-5.4, -0.4), no(1.6, 0.1), no(6, -0.2)], frente ? C.dobraFunda : C.brancoAtras.sombra);
+  mancha(p, [no(-6.6, -1), no(5.4, -0.6), no(5.4, -3.6), no(-6.6, -3.6)], frente ? C.dobra : C.brancoAtras.sombra);
+  risco(p, [no(-5.8, -1), no(0.8, -0.5), no(4.8, -0.8)], frente ? C.dobraFunda : C.brancoAtras.sombra);
 }
 
 function tronco(p: Pintor, e: Esqueleto, pl: Pele, forte: boolean) {
   const t = (f: number, h: number) => noTronco(e, f, h);
   if (forte) {
     // o trapézio do laranja sobe por trás do pescoço: é o ombro de quem ficou maior
-    p.peca([{ tipo: 'poligono', pts: [t(-8.2, 17.4), t(-4.8, 22.8), t(0.6, 24.2), t(5.4, 22.8), t(9, 18.6), t(0, 16)] }], pl.pele);
+    p.peca([{ tipo: 'poligono', pts: [t(-8.4, 11.4), t(-5.2, 15.4), t(0.4, 16.4), t(5.4, 15.6), t(9.2, 12.4), t(0, 10.4)] }], pl.pele);
   }
-  // quimono sem manga, estreito na cintura; o laranja o estica no peito
+  // quimono sem manga, curto e largo como o tronco do boneco; o laranja o estica no peito
   const w = forte ? 1.2 : 0;
   p.peca([{
     tipo: 'poligono',
-    pts: [t(-7.4 - w, 17.5), t(-4.5 - w * 0.6, 20.8 + w * 0.4), t(4 + w * 0.5, 21 + w * 0.4), t(8.2 + w, 18), t(7.8 + w, 11), t(5.6 + w * 0.6, 3.6), t(-5.2 - w * 0.4, 2), t(-6.8 - w, 9)],
+    pts: [t(-7.6 - w, 12), t(-5 - w * 0.6, 15.2 + w * 0.3), t(3.6 + w * 0.5, 15.4 + w * 0.3), t(8.2 + w, 12.4), t(8.4 + w, 7), t(7 + w * 0.6, 1.6), t(-6.2 - w * 0.4, 0.8), t(-7.8 - w, 6)],
   }], C.roxo);
   // o pano desce das axilas e junta na faixa
-  risco(p, [t(-5.4 - w, 15.2), t(-4.2, 10.6), t(-3, 6.4)], C.vincoRoxo);
-  risco(p, [t(6.6 + w, 13.2), t(5.2 + w * 0.5, 9.4), t(4.4, 6.8)], C.vincoRoxo);
-  risco(p, [t(0.4, 11.4), t(1.2, 6.8)], C.vincoRoxo);
+  risco(p, [t(-5.6 - w, 10.4), t(-4.4, 6.6), t(-3.4, 4.2)], C.vincoRoxo);
+  risco(p, [t(6.6 + w, 9.2), t(5.4 + w * 0.5, 5.4)], C.vincoRoxo);
   // o decote em V mostra o peito; a borda dele é o pano do quimono, e não um risco de pele escura
-  const decote = forte ? [t(-1, 21.6), t(7.4, 21), t(3.6, 11.6)] : [t(0.4, 21), t(5.6, 20.6), t(3.2, 14.2)];
-  p.peca([{ tipo: 'poligono', pts: decote }], { ...pl.pele, faixa: 0, linha: C.vincoRoxo });
-  risco(p, forte ? [t(1.2, 17.4), t(3, 16.2), t(5.6, 16.8)] : [t(1.8, 17.8), t(4.4, 17.3)], pl.vinco);
+  const decote = forte ? [t(-0.8, 15.8), t(7.4, 15.2), t(3.6, 8.6)] : [t(0.2, 15.4), t(5.6, 15.1), t(3.1, 10.2)];
+  p.peca([{ tipo: 'poligono', pts: decote }], { ...pl.pele, faixa: 1, linha: C.vincoRoxo });
+  if (forte) risco(p, [t(1.4, 12.6), t(3.2, 11.8), t(5.6, 12.2)], pl.vinco);
 }
 
 /**
@@ -409,102 +418,121 @@ function faixaDaCintura(p: Pintor, e: Esqueleto, forte: boolean) {
   const k = escalaDe(e);
   const t = (f: number, h: number) => noTronco(e, f, h);
   const w = forte ? 0.8 : 0;
-  p.peca([{ tipo: 'poligono', pts: [t(-5.8 - w, 6), t(6.6 + w, 6.8), t(6.6 + w, 2.6), t(-5.6 - w, 1.6)] }], C.faixa);
-  risco(p, [t(-5.4 - w, 4), t(1, 4.5), t(6.2 + w, 4.7)], C.vincoFaixa);
+  p.peca([{ tipo: 'poligono', pts: [t(-6.6 - w, 5.4), t(7.4 + w, 6), t(7.4 + w, 1.8), t(-6.4 - w, 0.8)] }], C.faixa);
+  risco(p, [t(-6 - w, 3.2), t(1, 3.7), t(7 + w, 3.9)], C.vincoFaixa);
   const vento = Math.max(0, Math.min(1, e.pose.vento ?? 0));
   // as duas pontas se abrem em V: paralelas e grossas, liam como uma alça pendurada
-  const ponta = (de: P, comp: number, abre: number): Forma => ({ tipo: 'capsula', a: de, b: soma(de, dir(abre - vento * 55), comp * k), ra: 1, rb: 0.75 });
-  p.peca([ponta(t(4.8 + w, 3.6), 6.2, 16), ponta(t(5.6 + w, 3.4), 5, -14)], C.faixa);
-  p.peca([{ tipo: 'elipse', c: t(5.3 + w, 4.3), rx: 1.6, ry: 1.5 }], C.faixa);
+  const ponta = (de: P, comp: number, abre: number): Forma => ({ tipo: 'capsula', a: de, b: soma(de, dir(abre - vento * 55), comp * k), ra: 1.2, rb: 0.9 });
+  p.peca([ponta(t(5.4 + w, 2.6), 6, 16), ponta(t(6.4 + w, 2.4), 4.8, -14)], C.faixa);
+  p.peca([{ tipo: 'elipse', c: t(6 + w, 3.4), rx: 1.9, ry: 1.8 }], C.faixa);
 }
 
 /**
- * Turbante: bulbo e volta na testa numa peça só — com um risco de contorno entre os dois, ele
- * virava um chapéu de dois andares. O bulbo pende para trás, e as voltas do pano (sombra embaixo,
- * brilho em cima) cruzam na frente, de onde saem as antenas: é pano enrolado, não capacete.
+ * Turbante: domo e volta na testa numa peça só — com um risco de contorno entre os dois, ele
+ * virava um chapéu de dois andares. No boneco ele é quase do tamanho do rosto, e é metade da
+ * cabeça grande. As voltas do pano SOBEM de trás para a frente, com sombra embaixo e brilho em
+ * cima: deitadas, paralelas ao chão, faziam do turbante uma pilha de panquecas.
  */
 function turbante(p: Pintor, e: Esqueleto, grande: boolean) {
   const h = (f: number, a: number) => naCabeca(e, f, a);
   p.peca([
-    { tipo: 'elipse', c: h(-2.2, 9.8), rx: 6.1, ry: 6, ang: e.angCabeca - 24 },
-    { tipo: 'poligono', pts: [h(-5.6, 2.2), h(1, 3.0), h(4.8, 3.2), h(5.6, 5.0), h(5.2, 7.2), h(-6.4, 7.0)] },
-  ], C.branco);
-  // As voltas SOBEM de trás para a frente e cruzam acima da testa. Deitadas, paralelas ao chão,
-  // elas faziam do turbante uma pilha de panquecas.
-  const volta = (pts: P[]) => {
-    risco(p, pts.map(([f, a]) => h(f, a)), C.dobraFunda);
-    if (grande) risco(p, pts.map(([f, a]) => h(f - 0.5, a + 0.7)), C.luzPano);
+    { tipo: 'elipse', c: h(-1.6, 11), rx: 9.4, ry: 8.4, ang: e.angCabeca - 12 },
+    { tipo: 'poligono', pts: [h(-9.8, 2.6), h(-3, 2.6), h(3.6, 3.2), h(8.6, 4.2), h(9.4, 6.8), h(8.4, 9.6), h(-10.4, 9.4)] },
+  ], C.turbante);
+  const volta = (baixo: P[], alto: P[]) => {
+    mancha(p, [...baixo, ...[...alto].reverse()].map(([f, a]) => h(f, a)), C.dobra);
+    risco(p, baixo.map(([f, a]) => h(f, a)), C.dobraFunda);
+    if (grande) risco(p, alto.map(([f, a]) => h(f, a + 0.7)), C.luzPano);
   };
-  volta([[-6.4, 5.4], [-2, 7.4], [3.4, 10.4]]);
-  volta([[-7.8, 9.2], [-4.4, 12.4], [0, 15.2]]);
-  if (grande) {
-    // a borda enrolada na testa e a volta que cruza as outras na frente
-    risco(p, [h(-5.2, 3.3), h(1, 4), h(4.9, 4.2)], C.dobra);
-    risco(p, [h(5, 6.4), h(3.4, 9.6), h(1.4, 12.8)], C.dobraFunda);
-  }
+  // a borda enrolada na testa: a dobra de cima separa a volta do domo
+  volta([[-10, 7.6], [-2, 8.2], [5, 8.6], [9.2, 8]], [[-10, 9], [-2, 9.8], [5, 10], [9, 9.4]]);
+  volta([[-10.4, 11.4], [-4, 13.4], [2.6, 17.4]], [[-10.2, 13], [-4, 15], [1.6, 18.6]]);
+  if (grande) risco(p, [h(-7, 4), h(0, 4.4), h(7.4, 5.4)], C.dobra);
 }
 
 /**
- * O rosto pixel a pixel, com o olho como origem. Na luta (cabeça de ~18 px): sobrancelha grossa
- * descendo para o nariz, com um pixel de pele até o turbante; olho com branco e a pupila na frente;
- * a maçã do rosto com brilho em cima e o vinco embaixo; boca reta de canto caído. No retrato do
- * placar (escala 1) a cabeça tem 12 px e o desenho é o de sempre, menor.
+ * O rosto pixel a pixel, com o olho como origem. Na luta (cabeça de ~26 px): sobrancelha grossa
+ * descendo para o nariz, e o olho grande de anime — cílio em cima, a íris alta com o brilho
+ * branco no alto e o fundo mais claro, o branco atrás dela. A boca pequena de canto caído mora
+ * perto do queixo. No retrato do placar (escala 1) o desenho é o mesmo, menor.
  */
 function rosto(p: Pintor, e: Esqueleto, pl: Pele, forte: boolean, grande: boolean) {
   const olhos = e.pose.olhos ?? 'abertos';
   const g: Record<number, string> = {};
   if (grande) {
-    // o laranja franze a testa careca, e a sobrancelha fica mais pesada
-    if (forte) { g[6] = '..VVV..'; g[4] = '.VVVV..'; }
-    g[2] = forte ? 'KKKK...' : 'KKK....';
-    g[1] = forte ? '.KKKKKK' : '..KKKKK';
-    if (olhos === 'abertos') { g[0] = forte ? '..WBWP.' : '..WWWP.'; g[-1] = '....WP.'; g[-2] = '..LL...'; }
-    else if (olhos === 'fechados') { g[-1] = '..KKKK.'; g[-2] = '..LL...'; }
-    else { g[0] = '..K.K..'; g[-1] = '...K...'; g[-2] = '..K.K..'; }
-    g[-3] = '.V.....';
-    g[-4] = '..V....';
-    if (e.pose.grito) { g[-5] = '....KKK'; g[-6] = '...KDRR'; g[-7] = '....KRD'; g[-8] = '.....KK'; }
-    else { g[-6] = '....MMM'; g[-7] = '...M...'; }
+    // o laranja franze a testa careca
+    if (forte) { g[4] = '.VVV......'; g[3] = '...VVV....'; }
+    g[1] = forte ? 'GGG.......' : '.GG.......';
+    g[0] = forte ? '.GGGGG....' : '..GGGG....';
+    g[-1] = '....GGGGG.';
+    if (olhos === 'abertos') {
+      // a quina de fora do cílio desce um pixel: é o traço que faz o olho de anime
+      g[-2] = '.KKKKKKKG.';
+      g[-3] = 'K.WIIIIIK.';
+      g[-4] = '..WIBBIII.';
+      g[-5] = '..WIBBIII.';
+      g[-6] = '..WIIIII..';
+      g[-7] = '..WJJJJI..';
+      g[-8] = '...WJJI...';
+      g[-9] = '....KKK...';
+      g[-10] = '.LL.......';
+    } else if (olhos === 'fechados') {
+      g[-5] = '.KKKKKKK..';
+      g[-4] = 'K.........';
+      g[-6] = '..LLLL....';
+    } else {
+      g[-3] = '..K...K...';
+      g[-4] = '...K.K....';
+      g[-5] = '....K.....';
+      g[-6] = '...K.K....';
+      g[-7] = '..K...K...';
+    }
+    if (e.pose.grito) { g[-10] = '...KKKK...'; g[-11] = '...KDDDK..'; g[-12] = '...KRRK...'; g[-13] = '....KK....'; }
+    else { g[-11] = '...MMMM...'; g[-12] = '..M.......'; }
   } else {
-    g[2] = '..KK...';
-    g[1] = '....KK.';
-    if (olhos === 'abertos') g[0] = '..WWP..';
-    else if (olhos === 'fechados') g[-1] = '..KKK..';
-    else { g[0] = '..K.K..'; g[-1] = '...K...'; g[-2] = '..K.K..'; }
-    if (e.pose.grito) { g[-4] = '...KD..'; g[-5] = '...KK..'; } else g[-4] = '...MM..';
+    g[1] = forte ? 'GGG....' : '.GG....';
+    g[0] = '...GGG.';
+    if (olhos === 'abertos') { g[-1] = '..KKKK.'; g[-2] = '..WIBK.'; g[-3] = '..WII..'; g[-4] = '...J...'; }
+    else if (olhos === 'fechados') g[-2] = '..KKKK.';
+    else { g[-1] = '..K.K..'; g[-2] = '...K...'; g[-3] = '..K.K..'; }
+    if (e.pose.grito) { g[-6] = '...KD..'; g[-7] = '...KK..'; } else g[-6] = '...MM..';
   }
-  const cores = { K: CONTORNO, W: pl.esclera, P: pl.pupila, B: pl.brilho, V: pl.vinco, L: pl.luz, M: pl.boca, D: C.dente, R: C.goela };
-  grade(p, e, grande ? naCabeca(e, 2.2, 0.1) : naCabeca(e, 3.1, -0.5), g, cores);
+  const cores = {
+    K: pl.cilio, G: pl.sobrancelha, W: pl.esclera, I: pl.iris, J: pl.irisBaixo, B: pl.brilho, V: pl.vinco, L: pl.luz,
+    M: pl.boca, D: C.dente, R: C.goela,
+  };
+  grade(p, e, grande ? naCabeca(e, 3.6, 1) : naCabeca(e, 3.4, -0.2), g, cores);
 }
 
 function cabeca(p: Pintor, e: Esqueleto, pl: Pele, forte: boolean) {
   const h = (f: number, a: number) => naCabeca(e, f, a);
   const grande = escalaDe(e) >= 1.25;
-  // pescoço comprido; o do laranja é um tronco
-  p.peca([{ tipo: 'capsula', a: e.pescoco, b: h(-0.6, -3), ra: forte ? 3.3 : 2.5, rb: forte ? 3 : 2.5 }], pl.pele);
-  // rosto de queixo comprido e fino, com o nariz marcando o perfil; careca, ganha o crânio inteiro
+  p.peca([{ tipo: 'capsula', a: e.pescoco, b: h(-0.8, -5), ra: forte ? 4 : 3.2, rb: forte ? 3.8 : 3 }], pl.pele);
+  // rosto de boneco: o crânio redondo e um queixo pequeno na frente; careca, ganha o alto inteiro
   const formas: Forma[] = [
-    { tipo: 'elipse', c: h(0, 0.4), rx: 5, ry: 6, ang: e.angCabeca },
-    { tipo: 'poligono', pts: [h(-3.4, -1.5), h(4.8, 1), h(5.5, -1.5), h(4.9, -2.6), h(5, -3.8), h(3.8, -6.4), h(1, -7.4), h(-2.2, -5.4)] },
+    { tipo: 'elipse', c: h(-0.6, 0.8), rx: 8.2, ry: 8.2 },
+    { tipo: 'poligono', pts: [h(-6, -2), h(-3.6, -6.6), h(0.4, -8.6), h(4.2, -8.6), h(6.9, -6.4), h(8.3, -3.2), h(8.7, -0.6), h(8, 2.6), h(3.6, 4.2)] },
   ];
-  if (forte) formas.push({ tipo: 'elipse', c: h(-0.8, 3.6), rx: 5.7, ry: 6.3, ang: e.angCabeca - 12 });
+  if (forte) formas.push({ tipo: 'elipse', c: h(-1, 3.2), rx: 8.6, ry: 8.4, ang: e.angCabeca - 8 });
   p.peca(formas, pl.pele);
   if (!forte) turbante(p, e, grande);
-  // as antenas saem da testa (furando o turbante, no verde) e se abrem, cada uma para um lado
+  // as antenas saem da testa (furando o turbante, no verde), se abrem e terminam num botão
   const antena = (pts: P[], pele: Tinta) => p.peca([
-    { tipo: 'capsula', a: h(...pts[0]), b: h(...pts[1]), ra: 0.7, rb: 0.55 },
-    { tipo: 'capsula', a: h(...pts[1]), b: h(...pts[2]), ra: 0.55, rb: 0.45 },
-  ], { ...pele, faixa: 0 });
+    { tipo: 'capsula', a: h(...pts[0]), b: h(...pts[1]), ra: forte ? 1 : 0.85, rb: 0.75 },
+    { tipo: 'capsula', a: h(...pts[1]), b: h(...pts[2]), ra: 0.75, rb: 0.65 },
+    { tipo: 'elipse', c: h(...pts[2]), rx: 1.1, ry: 1.1 },
+  ], { ...pele, faixa: 1 });
   if (forte) {
-    antena([[1.4, 8.4], [2, 12], [4.2, 14.6]], pl.peleAtras);
-    antena([[3.4, 7.4], [6.2, 10], [9.2, 10.8]], pl.pele);
+    // careca, as antenas crescem da testa até a altura em que o turbante as deixava
+    antena([[1.4, 9], [1.8, 15.8], [4.6, 20.4]], pl.pele);
+    antena([[4.6, 8], [7.6, 13.8], [10.8, 16.4]], pl.pele);
   } else {
-    antena([[1.2, 11.5], [1.6, 15.2], [4, 17.4]], pl.peleAtras);
-    antena([[3.8, 10], [6.8, 12.6], [9.8, 13]], pl.pele);
+    antena([[1.4, 17.2], [1.2, 21.8], [3.8, 25]], pl.peleAtras);
+    antena([[5, 14.8], [6.4, 19.6], [9.4, 22]], pl.pele);
   }
-  // orelha pontuda, para trás e para cima; o risco de dentro é o que a faz orelha e não chifre
-  p.peca([{ tipo: 'poligono', pts: [h(-1.4, 2.2), h(-5.2, 4.2), h(-10.4, 6.2), h(-6.4, 1.2), h(-3.8, -2.8)] }], { ...pl.pele, faixa: 1 });
-  risco(p, [h(-3.2, 0.4), h(-6.4, 3), h(-9, 5.4)], pl.vinco);
+  // orelha pontuda e grande, para trás e para cima; o risco de dentro é o que a faz orelha e não chifre
+  p.peca([{ tipo: 'poligono', pts: [h(-5.4, 2.4), h(-9, 4.4), h(-14.6, 7), h(-10.6, 0.2), h(-7.4, -3.4), h(-5, -2)] }], { ...pl.pele, faixa: 1 });
+  risco(p, [h(-6.6, 0), h(-10, 3), h(-12.8, 5.6)], pl.vinco);
   rosto(p, e, pl, forte, grande);
 }
 
@@ -530,22 +558,24 @@ export const picole: Personagem = {
 
 export const vitrine: { parado: PoseDoPicole; especial: PoseDoPicole; vitoria: PoseDoPicole } = {
   parado: {
-    quadril: [-1, -27], tronco: 8, cabeca: -5,
-    pernaF: { alvo: [13, -3] }, pernaT: { alvo: [-11, -3] },
-    bracoF: { alvo: [19, -44] }, bracoT: { alvo: [9, -48] },
+    quadril: [-1, -20.5], tronco: 8, cabeca: -6,
+    pernaF: { alvo: [11, -3] }, pernaT: { alvo: [-10, -3] },
+    bracoF: { alvo: [19, -30] }, bracoT: { alvo: [10, -29] },
   },
   especial: {
-    quadril: [-2, -25], tronco: 2, cabeca: -2,
-    pernaF: { alvo: [15, -3] }, pernaT: { alvo: [-15, -3] },
-    // a mão de trás fica escondida atrás do tronco: solta, ela cruzava a capa e sujava a silhueta
-    bracoF: { alvo: [9.5, -56] }, bracoT: { alvo: [2.5, -37] },
+    quadril: [-2, -19.5], tronco: 2, cabeca: -2,
+    pernaF: { alvo: [13, -3] }, pernaT: { alvo: [-13, -3] },
+    // o cotovelo sai para a frente e o antebraço volta até a testa: pelo alvo, o cotovelo dobrava
+    // para baixo e a mão tapava o olho. A de trás fica escondida atrás do tronco: solta, ela
+    // cruzava a capa e sujava a silhueta
+    bracoF: { ang: [85, 125] }, bracoT: { alvo: [3, -27] },
     dedosF: true, grito: true, vento: 0.6,
   },
   vitoria: {
-    quadril: [0, -29], tronco: -2, cabeca: 4,
+    quadril: [0, -21.5], tronco: -2, cabeca: 4,
     pernaF: { alvo: [8, -3] }, pernaT: { alvo: [-7, -3] },
     // braços cruzados: o antebraço da frente deitado sobre o peito, a mão de trás aparecendo na frente
-    bracoF: { ang: [25, -115] }, bracoT: { ang: [20, 110] },
+    bracoF: { ang: [30, -120] }, bracoT: { ang: [25, 110] },
     olhos: 'fechados', vento: 0.4,
   },
 };
@@ -556,8 +586,8 @@ export const vitrine: { parado: PoseDoPicole; especial: PoseDoPicole; vitoria: P
  * faz; esta é a pose de onde o disparo sai.
  */
 export const disparoDoEspecial: PoseDoPicole = {
-  quadril: [-3, -25], tronco: 10, cabeca: -6,
-  pernaF: { alvo: [16, -3] }, pernaT: { alvo: [-17, -3] },
-  bracoF: { alvo: [34, -46] }, bracoT: { alvo: [14, -40] },
+  quadril: [-3, -19.5], tronco: 10, cabeca: -6,
+  pernaF: { alvo: [15, -3] }, pernaT: { alvo: [-15, -3] },
+  bracoF: { alvo: [30, -34] }, bracoT: { alvo: [12, -27] },
   dedosF: true, maoT: 'aberta', grito: true, vento: 1,
 };

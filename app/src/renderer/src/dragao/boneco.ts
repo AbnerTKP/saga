@@ -182,6 +182,8 @@ export type Pintor = {
 
 export function pintor(q: Quadro): Pintor {
   const m = new Mascara(q.largura, q.altura);
+  // o contorno de fora do sprite inteiro: é o que deixa o contorno colorido fechar a silhueta
+  m.bordas = new Uint8Array(q.largura * q.altura);
   const raios = (f: Forma): Forma => (escala === 1 ? f
     : f.tipo === 'capsula' ? { ...f, ra: f.ra * escala, rb: f.rb * escala }
       : f.tipo === 'elipse' ? { ...f, rx: f.rx * escala, ry: f.ry * escala } : f);

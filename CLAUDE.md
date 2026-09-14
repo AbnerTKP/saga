@@ -1623,15 +1623,24 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   por isso as fichas escalam junto (`escalar`, em `fichas.ts`): espaço e pulo 1,5×, velocidade
   1,3× — o mundo continua com 640 px, e lutador maior correndo na mesma proporção atravessaria a
   arena rápido demais.
-- **O contorno é seletivo e a sombra tem cinco tons** (`raster.ts`): por fora do corpo, o escuro;
-  por dentro, onde uma peça cobre outra, um tom escuro da própria peça — o arame preto em volta
-  de cada pedaço era o que dava cara de recorte. Pixel que já era contorno de fora continua
-  escuro, senão a silhueta abre onde duas peças se encontram.
+- **O contorno é seletivo e a sombra tem cinco tons** (`raster.ts`): por fora do corpo, o
+  contorno da peça; por dentro, onde uma peça cobre outra, um tom escuro da própria peça — o
+  arame preto em volta de cada pedaço era o que dava cara de recorte. Quem sabe o que é contorno
+  de FORA é o `bordas` do sprite (e não "é quase preto"), porque os contornos são coloridos: sem
+  isso, a silhueta abria onde duas peças se encontram.
+- **O estilo dos lutadores é o do Goku que o dono mandou num zip** (32x32, feito por ferramenta
+  de pixel art): proporção chibi, com a cabeça em ~40% da altura, olho grande de anime, nenhum
+  contorno preto (cada material se contorna com um tom fundo dele mesmo) e sombra de matiz
+  deslocado com `pontilhado` (a passagem em xadrez de 1 px). A arte de antes — heróica, 1,5× e
+  refinada, a da v0.54.0 — está guardada na tag **`arte-esqueleto-v0.54`**, porque ele pediu
+  para poder voltar. As poses de golpe continuam sendo escritas na medida do Goiaba e esticadas
+  pelo tronco, braço e perna de cada um: mexer nessas três medidas do Goiaba muda o gesto dos
+  outros três.
 - **A transformação é da luta, não de vitrine** (`TRANSFORMACAO`, em `fichas.ts`): tecla P,
-  precisa de uma barra e meia de ki e gasta meia; o grito dura 2,5 s e **apanhar no meio perde a
-  transformação e o ki gasto** — gritar na cara do outro é risco. Transformado, 25% mais dano e
-  15% mais rápido; o ki escoa uma barra a cada 10 s e, zerando, volta ao normal. Round novo começa
-  na forma de sempre. Os nomes são do dono: Super Goiabadin, Super Vegetalzin; Picolé de Laranja e
+  precisa de uma barra e meia de ki e gasta meia; o grito dura 1,1 s e é **invulnerável**.
+  Nasceu com 2,5 s e interrompível ("gritar na cara do outro é risco"), e o dono achou demorado:
+  jogado, o grito virava esperar apanhar. Transformado, 25% mais dano e 15% mais rápido; o ki
+  escoa uma barra a cada 10 s e, zerando, volta ao normal. Round novo começa na forma de sempre. Os nomes são do dono: Super Goiabadin, Super Vegetalzin; Picolé de Laranja e
   Geladeira Dourada seguem a obra (o Piccolo laranja e o Freeza dourado).
 - **Os sons da transformação, do teletransporte e dos raios são gravações que o dono mandou**
   (`dragao/sons/`, tocadas por `somDeArquivo.ts`), recortadas e niveladas por LUFS, e não por
@@ -1641,7 +1650,14 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   (2,3 s a 4,6 s) vai no disparo e o começo vai na carga; do arquivo dos ataques de dedo, o
   primeiro trecho é a carga do Picolé, o segundo o Picolé Espiral e o terceiro o Raio
   Congelante. Tocam por `<audio>`: a página vem de `file://`, e a Web Audio precisaria buscar o
-  arquivo para decodificar.
+  arquivo para decodificar. **Soco, chute e rajada de ki** também são gravações dele, com
+  variações que se revezam (quatro socos e dois chutes tirados dos arquivos, duas rajadas tiradas
+  do começo de dois trechos de um disparo contínuo, que não tinha disparo isolado dentro);
+  o golpe forte leva junto o baque grave sintetizado, que dá o peso.
+- **O volume do jogo mora na arena, com um "Testar"** que toca soco, chute, rajada e raio no
+  volume escolhido — foi o pedido: regular e ouvir antes de entrar na luta. Vale para os
+  gravados e os sintetizados, muda também o que já está tocando, e fica no computador
+  (`cantinho.volumeDaLuta`, lido por `volumeGuardado`: chave vazia não pode virar zero).
 
 ## A limitação que caiu sem ser atacada
 

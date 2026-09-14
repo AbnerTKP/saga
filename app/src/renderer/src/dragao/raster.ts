@@ -28,6 +28,8 @@ export type Tinta = {
   semContorno?: boolean;
   /** O risco de dentro, onde a peça cobre outra; sem ele, sai um tom escuro da própria sombra. */
   linha?: Cor;
+  /** Passagem de sombra e de luz em xadrez de um pixel (o acabamento pintado). */
+  pontilhado?: boolean;
 };
 
 /** A luz vem do alto e da frente (o personagem olha para a direita no desenho). */
@@ -39,6 +41,8 @@ export class Mascara {
   readonly a: number;
   readonly m: Uint8Array;
   x0 = 0; y0 = 0; x1 = -1; y1 = -1;
+  /** Do sprite inteiro, e não da peça: 1 onde o pixel é contorno de FORA (ver `pintarMascara`). */
+  bordas?: Uint8Array;
   constructor(l: number, a: number) {
     this.l = l; this.a = a; this.m = new Uint8Array(l * a);
   }
@@ -129,18 +133,23 @@ export function marcarForma(m: Mascara, f: Forma) {
 export function pintarMascara(q: Quadro, m: Mascara, t: Tinta, luz: P = LUZ) {
   if (m.x1 < m.x0) return;
   const W = q.largura;
+  const bordas = m.bordas;
   if (!t.semContorno) {
-    // Contorno seletivo: por fora do corpo, o escuro de sempre; por DENTRO (a peça cobre outra
-    // já pintada), um tom escuro da própria peça. É o que separa o braço do peito sem desenhar um
-    // arame preto em volta de cada pedaço — o risco preto por dentro é o que dava cara de recorte.
-    // Pixel que já era contorno de fora (ou cabelo escuro) continua escuro: a silhueta não abre.
+    // Contorno seletivo: por fora do corpo, o contorno da própria peça; por DENTRO (a peça cobre
+    // outra já pintada), um tom escuro da própria peça. É o que separa o braço do peito sem
+    // desenhar um arame em volta de cada pedaço. Pixel que já era contorno de FORA continua como
+    // estava: a silhueta não abre onde duas peças se encontram. Quem sabe o que é contorno de fora
+    // é o `bordas` do sprite; sem ele (efeitos), vale o palpite de sempre, "é quase preto".
     const dentro = t.linha ?? misturar(t.sombra, t.contorno, 0.55);
     for (let y = Math.max(0, m.y0 - 1); y <= Math.min(q.altura - 1, m.y1 + 1); y++) {
       for (let x = Math.max(0, m.x0 - 1); x <= Math.min(W - 1, m.x1 + 1); x++) {
         if (m.tem(x, y)) continue;
         if (m.tem(x - 1, y) || m.tem(x + 1, y) || m.tem(x, y - 1) || m.tem(x, y + 1)) {
-          const antes = q.px[y * W + x];
-          q.px[y * W + x] = antes === 0 || escura(antes) ? t.contorno : dentro;
+          const i = y * W + x;
+          const antes = q.px[i];
+          if (antes === 0) { q.px[i] = t.contorno; if (bordas) bordas[i] = 1; }
+          else if (bordas ? bordas[i] === 1 : escura(antes)) q.px[i] = bordas ? antes : t.contorno;
+          else q.px[i] = dentro;
         }
       }
     }
@@ -155,14 +164,24 @@ export function pintarMascara(q: Quadro, m: Mascara, t: Tinta, luz: P = LUZ) {
   const mx = Math.round(luz[0] * 2.6), my = Math.round(luz[1] * 2.6);
   const funda = misturar(t.sombra, t.contorno, 0.3);
   const meiaLuz = t.luz !== undefined ? misturar(t.base, t.luz, 0.45) : t.base;
+  // Pontilhado: a passagem da base para a sombra (e para a meia-luz) em xadrez de um pixel, em vez
+  // de um degrau limpo — é o que dá o acabamento pintado à mão da arte que o dono mandou.
+  const px2 = Math.round(-luz[0] * (faixa + 1)), py2 = Math.round(-luz[1] * (faixa + 1));
+  const mx2 = Math.round(luz[0] * 3.8), my2 = Math.round(luz[1] * 3.8);
   for (let y = m.y0; y <= m.y1; y++) {
     for (let x = m.x0; x <= m.x1; x++) {
       if (!m.tem(x, y)) continue;
       let c = t.base;
+      const xadrez = ((x + y) & 1) === 0;
       if (faixa > 0 && !m.tem(x + sx, y + sy)) c = faixa > 1 && !m.tem(x + fx, y + fy) && m.tem(x - fx, y - fy) ? funda : t.sombra;
       else if (t.luz !== undefined && !m.tem(x + lx, y + ly)) c = t.luz;
       else if (t.luz !== undefined && faixa > 1 && !m.tem(x + mx, y + my)) c = meiaLuz;
-      if (x >= 0 && y >= 0 && x < W && y < q.altura) q.px[y * W + x] = c;
+      else if (t.pontilhado && faixa > 0 && !m.tem(x + px2, y + py2)) c = xadrez ? t.sombra : t.base;
+      else if (t.pontilhado && t.luz !== undefined && !m.tem(x + mx2, y + my2)) c = xadrez ? meiaLuz : t.base;
+      if (x >= 0 && y >= 0 && x < W && y < q.altura) {
+        q.px[y * W + x] = c;
+        if (bordas) bordas[y * W + x] = 0;
+      }
     }
   }
 }
