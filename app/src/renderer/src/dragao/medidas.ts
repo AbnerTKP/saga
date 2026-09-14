@@ -11,9 +11,10 @@ export const CHAO = 198;
  */
 export const MUNDO = 640;
 /**
- * O tamanho dos lutadores na tela: os personagens são escritos em "unidades" (o Goiaba tem uns 66
- * de altura) e desenhados 1,5 vezes maiores. Com 66 pixels a cabeça tinha 12, e rosto, mão e
- * músculo não cabiam; com uns 100 o lutador ocupa quase metade da altura, como nos jogos de luta
- * de fliperama. A simulação mede em pixels da tela: as fichas já vêm nesta escala.
+ * O tamanho dos lutadores na tela: os personagens são escritos em "unidades" (o Goiaba tem uns 62
+ * de altura) e desenhados nesta escala. Foi 1,5 na v0.54, quando o boneco de esqueleto precisava
+ * de pixels para rosto e mão; com o sprite do zip ampliado 3x o lutador ocupava quase metade da
+ * tela, e o dono achou "enorme". Hoje o zip vai 2x e a escala é 1: 62 pixels. A simulação mede em
+ * pixels da tela: as fichas já vêm nesta escala.
  */
-export const ESCALA = 1.5;
+export const ESCALA = 1;

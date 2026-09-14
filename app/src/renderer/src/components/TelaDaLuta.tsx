@@ -215,6 +215,7 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair,
     sons.volume = volume;
     gravados.tocar('golpe-soco');
     setTimeout(() => gravados.tocar('golpe-chute'), 320);
+    setTimeout(() => gravados.tocar('golpe-ar'), 480);
     setTimeout(() => gravados.tocar('golpe-defesa'), 640);
     setTimeout(() => { gravados.tocar('golpe-forte'); sons.tocar('forte'); }, 960);
     setTimeout(() => gravados.tocar('disparo-ki'), 1350);

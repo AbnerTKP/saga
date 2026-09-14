@@ -126,7 +126,7 @@ export const TEMPO_DO_ROUND = 99;
 
 /**
  * Os golpes de mão e pé do Goiaba, que servem de régua para os outros. As caixas saem do sprite de
- * pixel (3 pixels da tela por pixel do zip, divididos pela `ESCALA`): o punho esticado vai 12
+ * pixel (2 pixels da tela por pixel do zip, na `ESCALA` 1): o punho esticado vai 12
  * pixels do zip à frente do pé, a uns 13 de altura, e o pé do chute, 12 à frente e baixo. Com as
  * caixas do boneco antigo, que tinha perna comprida, o chute acertava 20 pixels antes de encostar.
  */

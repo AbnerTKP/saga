@@ -18,10 +18,10 @@ const CHAVES_DA_LUTA = [
   'sumindo',
 ];
 
-test('o parado do Goiaba é o zip, pixel por pixel, ampliado 3x com o pé na âncora', () => {
+test('o parado do Goiaba é o zip, pixel por pixel, ampliado 2x com o pé na âncora', () => {
   const q = quadroDoPixel('goiaba', 0, 'parado0')!;
   const e = tamanhoDoPixel;
-  assert.equal(e, 3);
+  assert.equal(e, 2);
   let opacos = 0;
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     const letra = LINHAS_GOIABA[y][x];

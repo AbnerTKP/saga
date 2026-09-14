@@ -1636,7 +1636,12 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   janela escondida o rAF para, e o outro lado ficaria esperando por nós.
 - **Protocolo**: `PROTOCOLO` em `lutas.mjs` e `PROTOCOLO_DA_LUTA` no app. Mudou a simulação
   de um jeito que a versão anterior não entende, sobe o número: app velho não senta.
-- **Os lutadores são desenhados 1,5× maiores do que são escritos** (`ESCALA`, em `medidas.ts`).
+- **O tamanho mudou duas vezes, e hoje a escala é 1** (`ESCALA`, em `medidas.ts`). Na v0.54 os
+  lutadores ficaram 1,5× maiores para o boneco de esqueleto ter rosto e mão; com o sprite do zip
+  ampliado 3x o dono achou "enorme", e na v0.56.1 o zip vai 2x (62 px) com a escala 1. Tudo o que
+  a simulação mede escala junto, então encolher mudou a luta (`PROTOCOLO` 5), e com o raio mais
+  lento a última batida da super deixava de caber nos 70 quadros: hoje a batida que derruba é a
+  última que cabe. O que segue é da mudança para 1,5, e vale ao contrário:
   O dono achou os cenários perfeitos e disse que os personagens "merecem refinamento", e o
   limite era o tamanho: com 66 px de altura a cabeça tinha 12, e rosto, mão e músculo não
   cabiam. O motor escala sozinho o que passa pelos ajudantes de `boneco.ts` e os raios das
@@ -1680,7 +1685,11 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   grave, defesa é o estalo mais claro (menos grave em relação ao total). Deu mais cinco socos,
   três chutes, quatro defesas (a defesa era um estalo sintetizado que ninguém ouvia) e um golpe
   forte, sorteados sem repetir o anterior e igualados pela média (-16,5 dB; defesa -19). **Se
-  alguma classificação estiver errada é de ouvido, e é do dono.** A aura de carregar ki é o
+  alguma classificação estiver errada é de ouvido, e é do dono.** Duas daquelas "defesas" eram
+  vento de golpe (subida lenta, quase sem grave) e viraram, com um terceiro trecho, o **golpe no
+  ar** que o dono pediu "mais oco": toca quando o soco ou o chute passa do primeiro quadro que
+  acerta sem encostar em ninguém, com os agudos cortados acima de 2,8 kHz e a -19. Achar de onde
+  saiu cada recorte foi por envelope (5 ms) contra o pacote inteiro — correlação acima de 0,99. A aura de carregar ki é o
   mesmo arquivo do estouro da transformação (md5 igual): o estouro usa o começo, a aura usa o
   zumbido com raios de 1,8 s a 9,3 s, em laço enquanto a tecla está segurada.
 - **O volume do jogo mora na arena, com um "Testar"** que toca soco, chute, rajada e raio no

@@ -5,7 +5,7 @@
  *
  * Tocam por `<audio>`, e não pela Web Audio: a página vem de `file://`, e buscar o arquivo para
  * decodificar esbarraria no esquema. Os níveis foram acertados no próprio arquivo: estouro da
- * transformação a -14 LUFS, disparos a -15, soco e chute com média perto de -16,5, defesa a -19,
+ * transformação a -14 LUFS, disparos a -15, soco e chute com média perto de -16,5, defesa e golpe no ar a -19,
  * a aura de carregar ki a -21 (em laço, por baixo da luta). Soco, chute e defesa têm várias
  * gravações e são sorteadas: o mesmo estalo dez vezes seguidas cansa o ouvido.
  */
@@ -33,8 +33,9 @@ import chute4 from './sons/chute-4.ogg';
 import chute5 from './sons/chute-5.ogg';
 import defesa1 from './sons/defesa-1.ogg';
 import defesa2 from './sons/defesa-2.ogg';
-import defesa3 from './sons/defesa-3.ogg';
-import defesa4 from './sons/defesa-4.ogg';
+import ar1 from './sons/ar-1.ogg';
+import ar2 from './sons/ar-2.ogg';
+import ar3 from './sons/ar-3.ogg';
 import forte1 from './sons/forte-1.ogg';
 import auraKi from './sons/aura-ki.ogg';
 import rajada1 from './sons/rajada-1.ogg';
@@ -48,7 +49,9 @@ const ARQUIVOS: Record<SomGravado, string[]> = {
   'dedo-carga': [dedoCarga], 'dedo-picole': [dedoPicole], 'dedo-geladeira': [dedoGeladeira],
   'golpe-soco': [soco1, soco2, soco3, soco4, soco5, soco6, soco7, soco8, soco9],
   'golpe-chute': [chute1, chute2, chute3, chute4, chute5],
-  'golpe-defesa': [defesa1, defesa2, defesa3, defesa4],
+  'golpe-defesa': [defesa1, defesa2],
+  // o soco e o chute que não encostam em ninguém: o vento do golpe, com os agudos cortados para soar oco
+  'golpe-ar': [ar1, ar2, ar3],
   'golpe-forte': [forte1],
   'disparo-ki': [rajada1, rajada2],
   'aura-ki': [auraKi],

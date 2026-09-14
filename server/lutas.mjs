@@ -27,7 +27,7 @@ export const ROUNDS = [1, 2];
  * ouve para atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior —
  * e muda junto com `PROTOCOLO_DA_LUTA`, no app (o teste confere os dois).
  */
-export const PROTOCOLO = 4; // 4: caixas de golpe e altura dos disparos do sprite de pixel
+export const PROTOCOLO = 5; // 5: lutadores menores (escala 1)
 /** Quadros por segundo da simulação, fixos — o `QPS` do app. É por eles que se confere o resultado. */
 export const QPS = 60;
 

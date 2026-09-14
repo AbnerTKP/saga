@@ -624,6 +624,9 @@ function moverProjeteis(e: EstadoDaLuta, entradas: readonly [Entrada, Entrada]) 
     if (e.fase === 'luta' && p.quadro >= p.proximaBatida && p.batidas > 0 && vulneravel(alvo) && cruza(caixa, corpo)) {
       p.batidas--;
       p.proximaBatida = p.quadro + p.intervalo;
+      // A batida que derruba é a última que CABE: com a parada de 2 quadros de cada batida, as dez
+      // da super não cabiam nos 70 quadros do raio, e ele acabava sem derrubar ninguém.
+      if (p.resta <= p.intervalo + 2) p.batidas = 0;
       const ultima = p.batidas === 0;
       const deOndeVem = p.direcao;
       const onde: [number, number] = [alvo.x / SUB - p.direcao * FICHAS[alvo.id].corpo.meiaLargura, p.y / SUB];

@@ -8,12 +8,13 @@
  * dura enquanto o lutador grita, e cala quando a transformação completa ou quando ele apanha.
  */
 import type { SomDaLuta } from './sons.ts';
+import { FICHAS, ehGolpeDeCorpo } from './fichas.ts';
 import { camera } from './luta.ts';
 import { TELA } from './medidas.ts';
 import { SUB, type EstadoDaLuta } from './tipos.ts';
 
 export type SomGravado = 'grito' | 'transformacao' | 'teletransporte' | 'raio-carga' | 'raio-disparo' | 'dedo-carga' | 'dedo-picole' | 'dedo-geladeira'
-  | 'golpe-soco' | 'golpe-chute' | 'golpe-defesa' | 'golpe-forte' | 'disparo-ki' | 'aura-ki';
+  | 'golpe-soco' | 'golpe-chute' | 'golpe-defesa' | 'golpe-forte' | 'golpe-ar' | 'disparo-ki' | 'aura-ki';
 
 export type Toque = { som: SomDaLuta | SomGravado; pan: number; /** quem pode ser calado depois */ chave?: string };
 
@@ -38,6 +39,12 @@ export function sonsNovos(e: EstadoDaLuta, vistos: Set<string>): Toque[] & { cal
       novo(`i${i}:${l.impactoEm}`, som, pan(l.x));
     }
     const comeco = e.quadro - l.quadro;
+    // Golpe no ar: passou o primeiro quadro que acerta e não encostou em ninguém, toca o vento,
+    // oco. Encostando, quem fala é o impacto — os dois juntos embolavam o soco.
+    if (ehGolpeDeCorpo(l.acao) && !l.acertou) {
+      const g = FICHAS[l.id].golpes[l.acao];
+      if (l.quadro > g.inicio && l.quadro <= g.inicio + g.ativo) novo(`v${i}:${comeco}`, 'golpe-ar', pan(l.x));
+    }
     if (l.acao === 'sumindo' && l.quadro < 3) novo(`s${i}:${comeco}`, 'teletransporte', pan(l.x));
     // O grito vale enquanto ele grita: começou a gritar, toca; parou (virou, ou apanhou), cala.
     if (l.acao === 'transformando') novo(`t${i}:${comeco}`, 'grito', pan(l.x), `grito${i}`);

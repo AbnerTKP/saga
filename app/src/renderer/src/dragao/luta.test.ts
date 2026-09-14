@@ -225,7 +225,8 @@ test('transformado bate mais forte, o ki escoa e, zerando, volta ao normal', () 
   const socoNoOutro = (forma: 0 | 1) => {
     const x = aoLutar(luta());
     x.lutadores[0].forma = forma;
-    x.lutadores[1].x = x.lutadores[0].x + 40 * SUB;
+    // de perto o bastante para o soco alcançar em qualquer escala: a ponta da caixa, mais o corpo do outro
+    x.lutadores[1].x = x.lutadores[0].x + Math.round((FICHAS.goiaba.golpes.soco1.caixa[2] + FICHAS.vegetal.corpo.meiaLargura - 4) * SUB);
     avancar(x, [BOTAO.SOCO, 0]);
     rodar(x, 20);
     return FICHAS.vegetal.vida - x.lutadores[1].vida;
@@ -238,7 +239,7 @@ test('transformado bate mais forte, o ki escoa e, zerando, volta ao normal', () 
   // e round novo começa na forma de sempre
   a.forma = 1;
   b.vida = 1;
-  b.x = a.x + 40 * SUB;
+  b.x = a.x + Math.round((FICHAS.goiaba.golpes.soco1.caixa[2] + FICHAS.vegetal.corpo.meiaLargura - 4) * SUB);
   avancar(e, [BOTAO.SOCO, 0]);
   rodar(e, DURACAO.nocaute + DURACAO.fimDoRound + 10);
   assert.equal(e.round, 2);

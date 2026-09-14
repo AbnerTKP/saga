@@ -1,5 +1,5 @@
 /**
- * O lutador de pixel pronto para a luta: a pose montada, vestida com a forma e ampliada 3x sem
+ * O lutador de pixel pronto para a luta: a pose montada, vestida com a forma e ampliada 2x sem
  * suavizar, no mesmo quadro e com a mesma âncora do sprite dos outros lutadores — o jogo cola um
  * ou outro sem saber a diferença.
  *
@@ -15,8 +15,8 @@ import { ROUPA_GOIABA, type Rampa, trocarRampa } from './materiais.ts';
 import { type Pecas, pecasDoGoiaba } from './pecas.ts';
 import { ALTURA_DA_ARTE, LARGURA_DA_ARTE, type Lutador, montarPose, PE_NA_ARTE, POSES } from './poses.ts';
 
-/** Quantos pixels da tela cada pixel da arte ocupa. */
-export const tamanhoDoPixel = 3;
+/** Quantos pixels da tela cada pixel da arte ocupa: 2, na `ESCALA` 1 (com 3 o lutador ficava enorme). */
+export const tamanhoDoPixel = 2;
 
 /** As poses que existem, na ordem da tabela. */
 export const CHAVES_DO_PIXEL = Object.keys(POSES);
