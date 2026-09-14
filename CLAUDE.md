@@ -1613,6 +1613,35 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   janela escondida o rAF para, e o outro lado ficaria esperando por nós.
 - **Protocolo**: `PROTOCOLO` em `lutas.mjs` e `PROTOCOLO_DA_LUTA` no app. Mudou a simulação
   de um jeito que a versão anterior não entende, sobe o número: app velho não senta.
+- **Os lutadores são desenhados 1,5× maiores do que são escritos** (`ESCALA`, em `medidas.ts`).
+  O dono achou os cenários perfeitos e disse que os personagens "merecem refinamento", e o
+  limite era o tamanho: com 66 px de altura a cabeça tinha 12, e rosto, mão e músculo não
+  cabiam. O motor escala sozinho o que passa pelos ajudantes de `boneco.ts` e os raios das
+  peças; **medida em pixel somada direto a um ponto não escala**, e foi assim que a capa do
+  Picolé e o rabo da Geladeira saíram soltos e curtos na primeira passada. O retrato do placar
+  continua na escala 1, que é o que cabe nos 32 px dele. A simulação mede em pixels da tela, e
+  por isso as fichas escalam junto (`escalar`, em `fichas.ts`): espaço e pulo 1,5×, velocidade
+  1,3× — o mundo continua com 640 px, e lutador maior correndo na mesma proporção atravessaria a
+  arena rápido demais.
+- **O contorno é seletivo e a sombra tem cinco tons** (`raster.ts`): por fora do corpo, o escuro;
+  por dentro, onde uma peça cobre outra, um tom escuro da própria peça — o arame preto em volta
+  de cada pedaço era o que dava cara de recorte. Pixel que já era contorno de fora continua
+  escuro, senão a silhueta abre onde duas peças se encontram.
+- **A transformação é da luta, não de vitrine** (`TRANSFORMACAO`, em `fichas.ts`): tecla P,
+  precisa de uma barra e meia de ki e gasta meia; o grito dura 2,5 s e **apanhar no meio perde a
+  transformação e o ki gasto** — gritar na cara do outro é risco. Transformado, 25% mais dano e
+  15% mais rápido; o ki escoa uma barra a cada 10 s e, zerando, volta ao normal. Round novo começa
+  na forma de sempre. Os nomes são do dono: Super Goiabadin, Super Vegetalzin; Picolé de Laranja e
+  Geladeira Dourada seguem a obra (o Piccolo laranja e o Freeza dourado).
+- **Os sons da transformação, do teletransporte e dos raios são gravações que o dono mandou**
+  (`dragao/sons/`, tocadas por `somDeArquivo.ts`), recortadas e niveladas por LUFS, e não por
+  pico: o estouro da transformação a -14, os disparos a -15, carga e teletransporte a -18 e -19.
+  O grito dura enquanto o lutador grita e cala em 120 ms quando a transformação completa ou é
+  interrompida — o pedido foi que o som não ficasse depois. Do "basic beam", só o estouro
+  (2,3 s a 4,6 s) vai no disparo e o começo vai na carga; do arquivo dos ataques de dedo, o
+  primeiro trecho é a carga do Picolé, o segundo o Picolé Espiral e o terceiro o Raio
+  Congelante. Tocam por `<audio>`: a página vem de `file://`, e a Web Audio precisaria buscar o
+  arquivo para decodificar.
 
 ## A limitação que caiu sem ser atacada
 
@@ -1874,7 +1903,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (460) + app (386), segundos, sem nada externo
+pnpm test        # servidor (460) + app (388), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -2056,4 +2085,6 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   a latência real entre as casas; o som (sintetizado em `sons.ts`, nunca ouvido — os testes
   são mudos); o Windows e máquina fraca; a plateia com a tela do app (só com robô); a
   reconexão depois de uma queda de verdade no meio da luta; e se a luta está equilibrada e
-  divertida, que é de mão e não de teste.
+  divertida, que é de mão e não de teste. Os sons gravados (grito, transformação, teletransporte,
+  raios) foram medidos em LUFS e nunca ouvidos aqui: o equilíbrio entre eles é de ouvido, e é do
+  dono.

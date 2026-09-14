@@ -8,6 +8,7 @@
  * forte, e o golpe grande com tempo de sobra para quem estiver atento pular ou defender.
  */
 import type { Acao, IdDoLutador, TipoDeProjetil } from './tipos.ts';
+import { ESCALA } from './medidas.ts';
 
 export type Caixa = [number, number, number, number];
 
@@ -76,6 +77,30 @@ export type Ficha = {
   super: Poder & { nome: string };
 };
 
+/**
+ * A transformação. Precisa de uma barra e meia de ki e gasta meia; o grito dura dois segundos e
+ * meio, e quem apanha no meio perde a transformação e o ki gasto — é o risco de gritar na cara do
+ * outro. Transformado, bate e anda mais; o ki escoa (uma barra a cada 10 s) e, zerando, volta ao
+ * normal.
+ */
+export const TRANSFORMACAO = {
+  kiMinimo: 150,
+  custo: 50,
+  duracao: 150,
+  /** Um ponto de ki a cada tantos quadros, enquanto transformado e lutando. */
+  escoamento: 6,
+  dano: 1.25,
+  velocidade: 1.15,
+};
+
+/** O nome da forma transformada de cada um, como aparece no letreiro e no placar. */
+export const NOMES_DAS_FORMAS: Record<IdDoLutador, string> = {
+  goiaba: 'Super Goiabadin',
+  vegetal: 'Super Vegetalzin',
+  picole: 'Picolé de Laranja',
+  geladeira: 'Geladeira Dourada',
+};
+
 export const KI_MAXIMO = 300;
 export const KI_POR_BARRA = 100;
 export const CUSTO_DO_SUMIR = 50;
@@ -87,7 +112,8 @@ export const KI_POR_APANHAR = 4;
 /** Ki com que cada um começa a luta. Passa de um round para o outro. */
 export const KI_INICIAL = 50;
 
-export const GRAVIDADE = 0.36;
+/** Gravidade na escala dos lutadores: com o pulo escalado junto, o tempo no ar continua o mesmo. */
+export const GRAVIDADE = 0.36 * ESCALA;
 /** Quantos quadros vale um toque para a frente esperando o segundo. */
 export const JANELA_DO_DUPLO_TOQUE = 12;
 /** Quadros de parada de impacto. */
@@ -125,7 +151,7 @@ const RAJADA_BASE: Poder = {
   espessura: 6, altura: 38, custo: 25, atordoa: 16,
 };
 
-export const FICHAS: Record<IdDoLutador, Ficha> = {
+const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
   goiaba: {
     id: 'goiaba', nome: 'Goiaba', estilo: 'equilibrado',
     vida: 1000, andar: 1.5, recuar: 1.2, investida: 4, pulo: 6.2,
@@ -168,6 +194,40 @@ export const FICHAS: Record<IdDoLutador, Ficha> = {
     super: { nome: 'Bola Congelante', tipo: 'bola', inicio: 24, duracao: 200, volta: 26, batidas: 1, intervalo: 1, dano: 280, velocidade: 2.4, espessura: 20, altura: 52, custo: 300, atordoa: 0, derruba: true },
   },
 };
+
+/**
+ * As fichas acima estão na medida em que os personagens são escritos (o Goiaba com uns 66 de
+ * altura). Na luta eles são desenhados `ESCALA` vezes maiores, então o que é espaço cresce junto —
+ * caixa de golpe, corpo, altura do disparo, espessura do raio, pulo — e a caixa continua batendo
+ * com o desenho. Velocidade cresce um pouco menos: o mundo continua com 640 pixels, e lutador
+ * maior correndo na mesma proporção atravessaria a arena rápido demais.
+ */
+const VELOCIDADE = 1 + (ESCALA - 1) * 0.6;
+function escalar(f: Ficha): Ficha {
+  const caixa = (c: Caixa): Caixa => [c[0] * ESCALA, c[1] * ESCALA, c[2] * ESCALA, c[3] * ESCALA];
+  const golpes = {} as Ficha['golpes'];
+  for (const [nome, g] of Object.entries(f.golpes) as [keyof Ficha['golpes'], Golpe][]) {
+    golpes[nome] = { ...g, caixa: caixa(g.caixa), empurra: g.empurra * VELOCIDADE, avanca: g.avanca === undefined ? undefined : g.avanca * VELOCIDADE };
+  }
+  const poder = <T extends Poder>(p: T): T => ({
+    ...p, altura: p.altura * ESCALA, espessura: p.espessura * ESCALA,
+    velocidade: p.tipo === 'laser' ? p.velocidade : p.velocidade * VELOCIDADE,
+  });
+  return {
+    ...f,
+    andar: f.andar * VELOCIDADE, recuar: f.recuar * VELOCIDADE, investida: f.investida * VELOCIDADE, pulo: f.pulo * ESCALA,
+    corpo: { meiaLargura: f.corpo.meiaLargura * ESCALA, altura: f.corpo.altura * ESCALA, alturaAgachado: f.corpo.alturaAgachado * ESCALA },
+    golpes, rajada: poder(f.rajada), especial: poder(f.especial), super: poder(f.super),
+  };
+}
+
+export const FICHAS = Object.fromEntries(
+  (Object.entries(NA_MEDIDA_DO_DESENHO) as [IdDoLutador, Ficha][]).map(([id, f]) => [id, escalar(f)]),
+) as Record<IdDoLutador, Ficha>;
+
+/** Quanto as velocidades da luta cresceram com a escala (a simulação usa nas medidas soltas dela). */
+export const ESCALA_DE_VELOCIDADE = VELOCIDADE;
+
 
 /** Os golpes de mão e pé pelo nome da ação. */
 export const GOLPES_DE_CORPO = ['soco1', 'soco2', 'soco3', 'chute1', 'chute2', 'socoBaixo', 'rasteira', 'socoAereo', 'chuteAereo'] as const;

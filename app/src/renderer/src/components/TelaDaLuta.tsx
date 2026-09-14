@@ -16,6 +16,7 @@ import { PROTOCOLO_DA_LUTA } from '../dragao/protocolo';
 import { criarQuadro, limpar, type Quadro } from '../dragao/quadro';
 import { EspectadorDaLuta, SessaoDaLuta, type Jogo, type Transporte } from '../dragao/rede';
 import { criarSonsDaLuta } from '../dragao/sons';
+import { criarSonsGravados, ehGravado } from '../dragao/somDeArquivo';
 import { LEGENDA, ouvirTeclado } from '../dragao/teclado';
 import { IDS_DOS_CENARIOS, IDS_DOS_LUTADORES, type EstadoDaLuta, type IdDoCenario, type IdDoLutador } from '../dragao/tipos';
 import * as goiabaM from '../dragao/personagens/goiaba';
@@ -443,6 +444,7 @@ function Luta({ arena, servidorId, diferenca, surdo, ocupado, live, onAgir, onSa
     const plateia = souLutador ? null : new EspectadorDaLuta({ jogo: JOGO, inicial: null, transporte });
     const teclado = souLutador ? ouvirTeclado(window) : null;
     const sons = criarSonsDaLuta();
+    const gravados = criarSonsGravados();
     const vistos = new Set<string>();
     const quadro = criarQuadro(TELA.largura, TELA.altura);
     const imagem = new ImageData(new Uint8ClampedArray(quadro.px.buffer as ArrayBuffer), TELA.largura, TELA.altura);
@@ -474,8 +476,15 @@ function Luta({ arena, servidorId, diferenca, surdo, ocupado, live, onAgir, onSa
       } else {
         const nomes: [string, string] = [nomeDoLutador(estado.lutadores[0].id).toUpperCase(), nomeDoLutador(estado.lutadores[1].id).toUpperCase()];
         desenharLuta(quadro, estado, { nomes, tique });
-        if (!surdoRef.current) for (const t of sonsNovos(estado, vistos)) sons.tocar(t.som, t.pan);
-        else sonsNovos(estado, vistos);
+        const toques = sonsNovos(estado, vistos);
+        if (!surdoRef.current) {
+          for (const t of toques) {
+            if (ehGravado(t.som)) gravados.tocar(t.som, t.chave);
+            else sons.tocar(t.som, t.pan);
+          }
+        }
+        // o grito cala quando a transformação completa ou é interrompida (e com o fone desligado)
+        for (const chave of toques.calar ?? []) gravados.calar(chave);
         // Acabou para mim: manda o resultado uma vez, com a impressão digital para o servidor comparar.
         if (sessao && estado.fase === 'fimDaLuta' && estado.faseQuadro > 60 && !resultadoMandado && arenaRef.current.estado === 'lutando') {
           resultadoMandado = true;
@@ -501,6 +510,7 @@ function Luta({ arena, servidorId, diferenca, surdo, ocupado, live, onAgir, onSa
       sessao?.fechar();
       plateia?.fechar();
       sons.fechar();
+      gravados.fechar();
       const room = sala;
       sala = null;
       room?.removeAllListeners();

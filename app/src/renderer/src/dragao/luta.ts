@@ -16,16 +16,21 @@ import {
 } from './tipos.ts';
 import {
   CUSTO_DO_SUMIR, DANO_NA_DEFESA, ESCALA_DO_COMBO, FICHAS, GRAVIDADE, JANELA_DO_DUPLO_TOQUE, KI_CARREGANDO, KI_INICIAL,
-  KI_MAXIMO, KI_POR_ACERTO, KI_POR_APANHAR, PARADA, TEMPO_DO_ROUND, ehGolpeDeCorpo, type Altura, type Ficha, type Golpe,
+  KI_MAXIMO, KI_POR_ACERTO, KI_POR_APANHAR, PARADA, TEMPO_DO_ROUND, TRANSFORMACAO, ESCALA_DE_VELOCIDADE, ehGolpeDeCorpo, type Altura, type Ficha, type Golpe,
   type Poder,
 } from './fichas.ts';
-import { MUNDO, TELA } from './medidas.ts';
+import { ESCALA, MUNDO, TELA } from './medidas.ts';
 
 const px = (v: number) => Math.round(v * SUB);
+/** Medida solta de espaço (na medida do desenho) e de velocidade, já na escala dos lutadores. */
+const esp = (v: number) => px(v * ESCALA);
+const vel = (v: number) => px(v * ESCALA_DE_VELOCIDADE);
+/** Transformado anda mais rápido. */
+const rapidez = (l: Lutador) => (l.forma === 1 ? TRANSFORMACAO.velocidade : 1);
 
 const GRAV = px(GRAVIDADE);
-const PAREDE_ESQUERDA = px(12);
-const PAREDE_DIREITA = px(MUNDO - 12);
+const PAREDE_ESQUERDA = px(16);
+const PAREDE_DIREITA = px(MUNDO - 16);
 /** Os dois nunca a mais que isto um do outro: a câmera tem de caber os dois. */
 const DISTANCIA_MAXIMA = px(TELA.largura - 40);
 export const DURACAO = { apresentacao: 110, nocaute: 100, tempo: 60, fimDoRound: 120 };
@@ -38,18 +43,18 @@ const ACOES: Acao[] = [
   'entrada', 'parado', 'andando', 'recuando', 'investida', 'recuo', 'agachado', 'pulando', 'pouso', 'defendendo',
   'defendendoBaixo', 'soco1', 'soco2', 'soco3', 'chute1', 'chute2', 'socoBaixo', 'rasteira', 'socoAereo', 'chuteAereo',
   'rajada', 'especial', 'super', 'carregando', 'sumindo', 'apanhando', 'apanhandoBaixo', 'voando', 'caido', 'levantando',
-  'vitoria', 'derrota',
+  'vitoria', 'derrota', 'transformando',
 ];
 const FASES: Fase[] = ['apresentacao', 'luta', 'nocaute', 'tempo', 'fimDoRound', 'fimDaLuta'];
 const NUMERO_DA_ACAO = new Map(ACOES.map((a, i) => [a, i]));
 
 /** Onde cada um começa o round. */
-const INICIO_X = [px(MUNDO / 2 - 70), px(MUNDO / 2 + 70)];
+const INICIO_X = [px(MUNDO / 2 - 80), px(MUNDO / 2 + 80)];
 
 function novoLutador(id: Lutador['id'], cor: 0 | 1, lado: 0 | 1): Lutador {
   const ficha = FICHAS[id];
   return {
-    id, cor, x: INICIO_X[lado], y: 0, vx: 0, vy: 0, lado: lado === 0 ? 1 : -1,
+    id, cor, forma: 0, formaDesde: -1, x: INICIO_X[lado], y: 0, vx: 0, vy: 0, lado: lado === 0 ? 1 : -1,
     acao: 'entrada', quadro: 0, vida: ficha.vida, vidaAtrasada: ficha.vida, ki: KI_INICIAL,
     atordoado: 0, invencivel: 0, acertou: false, encadear: null, combo: 0, vitorias: 0,
     anterior: 0, toqueFrente: 99, toqueTras: 99,
@@ -101,7 +106,7 @@ export function impressao(e: EstadoDaLuta): number {
     mix(l.x); mix(l.y); mix(l.vx); mix(l.vy); mix(l.lado); mix(NUMERO_DA_ACAO.get(l.acao) ?? -1); mix(l.quadro);
     mix(l.vida); mix(l.vidaAtrasada); mix(l.ki); mix(l.atordoado); mix(l.invencivel); mix(l.acertou ? 1 : 0);
     mix(l.encadear ? NUMERO_DA_ACAO.get(l.encadear) ?? -1 : -1); mix(l.combo); mix(l.vitorias); mix(l.anterior);
-    mix(l.toqueFrente); mix(l.toqueTras); mix(l.impactoEm); mix(l.impactoTipo);
+    mix(l.toqueFrente); mix(l.toqueTras); mix(l.impactoEm); mix(l.impactoTipo); mix(l.forma); mix(l.formaDesde);
   }
   mix(e.projeteis.length);
   for (const p of e.projeteis) {
@@ -154,7 +159,7 @@ export function faseDoGolpe(l: Lutador): 'inicio' | 'ativo' | 'volta' | null {
 export function caixaDoCorpo(l: Lutador): [number, number, number, number] {
   const c = FICHAS[l.id].corpo;
   const x = l.x / SUB, y = l.y / SUB;
-  const altura = agachado(l) ? c.alturaAgachado : l.acao === 'caido' ? 14 : estaNoAr(l) ? Math.round(c.altura * 0.8) : c.altura;
+  const altura = agachado(l) ? c.alturaAgachado : l.acao === 'caido' ? Math.round(14 * ESCALA) : estaNoAr(l) ? Math.round(c.altura * 0.8) : c.altura;
   return [x - c.meiaLargura, y, x + c.meiaLargura, y + altura];
 }
 
@@ -253,6 +258,8 @@ function proximoRound(e: EstadoDaLuta) {
     Object.assign(l, {
       x: INICIO_X[i], y: 0, vx: 0, vy: 0, lado: i === 0 ? 1 : -1, vida: ficha.vida, vidaAtrasada: ficha.vida,
       atordoado: 0, invencivel: 0, acertou: false, encadear: null, combo: 0, impactoTipo: 0,
+      // round novo começa na forma de sempre: a transformação é conquista do round
+      forma: 0,
     });
     mudar(l, 'entrada');
   });
@@ -267,8 +274,8 @@ function mudar(l: Lutador, acao: Acao) {
 
 function derrubar(l: Lutador, direcao: number) {
   mudar(l, 'voando');
-  l.vy = px(4.2);
-  l.vx = direcao * px(2.2);
+  l.vy = esp(4.2);
+  l.vx = direcao * vel(2.2);
   l.y = Math.max(l.y, 1);
   l.atordoado = 0;
 }
@@ -287,6 +294,11 @@ function passo(e: EstadoDaLuta, entradas: readonly [Entrada, Entrada]) {
   moverProjeteis(e, lutando ? entradas : [0, 0]);
   for (const l of e.lutadores) {
     if (l.invencivel > 0) l.invencivel--;
+    // Transformado, o ki escoa; zerou, volta ao normal. Só lutando: a apresentação não gasta.
+    if (l.forma === 1 && lutando && e.quadro % TRANSFORMACAO.escoamento === 0) {
+      l.ki = Math.max(0, l.ki - 1);
+      if (l.ki === 0) { l.forma = 0; l.formaDesde = e.quadro; }
+    }
     const emCombo = ATORDOADO.has(l.acao) || l.acao === 'voando' || l.acao === 'caido';
     if (!emCombo) l.combo = 0;
     if (l.vidaAtrasada < l.vida) l.vidaAtrasada = l.vida;
@@ -353,24 +365,35 @@ function decidir(e: EstadoDaLuta, i: 0 | 1, ent: Entrada) {
     case 'sumindo':
       if (l.quadro === Math.floor(QUADROS.sumir / 2)) {
         // reaparece nas costas do outro, sem sair do mundo
-        l.x = Math.max(PAREDE_ESQUERDA, Math.min(PAREDE_DIREITA, o.x - o.lado * px(30)));
+        l.x = Math.max(PAREDE_ESQUERDA, Math.min(PAREDE_DIREITA, o.x - o.lado * esp(30)));
         l.y = 0;
         l.lado = o.x >= l.x ? 1 : -1;
       }
       if (l.quadro >= QUADROS.sumir) mudar(l, 'parado');
       return;
     case 'investida':
-      l.vx = px(ficha.investida) * l.lado;
+      l.vx = px(ficha.investida * rapidez(l)) * l.lado;
       if (l.quadro >= QUADROS.investida) mudar(l, 'parado');
       else if (apertou & (BOTAO.SOCO | BOTAO.CHUTE)) break; // a investida vira golpe
       else return;
       break;
     case 'recuo':
-      l.vx = -px(3) * l.lado;
+      l.vx = -vel(3) * l.lado;
       if (l.quadro >= QUADROS.recuo) mudar(l, 'parado');
       return;
     case 'vitoria': case 'derrota':
       l.vx = 0;
+      return;
+    case 'transformando':
+      l.vx = 0;
+      if (l.quadro >= TRANSFORMACAO.duracao) {
+        l.forma = 1;
+        l.formaDesde = e.quadro;
+        mudar(l, 'parado');
+        // o estouro: um clarão curto em que só ele se mexe, como o da super
+        e.clarao = 24;
+        e.claraoDe = i;
+      }
       return;
     case 'carregando':
       l.vx = 0;
@@ -387,6 +410,12 @@ function decidir(e: EstadoDaLuta, i: 0 | 1, ent: Entrada) {
   // ---- livre: os botões começam a próxima coisa
   const baixo = (ent & BOTAO.BAIXO) !== 0;
   l.lado = o.x >= l.x ? 1 : -1;
+  if ((apertou & BOTAO.TRANSFORMAR) && l.forma === 0 && l.ki >= TRANSFORMACAO.kiMinimo) {
+    l.ki -= TRANSFORMACAO.custo;
+    mudar(l, 'transformando');
+    l.vx = 0;
+    return;
+  }
   if ((apertou & BOTAO.SUMIR) && l.ki >= CUSTO_DO_SUMIR) {
     l.ki -= CUSTO_DO_SUMIR;
     mudar(l, 'sumindo');
@@ -414,7 +443,7 @@ function decidir(e: EstadoDaLuta, i: 0 | 1, ent: Entrada) {
   if (ent & BOTAO.CIMA) {
     mudar(l, 'pulando');
     l.vy = px(ficha.pulo);
-    l.vx = (ent & frente) ? px(2) * l.lado : (ent & tras) ? -px(2) * l.lado : 0;
+    l.vx = (ent & frente) ? vel(2) * l.lado : (ent & tras) ? -vel(2) * l.lado : 0;
     l.y = 1;
     return;
   }
@@ -422,7 +451,7 @@ function decidir(e: EstadoDaLuta, i: 0 | 1, ent: Entrada) {
   if (duploTras) { mudar(l, 'recuo'); return; }
   const quer: Acao = baixo ? 'agachado' : (ent & frente) ? 'andando' : (ent & tras) ? 'recuando' : 'parado';
   if (quer !== l.acao) mudar(l, quer);
-  l.vx = quer === 'andando' ? px(ficha.andar) * l.lado : quer === 'recuando' ? -px(ficha.recuar) * l.lado : Math.trunc(l.vx / 2);
+  l.vx = quer === 'andando' ? px(ficha.andar * rapidez(l)) * l.lado : quer === 'recuando' ? -px(ficha.recuar * rapidez(l)) * l.lado : Math.trunc(l.vx / 2);
 }
 
 /** Golpe no ar: começa pelo botão apertado durante o pulo; o resto é física. */
@@ -515,7 +544,9 @@ function bater(e: EstadoDaLuta, atq: Lutador, def: Lutador, entradaDoDefensor: E
     return true;
   }
   const escala = ESCALA_DO_COMBO[Math.min(def.combo, ESCALA_DO_COMBO.length - 1)];
-  def.vida = Math.max(0, def.vida - Math.max(1, Math.floor(b.dano * escala / 100)));
+  // transformado bate mais forte (em inteiros: 125%)
+  const forca = atq.forma === 1 ? Math.round(TRANSFORMACAO.dano * 100) : 100;
+  def.vida = Math.max(0, def.vida - Math.max(1, Math.floor(b.dano * escala * forca / 10000)));
   def.combo++;
   atq.ki = Math.min(KI_MAXIMO, atq.ki + KI_POR_ACERTO);
   def.ki = Math.min(KI_MAXIMO, def.ki + KI_POR_APANHAR);
@@ -555,7 +586,7 @@ function acertarComCorpo(e: EstadoDaLuta, i: 0 | 1, entradaDoOutro: Entrada) {
 
 function soltar(e: EstadoDaLuta, i: 0 | 1, p: Poder, ehSuper: boolean) {
   const l = e.lutadores[i];
-  const mao = l.x + l.lado * px(20);
+  const mao = l.x + l.lado * esp(20);
   const base: Projetil = {
     id: e.proximoProjetil++, dono: i, tipo: p.tipo, super: ehSuper, x: mao, y: px(p.altura), vx: 0, ponta: mao,
     direcao: l.lado, resta: p.duracao, quadro: 0, batidas: p.batidas, intervalo: p.intervalo, proximaBatida: 0,
@@ -610,9 +641,9 @@ function moverProjeteis(e: EstadoDaLuta, entradas: readonly [Entrada, Entrada]) 
   for (const a of vivos) {
     for (const b of vivos) {
       if (a.dono !== 0 || b.dono !== 1 || a.resta <= 0 || b.resta <= 0) continue;
-      const ax0 = RAIOS.has(a.tipo) ? Math.min(a.x, a.ponta) : a.x - px(6), ax1 = RAIOS.has(a.tipo) ? Math.max(a.x, a.ponta) : a.x + px(6);
-      const bx0 = RAIOS.has(b.tipo) ? Math.min(b.x, b.ponta) : b.x - px(6), bx1 = RAIOS.has(b.tipo) ? Math.max(b.x, b.ponta) : b.x + px(6);
-      if (ax0 < bx1 && bx0 < ax1 && Math.abs(a.y - b.y) < px(24)) {
+      const ax0 = RAIOS.has(a.tipo) ? Math.min(a.x, a.ponta) : a.x - esp(6), ax1 = RAIOS.has(a.tipo) ? Math.max(a.x, a.ponta) : a.x + esp(6);
+      const bx0 = RAIOS.has(b.tipo) ? Math.min(b.x, b.ponta) : b.x - esp(6), bx1 = RAIOS.has(b.tipo) ? Math.max(b.x, b.ponta) : b.x + esp(6);
+      if (ax0 < bx1 && bx0 < ax1 && Math.abs(a.y - b.y) < esp(24)) {
         // bola grande da super atravessa rajada pequena
         if (a.tipo === 'bola' && b.tipo === 'rajada') { b.resta = 0; continue; }
         if (b.tipo === 'bola' && a.tipo === 'rajada') { a.resta = 0; continue; }

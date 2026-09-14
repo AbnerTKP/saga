@@ -24,6 +24,7 @@ export const BOTAO = {
   ESPECIAL: 128,
   CARREGAR: 256,
   SUMIR: 512,
+  TRANSFORMAR: 1024,
 } as const;
 
 export type Entrada = number;
@@ -66,6 +67,7 @@ export type Acao =
   | 'super'          // a versão de três barras, com clarão
   | 'carregando'     // segurando o botão de carregar ki
   | 'sumindo'        // o teletransporte para as costas do outro
+  | 'transformando'  // gritando para virar Super Goiabadin (e os dos outros); dá para ser interrompido
   // apanhando
   | 'apanhando'      // golpe alto ou médio, em pé
   | 'apanhandoBaixo' // agachado
@@ -81,6 +83,14 @@ export type Lutador = {
   id: IdDoLutador;
   /** Segunda cor: o mesmo personagem dos dois lados sai com as cores trocadas. */
   cor: 0 | 1;
+  /**
+   * 0 é a forma de sempre; 1 é a transformação (Super Goiabadin, Super Vegetalzin, Picolé de
+   * Laranja, Geladeira Dourada). Transformado, bate mais forte e anda mais rápido, e o ki escoa
+   * até acabar — aí volta ao normal.
+   */
+  forma: 0 | 1;
+  /** O quadro global em que a forma mudou pela última vez (-1 nunca): o som e o clarão saem daqui. */
+  formaDesde: number;
   /** Posição no mundo, em SUB. `y` é a altura acima do chão (0 é pisando). */
   x: number;
   y: number;

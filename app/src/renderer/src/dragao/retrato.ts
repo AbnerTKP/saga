@@ -8,7 +8,7 @@
  * transparente; a moldura é do placar.
  */
 import { type Quadro, colar, criarQuadro, ler } from './quadro.ts';
-import { type Corpo, type Personagem, type Pose, SPRITE, montar, sprite } from './boneco.ts';
+import { type Corpo, type Personagem, type Pose, esqueletoNoSprite, sprite } from './boneco.ts';
 import type { P } from './raster.ts';
 
 /**
@@ -82,10 +82,11 @@ function recortar(origem: Quadro, cabeca: P, topo: number, meio: number, lado: n
  * mais justo, com os mesmos pixels da luta.
  */
 export function retratoDe(personagem: Personagem, lado = 32, pose: Pose = poseDeRetrato(personagem.corpo)): Retrato {
-  const s = sprite(personagem, pose);
+  // o retrato é do tamanho de antes (escala 1): o placar tem 32 pixels para a cabeça
+  const s = sprite(personagem, pose, 1);
   // A cabeça no sprite: montar com o quadril deslocado pela âncora, como `sprite` faz por dentro.
   // A pose do retrato não tem alvo nenhum, então só o quadril precisa andar.
-  const e = montar(personagem.corpo, { ...pose, quadril: [pose.quadril[0] + SPRITE.ancoraX, pose.quadril[1] + SPRITE.ancoraY] });
+  const e = esqueletoNoSprite(personagem.corpo, pose, 1);
   // O que foi pintado acima do pescoço e perto da cabeça é a cabeça — cabelo, antena e domo
   // incluídos, que o esqueleto não conhece.
   const x0 = Math.max(0, Math.round(e.cabeca[0] - RAIO_DA_CABECA)), x1 = Math.min(s.largura - 1, Math.round(e.cabeca[0] + RAIO_DA_CABECA));

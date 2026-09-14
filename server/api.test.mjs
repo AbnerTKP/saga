@@ -1736,7 +1736,7 @@ test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, co
 
   // App velho não abre: abrir já é sentar.
   assert.equal((await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: {} })).status, 409);
-  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 1 } });
+  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 2 } });
   assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
   const { id } = aberta.corpo.arena;
   assert.equal(aberta.corpo.arena.meuLado, 0);
@@ -1746,9 +1746,9 @@ test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, co
   assert.deepEqual(doConvidado.convites.map((c) => [c.arena, c.de.id, c.cenario]), [[id, tkp.eu.id, 'ilha']]);
   assert.deepEqual(doConvidado.arenas.map((a) => a.id), [id]);
 
-  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 1 });
+  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 2 });
   assert.equal(sentou.corpo.arena.meuLado, 1);
-  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 1 })).status, 409);
+  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 2 })).status, 409);
 
   const comecou = await naArena(tkp.token, { id, acao: 'comecar' });
   assert.equal(comecou.status, 200, JSON.stringify(comecou.corpo));

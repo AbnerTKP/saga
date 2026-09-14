@@ -7,7 +7,7 @@
  * O contorno é pela vizinhança de QUATRO (cima, baixo, lados): a de oito engrossaria as
  * diagonais, e linha grossa é o que denuncia desenho feito por programa.
  */
-import { type Cor, type Quadro } from './quadro.ts';
+import { type Cor, type Quadro, misturar } from './quadro.ts';
 
 export type P = [number, number];
 
@@ -26,6 +26,8 @@ export type Tinta = {
   faixa?: number;
   /** Peça sem contorno por fora: detalhe que encosta noutra peça (a faixa da cintura, a boca). */
   semContorno?: boolean;
+  /** O risco de dentro, onde a peça cobre outra; sem ele, sai um tom escuro da própria sombra. */
+  linha?: Cor;
 };
 
 /** A luz vem do alto e da frente (o personagem olha para a direita no desenho). */
@@ -128,25 +130,46 @@ export function pintarMascara(q: Quadro, m: Mascara, t: Tinta, luz: P = LUZ) {
   if (m.x1 < m.x0) return;
   const W = q.largura;
   if (!t.semContorno) {
+    // Contorno seletivo: por fora do corpo, o escuro de sempre; por DENTRO (a peça cobre outra
+    // já pintada), um tom escuro da própria peça. É o que separa o braço do peito sem desenhar um
+    // arame preto em volta de cada pedaço — o risco preto por dentro é o que dava cara de recorte.
+    // Pixel que já era contorno de fora (ou cabelo escuro) continua escuro: a silhueta não abre.
+    const dentro = t.linha ?? misturar(t.sombra, t.contorno, 0.55);
     for (let y = Math.max(0, m.y0 - 1); y <= Math.min(q.altura - 1, m.y1 + 1); y++) {
       for (let x = Math.max(0, m.x0 - 1); x <= Math.min(W - 1, m.x1 + 1); x++) {
         if (m.tem(x, y)) continue;
-        if (m.tem(x - 1, y) || m.tem(x + 1, y) || m.tem(x, y - 1) || m.tem(x, y + 1)) q.px[y * W + x] = t.contorno;
+        if (m.tem(x - 1, y) || m.tem(x + 1, y) || m.tem(x, y - 1) || m.tem(x, y + 1)) {
+          const antes = q.px[y * W + x];
+          q.px[y * W + x] = antes === 0 || escura(antes) ? t.contorno : dentro;
+        }
       }
     }
   }
+  // Cinco tons pela luz: o brilho na borda virada para ela, uma meia-luz logo depois, a base, a
+  // sombra do lado oposto e, na borda de lá, a sombra funda de um pixel. Com uma faixa de sombra
+  // só, as áreas grandes (a calça, a capa) ficavam chapadas como papel recortado.
   const faixa = t.faixa ?? 2;
   const sx = Math.round(-luz[0] * faixa), sy = Math.round(-luz[1] * faixa);
+  const fx = Math.round(-luz[0]), fy = Math.round(-luz[1]);
   const lx = Math.round(luz[0] * 1.2), ly = Math.round(luz[1] * 1.2);
+  const mx = Math.round(luz[0] * 2.6), my = Math.round(luz[1] * 2.6);
+  const funda = misturar(t.sombra, t.contorno, 0.3);
+  const meiaLuz = t.luz !== undefined ? misturar(t.base, t.luz, 0.45) : t.base;
   for (let y = m.y0; y <= m.y1; y++) {
     for (let x = m.x0; x <= m.x1; x++) {
       if (!m.tem(x, y)) continue;
       let c = t.base;
-      if (faixa > 0 && !m.tem(x + sx, y + sy)) c = t.sombra;
+      if (faixa > 0 && !m.tem(x + sx, y + sy)) c = faixa > 1 && !m.tem(x + fx, y + fy) && m.tem(x - fx, y - fy) ? funda : t.sombra;
       else if (t.luz !== undefined && !m.tem(x + lx, y + ly)) c = t.luz;
+      else if (t.luz !== undefined && faixa > 1 && !m.tem(x + mx, y + my)) c = meiaLuz;
       if (x >= 0 && y >= 0 && x < W && y < q.altura) q.px[y * W + x] = c;
     }
   }
+}
+
+/** Cor quase preta: contorno de fora ou cabelo escuro, que o contorno de dentro não clareia. */
+function escura(c: Cor) {
+  return (c & 255) + ((c >>> 8) & 255) + ((c >>> 16) & 255) < 120;
 }
 
 /** Uma peça inteira: várias formas numa máscara só (o braço e o antebraço não ganham risco no cotovelo). */

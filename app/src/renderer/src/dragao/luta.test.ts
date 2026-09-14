@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { avancar, caixaDoCorpo, clonar, criarLuta, impressao } from './luta.ts';
 import { DURACAO } from './luta.ts';
 import { BOTAO, SUB, type EstadoDaLuta } from './tipos.ts';
-import { FICHAS, KI_INICIAL } from './fichas.ts';
+import { FICHAS, KI_INICIAL, TRANSFORMACAO } from './fichas.ts';
 
 const luta = (rounds: 1 | 2 = 2) =>
   criarLuta({ lutadores: ['goiaba', 'vegetal'], cenario: 'torneio', roundsParaVencer: rounds, semente: 7 });
@@ -191,6 +191,56 @@ test('o relógio zerado dá a vitória a quem tem mais vida', () => {
   rodar(e, DURACAO.tempo + DURACAO.fimDoRound + 5);
   assert.equal(e.fase, 'fimDaLuta');
   assert.equal(e.vencedor, 1);
+});
+
+test('transformar pede ki, grita e vira; apanhar no meio perde a transformação', () => {
+  const e = aoLutar(luta());
+  const [a, b] = e.lutadores;
+  a.ki = 100;
+  avancar(e, [BOTAO.TRANSFORMAR, 0]);
+  assert.notEqual(a.acao, 'transformando', 'sem ki suficiente não transforma');
+  a.ki = 200;
+  avancar(e, [0, 0]);
+  avancar(e, [BOTAO.TRANSFORMAR, 0]);
+  assert.equal(a.acao, 'transformando');
+  assert.equal(a.ki, 200 - TRANSFORMACAO.custo);
+  // o outro chega e bate no meio do grito
+  b.x = a.x + 30 * SUB * 1.5;
+  for (let i = 0; i < 20; i++) avancar(e, [0, i % 2 ? 0 : BOTAO.SOCO]);
+  assert.equal(a.forma, 0, 'interrompido não transforma');
+  assert.notEqual(a.acao, 'transformando');
+});
+
+test('transformado bate mais forte, o ki escoa e, zerando, volta ao normal', () => {
+  const e = aoLutar(luta());
+  const [a, b] = e.lutadores;
+  a.ki = 300;
+  avancar(e, [BOTAO.TRANSFORMAR, 0]);
+  rodar(e, TRANSFORMACAO.duracao + 40);
+  assert.equal(a.forma, 1);
+  assert.ok(a.formaDesde > 0);
+  // dano de um soco transformado contra o de um soco normal
+  const socoNoOutro = (forma: 0 | 1) => {
+    const x = aoLutar(luta());
+    x.lutadores[0].forma = forma;
+    x.lutadores[1].x = x.lutadores[0].x + 40 * SUB;
+    avancar(x, [BOTAO.SOCO, 0]);
+    rodar(x, 20);
+    return FICHAS.vegetal.vida - x.lutadores[1].vida;
+  };
+  assert.ok(socoNoOutro(1) > socoNoOutro(0), `${socoNoOutro(1)} × ${socoNoOutro(0)}`);
+  a.ki = 3;
+  rodar(e, TRANSFORMACAO.escoamento * 4);
+  assert.equal(a.ki, 0);
+  assert.equal(a.forma, 0);
+  // e round novo começa na forma de sempre
+  a.forma = 1;
+  b.vida = 1;
+  b.x = a.x + 40 * SUB;
+  avancar(e, [BOTAO.SOCO, 0]);
+  rodar(e, DURACAO.nocaute + DURACAO.fimDoRound + 10);
+  assert.equal(e.round, 2);
+  assert.equal(a.forma, 0);
 });
 
 test('desempenho: avançar e clonar cabem folgados num quadro', () => {

@@ -10,3 +10,10 @@ export const CHAO = 198;
  * quatro cenários são desenhados nesta largura, e a simulação prende os lutadores dentro dela.
  */
 export const MUNDO = 640;
+/**
+ * O tamanho dos lutadores na tela: os personagens são escritos em "unidades" (o Goiaba tem uns 66
+ * de altura) e desenhados 1,5 vezes maiores. Com 66 pixels a cabeça tinha 12, e rosto, mão e
+ * músculo não cabiam; com uns 100 o lutador ocupa quase metade da altura, como nos jogos de luta
+ * de fliperama. A simulação mede em pixels da tela: as fichas já vêm nesta escala.
+ */
+export const ESCALA = 1.5;

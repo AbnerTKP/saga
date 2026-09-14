@@ -19,7 +19,8 @@ import { camera } from './luta.ts';
 import { CHAO, TELA } from './medidas.ts';
 import { desenharPlacar, type LadoDoPlacar } from './placar.ts';
 import { colar, cor, criarQuadro, limpar, velar, type Cor, type Quadro } from './quadro.ts';
-import { retratoDe } from './retrato.ts';
+import { poseDeRetrato, retratoDe } from './retrato.ts';
+import { NOMES_DAS_FORMAS } from './fichas.ts';
 import { SUB, type EstadoDaLuta, type IdDoCenario, type IdDoLutador, type Lutador, type Projetil } from './tipos.ts';
 import { cenarioCanion } from './cenarios/canion.ts';
 import { cenarioIlha } from './cenarios/ilha.ts';
@@ -38,11 +39,25 @@ export function cenarioPronto(id: IdDoCenario): Cenario {
 }
 
 const retratos = new Map<string, Quadro>();
-export function retratoPronto(id: IdDoLutador): Quadro {
-  let r = retratos.get(id);
-  if (!r) { r = retratoDe(personagemDe(id)); retratos.set(id, r); }
+/** O retrato do placar, na forma em que o lutador está (o Super Goiabadin aparece dourado lá em cima). */
+export function retratoPronto(id: IdDoLutador, forma: 0 | 1 = 0): Quadro {
+  const chave = `${id}:${forma}`;
+  let r = retratos.get(chave);
+  if (!r) {
+    const p = personagemDe(id);
+    r = retratoDe(p, 32, { ...poseDeRetrato(p.corpo), forma });
+    retratos.set(chave, r);
+  }
   return r;
 }
+
+/** A aura de quem está transformado, e do grito: dourada nos dois de cabelo, laranja no Picolé. */
+const CORES_DA_FORMA: Record<IdDoLutador, CoresDeKi> = {
+  goiaba: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
+  vegetal: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
+  picole: { nucleo: cor('#fff2dc'), meio: cor('#ffb45a'), borda: cor('#e8661a'), escuro: cor('#7a2e08') },
+  geladeira: { nucleo: cor('#fff8d0'), meio: cor('#ffd84a'), borda: cor('#d99a12'), escuro: cor('#6e4a08') },
+};
 
 const PRETO = cor('#000000');
 const BRANCO = cor('#ffffff');
@@ -112,24 +127,30 @@ function letreiro(q: Quadro, texto: string, y: number, tinta: Cor, escala = 3) {
   }
 }
 
+/**
+ * Os letreiros moram logo abaixo do placar, e não no meio da tela: com os lutadores 1,5× maiores,
+ * a cabeça deles chega perto de y 100, e letreiro no meio tapava justamente quem gritou.
+ */
+const ALTO = 44;
+
 function letreiroDaFase(q: Quadro, e: EstadoDaLuta, nomes: [string, string]) {
   const f = e.faseQuadro;
   if (e.fase === 'apresentacao') {
-    if (f < 58) letreiro(q, `ROUND ${e.round}`, 80, BRANCO);
-    else letreiro(q, 'LUTEM!', 76, AMARELO, 4);
+    if (f < 58) letreiro(q, `ROUND ${e.round}`, ALTO + 6, BRANCO);
+    else letreiro(q, 'LUTEM!', ALTO, AMARELO, 4);
   } else if (e.fase === 'luta' && f < 30) {
-    letreiro(q, 'LUTEM!', 76, AMARELO, 4);
+    letreiro(q, 'LUTEM!', ALTO, AMARELO, 4);
   } else if (e.fase === 'nocaute' && f < 80) {
-    letreiro(q, 'NOCAUTE', 76, cor('#ff5a4a'), 4);
+    letreiro(q, 'NOCAUTE', ALTO, cor('#ff5a4a'), 4);
   } else if (e.fase === 'tempo') {
-    letreiro(q, 'TEMPO!', 76, AMARELO, 4);
+    letreiro(q, 'TEMPO!', ALTO, AMARELO, 4);
   } else if (e.fase === 'fimDoRound') {
     const v = e.vencedorDoRound;
-    letreiro(q, v === 2 ? 'EMPATE' : `${nomes[v as 0 | 1]} VENCE`, 80, BRANCO, 2);
+    letreiro(q, v === 2 ? 'EMPATE' : `${nomes[v as 0 | 1]} VENCE`, ALTO + 8, BRANCO, 2);
   } else if (e.fase === 'fimDaLuta') {
     const v = e.vencedor;
-    letreiro(q, v === 2 ? 'EMPATE' : 'VITÓRIA', 70, AMARELO, 4);
-    if (v === 0 || v === 1) letreiro(q, nomes[v], 108, BRANCO, 2);
+    letreiro(q, v === 2 ? 'EMPATE' : 'VITÓRIA', ALTO, AMARELO, 4);
+    if (v === 0 || v === 1) letreiro(q, nomes[v], ALTO + 50, BRANCO, 2);
   }
 }
 
@@ -159,7 +180,10 @@ export function desenharLuta(q: Quadro, e: EstadoDaLuta, pintura: Pintura) {
   for (const l of ordem) {
     const s = spriteDoLutador(l, e);
     const [x, y, espelhar] = lugarDoSprite(l, camX);
-    if (l.acao === 'carregando' || (l.acao === 'super' && e.clarao > 0)) desenharAura(q, s, x, y, espelhar, tique, CORES_DE_KI[l.id]);
+    if (l.acao === 'transformando') desenharAura(q, s, x, y, espelhar, tique, CORES_DA_FORMA[l.id]);
+    else if (l.acao === 'carregando' || (l.acao === 'super' && e.clarao > 0)) desenharAura(q, s, x, y, espelhar, tique, l.forma ? CORES_DA_FORMA[l.id] : CORES_DE_KI[l.id]);
+    // transformado, a aura fica acesa em volta, mais baixa: pisca de 4 em 4 quadros, que é o jeito do fliperama
+    else if (l.forma === 1 && (tique >> 2) % 3 !== 0) desenharAura(q, s, x, y, espelhar, tique, CORES_DA_FORMA[l.id]);
     const idade = e.quadro - l.impactoEm;
     const pisca = (l.impactoTipo === 1 || l.impactoTipo === 2) && idade >= 0 && idade < 3;
     const invisivel = l.invencivel > 0 && l.acao === 'levantando' && (tique >> 2) % 2 === 0;
@@ -177,12 +201,14 @@ export function desenharLuta(q: Quadro, e: EstadoDaLuta, pintura: Pintura) {
   }
   desenharFrente(q, cen, camX);
 
+  // transformado, o placar diz o nome da forma e mostra o retrato dela
+  const nomes = e.lutadores.map((l, i) => (l.forma === 1 ? NOMES_DAS_FORMAS[l.id].toUpperCase() : pintura.nomes[i])) as [string, string];
   const lado = (i: 0 | 1): LadoDoPlacar => {
     const l = e.lutadores[i];
     const vida = FICHAS[l.id].vida;
     return {
-      nome: pintura.nomes[i],
-      retrato: retratoPronto(l.id),
+      nome: nomes[i],
+      retrato: retratoPronto(l.id, l.forma),
       vida: l.vida / vida,
       vidaAtrasada: l.vidaAtrasada / vida,
       ki: l.ki / KI_POR_BARRA,
@@ -192,6 +218,13 @@ export function desenharLuta(q: Quadro, e: EstadoDaLuta, pintura: Pintura) {
   };
   desenharPlacar(q, { tempo: Math.ceil(e.tempo / 60), rodada: e.round, lados: [lado(0), lado(1)] }, 'a');
   letreiroDaFase(q, e, pintura.nomes);
+  // o nome da transformação no instante em que ela completa: "SUPER GOIABADIN!"
+  for (const l of e.lutadores) {
+    const idade = e.quadro - l.formaDesde;
+    if (l.forma === 1 && idade >= 0 && idade < 90 && e.fase === 'luta') {
+      letreiro(q, `${NOMES_DAS_FORMAS[l.id].toUpperCase()}!`, ALTO + 8, cor('#ffe45a'), 2);
+    }
+  }
 }
 
 const ehAtaque = (l: Lutador) => /^(soco|chute|rasteira|rajada|especial|super)/.test(l.acao);

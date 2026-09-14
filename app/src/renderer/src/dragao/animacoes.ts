@@ -133,6 +133,8 @@ export function poseAgora(l: Lutador, e: EstadoDaLuta): Quadro_ {
     case 'defendendo': return g('defesa');
     case 'defendendoBaixo': return g('defesaBaixa');
     case 'carregando': return g(alterna(q, 6) ? 'carregar1' : 'carregar2');
+    // O grito da transformação: a mesma força do carregar, tremendo mais rápido.
+    case 'transformando': return g(alterna(q, 3) ? 'carregar1' : 'carregar2', 't');
     case 'apanhando': return g(q < 6 ? 'apanhar1' : 'apanhar2');
     case 'apanhandoBaixo': return g('apanharBaixo');
     case 'voando': return g('voando');
@@ -185,10 +187,11 @@ const guardados = new Map<string, Quadro>();
 export function spriteDoLutador(l: Lutador, e: EstadoDaLuta): Quadro {
   const { chave, pose } = poseAgora(l, e);
   if (!pose) return VAZIO;
-  const k = `${l.id}:${l.cor}:${chave}`;
+  const forma = l.forma ?? 0;
+  const k = `${l.id}:${l.cor}:${forma}:${chave}`;
   let s = guardados.get(k);
   if (!s) {
-    s = sprite(PERSONAGENS[l.id].p, pose);
+    s = sprite(PERSONAGENS[l.id].p, { ...pose, forma });
     if (l.cor === 1) segundaCor(s);
     guardados.set(k, s);
   }
@@ -206,12 +209,16 @@ export function preaquecer(id: IdDoLutador, cor: 0 | 1) {
     'super', 'carregando', 'sumindo', 'apanhando', 'apanhandoBaixo', 'voando', 'caido', 'levantando', 'vitoria', 'derrota',
   ];
   const e = { quadro: 0, clarao: 0, claraoDe: -1, lutadores: [] } as unknown as EstadoDaLuta;
-  const l = { id, cor, acao: 'parado', quadro: 0, vy: 0, vida: 1 } as Lutador;
-  for (const acao of acoes) {
-    for (let q = 0; q < 140; q += 2) {
-      l.acao = acao; l.quadro = q; l.vy = q % 4 ? 100 : 0; l.vida = q % 6 ? 1 : 0;
-      e.quadro = q;
-      spriteDoLutador(l, e);
+  const l = { id, cor, forma: 0, acao: 'parado', quadro: 0, vy: 0, vida: 1 } as Lutador;
+  // as duas formas: a primeira transformação da luta não pode engasgar o quadro do estouro
+  for (const forma of [0, 1] as const) {
+    l.forma = forma;
+    for (const acao of [...acoes, 'transformando' as const]) {
+      for (let q = 0; q < 140; q += 2) {
+        l.acao = acao; l.quadro = q; l.vy = q % 4 ? 100 : 0; l.vida = q % 6 ? 1 : 0;
+        e.quadro = q;
+        spriteDoLutador(l, e);
+      }
     }
   }
 }

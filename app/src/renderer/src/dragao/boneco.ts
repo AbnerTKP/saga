@@ -10,6 +10,7 @@
  * pés. Ângulo de membro: 0 aponta para baixo, 90 para a frente, 180 para cima.
  */
 import { type Cor, type Quadro, criarQuadro } from './quadro.ts';
+import { ESCALA } from './medidas.ts';
 import { Mascara, type Forma, type P, type Tinta, pintarPeca } from './raster.ts';
 
 export type Membro = {
@@ -41,6 +42,8 @@ export type Pose = {
   olhos?: 'abertos' | 'fechados' | 'nocaute';
   /** Número livre que cada personagem usa como quiser: capa, rabo, cabelo balançando. */
   vento?: number;
+  /** A transformação: 1 desenha a forma transformada (cabelo dourado, pele laranja, corpo dourado). */
+  forma?: 0 | 1;
 };
 
 export type Corpo = {
@@ -74,6 +77,14 @@ export type Esqueleto = {
 };
 
 const RAD = Math.PI / 180;
+
+/**
+ * A escala do desenho em curso. Os personagens são escritos em medidas de "unidade" (o Goiaba tem
+ * uns 66 de altura) e desenhados em `ESCALA`: todo ponto que passa pelos ajudantes daqui (tronco,
+ * cabeça, osso, pé) e todo raio de peça saem multiplicados. Vive num `let` só durante `sprite`,
+ * que é síncrono — o retrato do placar desenha na escala 1, a luta na grande.
+ */
+let escala = 1;
 export const dir = (grau: number): P => [Math.sin(grau * RAD), Math.cos(grau * RAD)];
 export const soma = (a: P, b: P, k = 1): P => [a[0] + b[0] * k, a[1] + b[1] * k];
 export const dist = (a: P, b: P) => Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -131,17 +142,20 @@ export function montar(corpo: Corpo, pose: Pose): Esqueleto {
 
 /** Um ponto no referencial do tronco: [para a frente, para cima] a partir do quadril. */
 export function noTronco(e: Esqueleto, f: number, h: number): P {
+  f *= escala; h *= escala;
   return [e.quadril[0] + e.u[0] * f + e.v[0] * h, e.quadril[1] + e.u[1] * f + e.v[1] * h];
 }
 
 /** Um ponto no referencial da cabeça: [para a frente, para cima] a partir do centro dela. */
 export function naCabeca(e: Esqueleto, f: number, h: number): P {
+  f *= escala; h *= escala;
   const t = e.angCabeca * RAD;
   return [e.cabeca[0] + Math.cos(t) * f + Math.sin(t) * h, e.cabeca[1] + Math.sin(t) * f - Math.cos(t) * h];
 }
 
 /** Um ponto ao longo de um osso: `t` 0 na raiz, 1 na ponta; `lado` desloca na perpendicular. */
 export function noOsso(a: P, b: P, t: number, lado = 0): P {
+  lado *= escala;
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const d = Math.hypot(dx, dy) || 1;
   return [a[0] + dx * t - (dy / d) * lado, a[1] + dy * t + (dx / d) * lado];
@@ -149,6 +163,7 @@ export function noOsso(a: P, b: P, t: number, lado = 0): P {
 
 /** O pé: do calcanhar à ponta, deitado no chão com a sola no ângulo da pose. */
 export function formaDoPe(tornozelo: P, comprimento: number, altura: number, ang = 0, recuo = 2): Forma {
+  comprimento *= escala; altura *= escala; recuo *= escala;
   const a = ang * RAD;
   const f: P = [Math.cos(a), -Math.sin(a)];
   const up: P = [Math.sin(a), Math.cos(a)];
@@ -167,14 +182,21 @@ export type Pintor = {
 
 export function pintor(q: Quadro): Pintor {
   const m = new Mascara(q.largura, q.altura);
-  return { q, m, peca: (formas, t) => pintarPeca(q, m, formas, t) };
+  const raios = (f: Forma): Forma => (escala === 1 ? f
+    : f.tipo === 'capsula' ? { ...f, ra: f.ra * escala, rb: f.rb * escala }
+      : f.tipo === 'elipse' ? { ...f, rx: f.rx * escala, ry: f.ry * escala } : f);
+  return { q, m, peca: (formas, t) => pintarPeca(q, m, formas.map(raios), t) };
 }
 
 /** A tinta de um tom: base, sombra, luz e contorno, a partir de cores escritas à mão. */
 export const tinta = (base: Cor, sombra: Cor, contorno: Cor, luz?: Cor, faixa = 2): Tinta => ({ base, sombra, contorno, luz, faixa });
 
-/** O tamanho do sprite de um lutador e onde fica a âncora nele. */
-export const SPRITE = { largura: 128, altura: 120, ancoraX: 56, ancoraY: 112 };
+/** O tamanho do sprite de um lutador numa escala, e onde fica a âncora nele. */
+export const medidasDoSprite = (e: number) => ({
+  largura: Math.ceil(128 * e), altura: Math.ceil(120 * e), ancoraX: Math.round(56 * e), ancoraY: Math.round(112 * e),
+});
+/** O sprite da luta, na escala dos lutadores. */
+export const SPRITE = medidasDoSprite(ESCALA);
 
 export type Personagem = {
   id: string;
@@ -184,18 +206,34 @@ export type Personagem = {
   desenhar: (p: Pintor, e: Esqueleto) => void;
 };
 
-/** Desenha uma pose num sprite novo, com a âncora no lugar de sempre. */
-export function sprite(personagem: Personagem, pose: Pose): Quadro {
-  const q = criarQuadro(SPRITE.largura, SPRITE.altura);
-  const deslocada: Pose = {
+const escalarCorpo = (c: Corpo, e: number): Corpo => ({
+  tronco: c.tronco * e, pescoco: c.pescoco * e, bracoSup: c.bracoSup * e, antebraco: c.antebraco * e,
+  coxa: c.coxa * e, canela: c.canela * e,
+  ombroF: [c.ombroF[0] * e, c.ombroF[1] * e], ombroT: [c.ombroT[0] * e, c.ombroT[1] * e],
+  quadrilF: [c.quadrilF[0] * e, c.quadrilF[1] * e], quadrilT: [c.quadrilT[0] * e, c.quadrilT[1] * e],
+});
+
+/** O esqueleto de uma pose já no lugar do sprite: escalado e com a âncora somada. */
+export function esqueletoNoSprite(corpo: Corpo, pose: Pose, e = ESCALA): Esqueleto {
+  const med = medidasDoSprite(e);
+  const mover = (m: Membro): Membro => (m.alvo ? { ...m, alvo: [m.alvo[0] * e + med.ancoraX, m.alvo[1] * e + med.ancoraY] } : m);
+  return montar(escalarCorpo(corpo, e), {
     ...pose,
-    quadril: [pose.quadril[0] + SPRITE.ancoraX, pose.quadril[1] + SPRITE.ancoraY],
-    bracoF: moverAlvo(pose.bracoF), bracoT: moverAlvo(pose.bracoT),
-    pernaF: moverAlvo(pose.pernaF), pernaT: moverAlvo(pose.pernaT),
-  };
-  personagem.desenhar(pintor(q), montar(personagem.corpo, deslocada));
-  return q;
+    quadril: [pose.quadril[0] * e + med.ancoraX, pose.quadril[1] * e + med.ancoraY],
+    bracoF: mover(pose.bracoF), bracoT: mover(pose.bracoT), pernaF: mover(pose.pernaF), pernaT: mover(pose.pernaT),
+  });
 }
 
-const moverAlvo = (m: Membro): Membro =>
-  m.alvo ? { ...m, alvo: [m.alvo[0] + SPRITE.ancoraX, m.alvo[1] + SPRITE.ancoraY] } : m;
+/** Desenha uma pose num sprite novo, com a âncora no lugar de sempre, na escala pedida. */
+export function sprite(personagem: Personagem, pose: Pose, e = ESCALA): Quadro {
+  const med = medidasDoSprite(e);
+  const q = criarQuadro(med.largura, med.altura);
+  const antes = escala;
+  escala = e;
+  try {
+    personagem.desenhar(pintor(q), esqueletoNoSprite(personagem.corpo, pose, e));
+  } finally {
+    escala = antes;
+  }
+  return q;
+}

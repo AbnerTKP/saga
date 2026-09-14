@@ -4,4 +4,4 @@
  * veria outra luta e outro vencedor. Por isso app velho não senta: o servidor recusa e manda
  * atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior.
  */
-export const PROTOCOLO_DA_LUTA = 1;
+export const PROTOCOLO_DA_LUTA = 2; // 2: lutadores 1,5× maiores e a transformação
