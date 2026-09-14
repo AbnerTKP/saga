@@ -2,19 +2,24 @@ import { useEffect, useRef } from 'react';
 import { useFecharComEsc } from '../useFechar';
 import { Peca } from './Tabuleiro';
 import { CarroDesenho } from './DesenhoDaCorrida';
+import { QuadroNaTela } from './TelaDaLuta';
+import { retratoPronto } from '../dragao/desenho';
 
 /**
  * Os jogos, abertos pelo controle do painel de voz: o xadrez e a Fórmula 1. Com uma mesa ou um
  * grid seu de pé, o item leva de volta a ele em vez de abrir outro.
  */
-export function MenuDeJogos({ em, minha, corrida, onXadrez, onCorrida, onClose }: {
+export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onLuta, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
   minha: 'lobby' | 'jogando' | 'fim' | null;
   /** O que o item da Fórmula 1 diz embaixo do nome: abrir, voltar ao seu grid, ou assistir. */
   corrida: string;
+  /** O mesmo para o Dragão Quadrado: abrir uma arena, voltar à sua, ou assistir. */
+  luta: string;
   onXadrez: () => void;
   onCorrida: () => void;
+  onLuta: () => void;
   onClose: () => void;
 }) {
   useFecharComEsc(onClose);
@@ -47,6 +52,13 @@ export function MenuDeJogos({ em, minha, corrida, onXadrez, onCorrida, onClose }
         <span className="menu-de-jogos-textos">
           <span className="strong">Fórmula 1</span>
           <span className="muted small">{corrida}</span>
+        </span>
+      </button>
+      <button type="button" className="menu-de-jogos-item" onClick={() => { onLuta(); onClose(); }}>
+        <span className="luta-no-quadrado"><QuadroNaTela chave="icone" className="luta-icone" quadro={() => retratoPronto('goiaba')} /></span>
+        <span className="menu-de-jogos-textos">
+          <span className="strong">Dragão Quadrado</span>
+          <span className="muted small">{luta}</span>
         </span>
       </button>
     </div>

@@ -19,7 +19,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -53,6 +53,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** O subtítulo do item Fórmula 1 no menu de jogos, e o que ele faz. */
   textoDaCorrida: string;
   onCorrida: () => void;
+  textoDaLuta: string;
+  onLuta: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -347,8 +349,10 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       em={menuDeJogos}
       minha={minhaPartida}
       corrida={textoDaCorrida}
+      luta={textoDaLuta}
       onXadrez={onXadrez}
       onCorrida={onCorrida}
+      onLuta={onLuta}
       onClose={() => setMenuDeJogos(null)}
     />
   );

@@ -1559,6 +1559,61 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   O registro de erros vai só no erro, marcado por padrão, cortado aos últimos 60 mil
   caracteres — o `lerCorpo` derruba pedido acima de 100 mil.
 
+## O Dragão Quadrado
+
+Jogo de luta 1 contra 1 em pixel art, pedido pelo dono em 14/09/2026: quatro lutadores
+paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro cenários
+(Torneio, Planeta Verde, Ilha da Tartaruga, Cânion). O código do jogo mora em
+`app/src/renderer/src/dragao/`; a tela, em `TelaDaLuta.tsx`; o árbitro, em `server/lutas.mjs`.
+
+- **O dono escolheu vendo imagens do motor, e depois delegou o resto.** Viu os cenários, os
+  lutadores e três placares renderizados pelo código de verdade, escolheu o **placar A**
+  (vida larga no alto, ki em três barras nos cantos de baixo), disse que é **só jogador
+  contra jogador** — "esqueça a IA do computador" — e mandou terminar e publicar sem depender
+  dele. Controles simples, a arena no molde do grid da Fórmula 1 e o convite no mesmo cartão
+  foram decisões tomadas por padrão da casa, não escolhidas por ele.
+- **A arte não é desenhada pixel a pixel: é um esqueleto rasterizado** (`boneco.ts`,
+  `raster.ts`). Cada lutador é o mesmo boneco com proporção, roupa e cabeça próprias; cada
+  peça vira máscara com contorno de 1 px por fora (vizinhança de QUATRO — a de oito engrossa
+  a diagonal e denuncia desenho de programa) e faixa de sombra do lado oposto à luz. É o que
+  deixa quatro lutadores com dezenas de poses caberem em código. A tela é 384x216 ampliada sem
+  suavizar; o sprite é desenhado uma vez por pose e guardado (`animacoes.ts`). As poses de
+  golpe são escritas na medida do Goiaba e esticadas para o corpo de cada um; o tempo de cada
+  pose sai das fichas, então mexer no início de um soco move a pose junto.
+- **A simulação é inteira e determinística** (`luta.ts`, contra o contrato de `tipos.ts` e
+  as fichas de `fichas.ts`): posição em 1/64 de pixel, nada de `Math.random`, relógio ou
+  vírgula acumulada, e o estado é objeto simples que `clonar` copia campo a campo. O que o
+  desenho e o som precisam de um golpe fica ESCRITO no estado (`impacto*`), e não disparado
+  como evento — refazer um quadro não pode soltar a faísca duas vezes.
+- **A luta online é rollback, como nos jogos de luta** (`rede.ts`). Esperar o botão do outro
+  atravessar a internet a cada quadro deixaria o soco 100 ms atrás da tecla. Os dois rodam a
+  mesma simulação, cada um aplica o próprio botão com dois quadros de atraso e chuta o do
+  outro repetindo o último; quando o de verdade chega diferente, volta ao quadro errado e
+  refaz. Sem notícia por mais de 8 quadros, ESPERA em vez de adivinhar. Os botões vão pelo
+  canal de dados do LiveKit sem garantia de entrega — cada pacote repete tudo o que o outro
+  ainda não confirmou — e os dois trocam a impressão digital do estado de 2 em 2 s; divergir
+  vai para o registro. O servidor só arbitra o que muda devagar: arena, lados, convites,
+  semente, a hora do início e o resultado (dos dois; discordando, vale o primeiro e ele anota).
+  Como as corridas, **reiniciar o servidor encerra as lutas**.
+- **Medido com uma rede de mentira e com uma de verdade.** Nos testes, com 0, 40, 120 e
+  250 ms e até 20% de perda, os dois lados terminam idênticos à luta de referência sem rede.
+  Pelo LiveKit local e o servidor local, dois robôs do `@livekit/rtc-node` com a mesma
+  simulação lutaram até o nocaute: nenhuma divergência, no máximo 8 quadros de volta no tempo,
+  e o servidor aceitou o resultado. E o app de verdade, escondido e mudo, contra um robô: o
+  convite chegou e foi recusado pelo cartão, a arena abriu pelo menu de jogos, o robô sentou, a
+  luta rodou a **61 quadros por segundo** com o teclado do app acertando o robô, e o desistir
+  terminou a luta no servidor.
+- **Quem assiste não pode publicar nada na sala, e isso falha calado.** O passe da plateia
+  só assina; o primeiro desenho da plateia PEDIA o estado da luta a quem luta, e pelo
+  `rtc-node` a publicação sem permissão resolve e é descartada — a plateia ficou no quadro 0
+  para sempre, sem erro. Hoje o lado 0 manda o estado confirmado de 5 em 5 s, e quem entra no
+  meio pega a luta em até 5 s. Medido pelo LiveKit local: a plateia entrou no meio e
+  acompanhou, dois quadros à frente de quem luta (é o atraso dos botões).
+- **A simulação anda num `setInterval`, e o desenho no `requestAnimationFrame`.** Com a
+  janela escondida o rAF para, e o outro lado ficaria esperando por nós.
+- **Protocolo**: `PROTOCOLO` em `lutas.mjs` e `PROTOCOLO_DA_LUTA` no app. Mudou a simulação
+  de um jeito que a versão anterior não entende, sobe o número: app velho não senta.
+
 ## A limitação que caiu sem ser atacada
 
 Numa das cinco máquinas (Windows 11 25H2, headset USB Logitech como único dispositivo de
@@ -1819,7 +1874,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (438) + app (366), segundos, sem nada externo
+pnpm test        # servidor (460) + app (386), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1996,3 +2051,9 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   vieram de um LiveKit FALSO — as respostas de `ListRooms` e `ListParticipants` escritas à
   mão —, e não do LiveKit da produção. **Não foram exercidos**: a administração contra o
   servidor e o LiveKit de produção, com as pessoas de verdade, e o Windows.
+- **O Dragão Quadrado entre duas pessoas de verdade.** O que está medido está na seção do
+  jogo. **Não foram exercidos**: dois computadores com gente no teclado, pela produção e com
+  a latência real entre as casas; o som (sintetizado em `sons.ts`, nunca ouvido — os testes
+  são mudos); o Windows e máquina fraca; a plateia com a tela do app (só com robô); a
+  reconexão depois de uma queda de verdade no meio da luta; e se a luta está equilibrada e
+  divertida, que é de mão e não de teste.

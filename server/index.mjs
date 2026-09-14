@@ -24,6 +24,7 @@ import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import { criarGrids } from './corridas.mjs';
+import { criarArenas } from './lutas.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante, salaNoLiveKit, emCallPorSalaDe } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
@@ -77,6 +78,9 @@ const mesas = criarMesas();
 // Os grids de Fórmula 1, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as corridas.
 // A corrida em si anda pelo LiveKit, não por aqui — ver corridas.mjs.
 const grids = criarGrids();
+// As arenas do Dragão Quadrado, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as lutas.
+// A luta em si anda pelo LiveKit, e a simulação roda nos dois computadores — ver lutas.mjs.
+const arenas = criarArenas();
 // O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
 // só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
@@ -716,6 +720,8 @@ const ROTAS = {
       // Os grids de Fórmula 1 vão pela mesma carona, e pelo mesmo motivo do xadrez: o convite
       // tem de chegar a quem está em qualquer tela — inclusive olhando outro servidor.
       corridas: grids.resumo(naMesa(sid, eu), foraDaqui(eu)),
+      // As arenas do Dragão Quadrado, pela mesma carona e pelo mesmo motivo.
+      lutas: arenas.resumo(naMesa(sid, eu), foraDaqui(eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
@@ -1125,6 +1131,38 @@ const ROTAS = {
     const { sala, piloto } = grids.salaDaCorrida(naMesa(sid, eu), id);
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
     at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: piloto });
+    return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
+  },
+
+  // --- Dragão Quadrado ---------------------------------------------------------
+  // A arena é do servidor do pedido, como o grid. Os botões de cada quadro andam pelo LiveKit
+  // numa sala só dela; aqui ficam os lados, o começo e o resultado.
+  'POST /lutas/abrir': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return { arena: arenas.abrir(naMesa(sid, eu), await lerCorpo(req)) };
+  },
+
+  'GET /lutas/arena': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    return { arena: arenas.ver(naMesa(sid, eu), id) };
+  },
+
+  'POST /lutas/arena': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return arenas.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // O passe da sala da luta, como o da corrida: só dados. Quem assiste entra para LER os botões;
+  // publicar é só de quem está de um lado — um terceiro mandando botão desencontraria a simulação.
+  'POST /lutas/token': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { id } = await lerCorpo(req);
+    const { sala, lutador } = arenas.salaDaLuta(naMesa(sid, eu), id);
+    const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
+    at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: lutador });
     return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 

@@ -10,6 +10,8 @@ import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { ResumoDaMesa } from './jogos';
 import type { CodigoDoCarro } from './corrida';
+import type { IdDoCenario, IdDoLutador } from './dragao/tipos';
+import { PROTOCOLO_DA_LUTA } from './dragao/protocolo';
 import type { CorpoDoRelato } from './relato';
 
 export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
@@ -469,6 +471,7 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
   pedir<{
     servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
     corridas?: CorridasNoServidor;
+    lutas?: LutasNoServidor;
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
   }>('GET', `/rooms${comParametros({ lidas, lidasConversas: lidasDeConversa })}`, undefined, servidorId);
 
@@ -613,6 +616,75 @@ export const agirNoGrid = async (id: number, a: AcaoNoGrid, servidorId: number) 
 /** O passe da sala da corrida no LiveKit: só dados, e publicar só se você está sentado. */
 export const pedirTokenDaCorrida = (id: number, servidorId: number) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/corridas/token', { id }, servidorId);
+
+// --- Dragão Quadrado ------------------------------------------------------------
+
+export type EstadoDaArena = 'arena' | 'lutando' | 'fim';
+/** Rounds para vencer: 1 é luta única, 2 é melhor de três. */
+export type RoundsDaLuta = 1 | 2;
+/** O lado 0, o lado 1, ou 2 para empate. */
+export type VencedorDaLuta = 0 | 1 | 2;
+export type LadoDaArena = { pessoa: PessoaDaMesa; lutador: IdDoLutador } | null;
+
+/** Uma arena vista da busca de salas: quem abriu e quem está de cada lado. */
+export type ResumoDaArena = {
+  id: number; estado: EstadoDaArena; anfitriao: number; lutadores: (number | null)[]; cenario: IdDoCenario; rounds: RoundsDaLuta;
+};
+export type ConviteDeLuta = {
+  arena: number; servidor: number; servidorNome: string | null; de: PessoaDaMesa; cenario: IdDoCenario; rounds: RoundsDaLuta;
+  /** Quem já está do outro lado, e com que lutador: é quem o convidado vai enfrentar. */
+  oponente: { pessoa: PessoaDaMesa; lutador: IdDoLutador } | null;
+};
+export type LutasNoServidor = { arenas: ResumoDaArena[]; convites: ConviteDeLuta[] };
+
+export type Arena = {
+  id: number;
+  estado: EstadoDaArena;
+  anfitriao: PessoaDaMesa;
+  cenario: IdDoCenario;
+  rounds: RoundsDaLuta;
+  /** Sempre dois: o lado 0 e o lado 1. */
+  lados: [LadoDaArena, LadoDaArena];
+  chamados: PessoaDaMesa[];
+  recusaram: number[];
+  plateia: PessoaDaMesa[];
+  meuLado: 0 | 1 | null;
+  souAnfitriao: boolean;
+  /** A semente da simulação, a mesma nos dois computadores; sorteada de novo a cada luta. */
+  semente: number;
+  /** Quando a luta passa a valer, no relógio do servidor. */
+  inicioEm: number | null;
+  rodada: number;
+  vencedor: VencedorDaLuta | null;
+  /** 'luta' (resultado), 'abandono' ou 'semResultado' (o teto passou sem ninguém mandar). */
+  motivo: 'luta' | 'abandono' | 'semResultado' | null;
+  /** Quem já mandou o resultado, por lado: é o "esperando o outro confirmar". */
+  resultadoDe: [boolean, boolean];
+  /** A hora do servidor na resposta: é por ela que o app acerta o relógio da luta. */
+  agora: number;
+};
+
+export type AcaoNaArena =
+  | { acao: 'escolher'; lutador: IdDoLutador; protocolo: number }
+  | { acao: 'configurar'; cenario?: IdDoCenario; rounds?: RoundsDaLuta }
+  | { acao: 'chamar' | 'cancelarConvite'; alvo: number }
+  | { acao: 'resultado'; vencedor: VencedorDaLuta; quadros: number; impressao: number | string | null }
+  | { acao: 'levantar' | 'recusar' | 'comecar' | 'abandonar' | 'revanche' | 'fechar' };
+
+/** Abrir já é sentar no lado 0, e por isso leva o protocolo: servidor recusa app velho. */
+export const abrirArena = async (dados: { cenario?: IdDoCenario; rounds?: RoundsDaLuta }, servidorId: number) =>
+  (await pedir<{ arena: Arena }>('POST', '/lutas/abrir', { ...dados, protocolo: PROTOCOLO_DA_LUTA }, servidorId)).arena;
+
+export const verArena = async (id: number, servidorId: number) =>
+  (await pedir<{ arena: Arena }>('GET', `/lutas/arena?id=${id}`, undefined, servidorId)).arena;
+
+/** Fechar não devolve arena nenhuma: ela deixou de existir. */
+export const agirNaArena = async (id: number, a: AcaoNaArena, servidorId: number) =>
+  (await pedir<{ arena?: Arena; ok?: true }>('POST', '/lutas/arena', { id, ...a }, servidorId)).arena ?? null;
+
+/** O passe da sala da luta no LiveKit: só dados, e publicar só se você está de um lado. */
+export const pedirTokenDaLuta = (id: number, servidorId: number) =>
+  pedir<{ url: string; token: string; identity: string }>('POST', '/lutas/token', { id }, servidorId);
 
 /**
  * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.

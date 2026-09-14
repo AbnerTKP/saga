@@ -2143,3 +2143,41 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 @media (max-width: 640px) {
   .adm-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---- Dragão Quadrado ----------------------------------------------------------------------
+   A arena segue a casa (a coluna do grid da Fórmula 1 e da mesa do xadrez); o jogo, não: a luta é
+   pixel art numa canvas de 384x216 ampliada sem suavizar, e em múltiplo inteiro quando cabe. */
+.luta-arena { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--e4); overflow-y: auto; }
+.luta-lados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e3); }
+.luta-lado { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 12px 14px;
+  border-radius: 10px; background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); min-height: 250px; justify-content: flex-end; }
+.luta-lado.meu { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
+.luta-lado-rotulo { position: absolute; left: 12px; top: 10px; font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text3); }
+.luta-sprite { width: 256px; height: 240px; margin-bottom: -18px; }
+.luta-lado-nome { font-size: 16px; font-weight: 700; color: var(--white); letter-spacing: -.01em; }
+.luta-lado-vazio { margin: auto 0; color: var(--text3); font-size: 13px; text-align: center; }
+.luta-escolha { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); }
+.luta-escolher { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; text-align: left;
+  background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); }
+.luta-escolher:hover:not(:disabled) { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--bg4); }
+.luta-escolher.escolhido { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
+.luta-escolher:disabled { cursor: default; }
+.luta-retrato { width: 48px; height: 48px; flex: none; border-radius: 6px; background: var(--bg3); }
+.luta-escolher-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.luta-escolher-nome { font-size: 14px; font-weight: 650; color: var(--white); }
+.luta-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text2); margin-top: auto; }
+.luta-legenda kbd { font: 600 11px/1 inherit; padding: 3px 6px; border-radius: 5px; background: var(--bg3); color: var(--white);
+  box-shadow: inset 0 -1px 0 var(--bg4); }
+.luta-miniatura { display: block; width: 100%; height: 44px; object-fit: cover; border-radius: 5px; }
+.luta-area { gap: var(--e3); }
+.luta-palco { position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; background: #000; border-radius: 6px; }
+.luta-canvas { display: block; image-rendering: pixelated; }
+.luta-aviso { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 12px; border-radius: 8px;
+  background: rgba(20,22,27,.88); color: var(--white); font-size: 13px; font-weight: 600; pointer-events: none; }
+.tela-da-luta .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
+@media (max-width: 1100px) { .luta-escolha { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* O Dragão Quadrado no menu de jogos: o rosto do Goiaba no quadrado; e a capa do convite, o cenário. */
+.luta-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: #6fa8dc; display: grid; place-items: center; overflow: hidden; }
+.luta-icone { width: 32px; height: 32px; }
+.luta-capa { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }

@@ -1725,6 +1725,59 @@ test('fórmula 1 pela rede: abrir, chamar, o convite no /rooms, sentar, largar, 
   assert.deepEqual((await noGrid(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
 });
 
+// --- Dragão Quadrado ------------------------------------------------------------
+
+test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, começar, o passe só de dados e o número noutro servidor', async () => {
+  const tkp = (await cadastrar('dq_tkp')).corpo;
+  const juninho = (await cadastrar('dq_juninho')).corpo;
+  const tava = (await cadastrar('dq_tava')).corpo;
+  const casa = tkp.servidor.id;
+  const naArena = (sessao, corpo) => chamar('POST', '/lutas/arena', { sessao, servidor: casa, corpo });
+
+  // App velho não abre: abrir já é sentar.
+  assert.equal((await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: {} })).status, 409);
+  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 1 } });
+  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
+  const { id } = aberta.corpo.arena;
+  assert.equal(aberta.corpo.arena.meuLado, 0);
+
+  assert.equal((await naArena(tkp.token, { id, acao: 'chamar', alvo: juninho.eu.id })).status, 200);
+  const doConvidado = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo.lutas;
+  assert.deepEqual(doConvidado.convites.map((c) => [c.arena, c.de.id, c.cenario]), [[id, tkp.eu.id, 'ilha']]);
+  assert.deepEqual(doConvidado.arenas.map((a) => a.id), [id]);
+
+  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 1 });
+  assert.equal(sentou.corpo.arena.meuLado, 1);
+  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 1 })).status, 409);
+
+  const comecou = await naArena(tkp.token, { id, acao: 'comecar' });
+  assert.equal(comecou.status, 200, JSON.stringify(comecou.corpo));
+  assert.equal(comecou.corpo.arena.estado, 'lutando');
+
+  // O passe da luta: sala própria, sem áudio nem vídeo; dados só de quem está de um lado.
+  const grantDe = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).video;
+  const doLutador = await chamar('POST', '/lutas/token', { sessao: juninho.token, servidor: casa, corpo: { id } });
+  assert.equal(doLutador.status, 200, JSON.stringify(doLutador.corpo));
+  const g = grantDe(doLutador.corpo.token);
+  assert.match(g.room, /^luta-[0-9a-f]+-1$/);
+  assert.equal(g.canPublish, false);
+  assert.equal(g.canPublishData, true);
+  const daPlateia = await chamar('POST', '/lutas/token', { sessao: tava.token, servidor: casa, corpo: { id } });
+  assert.equal(grantDe(daPlateia.corpo.token).room, g.room);
+  assert.equal(grantDe(daPlateia.corpo.token).canPublishData, false);
+  const vista = await chamar('GET', `/lutas/arena?id=${id}`, { sessao: tava.token, servidor: casa });
+  assert.deepEqual(vista.corpo.arena.plateia.map((p) => p.id), [tava.eu.id]);
+
+  const outro = (await chamar('POST', '/servidores/criar', { sessao: tava.token, corpo: { nome: 'Torneio' } })).corpo.servidor;
+  assert.equal((await chamar('GET', `/lutas/arena?id=${id}`, { sessao: tava.token, servidor: outro.id })).status, 404);
+  assert.equal((await chamar('POST', '/lutas/token', { sessao: tava.token, servidor: outro.id, corpo: { id } })).status, 404);
+
+  assert.equal((await naArena(tkp.token, { id, acao: 'fechar' })).status, 409);
+  const fim = await naArena(tkp.token, { id, acao: 'abandonar' });
+  assert.deepEqual([fim.corpo.arena.estado, fim.corpo.arena.vencedor], ['fim', 1]);
+  assert.deepEqual((await naArena(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
+});
+
 // --- relatos -----------------------------------------------------------------------
 
 test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {
