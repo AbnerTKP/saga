@@ -68,6 +68,11 @@ publica só o servidor, e à mão continua valendo. Três coisas não óbvias:
   repositório é público. Configurar isso é do dono do repositório — quem só tem push não
   cria ambiente. As actions desse job vão presas por SHA, e o que ele imprime é público:
   por isso o passo 7 mostra só as linhas do arranque, e nunca o fim do `docker logs`.
+  **Configurado em 13/09/2026**, na v0.52.0: o ambiente com o AbnerTKP como aprovador e a
+  regra de tag `v*`, e a chave `saga-deploy@github-actions` gerada na máquina do dono,
+  autorizada no root da VPS, guardada no segredo do ambiente e apagada de lá — a privada não
+  existe em computador nenhum. A cada versão o job `servidor` para em "waiting" até alguém
+  aprovar (no GitHub, ou por `gh api …/runs/<id>/pending_deployments`).
 - **A identidade da VPS vai fixa, com `StrictHostKeyChecking yes`.** Não para proteger a
   chave — a assinatura do ssh vale só para aquela sessão, e um impostor não a leva —, mas
   porque quem se pusesse no caminho responderia as conferências do script do jeito que
