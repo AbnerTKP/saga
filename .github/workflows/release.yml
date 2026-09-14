@@ -26,12 +26,44 @@ jobs:
       - run: pnpm test
       - run: pnpm --filter app typecheck
 
+  # A versão tem nota? Conferido ANTES do servidor. Sem nota o Release não sai (ver
+  # criar-release), e descobrir isso só lá deixaria a produção numa versão que ninguém
+  # recebeu — e mover a tag para consertar publicaria o servidor de novo, na VPS de um
+  # núcleo. A regra é a mesma do criar-release: uma linha que começa com "Nota:" no corpo de
+  # algum commit da faixa.
+  notas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - run: |
+          ANTERIOR=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          FAIXA=${ANTERIOR:+$ANTERIOR..}$TAG
+          if ! git log --no-merges --format='%B' "$FAIXA" | grep -qE '^[[:space:]]*Nota:'; then
+            echo "::error::Nenhuma linha 'Nota:' em $FAIXA. Escreva 'Nota: <uma frase que um amigo entenda>' no corpo de um commit dessa faixa (o da versão serve), mova a tag e empurre de novo. O servidor NÃO foi publicado."
+            exit 1
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+
+  # O servidor sobe ANTES de o Release existir, pelo mesmo publicar.sh de sempre — ver
+  # servidor.yml. Nessa ordem e não na outra: com o Release primeiro, a atualização
+  # automática entrega o app novo aos amigos antes do servidor que o atende. Falhando o
+  # servidor, o Release não é criado e ninguém recebe nada.
+  servidor:
+    needs: [testes, notas]
+    uses: ./.github/workflows/servidor.yml
+    # Só a chave da VPS, e não `inherit`: o certificado do Mac não tem o que fazer num job que
+    # entra na produção como root. Com o segredo no ambiente `producao`, vale o do ambiente.
+    secrets:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
   # Cria o Release vazio antes de qualquer build. Sem isto, o electron-builder sobe os
   # arquivos em paralelo e cada upload que não acha um Release existente cria um novo —
   # o resultado são dois Releases com os arquivos divididos entre eles. Com o Release já
   # pronto, todos os uploads (dos dois sistemas) caem no mesmo lugar.
   criar-release:
-    needs: testes
+    needs: [testes, servidor]
     runs-on: ubuntu-latest
     steps:
       # A história inteira, com as tags: sem ela não dá para saber o que mudou desde a

@@ -110,9 +110,16 @@ scp -qr "${ENVIAR[@]}" "$VPS:$REMOTO/" || erro "o scp falhou"
 # duas listas saem no MESMO formato ("md5 caminho"), montadas do mesmo jeito nos dois
 # lados: `md5 -q` no macOS e `md5sum` no Linux escrevem diferente, e comparar a saída crua
 # de cada um recusa transferência boa (recusou uma, com a produção fora do ar).
+#
+# O md5 DESTE lado já não é só o do Mac: o CI publica de um Linux, onde `md5` não existe
+# (ver .github/workflows/servidor.yml). Seja qual for a ferramenta, sai só o hash — e a lista
+# continua montada do mesmo jeito que a de lá.
+md5_daqui() {
+  if command -v md5sum >/dev/null 2>&1; then md5sum "$1" | cut -d' ' -f1; else md5 -q "$1"; fi
+}
 lista_daqui() {
   find "${ENVIAR[@]}" -type f ! -name '*.test.mjs' | sort | while read -r f; do
-    printf '%s %s\n' "$(md5 -q "$f")" "$f"
+    printf '%s %s\n' "$(md5_daqui "$f")" "$f"
   done
 }
 AQUI=$(lista_daqui)
@@ -161,11 +168,21 @@ ssh -o ConnectTimeout=30 "$VPS" "cd $REMOTO && docker compose -f docker-compose.
 echo
 echo "=== 7. Conferindo depois ==="
 sleep 8
-ESTADO=$(ssh -o ConnectTimeout=20 "$VPS" 'docker ps --format "{{.Names}} {{.Status}}"')
+# Só os contêineres da Saga, e só as linhas do ARRANQUE do servidor. Pelo CI este script
+# escreve num log PÚBLICO (servidor.yml), e o fim do `docker logs` nem sempre é o arranque:
+# quando a imagem não muda, o `up -d` não recria o contêiner, e as últimas linhas seriam as
+# do servidor que já estava de pé — código de senha emitido para quem, erro com o pedido.
+# A linha que interessa conferir é a de "arquivos em … (N)": se o N zerar, algo saiu do volume.
+ESTADO=$(ssh -o ConnectTimeout=20 "$VPS" 'docker ps --filter name=server- --format "{{.Names}} {{.Status}}"')
 echo "$ESTADO" | sed 's/^/  /'
 echo "$ESTADO" | grep -qi restarting && erro "algum contêiner está reiniciando em loop"
 SAUDE=$(curl -s -m 10 -o /dev/null -w '%{http_code}' "http://${VPS#*@}:3001/health" || true)
 [ "$SAUDE" = 200 ] && ok "health responde 200" || erro "health respondeu '$SAUDE'"
-ssh -o ConnectTimeout=20 "$VPS" 'docker logs --tail 3 server-token-1 2>&1' | sed 's/^/  /'
+ARRANQUE=$(ssh -o ConnectTimeout=20 "$VPS" "docker logs --since 3m server-token-1 2>&1 | grep -E '^(Saga em|banco em)' | tail -2" || true)
+if [ -n "$ARRANQUE" ]; then
+  printf '%s\n' "$ARRANQUE" | sed 's/^/  /'
+else
+  echo "  (o contêiner não foi recriado: a imagem não mudou)"
+fi
 
 [ "$falhou" = 0 ] && echo && echo "Publicado." || { echo; echo "PUBLICADO COM PROBLEMA — veja os ✗ acima."; exit 1; }

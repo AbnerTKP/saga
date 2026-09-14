@@ -54,6 +54,28 @@ para ver se ele reclamava — e travava justamente quando a configuração estav
 aí o processo não termina. Verificação que trava é pior que verificação nenhuma; hoje ela
 é estática.
 
+**Na tag, quem publica o servidor é o CI** (`.github/workflows/servidor.yml`, chamado pelo
+`release.yml` depois de conferir que a versão tem `Nota:` e ANTES de criar o Release): o
+mesmo `publicar.sh`, com a chave de root no segredo `VPS_SSH_KEY`. Falhando o servidor, o
+Release não sai; faltando nota, nem o servidor sobe. Existe porque a v0.52.0 ficou pronta e
+parada: o computador de quem a fez não alcançava a VPS. O "Run workflow" do `servidor`
+publica só o servidor, e à mão continua valendo. Três coisas não óbvias:
+- **Cada tag roda os workflows do PRÓPRIO commit.** Tag num commit anterior ao `servidor.yml`
+  gera o Release sem publicar servidor nenhum — o app novo chega antes do servidor.
+- **A chave só está protegida com o segredo no ambiente `producao`**, com aprovação
+  obrigatória e só para tags `v*` (Settings › Environments). Segredo de REPOSITÓRIO chega a
+  qualquer workflow de qualquer branch: com ele, ter push no GitHub é ter root na VPS, e o
+  repositório é público. Configurar isso é do dono do repositório — quem só tem push não
+  cria ambiente. As actions desse job vão presas por SHA, e o que ele imprime é público:
+  por isso o passo 7 mostra só as linhas do arranque, e nunca o fim do `docker logs`.
+- **A identidade da VPS vai fixa, com `StrictHostKeyChecking yes`.** Não para proteger a
+  chave — a assinatura do ssh vale só para aquela sessão, e um impostor não a leva —, mas
+  porque quem se pusesse no caminho responderia as conferências do script do jeito que
+  quisesse, e uma publicação que não aconteceu terminaria em "Publicado".
+
+O script roda igual no Mac e no Linux do CI porque a lista de md5 deste lado usa `md5sum`
+quando existe e `md5 -q` quando não — sempre só o hash, montada como a de lá.
+
 **Nunca mande `livekit.yaml` daqui.** O de produção tem a chave de verdade e mora só na
 VPS; o do repositório é modelo e chama-se `livekit.exemplo.yaml` justamente porque um
 `scp` já sobrescreveu a produção com o placeholder. O LiveKit continuou de pé com a

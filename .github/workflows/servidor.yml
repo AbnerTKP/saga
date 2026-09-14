@@ -1,0 +1,90 @@
+# Publica o servidor na VPS pelo MESMO `server/publicar.sh` que se roda à mão.
+#
+# Existe para a publicação não depender de uma máquina com a chave da VPS: a v0.52.0 ficou
+# pronta no GitHub e parada, porque o computador de quem a fez não alcançava a VPS.
+# Reescrever as travas do script aqui, em YAML, daria duas conferências que divergem com o
+# tempo — e divergem em silêncio, como a lista de arquivos à mão já divergiu. O CI chama o
+# script, e cada trava continua num lugar só.
+#
+# Roda sozinho dentro do release (release.yml: o servidor sobe ANTES de o Release existir) e
+# à mão, pelo "Run workflow" desta tela, para publicar só o servidor. Só vale para tag e
+# branch que JÁ contêm este arquivo: cada execução usa os workflows do próprio commit.
+#
+# A chave dá root na produção, e isto aqui é um repositório PÚBLICO. O que a protege de
+# verdade é o segredo morar no ambiente `producao`, com aprovação obrigatória e só para tags
+# `v*` (Settings › Environments) — segredo de REPOSITÓRIO chega a qualquer workflow de
+# qualquer branch, e aí ter push no GitHub é ter root na VPS. Configurar isso é do dono do
+# repositório; ver CLAUDE.md, em "Produção".
+name: servidor
+on:
+  workflow_call:
+    secrets:
+      VPS_SSH_KEY:
+        # Não obrigatório de propósito: faltando, o passo abaixo diz o que fazer, em vez de o
+        # release falhar com um erro de validação que não fala em chave nenhuma. Com o
+        # segredo no ambiente `producao`, é o do ambiente que vale, e não o passado aqui.
+        required: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment: producao
+    # Nunca cancela a publicação que está no meio: um `up -d` interrompido deixa a produção
+    # num estado que ninguém escolheu. Não é fila: fica UMA à espera, e outra que chegue toma
+    # o lugar dela. No JOB, e não no topo, para valer igual à mão e dentro do release.
+    concurrency:
+      group: servidor-producao
+      cancel-in-progress: false
+    steps:
+      # Presas por SHA, e não pela tag: a tag de uma action pode ser redirecionada, e este job
+      # carrega a chave de root. A tag fica no comentário para saber o que atualizar.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with: { version: 11 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: pnpm }
+      # O script roda os testes e o typecheck antes de mandar qualquer coisa. Todo código que
+      # roda neste job — dependências npm incluídas — alcança a chave: é por isso que a
+      # aprovação do ambiente importa.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Chave da VPS
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "::error::Falta o segredo VPS_SSH_KEY: a chave privada que entra na VPS como root (de preferência no ambiente producao). Sem ela o servidor não sobe — e o release não é criado."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # A identidade da VPS vai FIXA, e o ssh é obrigado a conferi-la. Aceitando a primeira
+          # que aparecesse, quem se pusesse no caminho responderia as conferências do
+          # publicar.sh (memória, md5 dos arquivos, contêineres) do jeito que quisesse, e uma
+          # publicação que não aconteceu terminaria em "Publicado". A chave privada, essa, não
+          # vazaria: a assinatura do ssh vale só para aquela sessão. Se a VPS for reinstalada,
+          # a identidade muda e este passo recusa até alguém trocar a linha — que é o que se quer.
+          echo '76.13.225.79 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAq5StrAHma2nUKnCsleTEaGv7CSGXdrF8z3kp9OQPXh' > ~/.ssh/known_hosts
+          printf 'Host 76.13.225.79\n  StrictHostKeyChecking yes\n' > ~/.ssh/config
+          chmod 644 ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/config
+
+      - name: Publicar o servidor
+        working-directory: server
+        run: ./publicar.sh
+
+      # Os testes e o typecheck do publicar.sh escrevem num arquivo do runner, que some com ele.
+      # Falhando aqui depois de o job de testes ter passado, o motivo é justamente o difícil de
+      # reproduzir — então ele vai para o log.
+      - name: O que falhou nos testes
+        if: failure()
+        run: tail -n 200 /tmp/pub-test.log /tmp/pub-tsc.log 2>/dev/null || true
+
+      - name: Apagar a chave
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
