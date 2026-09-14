@@ -218,6 +218,13 @@ const salasDeVoz = (sid, quem) => salasDoServidor(sid, quem).filter((s) => s.tip
  * de uma partida continua tendo nome, o da conta, senão a mesa desenharia um buraco no lugar
  * de um dos jogadores.
  */
+/** Quem é quem nos OUTROS servidores, para o convite de um jogo de lá chegar aqui. */
+const foraDaqui = (eu) => ({
+  pessoaEm: (s, id) => naMesa(s, eu).pessoa(id),
+  ativoEm: (s, id) => naMesa(s, eu).membroAtivo(id),
+  nomeDoServidor: (s) => tabelaDeServidores.buscar(db, s)?.nome ?? null,
+});
+
 const naMesa = (sid, eu) => ({
   sid,
   eu: eu.id,
@@ -705,10 +712,10 @@ const ROTAS = {
       servidorId: sid,
       rooms: salas,
       categorias: categoriasM.listarCategorias(db, sid),
-      jogos: mesas.resumo(naMesa(sid, eu)),
+      jogos: mesas.resumo(naMesa(sid, eu), foraDaqui(eu)),
       // Os grids de Fórmula 1 vão pela mesma carona, e pelo mesmo motivo do xadrez: o convite
-      // tem de chegar a quem está em qualquer tela.
-      corridas: grids.resumo(naMesa(sid, eu)),
+      // tem de chegar a quem está em qualquer tela — inclusive olhando outro servidor.
+      corridas: grids.resumo(naMesa(sid, eu), foraDaqui(eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a

@@ -1693,10 +1693,10 @@ test('fórmula 1 pela rede: abrir, chamar, o convite no /rooms, sentar, largar, 
   const doConvidado = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo.corridas;
   assert.deepEqual(doConvidado.convites.map((c) => [c.grid, c.de.id, c.voltas]), [[id, tkp.eu.id, 3]]);
 
-  assert.equal((await noGrid(tkp.token, { id, acao: 'sentar', carro: 'VER' })).status, 200);
-  const sentou = await noGrid(juninho.token, { id, acao: 'sentar', carro: 'LEC' });
+  assert.equal((await noGrid(tkp.token, { id, acao: 'sentar', carro: 'VER', protocolo: 2 })).status, 200);
+  const sentou = await noGrid(juninho.token, { id, acao: 'sentar', carro: 'LEC', protocolo: 2 });
   assert.equal(sentou.corpo.grid.meuCarro, 'LEC');
-  assert.equal((await noGrid(tava.token, { id, acao: 'sentar', carro: 'VER' })).status, 409);
+  assert.equal((await noGrid(tava.token, { id, acao: 'sentar', carro: 'VER', protocolo: 2 })).status, 409);
 
   const largou = await noGrid(tkp.token, { id, acao: 'largar' });
   assert.equal(largou.status, 200, JSON.stringify(largou.corpo));

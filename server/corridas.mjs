@@ -22,6 +22,14 @@ export const VOLTAS = [3, 5, 10];
  * (`pista.ts`); aqui é só o nome que anda entre os dois, e é protocolo — só se acrescenta.
  */
 export const PISTAS = ['interlagos', 'monza', 'monaco', 'spa', 'bahrein', 'vegas'];
+/**
+ * A versão da corrida que o app fala. A 0.51 trocou a pista inteira — traçado, coordenadas,
+ * física —, e um app antigo na mesma corrida desenharia os outros num mundo que não é o dele:
+ * ninguém se enxerga e todo mundo aparece na torre. O app manda isto ao sentar; quem não manda
+ * (ou manda menos) não senta, e ouve para atualizar. Muda quando a corrida deixar de se entender
+ * com a versão anterior.
+ */
+export const PROTOCOLO = 2;
 
 /** Da ordem de largar até as luzes apagarem: o tempo de todo mundo abrir a pista e ver as cinco luzes. */
 export const ESPERA_DA_LARGADA = 7000;
@@ -124,8 +132,11 @@ export function criarGrids({
   };
 
   const acoes = {
-    sentar(grid, ctx, { carro }) {
+    sentar(grid, ctx, { carro, protocolo }) {
       soNoGrid(grid);
+      if (!(Number(protocolo) >= PROTOCOLO)) {
+        throw new ErroDeConta('A Fórmula 1 mudou: feche e abra a Saga para atualizar, e aí dá para correr.', 409);
+      }
       if (!CARROS.includes(carro)) throw new ErroDeConta('Esse carro não existe.', 400);
       const dono = grid.assentos.get(carro);
       if (dono === ctx.eu) return;
@@ -293,13 +304,21 @@ export function criarGrids({
   }
 
   return {
-    /** O que vai de carona no `/rooms`: os grids DESTE servidor e os convites de quem perguntou. */
-    resumo(ctx) {
+    /**
+     * O que vai de carona no `/rooms`: os grids DESTE servidor e os convites de quem perguntou —
+     * de TODOS os servidores dele, e não só do aberto: quem foi chamado pode estar olhando outro
+     * servidor ou uma conversa, e o convite tem de chegar mesmo assim. `fora` sabe quem é quem
+     * nos outros servidores; sem ele (os testes antigos), só o servidor do pedido.
+     */
+    resumo(ctx, fora = {}) {
       const agora = relogio();
       faxina(agora);
       for (const grid of grids.values()) if (correndoNele(grid, ctx.eu)) grid.pilotoVistoEm = agora;
       const daqui = [...grids.values()].filter((g) => g.sid === ctx.sid);
       const livre = !emCorrida(ctx.eu);
+      const chamadoEm = [...grids.values()].filter((g) => g.estado === 'grid' && g.chamados.has(ctx.eu)
+        && (g.sid === ctx.sid || !!fora.ativoEm?.(g.sid, ctx.eu)));
+      const quemEm = (g) => (id) => (g.sid === ctx.sid || !fora.pessoaEm ? ctx.pessoa(id) : fora.pessoaEm(g.sid, id));
       return {
         grids: daqui.map((g) => ({
           id: g.id,
@@ -310,9 +329,15 @@ export function criarGrids({
           pista: g.pista,
         })),
         convites: livre
-          ? daqui.filter((g) => g.estado === 'grid' && g.chamados.has(ctx.eu)).map((g) => ({
-            grid: g.id, de: ctx.pessoa(g.anfitriao), voltas: g.voltas, pista: g.pista, pilotos: g.assentos.size,
-          }))
+          ? chamadoEm.map((g) => {
+            const quem = quemEm(g);
+            return {
+              grid: g.id, servidor: g.sid, servidorNome: fora.nomeDoServidor?.(g.sid) ?? null,
+              de: quem(g.anfitriao), voltas: g.voltas, pista: g.pista, pilotos: g.assentos.size,
+              // quem já sentou, para o cartão do convite mostrar com quem se vai correr
+              sentados: CARROS.filter((c) => g.assentos.has(c)).map((carro) => ({ carro, pessoa: quem(g.assentos.get(carro)) })),
+            };
+          })
           : [],
       };
     },

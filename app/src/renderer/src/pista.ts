@@ -580,7 +580,7 @@ function montarEntorno(p: Pista) {
   // O mundo em volta: largo o bastante para a vista geral não mostrar chão sem nada.
   const { minX, minY, maxX, maxY } = p.limites;
   const larg = maxX - minX, alt = maxY - minY;
-  const mx = Math.max(1700, (alt * 1.6 - larg) / 2 + 500), my = Math.max(1700, (larg / 1.6 - alt) / 2 + 500);
+  const mx = Math.max(1700, (alt * 2.4 - larg) / 2 + 500), my = Math.max(1700, (larg / 1.6 - alt) / 2 + 500);
   p.mundo = { x0: minX - mx, y0: minY - my, x1: maxX + mx, y1: maxY + my };
   const foraDoCorredor = (x: number, y: number, folga: number) => {
     let ok = true;

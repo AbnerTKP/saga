@@ -6,7 +6,7 @@ import {
 import type { Aviso } from '../avisos';
 import { bandeiraDaVez, type Bandeira, type TipoDeBandeira } from '../bandeiras';
 import {
-  ATRASO_DE_DESENHO, EQUIPES, FISICA, PARADO, TOPICO, carroNoGrid, classificar, codificar, decodificar, dadosDoCarro,
+  ATRASO_DE_DESENHO, EQUIPES, FISICA, PARADO, PROTOCOLO_DA_CORRIDA, TOPICO, carroNoGrid, classificar, codificar, decodificar, dadosDoCarro,
   equipeDoCarro, formatarDiferenca, formatarTempo, guardarFoto, interpolar, kmh, luzesAcesas, passo,
   type Carro, type CodigoDoCarro, type Comandos, type Posicao,
 } from '../corrida';
@@ -215,7 +215,7 @@ function GridDeLargada({ grid, euId, ocupado, membros, naCall, onAgir, onSair }:
     const livre = !a.pessoa;
     return (
       <button key={a.carro} type="button" className={`corrida-assento ${meu ? 'meu' : ''} ${livre ? 'livre' : ''}`}
-        disabled={ocupado || !livre} onClick={() => onAgir({ acao: 'sentar', carro: a.carro })}
+        disabled={ocupado || !livre} onClick={() => onAgir({ acao: 'sentar', carro: a.carro, protocolo: PROTOCOLO_DA_CORRIDA })}
         title={livre ? `Sentar no carro de ${d.piloto}` : undefined}>
         <CarroDesenho carro={a.carro} largura={96} />
         <span className="corrida-assento-textos">
@@ -375,6 +375,7 @@ type Placar = {
   pontos: { id: number; x: number; y: number; cor: string; destaque: boolean }[];
   bandeira: Bandeira | null;
   seguido: number | null;
+  semSinal: Set<number>;
 };
 type Poeira = { x: number; y: number; vx: number; vy: number; vida: number; cor: string };
 type Rastro = { pts: [number, number, number][]; cor: string };
@@ -424,13 +425,25 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
   seguidoManualRef.current = seguidoManual;
 
   // ---- a sala da corrida no LiveKit
-  const [semSala, setSemSala] = useState(false);
+  //
+  // Ela CAI e VOLTA sozinha. Na primeira corrida de três, a conexão do Tava1 com o LiveKit
+  // caiu e voltou cinco vezes na mesma noite (os registros da voz dele), e na corrida o LiveKit
+  // não conseguia entregar os dados a ele — e a sala da corrida não tinha volta nenhuma: quem
+  // caía sumia da pista dos outros e ficava sozinho na dele até o fim, aparecendo só na torre.
+  // Hoje: caiu, tenta de novo com passe novo (1, 2, 4, 8 s); conectada mas muda — ninguém que
+  // está correndo manda nada há 6 s —, refaz a conexão também, porque "conectado" não quer
+  // dizer que o dado chega.
+  const [conexao, setConexao] = useState<'conectando' | 'ok' | 'caiu'>('conectando');
+  const ultimoDado = useRef(0);
+  const reconectar = useRef<(motivo: string) => void>(() => {});
   useEffect(() => {
-    const room = new Room({ adaptiveStream: false, dynacast: false });
-    sala.current = room;
     let vivo = true;
+    let tentativa = 0;
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    let ultimaTroca = 0;
     const decodificador = new TextDecoder();
-    room.on(RoomEvent.DataReceived, (dados: Uint8Array, participante?: RemoteParticipant, _tipo?: unknown, topico?: string) => {
+
+    const receber = (dados: Uint8Array, participante?: RemoteParticipant, _tipo?: unknown, topico?: string) => {
       if (topico !== TOPICO || !participante) return;
       const id = contaDaIdentidade(participante.identity);
       // Só quem está sentado corre: dado de mais alguém é descartado.
@@ -440,22 +453,69 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
       const atual = remotos.current.get(id);
       remotos.current.set(id, { fotos: guardarFoto(atual?.fotos ?? [], foto), recebidaEm: Date.now(), indice: atual?.indice ?? null });
       registrar(cronometro.current, id, foto.p, foto.t);
-    });
-    (async () => {
+      ultimoDado.current = Date.now();
+    };
+
+    const conectar = async () => {
+      if (!vivo) return;
+      const room = new Room({ adaptiveStream: false, dynacast: false });
+      sala.current = room;
+      ultimaTroca = Date.now();
+      room.on(RoomEvent.DataReceived, receber);
+      room.on(RoomEvent.Reconnecting, () => { if (sala.current === room) setConexao('caiu'); });
+      room.on(RoomEvent.Reconnected, () => { if (sala.current === room) setConexao('ok'); });
+      room.on(RoomEvent.Disconnected, (motivo) => {
+        if (!vivo || sala.current !== room) return;
+        anotar('aviso', 'corrida', `caí da sala da corrida (motivo ${motivo ?? 'nenhum'}); tentando de novo`);
+        setConexao('caiu');
+        agendar();
+      });
       try {
         const { url, token } = await pedirTokenDaCorrida(grid.id, servidorId);
-        if (!vivo) return;
+        if (!vivo || sala.current !== room) return;
         await room.connect(url, token, { autoSubscribe: false });
-        if (!vivo) void room.disconnect();
+        if (!vivo || sala.current !== room) { void room.disconnect(); return; }
+        if (tentativa > 0) anotar('info', 'corrida', `voltei à sala da corrida na tentativa ${tentativa + 1}`);
+        tentativa = 0;
+        ultimoDado.current = Date.now();
+        setConexao('ok');
       } catch (e) {
-        anotar('erro', 'corrida', `não entrei na sala da corrida: ${(e as Error).message}`);
-        if (vivo) setSemSala(true);
+        anotar('erro', 'corrida', `não entrei na sala da corrida (tentativa ${tentativa + 1}): ${(e as Error).message}`);
+        if (vivo && sala.current === room) { setConexao('caiu'); agendar(); }
       }
-    })();
+    };
+
+    const agendar = () => {
+      clearTimeout(espera);
+      // Terminada a corrida, não há mais o que receber.
+      if (!vivo || gridRef.current.estado !== 'correndo') return;
+      espera = setTimeout(() => {
+        const velha = sala.current;
+        sala.current = null;
+        velha?.removeAllListeners();
+        void velha?.disconnect();
+        void conectar();
+      }, Math.min(8000, 1000 * 2 ** tentativa++));
+    };
+
+    reconectar.current = (motivo) => {
+      // Uma troca por vez, e não mais que uma a cada 15 s: quem está mudo pode ser o outro.
+      if (!vivo || Date.now() - ultimaTroca < 15_000) return;
+      anotar('aviso', 'corrida', `refazendo a sala da corrida: ${motivo}`);
+      ultimaTroca = Date.now();
+      setConexao('caiu');
+      tentativa = 0;
+      agendar();
+    };
+
+    void conectar();
     return () => {
       vivo = false;
+      clearTimeout(espera);
+      const room = sala.current;
       sala.current = null;
-      void room.disconnect();
+      room?.removeAllListeners();
+      void room?.disconnect();
     };
     // A sala é da largada: outra largada é outro componente (a `key`).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -524,6 +584,7 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
     let luzesAntes: number | null = -1;
     let chegadaMandada = carro.current?.chegouEm != null;
     let pedido = 0;
+    let falhasDeEnvio = 0;
     const camera = { x: NaN, y: NaN };
     const poeira: Poeira[] = [];
     const rastros: Rastro[] = [];
@@ -620,7 +681,17 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
       if (eu && pilotando && room?.state === 'connected' && agoraPerf - ultimoEnvio >= 1000 / ENVIOS_POR_SEGUNDO) {
         ultimoEnvio = agoraPerf;
         const bytes = codificador.encode(JSON.stringify(codificar(eu, Math.max(tempo, 0))));
-        room.localParticipant.publishData(bytes, { reliable: false, topic: TOPICO }).catch(() => undefined);
+        room.localParticipant.publishData(bytes, { reliable: false, topic: TOPICO }).then(
+          () => { falhasDeEnvio = 0; },
+          () => { if (++falhasDeEnvio === 40) reconectar.current('40 envios de posição seguidos falharam'); },
+        );
+      }
+
+      // Conectado e mudo: há alguém correndo, e nada dele chega há 6 s.
+      if (g.estado === 'correndo' && tempo > 4000 && sala.current?.state === 'connected' && Date.now() - ultimoDado.current > 6000) {
+        const correndo = g.assentos.some((a) => a.pessoa && a.pessoa.id !== euId && !g.abandonos.includes(a.pessoa.id)
+          && !g.chegadas.some((c) => c.pessoa.id === a.pessoa!.id));
+        if (correndo) reconectar.current('ninguém que está correndo mandou posição há 6 s');
       }
 
       // A classificação e quem a câmera segue.
@@ -701,7 +772,18 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
       // O placar, algumas vezes por segundo: redesenhar o React a cada quadro não diz nada a mais.
       if (agoraPerf - ultimoPlacar > 1000 / PLACAR_POR_SEGUNDO) {
         ultimoPlacar = agoraPerf;
-        setPlacar(montarPlacar({ g, pista, mapa: mapaDoPlacar, euId, eu, tempo, linhas, cron: cronometro.current, seguidoId, corteEm: corteEm.current, outros }));
+        // Quem está sentado e correndo, mas de quem nada chega: a torre diz, em vez de mostrar
+        // um nome sem carro nenhum na pista.
+        const semSinal = new Set<number>();
+        if (g.estado === 'correndo' && tempo > 3000) {
+          for (const a of g.assentos) {
+            const id = a.pessoa?.id;
+            if (id === undefined || id === euId || g.abandonos.includes(id) || g.chegadas.some((c) => c.pessoa.id === id)) continue;
+            const r = remotos.current.get(id);
+            if (!r || Date.now() - r.recebidaEm > SEM_NOTICIA) semSinal.add(id);
+          }
+        }
+        setPlacar(montarPlacar({ g, pista, mapa: mapaDoPlacar, euId, eu, tempo, linhas, cron: cronometro.current, seguidoId, corteEm: corteEm.current, outros, semSinal }));
       }
     };
     pedido = requestAnimationFrame(frame);
@@ -737,7 +819,7 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
                   <span className="corrida-torre-dif">{placar.diferencas.get(l.id) ?? ''}</span>
                 </>
               );
-              const classe = `corrida-torre-linha ${l.voce ? 'voce' : ''} ${!souPiloto && placar.seguido === l.id ? 'seguido' : ''} ${l.abandonou ? 'fora' : ''}`;
+              const classe = `corrida-torre-linha ${l.voce ? 'voce' : ''} ${!souPiloto && placar.seguido === l.id ? 'seguido' : ''} ${l.abandonou || placar.semSinal.has(l.id) ? 'fora' : ''}`;
               return souPiloto ? (
                 <div key={l.id} className={classe}>{conteudo}</div>
               ) : (
@@ -814,8 +896,8 @@ function Corrida({ grid, euId, servidorId, diferenca, ocupado, surdo, tocar, liv
           </div>
         </div>
       )}
-      {semSala && grid.estado === 'correndo' && (
-        <div className="corrida-aviso-de-chegada erro">Não consegui ligar a pista aos outros carros — só o seu aparece.</div>
+      {conexao === 'caiu' && grid.estado === 'correndo' && (
+        <div className="corrida-aviso-de-chegada erro">A conexão com os outros carros caiu — reconectando…</div>
       )}
       {grid.estado === 'fim' && (
         <FimDaCorrida grid={grid} euId={euId} ocupado={ocupado} onAgir={onAgir} onSair={onSair} />
@@ -895,15 +977,17 @@ function montarLinhas(grid: Grid, noGrid: Carro[], euId: number, eu: Carro | nul
   return classificar(linhas);
 }
 
-function montarPlacar({ g, pista, mapa, euId, eu, tempo, linhas, cron, seguidoId, corteEm, outros }: {
+function montarPlacar({ g, pista, mapa, euId, eu, tempo, linhas, cron, seguidoId, corteEm, outros, semSinal }: {
   g: Grid; pista: Pista; mapa: ReturnType<typeof contorno>; euId: number; eu: Carro | null; tempo: number; linhas: Linha[]; cron: Cronometro;
   seguidoId: number | null; corteEm: number | null;
   outros: { id: number; x: number; y: number; carro: CodigoDoCarro; foto: Posicao }[];
+  semSinal: Set<number>;
 }): Placar {
   const lider = linhas[0];
   const diferencas = new Map<number, string>();
   linhas.forEach((l, i) => {
     if (l.abandonou) { diferencas.set(l.id, 'fora'); return; }
+    if (l.chegouEm === null && semSinal.has(l.id)) { diferencas.set(l.id, 'sem sinal'); return; }
     if (l.chegouEm !== null) {
       const total = l.chegouEm + l.punicao;
       diferencas.set(l.id, i === 0 || lider.chegouEm === null ? formatarTempo(total) : formatarDiferenca(total - lider.chegouEm - lider.punicao).replace(' s', ''));
@@ -959,6 +1043,7 @@ function montarPlacar({ g, pista, mapa, euId, eu, tempo, linhas, cron, seguidoId
     pontos,
     bandeira,
     seguido: seguidoId,
+    semSinal,
   };
 }
 

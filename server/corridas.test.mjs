@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  criarGrids, ESPERA_DA_LARGADA, DEPOIS_DO_VENCEDOR, TETO_POR_VOLTA, VOLTA_MINIMA, PLATEIA, ESQUECIDO, ABANDONADO, PISTAS,
+  criarGrids, ESPERA_DA_LARGADA, DEPOIS_DO_VENCEDOR, TETO_POR_VOLTA, VOLTA_MINIMA, PLATEIA, ESQUECIDO, ABANDONADO, PISTAS, PROTOCOLO,
 } from './corridas.mjs';
 import { ErroDeConta } from './contas.mjs';
 
@@ -32,8 +32,8 @@ const recusa = (status, texto) => (e) => {
 /** Grid aberto por TKP no VER, com Juninho no LEC, largado e com as luzes já apagadas. */
 function largado(t, { voltas = 3 } = {}) {
   const { id } = t.grids.abrir(t.como(TKP), { voltas });
-  t.agir(TKP, id, 'sentar', { carro: 'VER' });
-  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC' });
+  t.agir(TKP, id, 'sentar', { carro: 'VER', protocolo: PROTOCOLO });
+  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC', protocolo: PROTOCOLO });
   t.agir(TKP, id, 'largar');
   t.passar(ESPERA_DA_LARGADA);
   return id;
@@ -73,12 +73,15 @@ test('a pista: só quem abriu escolhe, só entre as seis, e pedido meio errado n
 test('sentar: um carro por pessoa, uma pessoa por carro', () => {
   const t = montar();
   const { id } = t.grids.abrir(t.como(TKP));
-  t.agir(TKP, id, 'sentar', { carro: 'VER' });
-  assert.throws(() => t.agir(JUNINHO, id, 'sentar', { carro: 'VER' }), recusa(409, /TKP já sentou/));
-  assert.throws(() => t.agir(JUNINHO, id, 'sentar', { carro: 'XYZ' }), recusa(400));
+  // App de antes do redesenho não diz o protocolo, e não senta: veria outra pista.
+  assert.throws(() => t.agir(TKP, id, 'sentar', { carro: 'VER' }), recusa(409, /atualizar/));
+  assert.throws(() => t.agir(TKP, id, 'sentar', { carro: 'VER', protocolo: 1 }), recusa(409, /atualizar/));
+  t.agir(TKP, id, 'sentar', { carro: 'VER', protocolo: PROTOCOLO });
+  assert.throws(() => t.agir(JUNINHO, id, 'sentar', { carro: 'VER', protocolo: PROTOCOLO }), recusa(409, /TKP já sentou/));
+  assert.throws(() => t.agir(JUNINHO, id, 'sentar', { carro: 'XYZ', protocolo: PROTOCOLO }), recusa(400));
   // Trocar de carro libera o anterior.
-  t.agir(TKP, id, 'sentar', { carro: 'NOR' });
-  const { grid } = t.agir(JUNINHO, id, 'sentar', { carro: 'VER' });
+  t.agir(TKP, id, 'sentar', { carro: 'NOR', protocolo: PROTOCOLO });
+  const { grid } = t.agir(JUNINHO, id, 'sentar', { carro: 'VER', protocolo: PROTOCOLO });
   assert.equal(grid.assentos.find((a) => a.carro === 'VER').pessoa.id, JUNINHO);
   assert.equal(grid.assentos.find((a) => a.carro === 'NOR').pessoa.id, TKP);
   assert.equal(grid.assentos.filter((a) => a.pessoa).length, 2);
@@ -98,7 +101,7 @@ test('chamar: vários de uma vez, o convite chega no resumo e some ao sentar ou 
   assert.deepEqual(convite.map((c) => [c.grid, c.de.nome, c.voltas]), [[id, 'TKP', 5]]);
   assert.deepEqual(t.grids.resumo(t.como(BIA)).convites, []);
 
-  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC' });
+  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC', protocolo: PROTOCOLO });
   assert.deepEqual(t.grids.resumo(t.como(JUNINHO)).convites, []);
   t.agir(RAFA, id, 'recusar');
   const { grid } = t.agir(TKP, id, 'configurar', { voltas: 10 });
@@ -114,7 +117,7 @@ test('largar: só quem abriu, com alguém sentado, e a largada fica no futuro', 
   const t = montar();
   const { id } = t.grids.abrir(t.como(TKP), { voltas: 3 });
   assert.throws(() => t.agir(TKP, id, 'largar'), recusa(409, /Ninguém sentou/));
-  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC' });
+  t.agir(JUNINHO, id, 'sentar', { carro: 'LEC', protocolo: PROTOCOLO });
   assert.throws(() => t.agir(JUNINHO, id, 'largar'), recusa(403));
   const { grid } = t.agir(TKP, id, 'largar');
   assert.equal(grid.estado, 'correndo');
@@ -122,7 +125,7 @@ test('largar: só quem abriu, com alguém sentado, e a largada fica no futuro', 
   assert.deepEqual(grid.ordem, ['LEC']);
   assert.equal(grid.rodada, 1);
   // Largou, os lugares não mudam mais.
-  assert.throws(() => t.agir(RAFA, id, 'sentar', { carro: 'VER' }), recusa(409, /já largou/));
+  assert.throws(() => t.agir(RAFA, id, 'sentar', { carro: 'VER', protocolo: PROTOCOLO }), recusa(409, /já largou/));
 });
 
 test('chegada: o tempo precisa fechar com a largada, e a ordem é a do tempo', () => {
@@ -191,7 +194,7 @@ test('ninguém corre em duas pistas ao mesmo tempo', () => {
   const t = montar();
   largado(t);
   const outro = t.grids.abrir(t.como(RAFA)).id;
-  assert.throws(() => t.agir(TKP, outro, 'sentar', { carro: 'NOR' }), recusa(409, /corrida em andamento/));
+  assert.throws(() => t.agir(TKP, outro, 'sentar', { carro: 'NOR', protocolo: PROTOCOLO }), recusa(409, /corrida em andamento/));
   // E quem está correndo não recebe convite até acabar.
   t.agir(RAFA, outro, 'chamar', { alvo: JUNINHO });
   assert.deepEqual(t.grids.resumo(t.como(JUNINHO)).convites, []);
@@ -236,4 +239,30 @@ test('a sala do LiveKit muda a cada largada, e só quem senta publica', () => {
   assert.deepEqual(t.grids.salaDaCorrida(t.como(TKP), id), { sala: 'corrida-abc-1', piloto: true });
   assert.deepEqual(t.grids.salaDaCorrida(t.como(RAFA), id), { sala: 'corrida-abc-1', piloto: false });
   assert.throws(() => t.grids.salaDaCorrida(t.como(RAFA, 2), id), recusa(404));
+});
+
+test('o convite chega de qualquer servidor da pessoa, com quem já sentou, e não de servidor que ela deixou', () => {
+  const t = montar();
+  // o grid é do servidor 2; Juninho pergunta olhando o servidor 1
+  const { id } = t.grids.abrir(t.como(TKP, 2), { pista: 'monaco' });
+  t.agir(TKP, id, 'sentar', { carro: 'NOR', protocolo: PROTOCOLO }, 2);
+  t.agir(TKP, id, 'chamar', { alvo: JUNINHO }, 2);
+  const fora = (ativo) => ({
+    pessoaEm: (sid, pid) => ({ id: pid, nome: `${NOMES[pid]} em ${sid}`, foto: null, idExibido: null }),
+    ativoEm: () => ativo,
+    nomeDoServidor: (sid) => `servidor ${sid}`,
+  });
+  const [convite] = t.grids.resumo(t.como(JUNINHO, 1), fora(true)).convites;
+  assert.equal(convite.grid, id);
+  assert.equal(convite.servidor, 2);
+  assert.equal(convite.servidorNome, 'servidor 2');
+  assert.equal(convite.de.nome, 'TKP em 2');
+  assert.equal(convite.pista, 'monaco');
+  assert.deepEqual(convite.sentados.map((s) => [s.carro, s.pessoa.nome]), [['NOR', 'TKP em 2']]);
+  // os grids continuam sendo só os do servidor aberto
+  assert.deepEqual(t.grids.resumo(t.como(JUNINHO, 1), fora(true)).grids, []);
+  // saiu de lá (ou foi banido): o convite não chega
+  assert.deepEqual(t.grids.resumo(t.como(JUNINHO, 1), fora(false)).convites, []);
+  // sem saber dos outros servidores, só o do pedido
+  assert.deepEqual(t.grids.resumo(t.como(JUNINHO, 1)).convites, []);
 });

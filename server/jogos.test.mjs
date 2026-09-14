@@ -102,7 +102,7 @@ test('o convite chega só a quem foi chamado, com a cor DELE, e acompanha o que 
   t.mesas.agir(t.como(TKP), { id, acao: 'chamar', alvo: JUNINHO });
 
   assert.deepEqual(t.mesas.resumo(t.como(JUNINHO)).convites, [
-    { mesa: id, de: { id: TKP, nome: 'TKP', foto: null, idExibido: null }, tempo: 600, cor: 'pretas' },
+    { mesa: id, servidor: 1, servidorNome: null, de: { id: TKP, nome: 'TKP', foto: null, idExibido: null }, tempo: 600, cor: 'pretas' },
   ]);
   const deOutro = t.mesas.resumo(t.como(TAVA));
   assert.deepEqual(deOutro.convites, []);
@@ -437,4 +437,19 @@ test('faxina: partida em que nenhum dos dois aparece some em 10 min, e a busca d
   t.mesas.resumo(t.como(JUNINHO));   // o app dele aberto, lendo o chat
   t.passar(ABANDONADA - 1);
   assert.equal(t.mesas.ver(t.como(TAVA), outra).estado, 'jogando', 'quem só saiu da tela do jogo perdeu a partida');
+});
+
+test('o convite de xadrez chega de outro servidor da pessoa, e não de um que ela deixou', () => {
+  const t = montar();
+  const { id } = t.mesas.abrir(t.como(TKP, 2), { tempo: 300, cor: 'brancas' });
+  t.mesas.agir(t.como(TKP, 2), { id, acao: 'chamar', alvo: JUNINHO });
+  const fora = (ativo) => ({
+    pessoaEm: (sid, pid) => ({ id: pid, nome: `${NOMES[pid]} em ${sid}`, foto: null, idExibido: null }),
+    ativoEm: () => ativo,
+    nomeDoServidor: (sid) => `servidor ${sid}`,
+  });
+  const { mesas, convites } = t.mesas.resumo(t.como(JUNINHO, 1), fora(true));
+  assert.deepEqual(mesas, []);
+  assert.deepEqual(convites.map((c) => [c.mesa, c.servidor, c.servidorNome, c.de.nome, c.cor]), [[id, 2, 'servidor 2', 'TKP em 2', 'pretas']]);
+  assert.deepEqual(t.mesas.resumo(t.como(JUNINHO, 1), fora(false)).convites, []);
 });

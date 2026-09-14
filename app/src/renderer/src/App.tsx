@@ -916,7 +916,8 @@ export function App() {
   const mesas = jogosDaqui?.mesas ?? SEM_MESAS;
   const jogandoPorPessoa = jogandoAgora(mesas);
   const minhaMesaAgora = sessao?.eu ? minhaMesa(mesas, sessao.eu.id) : null;
-  const convite = jogosDaqui?.convites.find((c) => c.mesa !== conviteRespondido) ?? null;
+  // O convite não é só do servidor aberto: chega de qualquer servidor seu, e cada um diz de qual é.
+  const convite = jogos?.convites.find((c) => c.mesa !== conviteRespondido) ?? null;
   // Quem está na SUA call agora, por conta: é a primeira lista do lobby do xadrez.
   const naMinhaCall = new Set(
     rm.participants.map((p) => contaDaIdentidade(p.identity)).filter((id): id is number => id !== null),
@@ -972,14 +973,28 @@ export function App() {
     } catch (e) { notas.mostrarFalha(e, 'Xadrez'); }
   }, [sessao?.servidor?.id, minhaMesaAgora, notas]);
 
+  /**
+   * Aceitar um convite é ir até ele. A partida é de um servidor, e a faixa que a traz de volta
+   * e o menu de jogos são do servidor aberto: aceitar o de outro servidor sem trocar abria o
+   * jogo por cima do servidor errado, e bastava sair dele para não ter mais caminho de volta.
+   * Troca como o clique na trilha, e sai das conversas junto.
+   */
+  const irAoServidorDoJogo = useCallback(async (servidorId: number) => {
+    setModoConversas(false);
+    if (servidorId !== sessao?.servidor?.id) await trocarDeServidor(servidorId);
+  }, [sessao?.servidor?.id, trocarDeServidor]);
+
   const responderConvite = useCallback(async (c: ConviteDeJogo, aceitar: boolean) => {
-    const servidorId = jogosDaqui?.servidorId;
+    const servidorId = c.servidor ?? jogos?.servidorId;
     if (!servidorId) return;
     setRespondendoConvite(true);
     try {
       await agirNaMesa(c.mesa, { acao: aceitar ? 'aceitar' : 'recusar' }, servidorId);
       setConviteRespondido(c.mesa);
-      if (aceitar) setJogoAberto({ tipo: 'xadrez', mesaId: c.mesa, servidorId });
+      if (aceitar) {
+        await irAoServidorDoJogo(servidorId);
+        setJogoAberto({ tipo: 'xadrez', mesaId: c.mesa, servidorId });
+      }
     } catch (e) {
       // Cancelado, ou você entrou noutra partida no meio: o convite sai da tela do mesmo
       // jeito, senão fica um botão que não faz mais nada.
@@ -988,7 +1003,7 @@ export function App() {
     } finally {
       setRespondendoConvite(false);
     }
-  }, [jogosDaqui?.servidorId, notas]);
+  }, [jogos?.servidorId, notas, irAoServidorDoJogo]);
 
   /**
    * A Fórmula 1 vista da busca de salas. "O seu grid" é o que você abriu ou em que está
@@ -1003,7 +1018,7 @@ export function App() {
     : [...grids].sort((a, b) => Number(b.estado === 'correndo') - Number(a.estado === 'correndo'))
       .find((g) => g.anfitriao === euIdAgora || g.pilotos.includes(euIdAgora)) ?? null;
   const gridDoServidor = meuGrid ?? grids[0] ?? null;
-  const conviteDeCorrida = corridasDaqui?.convites.find((c) => c.grid !== conviteDeCorridaRespondido) ?? null;
+  const conviteDeCorrida = corridas?.convites.find((c) => c.grid !== conviteDeCorridaRespondido) ?? null;
   const textoDaCorrida = meuGrid
     ? (meuGrid.estado === 'correndo' ? 'voltar à sua corrida' : 'voltar ao seu grid')
     : gridDoServidor
@@ -1022,13 +1037,17 @@ export function App() {
   }, [sessao?.servidor?.id, gridDoServidor, notas]);
 
   const responderConviteDeCorrida = useCallback(async (c: ConviteParaCorrer, correr: boolean) => {
-    const servidorId = corridasDaqui?.servidorId;
+    const servidorId = c.servidor ?? corridas?.servidorId;
     if (!servidorId) return;
     setConviteDeCorridaRespondido(c.grid);
     // Correr não responde nada ao servidor: abre o grid, e sentar num carro é a resposta.
-    if (correr) { setJogoAberto({ tipo: 'corrida', gridId: c.grid, servidorId }); return; }
+    if (correr) {
+      await irAoServidorDoJogo(servidorId);
+      setJogoAberto({ tipo: 'corrida', gridId: c.grid, servidorId });
+      return;
+    }
     try { await agirNoGrid(c.grid, { acao: 'recusar' }, servidorId); } catch (e) { notas.mostrarFalha(e, 'Fórmula 1'); }
-  }, [corridasDaqui?.servidorId, notas]);
+  }, [corridas?.servidorId, notas, irAoServidorDoJogo]);
 
   const conviteDeCorridaTocado = useRef<number | null>(null);
   useEffect(() => {
@@ -1513,13 +1532,14 @@ export function App() {
       {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
       <Avisos
         avisos={notas.avisos}
-        // O convite para jogar fica na mesma pilha, mas não some sozinho: quem chamou está
-        // esperando a resposta.
+        // O convite para jogar fica na mesma pilha, num cartão grande (a opção C do dono), e não
+        // some sozinho: quem chamou está esperando a resposta.
         extra={(convite || conviteDeCorrida) && (
           <>
             {convite && (
               <ConviteDeXadrez
                 convite={convite}
+                servidorAberto={servidorAberto}
                 ocupado={respondendoConvite}
                 onJogar={() => responderConvite(convite, true)}
                 onRecusar={() => responderConvite(convite, false)}
@@ -1528,6 +1548,7 @@ export function App() {
             {conviteDeCorrida && (
               <ConviteDeCorrida
                 convite={conviteDeCorrida}
+                servidorAberto={servidorAberto}
                 ocupado={false}
                 onCorrer={() => responderConviteDeCorrida(conviteDeCorrida, true)}
                 onRecusar={() => responderConviteDeCorrida(conviteDeCorrida, false)}

@@ -1392,6 +1392,22 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   cartão fica até "Jogar", "agora não" ou o cancelamento. **Quem está jogando não recebe
   convite**: o servidor o segura até a partida acabar, senão tocaria um chamado que ele
   mesmo recusaria.
+- **O convite é um CARTÃO, o mesmo para os dois jogos, e não uma notificação.** Era uma barrinha
+  na pilha de avisos, e o dono cobrou: *"não seja somente uma barrinha de notificação no canto,
+  e permaneça de pé para que ele possa aceitar ou negar"*. Ele escolheu entre três desenhos a
+  opção C — no canto, maior — e os dois jogos iguais (`CartaoDeConvite`): capa (a miniatura da
+  pista, ou uma faixa de tabuleiro com o cavalo), rótulo do jogo, quem chamou, o detalhe, quem
+  já está sentado com o anel da cor da equipe, e "Agora não" e a ação escritos, da largura toda.
+  As miniaturas das pistas são imagens GUARDADAS (`pistas/miniaturas/*.webp`, feitas pelo
+  próprio desenhista da corrida): montar a pista inteira só para a capa travaria a tela.
+- **O convite vem de TODOS os seus servidores, e diz de qual.** Só chegava o do servidor aberto,
+  e quem estava olhando outro não sabia que foi chamado. O `/rooms` junta os grids e as mesas de
+  qualquer servidor em que você é membro ativo (`resumo(ctx, fora)`), com `servidor` e
+  `servidorNome`, e o cartão escreve "· em Paddock" quando não é o aberto. **Aceitar leva ao
+  servidor do jogo** (`irAoServidorDoJogo`): a primeira versão abria a partida por cima do
+  servidor aberto, e bastava sair dela para não ter caminho de volta — a faixa e o menu de jogos
+  são do servidor aberto. Visto no app escondido: "Correr" num convite do Paddock, olhando o
+  CORNUME, troca a trilha para o Paddock e abre o grid de lá.
 - **Quem joga ganha um controle ao lado do nome, e ele É o botão** — o mesmo princípio do
   selo AO VIVO de quem transmite. Na linha da call e na lista de pessoas, porque quem joga
   FORA da call só aparece na segunda. Um clique e você está assistindo; a plateia aparece
@@ -1416,6 +1432,25 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   (`corrida-<nome>-<rodada>`), com passe sem áudio nem vídeo, e publicar dados é só de quem
   está sentado — quem assiste entra para ler. A sala muda a cada largada, para ninguém
   pendurado na anterior virar fantasma na seguinte.
+- **A sala da corrida se refaz sozinha, e "conectado" não quer dizer que o dado chega.** Na
+  primeira corrida a três, o Tava1 não via ninguém, ninguém o via, e ele aparecia na torre. O
+  LiveKit de produção registrou, na sala daquela corrida, `send data message error … data
+  channel is not available` para ele, e a voz dele tinha caído e voltado cinco vezes naquela
+  noite. A sala da corrida não tinha volta nenhuma: um `connect` e fim. Hoje (`TelaDaCorrida`):
+  caiu, entra de novo com passe novo em 1, 2, 4 e 8 s; e se ninguém que está correndo mandou
+  posição em 6 s, ou 40 envios seguidos falharam, refaz a conexão — no máximo uma vez a cada
+  15 s, porque quem está mudo pode ser o outro. Na torre, quem não manda nada há 3 s aparece
+  "sem sinal", e na pista uma faixa diz que a conexão caiu. Medido no app escondido e mudo,
+  contra LiveKit local: tirado da sala pelo `removeParticipant` aos 24,0 s, o aviso aparece e
+  some em 1 s e as posições dele voltam a chegar aos outros em ~1,5 s; com os outros dois
+  calados, a torre diz "sem sinal" em 3 s e a sala se refaz aos 6 s. **O defeito exato do
+  Tava1 — canal de dados indisponível com a conexão de pé — não foi reproduzido**: o que se
+  mediu foram as duas bordas dele.
+- **App velho não senta mais** (`PROTOCOLO = 2` em `corridas.mjs`, `PROTOCOLO_DA_CORRIDA` no app).
+  A pista, a punição e a volta mínima mudaram entre as versões, e um app antigo na mesma
+  corrida veria outra pista. Sentar sem o protocolo é 409 com "A Fórmula 1 mudou: feche e abra a
+  Saga para atualizar". Por isso **servidor e app sobem juntos**: app novo com servidor antigo
+  senta igual (o servidor ignora o campo), mas servidor novo recusa todo app de antes.
 - **Cada app simula o PRÓPRIO carro, e a batida é resolvida dos dois lados.** Árbitro central
   poria a latência no volante de todo mundo. Cada um empurra o próprio carro para fora do
   outro, pela posição que recebeu dele, e perde velocidade só no que ia contra — por isso a
@@ -1486,6 +1521,18 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   com 19 a 28 ms (é quando nasce ladrilho novo). Em máquina fraca e no Windows, não medido.
 - **O motor não é arquivo: é sintetizado ao vivo** (`motor.ts`), porque muda de tom a cada
   quadro. Só o SEU ronca. Luz, largada, batida e vitória são `.ogg` da família de sempre.
+- **O motor tem marchas, e o talo é GRAVE.** O primeiro foi recusado: *"o carro parece que
+  instantaneamente está na velocidade máxima, isso tudo bem, mas o som não remete a isso,
+  parece pouco e fica insuportável de ruim na velocidade máxima"*. Era uma serra com uma
+  quadrada uma oitava ACIMA, por um filtro ressonante que abria até ~2,2 kHz: o tom só subia e,
+  na reta, ficava parado num apito. Hoje são oito marchas (`rotacao`, pura e testada) — o giro
+  sobe dentro de cada uma e cai na troca, com uma respirada no volume —, o corpo é uma quadrada
+  uma oitava ABAIXO, o ruído de admissão só aparece acelerando, e a saturação vem ANTES de um
+  filtro sem ressonância. Gravado com `OfflineAudioContext` na mesma volta de mentira, no talo:
+  centroide de 1.259 Hz para **490 Hz**, energia acima de 2 kHz de 23,6% para **3,2%**, volume
+  igual (−24 dB). Na troca, o `setTargetAtTime` do quadro seguinte desfazia a respirada — por
+  isso o volume fica quieto por 120 ms depois dela; as sete trocas aparecem na gravação.
+  **Se ficou bom é de ouvido, e isso é do dono.**
 - **Teste escondido tem de ser MUDO.** Na primeira rodada da corrida o app de teste tocou luzes
   e motor pelos alto-falantes do dono — com ele ao vivo na Saga, e a live levou o som junto:
   o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
@@ -1767,7 +1814,7 @@ a gente não conhece.
 ## Testes
 
 ```bash
-pnpm test        # servidor (437) + app (364), segundos, sem nada externo
+pnpm test        # servidor (438) + app (366), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 
@@ -1929,9 +1976,13 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   pódio, a torre, o mapinha, a velocidade e o tempo da volta — conferido em imagem, a 60
   quadros. **Não foram exercidos**: gente pilotando no teclado (o volante de verdade, a
   sensação de freada e de curva), dois computadores, a bandeira azul numa corrida (só no teste
-  da regra), o convite no canto, os sons de ouvido, uma corrida com oito carros e máquina fraca
-  ou Windows. App novo com servidor antigo corre sempre em Interlagos, com a escolha da pista
-  apagada; app antigo e novo na mesma corrida veriam pistas diferentes.
+  da regra), os sons de ouvido, uma corrida com oito carros e máquina fraca ou Windows. **Da
+  segunda rodada**: o cartão de convite foi visto no app escondido (a F1 de outro servidor e o
+  xadrez do aberto juntos no canto, o "Agora não" recusando no servidor e o "Correr" trocando
+  de servidor); a volta da sala da corrida, medida com o participante tirado pelo LiveKit e com
+  os outros calados. **Não foram exercidos**: o motor novo de ouvido, o som do convite, o
+  cartão com uma foto de perfil de verdade, a queda do Tava1 como ela aconteceu (canal de dados
+  indisponível numa rede ruim) e a corrida com ele de novo.
 - **A administração da Saga com gente de verdade em call, e contra a produção.** O que está
   medido, na janela escondida contra um servidor local num cenário parecido com a produção
   (CORNUME e CARDUME, banido, sala privada com e sem cargo, sala de notas), é a tela

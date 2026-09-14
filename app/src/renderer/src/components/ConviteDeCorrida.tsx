@@ -1,30 +1,49 @@
 import type { ConviteDeCorrida as Convite } from '../api';
-import { definicao } from '../pista';
-import { Avatar } from './Avatar';
+import { equipeDoCarro } from '../corrida';
+import { definicao, type IdDaPista } from '../pista';
+import bahrein from '../pistas/miniaturas/bahrein.webp';
+import interlagos from '../pistas/miniaturas/interlagos.webp';
+import monaco from '../pistas/miniaturas/monaco.webp';
+import monza from '../pistas/miniaturas/monza.webp';
+import spa from '../pistas/miniaturas/spa.webp';
+import vegas from '../pistas/miniaturas/vegas.webp';
+import { CartaoDeConvite } from './CartaoDeConvite';
 
 /**
- * O convite para correr, no canto, como o do xadrez: não some sozinho, porque quem chamou
- * está esperando. "Correr" abre o grid — é lá que se escolhe o carro.
+ * A miniatura de cada pista, desenhada pelo próprio desenhista da corrida e guardada: montar a
+ * pista inteira só para a capa de um convite travaria a tela por uma fração de segundo.
  */
-export function ConviteDeCorrida({ convite, ocupado, onCorrer, onRecusar }: {
+const MINIATURAS: Record<IdDaPista, string> = { interlagos, monza, monaco, spa, bahrein, vegas };
+
+/**
+ * O convite para correr. "Correr" abre o grid — é lá que se escolhe o carro —, e o convite pode
+ * ser de um servidor que não é o aberto: aí ele diz de qual.
+ */
+export function ConviteDeCorrida({ convite, servidorAberto, ocupado, onCorrer, onRecusar }: {
   convite: Convite;
+  servidorAberto: number | null;
   ocupado: boolean;
   onCorrer: () => void;
   onRecusar: () => void;
 }) {
+  const pista = definicao(convite.pista ?? 'interlagos');
+  const deOutro = convite.servidor !== undefined && convite.servidor !== servidorAberto && convite.servidorNome;
+  const sentados = convite.sentados ?? [];
   return (
-    <div className="aviso convite-de-jogo" role="alert">
-      <Avatar nome={convite.de.nome} foto={convite.de.foto} tamanho="big" />
-      <div className="convite-de-jogo-corpo">
-        <div className="convite-de-jogo-texto">
-          <span className="strong">{convite.de.nome} te chamou para correr</span>
-          <span className="muted">{definicao(convite.pista ?? 'interlagos').nome} · {convite.voltas} voltas · {convite.pilotos} de 8 no grid</span>
-        </div>
-        <div className="convite-de-jogo-botoes">
-          <button type="button" className="primary sm" disabled={ocupado} onClick={onCorrer}>Correr</button>
-          <button type="button" className="link" disabled={ocupado} onClick={onRecusar}>agora não</button>
-        </div>
-      </div>
-    </div>
+    <CartaoDeConvite
+      jogo="Fórmula 1"
+      capa={<img src={MINIATURAS[pista.id]} alt="" />}
+      de={convite.de}
+      titulo={`${convite.de.nome} te chamou para correr`}
+      detalhe={`${pista.gp} · ${convite.voltas} voltas${deOutro ? ` · em ${convite.servidorNome}` : ''}`}
+      junto={{
+        pessoas: sentados.map((s) => ({ pessoa: s.pessoa, cor: equipeDoCarro(s.carro).cor })),
+        texto: `${convite.pilotos} de 8 no grid`,
+      }}
+      aceitar="Correr"
+      ocupado={ocupado}
+      onAceitar={onCorrer}
+      onRecusar={onRecusar}
+    />
   );
 }

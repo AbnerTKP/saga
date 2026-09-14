@@ -1559,10 +1559,36 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
   background: #eed8b4; display: grid; place-items: center; font-size: 26px; }
 
 /* O convite para jogar, na pilha dos avisos — mas ele não some sozinho: quem chamou espera. */
-.convite-de-jogo { width: 330px; border-left-color: var(--accent); align-items: flex-start; }
-.convite-de-jogo-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
-.convite-de-jogo-texto { display: flex; flex-direction: column; }
-.convite-de-jogo-botoes { display: flex; align-items: center; gap: 14px; }
+/* O convite para jogar: o cartão grande no canto (a opção C do dono), para o xadrez e a Fórmula 1.
+   Ele mora na pilha dos avisos, que não recebe clique — por isso o `pointer-events` volta aqui. */
+.cartao-de-convite { pointer-events: auto; width: 340px; border-radius: 12px; overflow: hidden; background: var(--bg1);
+  box-shadow: inset 0 0 0 1px rgba(63,127,224,.55), 0 12px 32px rgba(0,0,0,.55); animation: aviso-entra .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .cartao-de-convite { animation: none; } }
+.cartao-de-convite-capa { position: relative; height: 110px; overflow: hidden; }
+.cartao-de-convite-capa > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cartao-de-convite-capa::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(26,29,36,0) 35%, var(--bg1) 100%); }
+.cartao-de-convite-rotulo { position: absolute; z-index: 1; left: 14px; top: 12px; display: flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: 999px; background: rgba(20,22,27,.85); font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--accent-claro); }
+.cartao-de-convite-corpo { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 12px; margin-top: -18px; padding: 0 14px 14px; }
+.cartao-de-convite-quem { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cartao-de-convite-foto { flex: none; border-radius: 50%; box-shadow: 0 0 0 3px var(--bg1); display: flex; }
+.cartao-de-convite-foto .avatar.big { width: 40px; height: 40px; font-size: 16px; }
+.cartao-de-convite-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.cartao-de-convite-titulo { font-size: 15px; font-weight: 700; color: var(--white); overflow-wrap: anywhere; }
+.cartao-de-convite-detalhe { font-size: 12.5px; color: var(--text2); }
+.cartao-de-convite-junto { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text2); }
+.cartao-de-convite-fotos { display: flex; padding-left: 4px; }
+.cartao-de-convite-mini { display: flex; border-radius: 50%; }
+.cartao-de-convite-mini + .cartao-de-convite-mini { margin-left: -4px; }
+.cartao-de-convite-mini .avatar { width: 20px; height: 20px; font-size: 8.5px; }
+.cartao-de-convite-botoes { display: flex; gap: 8px; }
+.cartao-de-convite-botoes > button { flex: 1; padding: 10px 12px; font-size: 14px; }
+/* A capa do xadrez: três fileiras de tabuleiro e um cavalo. */
+.capa-de-xadrez { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(3, 1fr); }
+/* À direita: no meio, o cavalo encostava no rótulo do canto (visto na foto do app). */
+.capa-de-xadrez-peca { position: absolute; right: 30px; top: 46%; transform: translateY(-50%); font-size: 62px; }
 
 .faixa-da-partida .faixa-partida-titulo { font-size: 12.5px; color: var(--text2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

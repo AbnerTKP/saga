@@ -382,7 +382,8 @@ export function criarMesas({
      * O que vai de carona no `/rooms`: as mesas DESTE servidor, para a tela marcar quem está
      * jogando, e os convites de quem perguntou.
      */
-    resumo(ctx) {
+    /** Como o dos grids: as mesas daqui e os convites de todos os servidores de quem perguntou. */
+    resumo(ctx, fora = {}) {
       const agora = relogio();
       faxina(agora);
       // Buscar as salas é o app do jogador aberto, e isso conta como aparecer: quem saiu da tela
@@ -404,8 +405,11 @@ export function criarMesas({
           vez: m.estado === 'jogando' ? m.posicao.vez : null,
         })),
         convites: livre
-          ? daqui.filter((m) => m.estado === 'lobby' && m.convidado === ctx.eu).map((m) => ({
-            mesa: m.id, de: ctx.pessoa(m.anfitriao), tempo: m.tempo, cor: COR_DO_CONVIDADO[m.cor],
+          ? [...mesas.values()].filter((m) => m.estado === 'lobby' && m.convidado === ctx.eu
+            && (m.sid === ctx.sid || !!fora.ativoEm?.(m.sid, ctx.eu))).map((m) => ({
+            mesa: m.id, servidor: m.sid, servidorNome: fora.nomeDoServidor?.(m.sid) ?? null,
+            de: m.sid === ctx.sid || !fora.pessoaEm ? ctx.pessoa(m.anfitriao) : fora.pessoaEm(m.sid, m.anfitriao),
+            tempo: m.tempo, cor: COR_DO_CONVIDADO[m.cor],
           }))
           : [],
       };

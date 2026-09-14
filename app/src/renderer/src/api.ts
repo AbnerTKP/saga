@@ -484,7 +484,11 @@ const comParametros = (campos: Record<string, string>) => {
 export type PessoaDaMesa = { id: number; nome: string; foto: string | null; idExibido: string | null };
 
 /** `cor` é a de quem foi chamado: quem abriu de brancas chama alguém para as pretas. */
-export type ConviteDeJogo = { mesa: number; de: PessoaDaMesa; tempo: number | null; cor: CorEscolhida };
+/**
+ * `servidor` e `servidorNome`: de que servidor é a mesa. O convite chega de qualquer servidor da
+ * pessoa, e responder vai ao servidor DELE. Servidor antigo não manda: aí é o servidor aberto.
+ */
+export type ConviteDeJogo = { mesa: number; servidor?: number; servidorNome?: string | null; de: PessoaDaMesa; tempo: number | null; cor: CorEscolhida };
 
 export type JogosNoServidor = { mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] };
 
@@ -555,7 +559,11 @@ export const enviarRelato = (corpo: CorpoDoRelato) =>
 /** `pista` só vem de servidor que já conhece as pistas; sem ela, é Interlagos. */
 export type ResumoDoGrid = { id: number; estado: EstadoDoGrid; anfitriao: number; pilotos: number[]; voltas: number; pista?: string };
 export type EstadoDoGrid = 'grid' | 'correndo' | 'fim';
-export type ConviteDeCorrida = { grid: number; de: PessoaDaMesa; voltas: number; pista?: string; pilotos: number };
+export type ConviteDeCorrida = {
+  grid: number; servidor?: number; servidorNome?: string | null; de: PessoaDaMesa; voltas: number; pista?: string; pilotos: number;
+  /** Quem já sentou, e em que carro; servidor antigo não manda. */
+  sentados?: { carro: CodigoDoCarro; pessoa: PessoaDaMesa }[];
+};
 export type CorridasNoServidor = { grids: ResumoDoGrid[]; convites: ConviteDeCorrida[] };
 
 export type Grid = {
@@ -585,7 +593,7 @@ export type Grid = {
 };
 
 export type AcaoNoGrid =
-  | { acao: 'sentar'; carro: CodigoDoCarro }
+  | { acao: 'sentar'; carro: CodigoDoCarro; protocolo: number }
   | { acao: 'configurar'; voltas?: number; pista?: string }
   | { acao: 'chamar' | 'cancelarConvite'; alvo: number }
   | { acao: 'chegada'; tempo: number; melhorVolta: number | null; punicao: number }

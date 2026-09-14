@@ -321,6 +321,13 @@ export type Posicao = {
 
 export const TOPICO = 'corrida';
 
+/**
+ * A versão da corrida que este app fala, mandada ao sentar. Um app antigo desenharia a pista
+ * velha e os outros carros num mundo que não é o dele — ninguém se enxerga —, então o servidor
+ * não o deixa sentar (`corridas.mjs`, `PROTOCOLO`).
+ */
+export const PROTOCOLO_DA_CORRIDA = 2;
+
 export function codificar(carro: Carro, tempo: number): Posicao {
   return {
     t: Math.round(tempo),

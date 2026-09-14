@@ -1,31 +1,37 @@
 import type { ConviteDeJogo } from '../api';
 import { descreverMesa } from '../xadrez';
-import { Avatar } from './Avatar';
+import { CartaoDeConvite } from './CartaoDeConvite';
+import { Peca } from './Tabuleiro';
 
 /**
- * O convite para jogar, no canto, onde a pessoa estiver: lendo o chat, na call ou fora dela.
- * Mora na pilha dos avisos, mas não some sozinho como eles — quem chamou está esperando a
- * resposta, e ele só sai com um "Jogar", um "agora não" ou com quem chamou desistindo.
+ * O convite para jogar xadrez, no mesmo cartão da Fórmula 1: onde a pessoa estiver — lendo o
+ * chat, na call ou olhando outro servidor —, até um "Jogar", um "Agora não" ou quem chamou
+ * desistir. A capa é um pedaço de tabuleiro com um cavalo.
  */
-export function ConviteDeXadrez({ convite, ocupado, onJogar, onRecusar }: {
+export function ConviteDeXadrez({ convite, servidorAberto, ocupado, onJogar, onRecusar }: {
   convite: ConviteDeJogo;
+  servidorAberto: number | null;
   ocupado: boolean;
   onJogar: () => void;
   onRecusar: () => void;
 }) {
+  const deOutro = convite.servidor !== undefined && convite.servidor !== servidorAberto && convite.servidorNome;
   return (
-    <div className="aviso convite-de-jogo" role="alert">
-      <Avatar nome={convite.de.nome} foto={convite.de.foto} tamanho="big" />
-      <div className="convite-de-jogo-corpo">
-        <div className="convite-de-jogo-texto">
-          <span className="strong">{convite.de.nome} te chamou para jogar xadrez</span>
-          <span className="muted">{descreverMesa(convite.tempo, convite.cor)}</span>
-        </div>
-        <div className="convite-de-jogo-botoes">
-          <button type="button" className="primary sm" disabled={ocupado} onClick={onJogar}>Jogar</button>
-          <button type="button" className="link" disabled={ocupado} onClick={onRecusar}>agora não</button>
-        </div>
-      </div>
-    </div>
+    <CartaoDeConvite
+      jogo="Xadrez"
+      capa={
+        <span className="capa-de-xadrez" aria-hidden="true">
+          {Array.from({ length: 30 }, (_, k) => <span key={k} className={`casa ${(Math.floor(k / 10) + k) % 2 ? 'escura' : 'clara'}`} />)}
+          <span className="capa-de-xadrez-peca"><Peca letra="N" /></span>
+        </span>
+      }
+      de={convite.de}
+      titulo={`${convite.de.nome} te chamou para jogar xadrez`}
+      detalhe={`${descreverMesa(convite.tempo, convite.cor)}${deOutro ? ` · em ${convite.servidorNome}` : ''}`}
+      aceitar="Jogar"
+      ocupado={ocupado}
+      onAceitar={onJogar}
+      onRecusar={onRecusar}
+    />
   );
 }
