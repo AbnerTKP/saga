@@ -16,11 +16,37 @@ import { comLimite } from './limite';
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
 /** Captura sem o processamento de microfone, e em estéreo. Ver o comentário em startScreen. */
-const SOM_DE_VERDADE: AudioCaptureOptions = {
+const SOM_DE_VERDADE: AudioCaptureOptions & { restrictOwnAudio?: boolean } = {
   echoCancellation: false,
   noiseSuppression: false,
   autoGainControl: false,
   channelCount: 2,
+  // Quem tira a NOSSA voz da captura é esta constraint, e não o id do dispositivo.
+  //
+  // Estava escrito aqui que bastava pedir o 'loopbackWithoutChrome': ele abre um
+  // dispositivo distinto, isso foi medido, e concluímos que dispositivo distinto era
+  // exclusão feita. No Mac não é. Medido com o Electron deste projeto, lendo o
+  // `getSettings()` da faixa que volta:
+  //
+  //   loopbackWithoutChrome, sozinho ............ restrictOwnAudio = false
+  //   loopbackWithoutChrome + restrictOwnAudio ... restrictOwnAudio = true
+  //   loopback, sozinho ......................... restrictOwnAudio = false
+  //   loopback + restrictOwnAudio ............... restrictOwnAudio = true
+  //
+  // Ou seja: o id escolhe por onde capturar, a constraint escolhe o que EXCLUIR, e sem
+  // ela a captura leva o mix inteiro — as vozes da call que a Saga está tocando voltam
+  // para todo mundo. Era o retorno que o dono ouvia ao transmitir uma série do Mac, com
+  // o registro dele mostrando `modo "loopbackWithoutChrome"` em todas as transmissões:
+  // o modo certo estava sendo usado o tempo todo, e não excluía nada.
+  //
+  // Vai como valor simples, e não como `exact`: assim é um PEDIDO. Onde o Chromium não
+  // puder atender, a faixa vem do mesmo jeito em vez de a transmissão falhar — e quem
+  // diz o que de fato aconteceu é o registro, logo abaixo, e não esta linha.
+  //
+  // A chave não está no `AudioCaptureOptions` do livekit-client, mas ele repassa o objeto
+  // de áudio CRU para o `getDisplayMedia` (`screenCaptureToDisplayMediaStreamOptions`),
+  // então ela chega — daí o tipo estendido acima, como o cast do ModoDeAudio no main.
+  restrictOwnAudio: true,
 };
 import {
   Room,
@@ -626,7 +652,19 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           anotar('aviso', 'tela', `modo "${modo}" foi aceito, mas nenhuma faixa de áudio foi publicada`);
           avisar('aviso', explicarTelaMuda(window.desktop.platform));
         } else if (audio && veioAudio) {
-          anotar('info', 'tela', `áudio da tela publicado no modo "${modo}"`);
+          // O modo PEDIDO não conta a história toda: o `loopbackWithoutChrome` é aceito no
+          // Mac sem excluir coisa nenhuma, e foi assim que o retorno passou despercebido —
+          // o registro dizia o modo certo em toda transmissão. O que vale é o que a faixa
+          // RESPONDE, então é isso que fica escrito.
+          const faixa = lp().getTrackPublication(Track.Source.ScreenShareAudio)?.track;
+          const restrito = (faixa?.mediaStreamTrack?.getSettings() as
+            { restrictOwnAudio?: boolean } | undefined)?.restrictOwnAudio;
+          anotar('info', 'tela', `áudio da tela publicado no modo "${modo}"`
+            + ` | sem a nossa voz: ${restrito === undefined ? 'a máquina não respondeu' : restrito ? 'sim' : 'NÃO'}`);
+          if (restrito === false) {
+            anotar('aviso', 'tela',
+              'a captura está levando o áudio da própria Saga: quem estiver na call vai se ouvir de volta');
+          }
         }
 
         if (modo === 'loopbackWithMute') {

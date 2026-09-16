@@ -732,17 +732,35 @@ cargo, banimento, castigo, nome exibido e identificador pertencem ao vínculo pe
   `echoCancellation` do microfone não alcança. `loopbackWithMute` também não resolve: ele
   silencia o *endereço de saída da máquina*, não o app — quem transmite perde o filme e as
   vozes, e a captura continua a mesma.
-- **`loopbackWithoutChrome` é o modo que exclui o próprio app**, e é o primeiro da fila. A
-  tipagem da Electron só conhece dois valores, mas ela repassa a string crua como id de
-  dispositivo e o Chromium a reconhece — é o mesmo id que o Chrome usa para atender
-  `restrictOwnAudio`. Medido aqui com o Electron do projeto: `loopback` →
+- **`loopbackWithoutChrome` escolhe POR ONDE capturar; quem exclui a nossa voz é a
+  constraint `restrictOwnAudio`.** Este parágrafo já disse que o id bastava, e o dono pagou
+  a conta: transmitindo uma série do Mac, todo mundo na call se ouvia de volta. O registro
+  dele mostrava `modo "loopbackWithoutChrome"` em TODAS as transmissões — o modo tido como
+  certo estava sendo usado o tempo todo, e não excluía nada. Medido com o Electron do
+  projeto, lendo o `getSettings()` da faixa que volta:
+
+  | pedido | `restrictOwnAudio` efetivo |
+  |---|---|
+  | `loopbackWithoutChrome`, sozinho | **false** |
+  | `loopback`, sozinho | **false** |
+  | `loopbackWithoutChrome` + `restrictOwnAudio: true` | **true** |
+  | `loopback` + `restrictOwnAudio: true` | **true** |
+
+  Por isso a constraint entrou no `SOM_DE_VERDADE`, como pedido e não como `exact`: onde o
+  Chromium não puder atender, a faixa vem do mesmo jeito em vez de a transmissão falhar. E
+  o registro passou a escrever o que a faixa RESPONDEU (`sem a nossa voz: sim/NÃO`), não o
+  modo pedido — foi o registro dizendo "modo certo" que escondeu isto por versões. **A
+  lição é a de sempre, na forma mais cara:** "dispositivo distinto" foi medido e estava
+  certo; "logo, exclusão feita" foi deduzido, e era isso que ninguém tinha medido.
+  O id continua na fila, e continua valendo: a tipagem da Electron só conhece dois valores,
+  mas ela repassa a string crua e o Chromium a reconhece — `loopback` →
   `deviceId: "loopback"`, `loopbackWithoutChrome` → `deviceId: "loopbackWithoutChrome"`, e
-  uma string inventada → `NotReadableError`. Ou seja, é dispositivo de verdade, não string
-  ignorada. Por dentro é captura por processo, então pede Windows 11 ou macOS 14.2: onde
-  não houver, ou lança (e a fila cai para `loopback`) ou vem muda — e é só por isso que
-  faixa muda **neste modo** cai para o próximo, em vez de só avisar como nos outros. Cair
-  de `loopback` para `loopbackWithMute` seria pior que o problema. De quebra, ele destravou
-  a máquina do headset Logitech — ver "A limitação que caiu sem ser atacada".
+  uma string inventada → `NotReadableError`. Por dentro é captura por processo, então pede
+  Windows 11 ou macOS 14.2: onde não houver, ou lança (e a fila cai para `loopback`) ou vem
+  muda — e é só por isso que faixa muda **neste modo** cai para o próximo, em vez de só
+  avisar como nos outros. Cair de `loopback` para `loopbackWithMute` seria pior que o
+  problema. De quebra, ele destravou a máquina do headset Logitech — ver "A limitação que
+  caiu sem ser atacada".
 - **Ad-hoc não é identidade estável — é o contrário disso.** O `afterPack` assina, e
   assinar é obrigatório: sem assinatura nenhuma o macOS não tem a que associar permissão de
   microfone, câmera e tela. Mas ad-hoc não resolve, e por anos estava escrito aqui e no
@@ -2029,9 +2047,14 @@ da extensão (`allowImportingTsExtensions` no tsconfig).
   recusando igual.
 - **Se o DMG assinado com certificado próprio abre nos outros Macs** sem virar "está
   danificado". Ninguém testou, e é o risco que atinge os quatro de uma vez.
-- **Se o `loopbackWithoutChrome` de fato corta o retorno de voz.** O que está medido é o
-  dispositivo abrir e ser um dispositivo distinto. Que ele remova as nossas vozes da
-  captura exige duas pessoas numa call de verdade — e no Windows nada disso foi exercido.
+- **Se o `restrictOwnAudio` de fato corta o retorno de voz.** No Mac, o
+  `loopbackWithoutChrome` sozinho NÃO cortava — isso está medido, e é o que causou o
+  retorno que o dono ouviu. O que está medido do conserto é a constraint chegar e voltar
+  `true` na faixa. **A prova acústica não foi feita**: o tom tocado dentro do app sumindo
+  da captura exige som audível na máquina, e a captura do Electron de desenvolvimento aqui
+  vem silenciosa com a saída no mudo e passou a recusar (`AbortError: Error starting
+  capture`) depois de muitas aberturas seguidas. Quem fecha isto é transmitir com duas
+  pessoas numa call — e no Windows nada disso foi exercido.
 - **Por que a faixa de áudio da tela vem silenciosa neste Mac** nos dois modos, com a
   chave de permissão presente no Info.plist. Não foi explicado.
 - **O volume do soundboard mexendo no som de verdade.** Está medido que o som do
