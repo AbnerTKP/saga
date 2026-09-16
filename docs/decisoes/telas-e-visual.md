@@ -262,3 +262,18 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   apagar o arquivo, não reescrever a funcionalidade. A trava saiu de vez porque uma
   constante que só vale `true` é peso morto — quem quiser fechar de novo fecha, e será
   outra decisão, não a mesma esperando.
+- **Nada anima com a Saga parada.** Em 16/09/2026 o dono viu a Saga com o processo de desenho e o
+  da GPU perto de 100% cada um no Mac dele, e um amigo, 50% num MacBook M5 Pro — "o Fluxer usa 1%".
+  Medido com a Saga escondida, desenhando fora da tela sobre uma cópia dos dados de produção e
+  parada numa tela sem nada acontecendo: 58 repinturas por segundo e 14% de CPU. Tirando só o
+  arco-íris do Berserk, 47 repinturas e 6%; só os GIFs, 58 e 13%; os dois, ZERO e 0,4% — não havia
+  mais nada. Texto com `background-clip: text` não anima fora do desenho, então cada nome Berserk
+  repintava a janela a cada quadro, e um GIF de 200 px basta para o macOS recompor a janela inteira
+  a cada quadro dele — na tela Retina a 120 Hz, é o que virava 100%. Hoje, como no Discord: **foto,
+  banner e ícone de servidor em GIF ficam parados** num quadro e animam com o mouse sobre a linha da
+  pessoa (`imagemParada.ts`, usado pelo `Avatar`); **o arco-íris fica pintado parado** e anda no
+  mesmo hover; e **o GIF da conversa anima com a Saga em foco** e para quando ela vai para trás. Medido
+  depois: parada, zero repinturas e 0,3%; com o chat aberto, zero e 2%. O quadro parado é o do
+  MEIO, porque a foto do FelipeTKP entra aparecendo e o primeiro quadro dela é branco inteiro. O
+  cartão de perfil aberto e o visualizador de imagem continuam animando: são abertos de propósito, e
+  fecham. **Coisa nova que se mexe sozinha na tela tem de ser medida parada** antes de subir.

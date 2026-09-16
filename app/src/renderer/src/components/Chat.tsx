@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { urlDoArquivo, type Digitando, type Mensagem } from '../api';
+import { useImagemParada, useJanelaEmFoco } from '../imagemParada';
 import { Icon } from './Icon';
 import { partirEmLinks } from '../links';
 import { Avatar } from './Avatar';
@@ -348,7 +349,7 @@ export function Chat({
                       title="Ver maior"
                       onClick={() => onVerImagem(urlDoArquivo(m.imagem)!)}
                     >
-                      <img src={urlDoArquivo(m.imagem)!} alt="GIF" draggable={false} />
+                      <ImagemDoChat url={urlDoArquivo(m.imagem)!} />
                     </button>
                   )}
                   {m.arquivo && <Anexo arquivo={m.arquivo} />}
@@ -495,4 +496,14 @@ export function Chat({
       )}
     </div>
   );
+}
+
+/**
+ * O GIF da conversa anima com a Saga em foco, como no Discord, e para quando ela vai para trás
+ * de outra janela: animando o tempo todo, cada GIF na tela redesenhava a janela inteira sem
+ * parar (ver imagemParada.ts).
+ */
+function ImagemDoChat({ url }: { url: string }) {
+  const src = useImagemParada(url, useJanelaEmFoco());
+  return <img src={src ?? undefined} alt="GIF" draggable={false} />;
 }

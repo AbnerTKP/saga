@@ -838,17 +838,23 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   background: rgba(192,132,252,.18); color: #d8b4fe;
 }
 
-/* Arco-íris do Berserk. O gradiente anda devagar de propósito: nome é para ler. */
+/* Arco-íris do Berserk. O gradiente anda devagar de propósito: nome é para ler.
+   Parado, e andando só com o mouse sobre a linha da pessoa. Andando o tempo todo, cada nome
+   Berserk na tela repintava a janela a cada quadro — texto com `background-clip: text` não
+   anima fora do desenho —, e medido com a Saga parada ele era a maior parte do gasto: 58
+   repinturas por segundo sem nada acontecendo (ver imagemParada.ts, que conta o resto). */
 .nome-berserk {
   background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
-  background-size: 300% 100%;
+  background-size: 300% 100%; background-position: 30% 0;
   -webkit-background-clip: text; background-clip: text;
   color: transparent; font-weight: 700;
+}
+.nome-berserk:hover, .msg:hover .nome-berserk, .membro-linha:hover .nome-berserk, .people > li:hover .nome-berserk {
   animation: arco-iris 8s linear infinite;
 }
 @keyframes arco-iris { to { background-position: 300% 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .nome-berserk { animation: none; background-position: 30% 0; }
+  .nome-berserk, .nome-berserk:hover, .msg:hover .nome-berserk, .membro-linha:hover .nome-berserk, .people > li:hover .nome-berserk { animation: none; }
 }
 
 .selo-berserk {

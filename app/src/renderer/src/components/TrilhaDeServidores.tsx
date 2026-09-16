@@ -1,4 +1,5 @@
 import { urlDoArquivo, type Servidor } from '../api';
+import { useApontado, useImagemParada } from '../imagemParada';
 import { Icon } from './Icon';
 
 /**
@@ -54,7 +55,7 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
             onClick={() => onEscolher(s.id)}
             onContextMenu={(e) => { e.preventDefault(); onAjustar(s.id); }}
           >
-            {foto ? <img src={foto} alt="" draggable={false} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
+            {foto ? <FotoDoServidor url={foto} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
           </button>
         );
       })}
@@ -75,4 +76,11 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
       )}
     </nav>
   );
+}
+
+/** A foto do servidor na trilha: GIF parado, animando com o mouse em cima (ver imagemParada.ts). */
+function FotoDoServidor({ url }: { url: string }) {
+  const [apontado, apontar] = useApontado();
+  const src = useImagemParada(url, apontado);
+  return <img ref={apontar} src={src ?? undefined} alt="" draggable={false} />;
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { urlDoArquivo } from '../api';
 import { estilo, type Enquadramento } from '../enquadramento';
+import { useApontado, useImagemParada } from '../imagemParada';
 
 export type TamanhoDoAvatar = 'normal' | 'big' | 'huge';
 
@@ -24,23 +25,27 @@ export function Avatar({ nome, foto, enquadramento, tamanho = 'normal', extra, t
   // não um sim/não, para que trocar de foto tente de novo sozinho.
   const [quebrada, setQuebrada] = useState<string | null>(null);
   const temFoto = !!url && quebrada !== url;
+  // GIF parado no primeiro quadro, e animando com o mouse sobre a linha da pessoa: animado o
+  // tempo todo, cada foto redesenhava a janela inteira sem parar (ver imagemParada.ts).
+  const [apontado, apontar] = useApontado();
+  const src = useImagemParada(url, apontado);
 
   const classe = ['avatar', tamanho !== 'normal' ? tamanho : '', temFoto ? 'com-foto' : '',
     onClick && temFoto ? 'clicavel' : '', extra ?? ''].filter(Boolean).join(' ');
   const corpo = temFoto
-    ? <img src={url} alt="" draggable={false} style={estilo(enquadramento)} onError={() => setQuebrada(url)} />
+    ? <img src={src ?? undefined} alt="" draggable={false} style={estilo(enquadramento)} onError={() => src === url && setQuebrada(url)} />
     : nome.slice(0, 1).toUpperCase();
 
   // Sem status, nada muda: a bolinha só existe onde faz sentido mostrá-la.
   if (!status) {
     return (
-      <span className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
+      <span ref={apontar} className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
         {corpo}
       </span>
     );
   }
   return (
-    <span className={`com-presenca ${tamanho !== 'normal' ? tamanho : ''}`}>
+    <span ref={apontar} className={`com-presenca ${tamanho !== 'normal' ? tamanho : ''}`}>
       <span className={classe} title={titulo} onClick={temFoto && onClick ? onClick : undefined}>
         {corpo}
       </span>
