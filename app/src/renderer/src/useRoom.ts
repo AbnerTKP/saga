@@ -12,6 +12,7 @@ import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
+import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhasGuardadas, trocarAparelho } from './aparelhos';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -286,6 +287,43 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const microfoneRef = useRef(microfone);
   microfoneRef.current = microfone;
 
+  /** Falhar o microfone avisa na tela e fica no registro: só na tela, sumia com o aviso. */
+  const falhouOMicrofone = useCallback((e: Error) => {
+    anotar('erro', 'microfone', e);
+    setError(`Microfone: ${e.message}`);
+  }, [setError]);
+
+  /**
+   * Põe o microfone no aparelho certo — o escolhido na Saga, se estiver conectado, ou o padrão
+   * do sistema, seguindo o sistema quando ele troca (ver `decidirMicrofone`). Roda ao abrir a
+   * Saga, ao entrar na call, ao abrir o microfone e sempre que um aparelho chega ou sai. Antes,
+   * a escolha era só da tela: fechar a Saga a esquecia, e no Mac o padrão do sistema não era
+   * seguido.
+   */
+  const conferirMicrofone = useCallback(async () => {
+    let texto: string | null = null;
+    try { texto = localStorage.getItem(CHAVE_DOS_APARELHOS); } catch { /* sem storage, sem escolha */ }
+    let disponiveis: MediaDeviceInfo[];
+    try {
+      disponiveis = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+    } catch { return; }
+    const faixa = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+    const decisao = decidirMicrofone({
+      escolhido: escolhasGuardadas(texto).audioinput,
+      ativo: room.getActiveDevice('audioinput'),
+      disponiveis,
+      grupoDaFaixa: faixa?.getSourceTrackSettings().groupId ?? null,
+    });
+    if (!decisao) return;
+    try {
+      if ('trocarPara' in decisao) await trocarAparelho(room, 'audioinput', decisao.trocarPara);
+      else await faixa?.restartTrack();
+    } catch (e) {
+      anotar('erro', 'microfone', e);
+    }
+  }, [room]);
+  useEffect(() => { conferirMicrofone(); }, [conferirMicrofone]);
+
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
   const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS, undefined,
     (qual, e) => anotar('erro', 'som', `o aviso "${qual}" não tocou: ${(e as Error)?.message ?? e}`)), []);
@@ -404,7 +442,18 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
       .on(RoomEvent.TrackMuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.TrackUnmuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
-      .on(RoomEvent.ActiveDeviceChanged, () => microfoneRef.current.eventos.trocouDeMicrofone())
+      .on(RoomEvent.ActiveDeviceChanged, (tipo: MediaDeviceKind, id: string) => {
+        microfoneRef.current.eventos.trocouDeMicrofone();
+        // quem mostra o aparelho em uso é a tela de configurações, lendo a sala
+        bump();
+        if (tipo !== 'audioinput') return;
+        navigator.mediaDevices.enumerateDevices()
+          .then((ds) => ds.find((d) => d.kind === 'audioinput' && d.deviceId === id)?.label || id)
+          .catch(() => id)
+          .then((nome) => anotar('info', 'microfone', `em uso: ${nome}`));
+      })
+      // Aparelho que chega ou sai: a lista muda, e a escolha guardada pode voltar a valer.
+      .on(RoomEvent.MediaDevicesChanged, () => { conferirMicrofone(); bump(); })
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
         // Transmissão que começa não entra sozinha: ela aparece apagada na lista, e só
@@ -414,15 +463,20 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
       })
       .on(RoomEvent.TrackUnpublished, bump)
-      .on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => { microfoneRef.current.eventos.aoPublicar(pub); bump(); })
+      .on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => {
+        microfoneRef.current.eventos.aoPublicar(pub);
+        // Aberto o microfone, a lista de aparelhos já vem com os ids: a escolha guardada vale agora.
+        if (pub.source === Track.Source.Microphone) conferirMicrofone();
+        bump();
+      })
       .on(RoomEvent.LocalTrackUnpublished, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.ConnectionQualityChanged, bump)
-      .on(RoomEvent.MediaDevicesError, onError);
+      .on(RoomEvent.MediaDevicesError, (e: Error) => { anotar('erro', 'aparelhos', e); onError(e); });
 
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar, conferirMicrofone]);
 
   const join = useCallback(async (url: string, token: string, sala: SalaDaVoz, comMicrofone = true) => {
     setError(null);
@@ -450,7 +504,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // `comMicrofone` só vem quando é uma VOLTA depois de queda: aí o microfone volta
       // como estava, e quem tinha se mutado não reaparece falando sem saber.
       if (!deafenedRef.current && comMicrofone) {
-        await room.localParticipant.setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
+        await conferirMicrofone();
+        await room.localParticipant.setMicrophoneEnabled(true).catch(falhouOMicrofone);
       }
     } catch (e) {
       // Se o tempo estourou, a tentativa pode continuar viva por baixo; derruba antes
@@ -460,7 +515,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room, tocarAviso, anunciar]);
+  }, [room, tocarAviso, anunciar, conferirMicrofone, falhouOMicrofone]);
 
   const leave = useCallback(async () => {
     desligueiDeProposito.current = true;
@@ -474,13 +529,13 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const toggleMic = useCallback(async () => {
     if (deafenedRef.current) return;
     const ligando = !lp().isMicrophoneEnabled;
-    await lp().setMicrophoneEnabled(ligando).catch((e: Error) => setError(`Microfone: ${e.message}`));
+    await lp().setMicrophoneEnabled(ligando).catch(falhouOMicrofone);
     // O som sai do que o microfone FICOU, e não do que foi pedido: falhar em adquirir o
     // dispositivo — headset ocupado, permissão negada — deixaria um "ligou" mentindo.
     // Claro ao ligar, escuro ao mutar, como na live.
     tocarAviso(lp().isMicrophoneEnabled ? 'micLigou' : 'micMutou', deafenedRef.current);
     bump();
-  }, [room, tocarAviso]);
+  }, [room, tocarAviso, falhouOMicrofone]);
 
   const toggleCam = useCallback(async () => {
     await lp().setCameraEnabled(!lp().isCameraEnabled).catch((e: Error) => setError(`Câmera: ${e.message}`));
@@ -744,13 +799,13 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       anunciar();
       if (next) {
         micBeforeDeafen.current = lp().isMicrophoneEnabled;
-        await lp().setMicrophoneEnabled(false).catch((e: Error) => setError(`Microfone: ${e.message}`));
+        await lp().setMicrophoneEnabled(false).catch(falhouOMicrofone);
       } else if (micBeforeDeafen.current) {
-        await lp().setMicrophoneEnabled(true).catch((e: Error) => setError(`Microfone: ${e.message}`));
+        await lp().setMicrophoneEnabled(true).catch(falhouOMicrofone);
       }
     }
     bump();
-  }, [room, aplicarAudio, anunciar]);
+  }, [room, aplicarAudio, anunciar, falhouOMicrofone]);
 
   /** Toca um som para todo mundo da sala, e também nos alto-falantes de quem tocou. */
   /**

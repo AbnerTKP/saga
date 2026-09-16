@@ -45,6 +45,36 @@ Supressão de ruído, corte automático, soundboard e os sons de aviso.
   com a TV que o corte acabou de tirar da call. E o medidor agora é refeito quando a faixa
   muda — antes ele só era criado uma vez por pessoa, e trocar de microfone o deixava
   lendo uma faixa que não ia mais para lugar nenhum.
+- **Trocar de microfone não funcionava, e o microfone que desconectava mutava com erro — a
+  mesma causa.** O LiveKit 2.22 remonta o caminho do microfone (`restart` do processador) sem o
+  `audioContext`, que só vem no primeiro `init`, apesar do tipo dizer o contrário. A montagem
+  quebrava: escolher outro microfone falhava, a faixa morria e ia silêncio para a call — e a tela
+  de configurações engolia o erro (`.catch(() => undefined)`), então o seletor mostrava o
+  microfone novo. Desconectar o aparelho caía no mesmo lugar pelo lado do LiveKit: ele tenta o
+  padrão, a remontagem quebra, e ele "muta em vez disso"; religar dava o erro na tela e nada no
+  registro. **Medido** numa bancada escondida e muda (Electron com os microfones falsos do
+  Chromium, o `useMicrofone` de verdade, `livekit-server --dev` e um robô do `rtc-node` medindo o
+  que chega): antes, −19 dB até a troca e −120 dali em diante, erro `reading 'audioWorklet'` e
+  microfone mudo ao religar; depois, a troca, o aparelho que some (a faixa crua terminando), mutar
+  e religar, o "Padrão do sistema" e a supressão Forte seguem com som chegando, com um tropeço de
+  meio segundo na troca. O processador usa o contexto de `aoPublicar` quando o LiveKit não manda.
+- **O seletor mostra o aparelho EM USO, lido da sala, e não o clique.** Foi o seletor que mostrava
+  o clique que escondeu a troca quebrada. Troca que falha aparece embaixo dele e vai para o
+  registro — e **volta ao padrão do sistema** (`trocarAparelho`): o LiveKit fecha o microfone de
+  antes ANTES de abrir o novo, e medido, sem a volta, um aparelho que não abre deixava a pessoa
+  muda. "Padrão do sistema" era pedido como id exato vazio, que não é aparelho nenhum: vai como
+  `default`. Os apelidos `default` e `communications` saem da lista e viram essa opção, com o nome
+  do aparelho que o sistema usa entre parênteses.
+- **O microfone escolhido é lembrado, e o padrão do sistema é seguido** (`aparelhos.ts`,
+  `conferirMicrofone` no `useRoom`). A escolha vivia só na tela: fechar a Saga voltava ao padrão —
+  no Windows, "só vale o microfone do sistema". Hoje ela fica em `cantinho.aparelhos` e vale ao
+  abrir a Saga, ao entrar na call e quando o aparelho volta a ser conectado; enquanto ele está
+  fora, vale o padrão. E quem está no padrão acompanha o sistema: a faixa aberta no `default`
+  fica presa ao aparelho de quando abriu (no Mac, trocar o microfone do sistema não mudava nada),
+  e quando o grupo do `default` na lista deixa de ser o da faixa, ela reabre. **Isso não foi
+  medido em aparelho de verdade** — os microfones falsos do Chromium não mudam o padrão nem
+  desconectam —, e está em `confirmar-com-o-dono.md`. Só o microfone é lembrado; saída de som e
+  câmera trocam na hora e esquecem ao fechar, como antes.
 - **Os eventos da sala do microfone entram pelo efeito do `useRoom`.** Ele limpa TODOS os
   ouvintes da sala quando se refaz (`removeAllListeners`); um ouvinte registrado à parte
   sumiria calado e o microfone voltaria a ir cru sem erro nenhum.

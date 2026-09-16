@@ -154,6 +154,14 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   vieram de um LiveKit FALSO — as respostas de `ListRooms` e `ListParticipants` escritas à
   mão —, e não do LiveKit da produção. **Não foram exercidos**: a administração contra o
   servidor e o LiveKit de produção, com as pessoas de verdade, e o Windows.
+- **Microfone de verdade: trocar, desconectar e o padrão do sistema** (16/09/2026). Medido numa
+  bancada com os microfones falsos do Chromium (ver `decisoes/som-e-microfone.md`): trocar pela
+  Saga, a faixa que acaba, mutar e religar, "Padrão do sistema" e a troca que falha. **Não foram
+  exercidos**: tirar um headset USB ou Bluetooth de verdade no meio da call (no Mac e no Windows);
+  a Saga voltar sozinha para o microfone escolhido quando ele é conectado de novo; trocar o
+  microfone do SISTEMA com a Saga no "Padrão do sistema" e ela acompanhar (a conta é pelo grupo do
+  aparelho, e o Chromium pode não mudar o grupo do `default` do mesmo jeito nos dois sistemas); e
+  o microfone escolhido continuar valendo depois de fechar e abrir a Saga.
 - **O Dragão Quadrado entre duas pessoas de verdade.** O que está medido está na seção do
   jogo. **Não foram exercidos**: dois computadores com gente no teclado, pela produção e com
   a latência real entre as casas; o som (sintetizado em `sons.ts`, nunca ouvido — os testes

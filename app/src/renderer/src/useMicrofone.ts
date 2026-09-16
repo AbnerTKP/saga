@@ -130,7 +130,17 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
     const processador: TrackProcessor<Track.Kind.Audio, AudioProcessorOptions> = {
       name: 'saga-microfone',
       init: async (opts) => {
-        montagem = await MontagemDoMicrofone.criar(opts.audioContext, opts.track, ajustesRef.current);
+        try {
+          // O contexto só vem no `init` do `setProcessor`. No `restart` — trocar de microfone,
+          // o microfone que some, religar depois disso — o LiveKit 2.22 chama sem ele, apesar do
+          // tipo dizer o contrário, e a montagem quebrava: a troca falhava, a faixa ficava morta
+          // e quem religava ficava mudo com erro na tela. Medido numa call de verdade. O
+          // contexto é o mesmo que `aoPublicar` deu à faixa.
+          montagem = await MontagemDoMicrofone.criar(opts.audioContext ?? contexto(), opts.track, ajustesRef.current);
+        } catch (e) {
+          anotar('erro', 'microfone', e);
+          throw e;
+        }
         acompanharFiltro(montagem);
         processador.processedTrack = montagem.saida;
         daCall.current = montagem;

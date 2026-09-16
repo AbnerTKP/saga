@@ -14,6 +14,8 @@ import type { MicrofoneDaCall } from '../useMicrofone';
 import type { AberturaComOSistema } from '../desktop';
 import { useFecharComEsc } from '../useFechar';
 import { atalhoDoEvento, comoSeLe } from '../atalho';
+import { anotar } from '../registro';
+import { CHAVE_DOS_APARELHOS, comEscolha, opcoesDoSeletor, trocarAparelho, valorNoSeletor } from '../aparelhos';
 
 type Kind = 'audioinput' | 'audiooutput' | 'videoinput';
 const APARELHOS: Record<Kind, string> = {
@@ -146,11 +148,12 @@ export function PainelDaConta({
   const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souBerserk));
   const permitidas = qualidadesDe(souBerserk);
   const [aparelhos, setAparelhos] = useState<Record<Kind, MediaDeviceInfo[]>>({ audioinput: [], audiooutput: [], videoinput: [] });
-  const [emUso, setEmUso] = useState<Record<Kind, string>>({
-    audioinput: room.getActiveDevice('audioinput') ?? '',
-    audiooutput: room.getActiveDevice('audiooutput') ?? '',
-    videoinput: room.getActiveDevice('videoinput') ?? '',
-  });
+  /**
+   * O que foi clicado e ainda está trocando. Fora isso, o seletor mostra o aparelho EM USO, lido
+   * da sala: antes ele mostrava o clique, e a troca que falhava calada ficava parecendo feita.
+   */
+  const [trocando, setTrocando] = useState<Partial<Record<Kind, string>>>({});
+  const [erroDoAparelho, setErroDoAparelho] = useState<Partial<Record<Kind, string>>>({});
 
   useEffect(() => {
     window.desktop.aberturaComOSistema()
@@ -158,20 +161,39 @@ export function PainelDaConta({
       .catch(() => setRespostaDoInicio('erro'));
   }, []);
 
+  // A lista acompanha o aparelho que chega e o que sai: carregada uma vez só, o microfone
+  // conectado com a tela aberta não aparecia.
   useEffect(() => {
-    (async () => {
+    let vivo = true;
+    const carregar = async () => {
       const [a, o, v] = await Promise.all([
         Room.getLocalDevices('audioinput', true),
         Room.getLocalDevices('audiooutput', true),
         Room.getLocalDevices('videoinput', true),
       ]);
-      setAparelhos({ audioinput: a, audiooutput: o, videoinput: v });
-    })();
+      if (vivo) setAparelhos({ audioinput: a, audiooutput: o, videoinput: v });
+    };
+    carregar().catch((e) => anotar('erro', 'aparelhos', e));
+    navigator.mediaDevices.addEventListener('devicechange', carregar);
+    return () => { vivo = false; navigator.mediaDevices.removeEventListener('devicechange', carregar); };
   }, []);
 
-  const trocar = async (kind: Kind, id: string) => {
-    setEmUso((s) => ({ ...s, [kind]: id }));
-    await room.switchActiveDevice(kind, id).catch(() => undefined);
+  const trocar = async (kind: Kind, valor: string) => {
+    setTrocando((s) => ({ ...s, [kind]: valor }));
+    setErroDoAparelho((s) => ({ ...s, [kind]: undefined }));
+    try {
+      await trocarAparelho(room, kind, valor);
+      // Só o microfone é lembrado: é ele que a Saga põe de volta ao abrir e quando o aparelho volta.
+      if (kind === 'audioinput') {
+        try { localStorage.setItem(CHAVE_DOS_APARELHOS, comEscolha(localStorage.getItem(CHAVE_DOS_APARELHOS), kind, valor)); } catch { /* vale até fechar */ }
+      }
+    } catch (e) {
+      anotar('erro', 'aparelhos', e);
+      const motivo = (e as Error).message ? `: ${(e as Error).message}` : '.';
+      setErroDoAparelho((s) => ({ ...s, [kind]: `Não deu para usar esse aparelho${motivo}${kind === 'audiooutput' ? '' : ' Voltei para o padrão do sistema.'}` }));
+    } finally {
+      setTrocando((s) => ({ ...s, [kind]: undefined }));
+    }
   };
 
   const salvarMeuNome = async () => {
@@ -307,15 +329,22 @@ export function PainelDaConta({
                 </small>
               </label>
 
-              {(Object.keys(APARELHOS) as Kind[]).map((kind) => (
-                <label key={kind}>
-                  {APARELHOS[kind]}
-                  <select value={emUso[kind]} onChange={(e) => trocar(kind, e.target.value)}>
-                    <option value="">Padrão do sistema</option>
-                    {aparelhos[kind].map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId}</option>)}
-                  </select>
-                </label>
-              ))}
+              {(Object.keys(APARELHOS) as Kind[]).map((kind) => {
+                const { lista, nomeDoPadrao } = opcoesDoSeletor(aparelhos[kind]);
+                const valor = trocando[kind] ?? valorNoSeletor(room.getActiveDevice(kind));
+                return (
+                  <label key={kind}>
+                    {APARELHOS[kind]}
+                    <select value={valor} onChange={(e) => trocar(kind, e.target.value)}>
+                      <option value="">Padrão do sistema{nomeDoPadrao ? ` (${nomeDoPadrao})` : ''}</option>
+                      {lista.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId}</option>)}
+                      {/* o aparelho em uso que saiu da lista continua no seletor, em vez de ele mentir outro */}
+                      {valor && aparelhos[kind].length > 0 && !lista.some((d) => d.deviceId === valor) && <option value={valor}>Aparelho desconectado</option>}
+                    </select>
+                    {erroDoAparelho[kind] && <div className="error">{erroDoAparelho[kind]}</div>}
+                  </label>
+                );
+              })}
             </div>
           </section>
 
