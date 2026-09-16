@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto';
 import { ErroDeConta } from './contas.mjs';
 
 /** Os lutadores. Os nomes são protocolo com o app (`IDS_DOS_LUTADORES`): só se acrescenta. */
-export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'goteira'];
+export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'gotinha', 'tronco', 'goteira'];
 /**
  * A versão da Saga que trouxe cada lutador que não é dos quatro primeiros. App que não conhece um
  * lutador QUEBRA ao ler o nome dele, e quebra a tela inteira: em 16/09/2026 quem ainda estava na
@@ -24,7 +24,7 @@ export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSup
  * sem o lutador e a arena como recusa para atualizar. Lutador novo entra aqui com a versão que o
  * traz; o teste cobra.
  */
-export const LUTADOR_DESDE = { goiabaSuper: '0.57.0', vegetalSuper: '0.57.0', goteira: '0.57.0' };
+export const LUTADOR_DESDE = { goiabaSuper: '0.57.0', vegetalSuper: '0.57.0', goteira: '0.57.0', gotinha: '0.58.0', tronco: '0.58.0' };
 /**
  * Se o app de quem pergunta (`ctx.app`, a versão tirada do pedido) conhece o lutador. Sem versão —
  * o teste, um robô —, conhece todos: a trava é para a Saga antiga, que sempre diz a dela.
@@ -48,7 +48,7 @@ export const ROUNDS = [1, 2];
  * ouve para atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior —
  * e muda junto com `PROTOCOLO_DA_LUTA`, no app (o teste confere os dois).
  */
-export const PROTOCOLO = 6; // 6: Goiaba e Vegetal da Super Feira, e a Goteira — app velho não conhece
+export const PROTOCOLO = 7; // 7: Gotinha e Tronco — app velho não conhece
 /** Quadros por segundo da simulação, fixos — o `QPS` do app. É por eles que se confere o resultado. */
 export const QPS = 60;
 

@@ -4,4 +4,4 @@
  * veria outra luta e outro vencedor. Por isso app velho não senta: o servidor recusa e manda
  * atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior.
  */
-export const PROTOCOLO_DA_LUTA = 6; // 6: Goiaba e Vegetal da Super Feira, e a Goteira
+export const PROTOCOLO_DA_LUTA = 7; // 7: Gotinha e Tronco

@@ -42,6 +42,10 @@ export const CORES_DE_KI: Record<IdDoLutador, CoresDeKi> = {
   vegetalSuper: { nucleo: cor('#f6fff0'), meio: cor('#b9f59c'), borda: cor('#4cc23a'), escuro: cor('#1d5e1a') },
   // o fantasma é branco e lilás, mais pálido que o violeta do Vegetal
   goteira: { nucleo: cor('#ffffff'), meio: cor('#eeeaff'), borda: cor('#ada0ee'), escuro: cor('#4d3f9c') },
+  // a onda do Gotinha é turquesa: a do pai é azul-céu, e as duas se encontrando não viram uma só
+  gotinha: { nucleo: cor('#effffb'), meio: cor('#8ff5e0'), borda: cor('#22c4b0'), escuro: cor('#0b5e5a') },
+  // o Ataque Tostado é laranja-queimado: nenhum outro ki puxa para o vermelho
+  tronco: { nucleo: cor('#fff4e8'), meio: cor('#ffb27a'), borda: cor('#f0602a'), escuro: cor('#7a2408') },
 };
 
 /** As cores de fora do ki: a estrela do golpe é sempre branca e amarela, venha de quem vier. */

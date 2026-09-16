@@ -103,6 +103,8 @@ export const NOMES_DAS_FORMAS: Record<IdDoLutador, string> = {
   goiabaSuper: 'Super Goiabadin Blue',
   vegetalSuper: 'Super Vegetalzin Blue',
   goteira: 'Super Goteira 3',
+  gotinha: 'Super Gotinha',
+  tronco: 'Super Tronco',
 };
 
 export const KI_MAXIMO = 300;
@@ -232,6 +234,27 @@ const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
     rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 6.2, custo: 20, dano: 32 },
     especial: { nome: 'Fantasma Kamikaze', tipo: 'bola', inicio: 18, duracao: 220, volta: 22, batidas: 1, intervalo: 1, dano: 150, velocidade: 2.2, espessura: 10, altura: 33, custo: 100, atordoa: 0, derruba: true },
     super: { nome: 'Míssil Morre-Morre', tipo: 'onda', inicio: 12, duracao: 64, volta: 28, batidas: 12, intervalo: 5, dano: 28, velocidade: 18, espessura: 14, altura: 31, custo: 300, atordoa: 16, derruba: true },
+  },
+  // Os dois que se fundem na Goteira, cada um por si: crianças, rápidas e de pouca vida como ela.
+  // O Gotinha é o pai em pequeno — a onda dele, mais curta —, e pula mais alto que todos; o Tronco
+  // bate um pouco mais forte, e a super é uma bola que vai depressa.
+  gotinha: {
+    id: 'gotinha', nome: 'Gotinha', estilo: 'ágil, pula alto',
+    vida: 900, andar: 1.8, recuar: 1.45, investida: 5, pulo: 7,
+    corpo: { meiaLargura: 11, altura: 58, alturaAgachado: 40 },
+    golpes: comAlcance(GOLPES_BASE, 1, 0.95),
+    rajada: { ...RAJADA_BASE, inicio: 10, velocidade: 5.8, custo: 20, dano: 32 },
+    especial: { nome: 'Ondinha Goiabada', tipo: 'onda', inicio: 18, duracao: 36, volta: 22, batidas: 6, intervalo: 6, dano: 18, velocidade: 15, espessura: 8, altura: 31, custo: 100, atordoa: 14, derruba: true },
+    super: { nome: 'Ondona Goiabada', tipo: 'onda', inicio: 14, duracao: 66, volta: 28, batidas: 10, intervalo: 6, dano: 29, velocidade: 17, espessura: 15, altura: 31, custo: 300, atordoa: 16, derruba: true },
+  },
+  tronco: {
+    id: 'tronco', nome: 'Tronco', estilo: 'atrevido, bate forte',
+    vida: 910, andar: 1.75, recuar: 1.4, investida: 4.9, pulo: 6.8,
+    corpo: { meiaLargura: 11, altura: 58, alturaAgachado: 40 },
+    golpes: comAlcance(GOLPES_BASE, 1, 1.04),
+    rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 6, custo: 20, dano: 34 },
+    especial: { nome: 'Canhãozinho de Alho', tipo: 'onda', inicio: 15, duracao: 32, volta: 22, batidas: 6, intervalo: 6, dano: 18, velocidade: 16, espessura: 8, altura: 31, custo: 100, atordoa: 14, derruba: true },
+    super: { nome: 'Ataque Tostado', tipo: 'bola', inicio: 16, duracao: 140, volta: 26, batidas: 1, intervalo: 1, dano: 230, velocidade: 4.6, espessura: 16, altura: 34, custo: 300, atordoa: 0, derruba: true },
   },
 };
 

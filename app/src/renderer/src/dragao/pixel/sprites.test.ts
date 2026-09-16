@@ -140,3 +140,17 @@ test('o Super Goteira 3 ganha a juba pelas costas, e a Goteira não', () => {
   // a juba anda com a cabeça: no soco ela também está lá
   assert.ok(juba(1, 'soco') > 40);
 });
+
+test('o Gotinha não é o Goiaba de cabelo trocado só no nome, e o cabelo do Tronco é lilás', () => {
+  // o Gotinha é o pai em pequeno: sem isto, um registro esquecido o deixaria igual ao Goiaba sem ninguém ver
+  assert.notDeepEqual(quadroDoPixel('gotinha', 0, 'parado0')!.px, quadroDoPixel('goiaba', 0, 'parado0')!.px);
+  const a = artePixel('tronco', 0, 'parado0')!;
+  let cabelo = 0, lilas = 0;
+  for (let i = 0; i < a.mat.length; i++) {
+    if (MATERIAIS[a.mat[i] - 1] !== 'cabelo') continue;
+    cabelo++;
+    const [r, g, b] = canais(a.cor[i]);
+    if (b > g + 20 && r > g) lilas++;
+  }
+  assert.ok(cabelo > 80 && lilas > cabelo * 0.9, `${lilas} de ${cabelo} pixels de cabelo lilases`);
+});

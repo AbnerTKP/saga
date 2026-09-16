@@ -171,4 +171,5 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   raios) foram medidos em LUFS e nunca ouvidos aqui: o equilíbrio entre eles é de ouvido, e é do
   dono. **Os três de 16/09/2026** (Goiaba e Vegetal da Super Feira, Goteira) só foram vistos em
   imagem e simulados: a ficha de cada um — vida, velocidade, a bola lenta no especial — foi
-  conferida por dano medido contra um alvo parado, e nunca jogada.
+  conferida por dano medido contra um alvo parado, e nunca jogada. O mesmo vale para o **Gotinha e o
+  Tronco**, e a fileira de nove retratos só foi vista na prévia, nunca no app aberto.

@@ -26,9 +26,9 @@ export const CHAVES_DO_PIXEL = Object.keys(POSES);
  * degrau abaixo — sem descer, o miolo do cabelo (que no zip já é o tom claro) virava creme, e o
  * dourado sumia.
  */
-const OURO: Rampa = [['#6b3406'], ['#c26d0c'], ['#e0a21c'], ['#ffe45a'], ['#fffbd0']];
+export const OURO: Rampa = [['#6b3406'], ['#c26d0c'], ['#e0a21c'], ['#ffe45a'], ['#fffbd0']];
 /** O olho verde-água: a íris e a pupila; o branco fica. */
-const VERDE_AGUA: Rampa = [['#07393a'], ['#0c6f68'], ['#26b8a4'], ['#fbf3fe'], ['#fbfafe']];
+export const VERDE_AGUA: Rampa = [['#07393a'], ['#0c6f68'], ['#26b8a4'], ['#fbf3fe'], ['#fbfafe']];
 
 /**
  * O que um lutador de pixel fornece: as peças (normal e transformado), a roupa (as rampas dos

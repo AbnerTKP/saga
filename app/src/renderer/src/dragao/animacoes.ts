@@ -29,11 +29,13 @@ const PERSONAGENS: Record<IdDoLutador, { p: Personagem; vitrine: Vitrine; dispar
   vegetal: { p: vegetalM.vegetal, vitrine: vegetalM.vitrine },
   picole: { p: picoleM.picole, vitrine: picoleM.vitrine, disparo: picoleM.disparoDoEspecial },
   geladeira: { p: geladeiraM.geladeira, vitrine: geladeiraM.vitrine },
-  // Os três que chegaram depois nasceram só de pixel: o boneco deles é o de quem têm o corpo, e só
+  // Os que chegaram depois nasceram só de pixel: o boneco deles é o de quem têm o corpo, e só
   // serve de medida (o teste de sprites exige pixel de todos, então ele nunca é desenhado).
   goiabaSuper: { p: goiabaM.goiaba, vitrine: goiabaM.vitrine },
   vegetalSuper: { p: vegetalM.vegetal, vitrine: vegetalM.vitrine },
   goteira: { p: goiabaM.goiaba, vitrine: goiabaM.vitrine },
+  gotinha: { p: goiabaM.goiaba, vitrine: goiabaM.vitrine },
+  tronco: { p: vegetalM.vegetal, vitrine: vegetalM.vitrine },
 };
 
 export const personagemDe = (id: IdDoLutador) => PERSONAGENS[id].p;

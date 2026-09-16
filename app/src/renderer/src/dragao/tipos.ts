@@ -29,7 +29,7 @@ export const BOTAO = {
 
 export type Entrada = number;
 
-export const IDS_DOS_LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'goteira'] as const;
+export const IDS_DOS_LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'gotinha', 'tronco', 'goteira'] as const;
 export type IdDoLutador = (typeof IDS_DOS_LUTADORES)[number];
 
 export const IDS_DOS_CENARIOS = ['torneio', 'planeta', 'ilha', 'canion'] as const;
@@ -85,7 +85,8 @@ export type Lutador = {
   cor: 0 | 1;
   /**
    * 0 é a forma de sempre; 1 é a transformação (Super Goiabadin, Super Vegetalzin, Picolé de
-   * Laranja, Geladeira Dourada, os dois Blue da Super Feira e o Super Goteira 3). Transformado,
+   * Laranja, Geladeira Dourada, os dois Blue da Super Feira, Super Gotinha, Super Tronco e o Super
+   * Goteira 3). Transformado,
    * bate mais forte e anda mais rápido, e o ki escoa até acabar — aí volta ao normal.
    */
   forma: 0 | 1;

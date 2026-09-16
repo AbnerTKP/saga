@@ -1737,7 +1737,7 @@ test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, co
 
   // App velho não abre: abrir já é sentar.
   assert.equal((await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: {} })).status, 409);
-  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 6 } });
+  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 7 } });
   assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
   const { id } = aberta.corpo.arena;
   assert.equal(aberta.corpo.arena.meuLado, 0);
@@ -1747,9 +1747,9 @@ test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, co
   assert.deepEqual(doConvidado.convites.map((c) => [c.arena, c.de.id, c.cenario]), [[id, tkp.eu.id, 'ilha']]);
   assert.deepEqual(doConvidado.arenas.map((a) => a.id), [id]);
 
-  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 6 });
+  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 7 });
   assert.equal(sentou.corpo.arena.meuLado, 1);
-  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 6 })).status, 409);
+  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 7 })).status, 409);
 
   const comecou = await naArena(tkp.token, { id, acao: 'comecar' });
   assert.equal(comecou.status, 200, JSON.stringify(comecou.corpo));
@@ -1785,8 +1785,8 @@ test('dragão quadrado: a Saga antiga não recebe lutador que não conhece, pela
   const casa = tkp.servidor.id;
   // O User-Agent de verdade do Electron: o `%s/%s Chrome/%s Electron/…` com o nome e a versão do app.
   const saga = (v) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Saga/${v} Chrome/142.0.7444.265 Electron/39.8.10 Safari/537.36`;
-  const { id } = (await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { protocolo: 6 }, agente: saga('0.57.0') })).corpo.arena;
-  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'escolher', lutador: 'goteira', protocolo: 6 } });
+  const { id } = (await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { protocolo: 7 }, agente: saga('0.57.0') })).corpo.arena;
+  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'escolher', lutador: 'goteira', protocolo: 7 } });
   assert.equal((await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'chamar', alvo: juninho.eu.id } })).status, 200);
 
   const convite = async (agente) => (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa, agente })).corpo.lutas.convites[0];

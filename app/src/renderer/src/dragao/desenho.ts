@@ -64,6 +64,8 @@ const CORES_DA_FORMA: Record<IdDoLutador, CoresDeKi> = {
   goiabaSuper: { nucleo: cor('#ecffff'), meio: cor('#7fe3ff'), borda: cor('#1fa2ee'), escuro: cor('#0c4796') },
   vegetalSuper: { nucleo: cor('#ecffff'), meio: cor('#7fe3ff'), borda: cor('#1fa2ee'), escuro: cor('#0c4796') },
   goteira: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
+  gotinha: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
+  tronco: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
 };
 
 const PRETO = cor('#000000');

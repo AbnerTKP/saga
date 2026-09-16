@@ -9,3 +9,5 @@ import './picole.ts';
 import './goiaba-super.ts';
 import './vegetal-super.ts';
 import './goteira.ts';
+import './gotinha.ts';
+import './tronco.ts';

@@ -18,8 +18,8 @@ import { comOmbreira } from './vegetal.ts';
 
 // ——— a roupa ———
 
-/** O preto do cabelo, puxado para o violeta: é o que deixa a franja lilás parecer do mesmo cabelo. */
-const PRETO: Rampa = [
+/** O preto do cabelo, puxado para o violeta: é o que deixa a franja lilás parecer do mesmo cabelo. O Gotinha usa o mesmo. */
+export const PRETO: Rampa = [
   ['#000000', '#040208'], ['#0f0a1a', '#120c1e'], ['#1c1530', '#201834', '#181228'],
   ['#2c2346', '#2a2140', '#302650'], ['#463a64', '#4c3f6c'],
 ];
@@ -35,7 +35,7 @@ const AZUL_CLARO: Rampa = [
   ['#0a1830', '#000000'], ['#1f5c9a', '#23609e'], ['#3a8fd0', '#3384c8', '#4298d6'],
   ['#6cc2ee', '#62b8ea', '#78caf2'], ['#b4e8fb', '#c8f0ff'],
 ];
-const SAPATO: Rampa = [
+export const SAPATO: Rampa = [
   ['#000000', '#00000a'], ['#121118', '#16151e'], ['#23212c', '#2a2834', '#1e1c26'],
   ['#3a3846', '#403e4c'], ['#5e5c6c', '#666474'],
 ];
@@ -50,7 +50,7 @@ const MOSTARDA: Rampa = [
  * que aparece no decote — vira o peito de fora. Só o degrau fundo é outro: o da pele é o vermelho
  * da orelha, e o braço de trás, que desce para ele, saía cor de sangue.
  */
-const BRACO: Rampa = [ROUPA_GOIABA.pele[0], ['#c4605a', '#b8584e'], ROUPA_GOIABA.pele[2], ROUPA_GOIABA.pele[3], ROUPA_GOIABA.pele[4]];
+export const BRACO: Rampa = [ROUPA_GOIABA.pele[0], ['#c4605a', '#b8584e'], ROUPA_GOIABA.pele[2], ROUPA_GOIABA.pele[3], ROUPA_GOIABA.pele[4]];
 
 export const ROUPA_GOTEIRA: Roupa = {
   pele: ROUPA_GOIABA.pele,
@@ -83,14 +83,17 @@ const sorte = (x: number, y: number, s: number) => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
 
-/** Linhas de símbolos numa arte, com a linha 0 da grade na linha `y0` do zip. */
-function pintar(linhas: string[], y0: number, semente = 9): Arte {
+/**
+ * Linhas de símbolos numa arte, com a linha 0 da grade na linha `y0` do zip. As tintas dizem o
+ * material e os tons de cada símbolo; o Tronco pinta a cabeça dele com as suas.
+ */
+export function pintarSimbolos(linhas: string[], y0: number, tintas: Record<string, [Material, string[]]>, semente = 9): Arte {
   const largura = Math.max(...linhas.map((l) => l.length));
   const a = criarArte(largura, linhas.length, [0, -y0]);
   linhas.forEach((l, y) => [...l].forEach((ch, x) => {
     if (ch === '.') return;
-    const t = TINTAS[ch];
-    if (!t) throw new Error(`símbolo desconhecido na Goteira: ${ch}`);
+    const t = tintas[ch];
+    if (!t) throw new Error(`símbolo desconhecido: ${ch}`);
     const tons = t[1];
     const hex = tons.length > 1 && sorte(x, y + y0, semente) < 0.34 ? tons[1 + Math.floor(sorte(y + y0, x, semente + 1) * (tons.length - 1))] : tons[0];
     a.cor[y * largura + x] = cor(hex);
@@ -98,6 +101,7 @@ function pintar(linhas: string[], y0: number, semente = 9): Arte {
   }));
   return a;
 }
+const pintar = (linhas: string[], y0: number) => pintarSimbolos(linhas, y0, TINTAS);
 
 // ——— as cabeças ———
 
@@ -125,18 +129,18 @@ const FRANJA = [
   '.....................v..........', // 12
 ];
 
-type Cara = 'cabeca' | 'cabecaGrito' | 'cabecaFechados' | 'cabecaDor';
-const CARAS: Cara[] = ['cabeca', 'cabecaGrito', 'cabecaFechados', 'cabecaDor'];
+export type Cara = 'cabeca' | 'cabecaGrito' | 'cabecaFechados' | 'cabecaDor';
+export const CARAS: Cara[] = ['cabeca', 'cabecaGrito', 'cabecaFechados', 'cabecaDor'];
 
 /** Uma cabeça de 32 colunas com espaço acima da linha 0 do zip, e as camadas coladas em ordem. */
-function juntar(topo: number, ...camadas: Arte[]): Arte {
+export function juntar(topo: number, ...camadas: Arte[]): Arte {
   const a = criarArte(32, 32 + topo, [0, topo]);
   for (const c of camadas) colarArte(a, c, 0, topo);
   return a;
 }
 
 /** O corpo inteiro com a cabeça trocada. */
-function comCabeca(inteiro: Arte, cabeca: Arte): Arte {
+export function comCabeca(inteiro: Arte, cabeca: Arte): Arte {
   const corpo = recortar(inteiro, (_x, y, m) => !(y - inteiro.pivo[1] <= 16 && (m === 'cabelo' || m === 'pele' || m === 'olho')));
   return juntar(cabeca.pivo[1], corpo, cabeca);
 }

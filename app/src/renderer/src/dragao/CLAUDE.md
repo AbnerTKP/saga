@@ -4,8 +4,8 @@ O geral está no `CLAUDE.md` da raiz; o árbitro mora em `server/lutas.mjs`.
 
 
 Jogo de luta 1 contra 1 em pixel art, pedido pelo dono em 14/09/2026: quatro lutadores
-paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira) — sete desde 16/09, com o Goiaba e o
-Vegetal da Super Feira e a Goteira —, vida e ki, quatro cenários
+paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira) — nove desde 16/09, com o Goiaba e o
+Vegetal da Super Feira, a Goteira, o Gotinha e o Tronco —, vida e ki, quatro cenários
 (Torneio, Planeta Verde, Ilha da Tartaruga, Cânion). O código do jogo mora em
 `app/src/renderer/src/dragao/`; a tela, em `TelaDaLuta.tsx`; o árbitro, em `server/lutas.mjs`.
 
@@ -168,3 +168,17 @@ Vegetal da Super Feira e a Goteira —, vida e ki, quatro cenários
   140 e 150, como o Picolé Espiral, e a super de todos fica entre 180 e 280 — o teste passa pelos
   sete. O ki do Blue é anil e o da Alface Final é verde, para dois raios se encontrando não virarem
   uma mancha só.
+- **Gotinha e Tronco, as metades da Goteira (16/09/2026).** O pedido foi "já que tem o goteira,
+  quero o que seria o trunks e o goten também", e foi lido como as crianças da fase do Boo, com
+  Super Saiyajin no P. Os nomes (Gotinha, Tronco, Super Gotinha, Super Tronco) e os golpes são
+  meus, não do dono. O **Gotinha** é o zip com o cabelo preto da Goteira, caneleira marinho e sapato
+  preto: o Goten é o pai em pequeno na obra também, então é o lutador mais parecido com o Goiaba (o
+  teste confere que não saiu igual) e a onda dele é turquesa, e não azul-céu. O **Tronco** tem
+  cabeça nova — o rosto do zip e, por cima, o cabelo lilás liso pintado em símbolos
+  (`pintarSimbolos`, tirado da Goteira sem mudar pixel dela: o md5 de todas as poses bateu antes e
+  depois) — e o olho azul; o Super Tronco é outro corte, arrepiado. A primeira passada do cabelo
+  saiu volumosa como um black power: o do Trunks é rente à cabeça. **A escolha com nove** segue a
+  fileira que o dono escolheu, com o rosto encolhendo até caber, e quebra em 5 + 4 por
+  `@container` na largura da ARENA, e não da janela: a live aberta ao lado come 260 px dela, e com a
+  lista de pessoas escondida pela luta a arena tem a janela menos uns 610 px. `PROTOCOLO` 7, e os
+  dois em `LUTADOR_DESDE` com a 0.58.0.
