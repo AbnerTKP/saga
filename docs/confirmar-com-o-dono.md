@@ -161,4 +161,6 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   reconexão depois de uma queda de verdade no meio da luta; e se a luta está equilibrada e
   divertida, que é de mão e não de teste. Os sons gravados (grito, transformação, teletransporte,
   raios) foram medidos em LUFS e nunca ouvidos aqui: o equilíbrio entre eles é de ouvido, e é do
-  dono.
+  dono. **Os três de 16/09/2026** (Goiaba e Vegetal da Super Feira, Goteira) só foram vistos em
+  imagem e simulados: a ficha de cada um — vida, velocidade, a bola lenta no especial — foi
+  conferida por dano medido contra um alvo parado, e nunca jogada.

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPRITE } from '../boneco.ts';
-import { cor } from '../quadro.ts';
+import { canais, cor } from '../quadro.ts';
 import { LINHAS_GOIABA, PALETA_GOIABA } from './base-goiaba.ts';
 import { IDS_DOS_LUTADORES } from '../tipos.ts';
 import { MATERIAIS } from './materiais.ts';
@@ -37,7 +37,7 @@ test('o parado do Goiaba é o zip, pixel por pixel, ampliado 2x com o pé na ân
   assert.equal(q.px.filter((c) => c !== 0).length, opacos * e * e);
 });
 
-test('toda pose da luta existe nos quatro, nas duas formas, do tamanho do sprite e pisando na âncora', () => {
+test('toda pose da luta existe em todos os lutadores, nas duas formas, do tamanho do sprite e pisando na âncora', () => {
   assert.deepEqual([...CHAVES_DA_LUTA].sort(), [...CHAVES_DO_PIXEL].sort());
   // lutador fora de todos.ts cairia no boneco antigo sem erro nenhum: é aqui que isso aparece
   for (const id of IDS_DOS_LUTADORES) for (const forma of [0, 1] as const) {
@@ -109,4 +109,34 @@ test('o retrato tem 32x32 e mostra a cabeça', () => {
     assert.ok(r.px.filter((c) => c !== 0).length > 32 * 32 * 0.4);
     assert.equal(retratoDoPixel('goiaba', forma), r);
   }
+});
+
+test('os da Super Feira não são cópia dos de antes, e o Blue pinta o cabelo de azul', () => {
+  for (const [antes, novo] of [['goiaba', 'goiabaSuper'], ['vegetal', 'vegetalSuper']] as const) {
+    assert.notDeepEqual(quadroDoPixel(novo, 0, 'parado0')!.px, quadroDoPixel(antes, 0, 'parado0')!.px, `${novo} tem roupa própria`);
+    const a = artePixel(novo, 1, 'parado0')!;
+    let cabelo = 0, azul = 0;
+    for (let i = 0; i < a.mat.length; i++) {
+      if (MATERIAIS[a.mat[i] - 1] !== 'cabelo') continue;
+      cabelo++;
+      const [r, , b] = canais(a.cor[i]);
+      if (b > r + 30) azul++;
+    }
+    assert.ok(cabelo > 50 && azul > cabelo * 0.9, `${novo}: ${azul} de ${cabelo} pixels de cabelo azuis`);
+  }
+});
+
+test('o Super Goteira 3 ganha a juba pelas costas, e a Goteira não', () => {
+  // cabelo abaixo do queixo (linha 17 do zip) é juba
+  const juba = (forma: 0 | 1, pose: string) => {
+    const a = artePixel('goteira', forma, pose)!;
+    const queixo = PE_NA_ARTE[1] - (30 - 17);
+    let n = 0;
+    for (let y = queixo; y < a.altura; y++) for (let x = 0; x < a.largura; x++) if (MATERIAIS[a.mat[y * a.largura + x] - 1] === 'cabelo') n++;
+    return n;
+  };
+  assert.equal(juba(0, 'parado0'), 0);
+  assert.ok(juba(1, 'parado0') > 40, `juba no parado: ${juba(1, 'parado0')}`);
+  // a juba anda com a cabeça: no soco ela também está lá
+  assert.ok(juba(1, 'soco') > 40);
 });

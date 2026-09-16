@@ -4,7 +4,8 @@ O geral está no `CLAUDE.md` da raiz; o árbitro mora em `server/lutas.mjs`.
 
 
 Jogo de luta 1 contra 1 em pixel art, pedido pelo dono em 14/09/2026: quatro lutadores
-paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro cenários
+paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira) — sete desde 16/09, com o Goiaba e o
+Vegetal da Super Feira e a Goteira —, vida e ki, quatro cenários
 (Torneio, Planeta Verde, Ilha da Tartaruga, Cânion). O código do jogo mora em
 `app/src/renderer/src/dragao/`; a tela, em `TelaDaLuta.tsx`; o árbitro, em `server/lutas.mjs`.
 
@@ -138,3 +139,24 @@ paródia de Dragon Ball (Goiaba, Vegetal, Picolé, Geladeira), vida e ki, quatro
   volume escolhido — foi o pedido: regular e ouvir antes de entrar na luta. Vale para os
   gravados e os sintetizados, muda também o que já está tocando, e fica no computador
   (`cantinho.volumeDaLuta`, lido por `volumeGuardado`: chave vazia não pode virar zero).
+- **Os três de 16/09/2026: Goiaba e Vegetal da Super Feira, e a Goteira.** O pedido foi "o goiaba
+  da super feira, o vegeta da superfeira, com transformação blue, e fusão do goten com trunks", e
+  lia-se de dois jeitos — formas novas nos lutadores de hoje ou lutadores novos. O dono escolheu:
+  **dois lutadores novos** (o P deles é o Blue; o Goiaba e o Vegetal de antes seguem dourados) e a
+  fusão como **Gotenks já fundido, com o Super Saiyajin 3 no P**. Os nomes Goteira, Super Goiabadin
+  Blue, Super Vegetalzin Blue e Super Goteira 3 NÃO são do dono: saíram por padrão, na linha do
+  Super Goiabadin que ele deu, e são troca de uma linha.
+  O corpo é o do zip, como o dos outros: os da Super Feira são o Goiaba e o Vegetal com outra roupa
+  (marinho; azul-rei e sem ombreira — `pecasDoVegetal` recebe a roupa, `comOmbreira` é a conta da
+  ombreira que a Goteira também usa para o enchimento mostarda do colete). Por isso o rosto normal
+  deles é igual ao dos de antes, e **na escolha eles aparecem no Blue** (`formaNaEscolha`). A
+  Goteira é o zip com o cabelo preto, espetos mais altos e a franja lilás pintada por cima; o Super
+  3 troca a cabeça (testa limpa e coroa) e ganha a **juba**, que não pode morar na cabeça — ela
+  passaria por cima do corpo — e entra por baixo da pose montada, presa onde a cabeça da pose está
+  (`comJuba`). **A escolha virou fileira de retratos**: com sete, a grade de quatro deixava buraco;
+  o dono viu as duas telas desenhadas e escolheu a fileira. App velho não conhece os ids novos e
+  quebraria ao ver um deles do outro lado: `PROTOCOLO` 6. Pela primeira vez uma **bola é especial**
+  (Big Bang de Brócolis, Fantasma Kamikaze), e não só super: medido contra um Picolé parado, tira
+  140 e 150, como o Picolé Espiral, e a super de todos fica entre 180 e 280 — o teste passa pelos
+  sete. O ki do Blue é anil e o da Alface Final é verde, para dois raios se encontrando não virarem
+  uma mancha só.

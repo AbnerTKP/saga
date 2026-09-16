@@ -99,6 +99,10 @@ export const NOMES_DAS_FORMAS: Record<IdDoLutador, string> = {
   vegetal: 'Super Vegetalzin',
   picole: 'Picolé de Laranja',
   geladeira: 'Geladeira Dourada',
+  // o Super Saiyajin Blue da fase nova, e o Super Saiyajin 3 do Gotenks
+  goiabaSuper: 'Super Goiabadin Blue',
+  vegetalSuper: 'Super Vegetalzin Blue',
+  goteira: 'Super Goteira 3',
 };
 
 export const KI_MAXIMO = 300;
@@ -197,6 +201,37 @@ const NA_MEDIDA_DO_DESENHO: Record<IdDoLutador, Ficha> = {
     rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 7, custo: 20, dano: 34, altura: 31 },
     especial: { nome: 'Raio Congelante', tipo: 'laser', inicio: 10, duracao: 10, volta: 20, batidas: 1, intervalo: 1, dano: 90, velocidade: 400, espessura: 3, altura: 31, custo: 100, atordoa: 0, derruba: true },
     super: { nome: 'Bola Congelante', tipo: 'bola', inicio: 24, duracao: 200, volta: 26, batidas: 1, intervalo: 1, dano: 280, velocidade: 2.4, espessura: 20, altura: 40, custo: 300, atordoa: 0, derruba: true },
+  },
+  // Os da Super Feira são os mesmos dois, mais afiados: o Goiaba solta o raio mais cedo e mais
+  // rápido, o Vegetal bate mais forte e troca o raio do especial por uma bola que vai longe.
+  goiabaSuper: {
+    id: 'goiabaSuper', nome: 'Goiaba Super Feira', estilo: 'veloz, raio rápido',
+    vida: 970, andar: 1.6, recuar: 1.25, investida: 4.3, pulo: 6.3,
+    corpo: { meiaLargura: 11, altura: 62, alturaAgachado: 42 },
+    golpes: comAlcance(GOLPES_BASE, 1, 1.03),
+    rajada: { ...RAJADA_BASE, inicio: 10, velocidade: 5.6 },
+    especial: { nome: 'Onda Goiabada', tipo: 'onda', inicio: 17, duracao: 38, volta: 22, batidas: 7, intervalo: 5, dano: 17, velocidade: 17, espessura: 9, altura: 31, custo: 100, atordoa: 14, derruba: true },
+    super: { nome: 'Onda Goiabada Blue', tipo: 'onda', inicio: 12, duracao: 66, volta: 28, batidas: 10, intervalo: 6, dano: 30, velocidade: 19, espessura: 16, altura: 31, custo: 300, atordoa: 16, derruba: true },
+  },
+  vegetalSuper: {
+    id: 'vegetalSuper', nome: 'Vegetal Super Feira', estilo: 'agressivo, bate forte',
+    vida: 930, andar: 1.8, recuar: 1.35, investida: 4.8, pulo: 6.5,
+    corpo: { meiaLargura: 11, altura: 58, alturaAgachado: 40 },
+    golpes: comAlcance(GOLPES_BASE, 1, 1.1),
+    rajada: { ...RAJADA_BASE, inicio: 8, velocidade: 6, custo: 20, dano: 34 },
+    especial: { nome: 'Big Bang de Brócolis', tipo: 'bola', inicio: 14, duracao: 160, volta: 22, batidas: 1, intervalo: 1, dano: 140, velocidade: 3.8, espessura: 11, altura: 31, custo: 100, atordoa: 0, derruba: true },
+    super: { nome: 'Alface Final', tipo: 'onda', inicio: 16, duracao: 62, volta: 30, batidas: 10, intervalo: 6, dano: 32, velocidade: 18, espessura: 18, altura: 31, custo: 300, atordoa: 16, derruba: true },
+  },
+  // A fusão do Goten com o Trunks: criança, a mais rápida e a de menos vida. O especial é o
+  // fantasma que voa devagar e estoura; a super, a chuva de mísseis.
+  goteira: {
+    id: 'goteira', nome: 'Goteira', estilo: 'ligeiro, vida curta',
+    vida: 890, andar: 1.9, recuar: 1.5, investida: 5.2, pulo: 6.9,
+    corpo: { meiaLargura: 10, altura: 58, alturaAgachado: 40 },
+    golpes: comAlcance(GOLPES_BASE, 1, 0.97),
+    rajada: { ...RAJADA_BASE, inicio: 9, velocidade: 6.2, custo: 20, dano: 32 },
+    especial: { nome: 'Fantasma Kamikaze', tipo: 'bola', inicio: 18, duracao: 220, volta: 22, batidas: 1, intervalo: 1, dano: 150, velocidade: 2.2, espessura: 10, altura: 33, custo: 100, atordoa: 0, derruba: true },
+    super: { nome: 'Míssil Morre-Morre', tipo: 'onda', inicio: 12, duracao: 64, volta: 28, batidas: 12, intervalo: 5, dano: 28, velocidade: 18, espessura: 14, altura: 31, custo: 300, atordoa: 16, derruba: true },
   },
 };
 

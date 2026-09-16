@@ -53,11 +53,11 @@ export function sonsNovos(e: EstadoDaLuta, vistos: Set<string>): Toque[] & { cal
     if (l.acao === 'carregando') novo(`a${i}:${comeco}`, 'aura-ki', pan(l.x), `aura${i}`);
     else calar.push(`aura${i}`);
     if (l.forma === 1 && e.quadro - l.formaDesde < 8) novo(`f${i}:${l.formaDesde}`, 'transformacao', pan(l.x));
-    // A carga do raio: mãos para trás no Goiaba e no Vegetal, dedos na testa no Picolé. O Raio
-    // Congelante da Geladeira sai quase na hora: não tem carga para ouvir.
+    // A carga do raio: mãos para trás (Goiaba, Vegetal, os da Super Feira e a Goteira), dedos na
+    // testa no Picolé. O Raio Congelante da Geladeira sai quase na hora: não tem carga para ouvir.
     if ((l.acao === 'especial' || l.acao === 'super') && l.quadro < 4) {
-      if (l.id === 'goiaba' || l.id === 'vegetal') novo(`c${i}:${comeco}`, 'raio-carga', pan(l.x));
-      else if (l.id === 'picole') novo(`c${i}:${comeco}`, 'dedo-carga', pan(l.x));
+      if (l.id === 'picole') novo(`c${i}:${comeco}`, 'dedo-carga', pan(l.x));
+      else if (l.id !== 'geladeira') novo(`c${i}:${comeco}`, 'raio-carga', pan(l.x));
     }
   });
   for (const p of e.projeteis) {

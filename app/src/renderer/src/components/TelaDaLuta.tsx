@@ -28,6 +28,11 @@ const TOPICO = 'luta';
 const CHAVE_DO_VOLUME = 'cantinho.volumeDaLuta';
 const NOMES_DOS_CENARIOS: Record<IdDoCenario, string> = { torneio: 'Torneio', planeta: 'Planeta Verde', ilha: 'Ilha da Tartaruga', canion: 'Cânion' };
 const nomeDoLutador = (id: IdDoLutador) => FICHAS[id].nome;
+/**
+ * O rosto na escolha. Os da Super Feira aparecem no Blue: no normal o rosto deles é o mesmo do
+ * Goiaba e do Vegetal, e a fileira teria dois pares de gêmeos.
+ */
+const formaNaEscolha = (id: IdDoLutador) => (id === 'goiabaSuper' || id === 'vegetalSuper' ? 1 : 0);
 
 /** Um quadro de pixels numa `<canvas>`, ampliado sem suavizar. `desenhar` roda quando `chave` muda. */
 export function QuadroNaTela({ quadro, chave, className, style, liso }: {
@@ -285,11 +290,8 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair,
           {IDS_DOS_LUTADORES.map((id) => (
             <button key={id} type="button" className={`luta-escolher ${meu === id ? 'escolhido' : ''}`} disabled={ocupado || !podeEscolher}
               onClick={() => meu !== id && escolher(id)} title={FICHAS[id].estilo}>
-              <QuadroNaTela chave={`r-${id}`} className="luta-retrato" quadro={() => retratoPronto(id)} />
-              <span className="luta-escolher-textos">
-                <span className="luta-escolher-nome">{nomeDoLutador(id)}</span>
-                <span className="muted small">{FICHAS[id].estilo}</span>
-              </span>
+              <QuadroNaTela chave={`r-${id}`} className="luta-retrato" quadro={() => retratoPronto(id, formaNaEscolha(id))} />
+              <span className="luta-escolher-nome">{nomeDoLutador(id)}</span>
             </button>
           ))}
         </div>

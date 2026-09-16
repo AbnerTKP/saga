@@ -2157,15 +2157,16 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 .luta-sprite { width: 256px; height: 240px; margin-bottom: -18px; }
 .luta-lado-nome { font-size: 16px; font-weight: 700; color: var(--white); letter-spacing: -.01em; }
 .luta-lado-vazio { margin: auto 0; color: var(--text3); font-size: 13px; text-align: center; }
-.luta-escolha { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); }
-.luta-escolher { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; text-align: left;
+/* A escolha é uma fileira de retratos, como nos jogos de luta: com sete lutadores, a grade de quatro
+   deixava um buraco. O estilo de cada um fica no title. */
+.luta-escolha { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--e2); }
+.luta-escolher { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 9px; border-radius: 10px;
   background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); }
 .luta-escolher:hover:not(:disabled) { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--bg4); }
 .luta-escolher.escolhido { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
 .luta-escolher:disabled { cursor: default; }
-.luta-retrato { width: 48px; height: 48px; flex: none; border-radius: 6px; background: var(--bg3); }
-.luta-escolher-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.luta-escolher-nome { font-size: 14px; font-weight: 650; color: var(--white); }
+.luta-retrato { width: 64px; height: 64px; flex: none; border-radius: 6px; background: var(--bg3); }
+.luta-escolher-nome { font-size: 13px; font-weight: 650; color: var(--white); text-align: center; line-height: 1.2; text-wrap: balance; }
 .luta-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text2); margin-top: auto; }
 .luta-legenda kbd { font: 600 11px/1 inherit; padding: 3px 6px; border-radius: 5px; background: var(--bg3); color: var(--white);
   box-shadow: inset 0 -1px 0 var(--bg4); }
@@ -2176,7 +2177,7 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 .luta-aviso { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 12px; border-radius: 8px;
   background: rgba(20,22,27,.88); color: var(--white); font-size: 13px; font-weight: 600; pointer-events: none; }
 .tela-da-luta .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
-@media (max-width: 1100px) { .luta-escolha { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .luta-escolha { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 /* O Dragão Quadrado no menu de jogos: o rosto do Goiaba no quadrado; e a capa do convite, o cenário. */
 .luta-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: #6fa8dc; display: grid; place-items: center; overflow: hidden; }
 .luta-icone { width: 32px; height: 32px; }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { avancar, caixaDoCorpo, clonar, criarLuta, impressao } from './luta.ts';
 import { DURACAO } from './luta.ts';
-import { BOTAO, SUB, type EstadoDaLuta } from './tipos.ts';
+import { BOTAO, IDS_DOS_LUTADORES, SUB, type EstadoDaLuta } from './tipos.ts';
 import { FICHAS, KI_INICIAL, TRANSFORMACAO } from './fichas.ts';
 
 const luta = (rounds: 1 | 2 = 2) =>
@@ -134,6 +134,21 @@ test('a super gasta três barras, congela a tela no clarão e derruba', () => {
   rodar(e, 200);
   assert.ok(b.vida < FICHAS.vegetal.vida - 150, `vida ${b.vida}`);
   assert.ok(['voando', 'caido', 'levantando'].includes(b.acao) || b.vida < 700, `a última batida derruba (${b.acao})`);
+});
+
+test('em todo lutador o especial e a super saem e acertam quem está parado na frente', () => {
+  // a bola lenta da Goteira e a do Vegetal da Super Feira são especiais, e não só super, pela primeira vez
+  for (const id of IDS_DOS_LUTADORES) {
+    for (const botao of [BOTAO.ESPECIAL, BOTAO.BAIXO | BOTAO.ESPECIAL]) {
+      const e = aoLutar(criarLuta({ lutadores: [id, 'picole'], cenario: 'torneio', roundsParaVencer: 2, semente: 3 }));
+      const [a, b] = e.lutadores;
+      a.ki = 300;
+      avancar(e, [botao, 0]);
+      assert.equal(a.acao, botao === BOTAO.ESPECIAL ? 'especial' : 'super', id);
+      rodar(e, 300);
+      assert.ok(b.vida <= FICHAS.picole.vida - 50, `${id} ${a.acao}: vida do outro ${b.vida}`);
+    }
+  }
 });
 
 test('sumir aparece nas costas do outro', () => {

@@ -14,8 +14,8 @@
 import { randomBytes } from 'node:crypto';
 import { ErroDeConta } from './contas.mjs';
 
-/** Os quatro lutadores. Os nomes são protocolo com o app (`IDS_DOS_LUTADORES`): só se acrescenta. */
-export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira'];
+/** Os lutadores. Os nomes são protocolo com o app (`IDS_DOS_LUTADORES`): só se acrescenta. */
+export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'goteira'];
 /** Os quatro cenários, também protocolo (`IDS_DOS_CENARIOS`). */
 export const CENARIOS = ['torneio', 'planeta', 'ilha', 'canion'];
 /** Rounds para vencer: 1 é luta única, 2 é melhor de três. */
@@ -27,7 +27,7 @@ export const ROUNDS = [1, 2];
  * ouve para atualizar. Muda quando a simulação deixar de dar o mesmo resultado que a anterior —
  * e muda junto com `PROTOCOLO_DA_LUTA`, no app (o teste confere os dois).
  */
-export const PROTOCOLO = 5; // 5: lutadores menores (escala 1)
+export const PROTOCOLO = 6; // 6: Goiaba e Vegetal da Super Feira, e a Goteira — app velho não conhece
 /** Quadros por segundo da simulação, fixos — o `QPS` do app. É por eles que se confere o resultado. */
 export const QPS = 60;
 

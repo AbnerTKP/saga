@@ -114,8 +114,11 @@ const BOCA_ABERTA: [number, number, string, Material][] = [
 
 const CABECA = new Set(['cabelo', 'pele', 'olho']);
 
-/** O corpo do Goiaba com a cabeça do Vegetal no lugar da dele, já vestido com a armadura. */
-function pecasDoVegetal(linhas: string[], y0: number): Pecas {
+/**
+ * O corpo do Goiaba com a cabeça do Vegetal no lugar da dele, já vestido com a armadura (ou com
+ * outra roupa: é assim que sai o da Super Feira).
+ */
+export function pecasDoVegetal(linhas: string[] = CABECA_NORMAL, y0 = -6, roupa: Roupa = ROUPA_VEGETAL): Pecas {
   const cabeca = cabecaEmLetras(y0, linhas);
   const base = arteDaBase(LINHAS_GOIABA, PALETA_GOIABA, MATERIAIS_GOIABA);
   const semCabeca = recortar(base, (_x, y, m) => !(y <= 16 && CABECA.has(m!)));
@@ -135,7 +138,7 @@ function pecasDoVegetal(linhas: string[], y0: number): Pecas {
     cabecaGrito: editar(cabeca, BOCA_ABERTA),
     cabecaFechados: editar(cabeca, OLHO_FECHADO),
     cabecaDor: editar(cabeca, [...OLHO_FECHADO, ...BOCA_ABERTA]),
-  }, ROUPA_VEGETAL);
+  }, roupa);
 }
 
 /** A ombreira dourada, com o pivô no ombro. */
@@ -147,13 +150,12 @@ const ARTICULA = /^(braco|punho|mao)/;
  * Pinta a ombreira no ombro do braço da FRENTE — é ele que sai de debaixo dela; sem braço de
  * carimbo (parado, andando, caído), no ombro do zip levado junto com o tronco, girado se ele
  * estiver. Só pinta sobre o corpo e nunca sobre cabeça ou luva: fica atrás do queixo e do punho
- * da guarda, e não aumenta a silhueta.
+ * da guarda, e não aumenta a silhueta. A Goteira usa a mesma conta para o enchimento do colete.
  */
-function enfeitar(a: Arte, pose: string): Arte {
+export function comOmbreira(a: Arte, pose: string, ombreira: Arte): Arte {
   const camadas = POSES[pose];
   if (!camadas) return a;
   const o = criarArte(a.largura, a.altura, a.pivo);
-  const ombreira = pintarCarimbo(OMBREIRA, ROUPA_VEGETAL);
   const braco = camadas.find((c) => 'carimbo' in c && !c.atras && ARTICULA.test(c.carimbo));
   if (braco && 'carimbo' in braco) colarArte(o, ombreira, DX + braco.x, DY + braco.y, { espelhar: braco.espelhar });
   else {
@@ -184,6 +186,6 @@ registrarPixel('vegetal', () => {
     roupa: ROUPA_VEGETAL,
     forma1: (a) => tingir(a, (c, m) => (m === 'cabelo' ? trocarRampa(c, ROUPA_VEGETAL.cabelo, DOURADO, -0.5)
       : m === 'olho' ? trocarRampa(c, ROUPA_VEGETAL.olho, VERDE_AGUA) : c)),
-    enfeitar: (a, pose) => enfeitar(a, pose),
+    enfeitar: (a, pose) => comOmbreira(a, pose, pintarCarimbo(OMBREIRA, ROUPA_VEGETAL)),
   };
 });

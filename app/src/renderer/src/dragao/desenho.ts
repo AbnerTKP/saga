@@ -55,12 +55,15 @@ export function retratoPronto(id: IdDoLutador, forma: 0 | 1 = 0): Quadro {
   return r;
 }
 
-/** A aura de quem está transformado, e do grito: dourada nos dois de cabelo, laranja no Picolé. */
+/** A aura de quem está transformado, e do grito: dourada nos de cabelo, azul no Blue, laranja no Picolé. */
 const CORES_DA_FORMA: Record<IdDoLutador, CoresDeKi> = {
   goiaba: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
   vegetal: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
   picole: { nucleo: cor('#fff2dc'), meio: cor('#ffb45a'), borda: cor('#e8661a'), escuro: cor('#7a2e08') },
   geladeira: { nucleo: cor('#fff8d0'), meio: cor('#ffd84a'), borda: cor('#d99a12'), escuro: cor('#6e4a08') },
+  goiabaSuper: { nucleo: cor('#ecffff'), meio: cor('#7fe3ff'), borda: cor('#1fa2ee'), escuro: cor('#0c4796') },
+  vegetalSuper: { nucleo: cor('#ecffff'), meio: cor('#7fe3ff'), borda: cor('#1fa2ee'), escuro: cor('#0c4796') },
+  goteira: { nucleo: cor('#fffbe0'), meio: cor('#ffe45a'), borda: cor('#f0a81c'), escuro: cor('#8a5208') },
 };
 
 const PRETO = cor('#000000');

@@ -22,6 +22,7 @@
 import { type Cor, type Quadro, cor, linha, pixel } from './quadro.ts';
 import { Mascara, type Forma, type P, marcarForma, pintarMascara } from './raster.ts';
 import { pontilhar } from './cenario.ts';
+import type { IdDoLutador } from './tipos.ts';
 
 export type CoresDeKi = { nucleo: Cor; meio: Cor; borda: Cor; escuro: Cor };
 
@@ -30,11 +31,17 @@ export type CoresDeKi = { nucleo: Cor; meio: Cor; borda: Cor; escuro: Cor };
  * é o que separa o raio dele do da Geladeira, que também puxa para o rosa — com os dois em
  * roxo-e-branco, uma onda contra a outra viraria uma mancha só no meio da tela.
  */
-export const CORES_DE_KI: Record<'goiaba' | 'vegetal' | 'picole' | 'geladeira', CoresDeKi> = {
+export const CORES_DE_KI: Record<IdDoLutador, CoresDeKi> = {
   goiaba: { nucleo: cor('#f2fdff'), meio: cor('#9ce6ff'), borda: cor('#38a9ee'), escuro: cor('#1b4f9c') },
   vegetal: { nucleo: cor('#fff8c4'), meio: cor('#d7a2ff'), borda: cor('#9446e0'), escuro: cor('#431a82') },
   picole: { nucleo: cor('#fffff0'), meio: cor('#ffe75e'), borda: cor('#f4a519'), escuro: cor('#94500c') },
   geladeira: { nucleo: cor('#fff0fa'), meio: cor('#ff9ddd'), borda: cor('#e2359c'), escuro: cor('#7a124f') },
+  // o Blue é anil, mais fundo que o azul-céu do Goiaba: os dois raios se encontrando não viram um só
+  goiabaSuper: { nucleo: cor('#eef4ff'), meio: cor('#86a8ff'), borda: cor('#3b5cf0'), escuro: cor('#1a268a') },
+  // a Alface Final é verde: é o único ki verde, e o nome pede
+  vegetalSuper: { nucleo: cor('#f6fff0'), meio: cor('#b9f59c'), borda: cor('#4cc23a'), escuro: cor('#1d5e1a') },
+  // o fantasma é branco e lilás, mais pálido que o violeta do Vegetal
+  goteira: { nucleo: cor('#ffffff'), meio: cor('#eeeaff'), borda: cor('#ada0ee'), escuro: cor('#4d3f9c') },
 };
 
 /** As cores de fora do ki: a estrela do golpe é sempre branca e amarela, venha de quem vier. */
