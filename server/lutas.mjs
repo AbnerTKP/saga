@@ -16,6 +16,27 @@ import { ErroDeConta } from './contas.mjs';
 
 /** Os lutadores. Os nomes são protocolo com o app (`IDS_DOS_LUTADORES`): só se acrescenta. */
 export const LUTADORES = ['goiaba', 'vegetal', 'picole', 'geladeira', 'goiabaSuper', 'vegetalSuper', 'goteira'];
+/**
+ * A versão da Saga que trouxe cada lutador que não é dos quatro primeiros. App que não conhece um
+ * lutador QUEBRA ao ler o nome dele, e quebra a tela inteira: em 16/09/2026 quem ainda estava na
+ * 0.56 e foi chamado por alguém esperando de Goteira ficou com a Saga preta — e de novo a cada vez
+ * que abria, enquanto o convite existisse. Quem pergunta de uma versão anterior recebe o convite
+ * sem o lutador e a arena como recusa para atualizar. Lutador novo entra aqui com a versão que o
+ * traz; o teste cobra.
+ */
+export const LUTADOR_DESDE = { goiabaSuper: '0.57.0', vegetalSuper: '0.57.0', goteira: '0.57.0' };
+/**
+ * Se o app de quem pergunta (`ctx.app`, a versão tirada do pedido) conhece o lutador. Sem versão —
+ * o teste, um robô —, conhece todos: a trava é para a Saga antiga, que sempre diz a dela.
+ */
+function conhece(ctx, lutador) {
+  const desde = LUTADOR_DESDE[lutador];
+  if (!desde || !ctx.app) return true;
+  const [a, b] = [ctx.app, desde].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return true;
+}
+const conheceTodos = (arena, ctx) => arena.lados.every((l) => l === null || conhece(ctx, l.lutador));
 /** Os quatro cenários, também protocolo (`IDS_DOS_CENARIOS`). */
 export const CENARIOS = ['torneio', 'planeta', 'ilha', 'canion'];
 /** Rounds para vencer: 1 é luta única, 2 é melhor de três. */
@@ -414,7 +435,8 @@ export function criarArenas({
             return {
               arena: a.id, servidor: a.sid, servidorNome: fora.nomeDoServidor?.(a.sid) ?? null,
               de: quem(a.anfitriao), cenario: a.cenario, rounds: a.rounds,
-              oponente: sentado ? { pessoa: quem(sentado.pessoa), lutador: sentado.lutador } : null,
+              // Lutador que o app de quem foi chamado não conhece fica de fora (ver `LUTADOR_DESDE`).
+              oponente: sentado && conhece(ctx, sentado.lutador) ? { pessoa: quem(sentado.pessoa), lutador: sentado.lutador } : null,
             };
           })
           : [],
@@ -472,12 +494,14 @@ export function criarArenas({
       const agora = relogio();
       faxina(agora);
       const arena = acharArena(ctx, id);
+      // Antes de entrar na plateia: quem não consegue ver a luta não está assistindo.
+      if (!conheceTodos(arena, ctx)) throw new ErroDeConta('Essa arena tem lutador novo: atualize a Saga para entrar.', 409);
       if (lutandoNela(arena, ctx.eu)) arena.lutadorVistoEm = agora;
       else if (ladoDe(arena, ctx.eu) === null) arena.plateia.set(ctx.eu, agora);
       return verArena(arena, ctx, agora);
     },
 
-    /** Uma ação na arena. Devolve `{ arena }` — ou `{ ok: true }` quando a ação foi fechar. */
+    /** Uma ação na arena. Devolve `{ arena }` — ou `{ ok: true }` quando a ação foi fechar, ou quando o app de quem agiu não conhece um dos lutadores. */
     agir(ctx, { id, acao, ...dados } = {}) {
       const agora = relogio();
       faxina(agora);
@@ -487,6 +511,8 @@ export function criarArenas({
       if (r?.ok) return r;
       arena.mexidoEm = agora;
       if (lutandoNela(arena, ctx.eu)) arena.lutadorVistoEm = agora;
+      // O app antigo só recusa convite daqui, e a resposta dele é ignorada: feito, sem a arena.
+      if (!conheceTodos(arena, ctx)) return { ok: true };
       return { arena: verArena(arena, ctx, agora) };
     },
 

@@ -17,7 +17,11 @@ export function ConviteDeLuta({ convite, servidorAberto, onLutar, onRecusar }: {
   onRecusar: () => void;
 }) {
   const deOutro = convite.servidor !== undefined && convite.servidor !== servidorAberto && convite.servidorNome;
-  const com = convite.oponente ? ` · ${FICHAS[convite.oponente.lutador].nome}` : '';
+  // Lutador que este app não conhece fica de fora, em vez de derrubar a tela inteira: foi o que
+  // deixou a Saga 0.56 preta ao ser chamada por alguém de Goteira (o servidor já não manda, e isto
+  // é para o dia em que ele esquecer — ver `LUTADOR_DESDE`, em server/lutas.mjs).
+  const lutador = convite.oponente ? FICHAS[convite.oponente.lutador] : undefined;
+  const com = lutador ? ` · ${lutador.nome}` : '';
   return (
     <CartaoDeConvite
       jogo="Dragão Quadrado"

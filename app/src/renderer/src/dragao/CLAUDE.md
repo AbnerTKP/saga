@@ -79,6 +79,14 @@ Vegetal da Super Feira e a Goteira —, vida e ki, quatro cenários
   janela escondida o rAF para, e o outro lado ficaria esperando por nós.
 - **Protocolo**: `PROTOCOLO` em `lutas.mjs` e `PROTOCOLO_DA_LUTA` no app. Mudou a simulação
   de um jeito que a versão anterior não entende, sobe o número: app velho não senta.
+- **O protocolo impede o app velho de SENTAR, não de LER.** A v0.57.0 trouxe três lutadores, e quem
+  ficou na 0.56 e foi chamado por alguém de Goteira recebeu, no `/rooms`, um convite com um nome
+  que não conhecia: `FICHAS[id].nome` estourou no cartão, o app não tem limite de erro, e a Saga
+  inteira ficou preta — de novo a cada vez que abria, enquanto o convite existisse. Hoje o
+  servidor lê a versão do app no User-Agent (o Electron manda `Saga/0.57.0`) e, a quem não conhece
+  um lutador (`LUTADOR_DESDE`, em `lutas.mjs`), manda o convite sem ele e responde a arena com
+  "atualize a Saga". **Lutador novo entra em `LUTADOR_DESDE` com a versão que o traz** — o teste
+  cobra —, e o cartão do convite passou a pular lutador desconhecido em vez de quebrar.
 - **O tamanho mudou duas vezes, e hoje a escala é 1** (`ESCALA`, em `medidas.ts`). Na v0.54 os
   lutadores ficaram 1,5× maiores para o boneco de esqueleto ter rosto e mão; com o sprite do zip
   ampliado 3x o dono achou "enorme", e na v0.56.1 o zip vai 2x (62 px) com a escala 1. Tudo o que

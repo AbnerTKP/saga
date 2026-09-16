@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   criarArenas, ESPERA_DO_INICIO, ESPERA_DO_OUTRO, TETO_DA_LUTA, PLATEIA, ESQUECIDA, ABANDONADA, QPS,
-  LUTADORES, CENARIOS, PROTOCOLO,
+  LUTADORES, LUTADOR_DESDE, CENARIOS, PROTOCOLO,
 } from './lutas.mjs';
 import { ErroDeConta } from './contas.mjs';
 
@@ -81,6 +81,43 @@ test('app velho não abre nem senta', () => {
   const { id } = t.arenas.abrir(t.como(TKP), P);
   assert.throws(() => t.agir(JUNINHO, id, 'escolher', { lutador: 'vegetal' }), recusa(409, /atualizar/));
   assert.equal(t.arenas.ver(t.como(JUNINHO), id).lados[1], null);
+});
+
+test('lutador que o app não conhece não chega a ele: o convite vem sem o lutador, e a arena recusa para atualizar', () => {
+  // Em 16/09/2026 a Saga 0.56 foi chamada por quem esperava de Goteira, leu um nome que não
+  // conhecia e ficou preta — de novo a cada vez que abria, enquanto o convite existisse.
+  const t = montar();
+  const antigo = (eu) => ({ ...t.como(eu), app: '0.56.2' });
+  const { id } = t.arenas.abrir(t.como(TKP), P);
+  t.agir(TKP, id, 'chamar', { alvo: JUNINHO });
+  t.agir(TKP, id, 'chamar', { alvo: RAFA });
+  // Dos quatro de sempre, o antigo conhece: vê tudo como antes.
+  assert.equal(t.arenas.resumo(antigo(JUNINHO)).convites[0].oponente.lutador, 'goiaba');
+  assert.equal(t.arenas.ver(antigo(BIA), id).lados[0].lutador, 'goiaba');
+
+  t.agir(TKP, id, 'escolher', { lutador: 'goteira', ...P });
+  const [convite] = t.arenas.resumo(antigo(JUNINHO)).convites;
+  assert.equal(convite.arena, id);
+  assert.equal(convite.oponente, null);
+  assert.throws(() => t.arenas.ver(antigo(RAFA), id), recusa(409, /atualize/));
+  // quem não conseguiu ver não entrou na plateia (a Bia entrou quando ainda via)
+  assert.deepEqual(t.arenas.ver(t.como(TKP), id).plateia.map((p) => p.id), [BIA]);
+  // recusar funciona, e a resposta vem sem a arena
+  assert.deepEqual(t.arenas.agir(antigo(JUNINHO), { id, acao: 'recusar' }), { ok: true });
+  assert.deepEqual(t.arenas.resumo(antigo(JUNINHO)).convites, []);
+  assert.deepEqual(t.arenas.ver(t.como(TKP), id).recusaram, [JUNINHO]);
+
+  // A versão que trouxe o lutador, as depois dela e quem não diz versão veem tudo.
+  for (const app of ['0.57.0', '0.57.1', '0.100.0', '1.0.0', null]) {
+    assert.equal(t.arenas.ver({ ...t.como(BIA), app }, id).lados[0].lutador, 'goteira', String(app));
+  }
+  assert.throws(() => t.arenas.ver({ ...t.como(BIA), app: '0.9.9' }, id), recusa(409));
+});
+
+test('todo lutador além dos quatro primeiros diz de que versão da Saga é', () => {
+  // Esquecer é o app anterior quebrar ao ver o lutador novo — ver o teste acima.
+  assert.deepEqual(Object.keys(LUTADOR_DESDE).sort(), LUTADORES.slice(4).sort());
+  for (const v of Object.values(LUTADOR_DESDE)) assert.match(v, /^\d+\.\d+\.\d+$/);
 });
 
 test('escolher: senta no lado livre, e já sentado troca de lutador', () => {

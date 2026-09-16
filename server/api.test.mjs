@@ -57,13 +57,14 @@ after(() => {
   rmSync(pasta, { recursive: true, force: true });
 });
 
-const chamar = async (metodo, rota, { corpo, sessao, servidor } = {}) => {
+const chamar = async (metodo, rota, { corpo, sessao, servidor, agente } = {}) => {
   const r = await fetch(base + rota, {
     method: metodo,
     headers: {
       'content-type': 'application/json',
       ...(sessao ? { 'x-sessao': sessao } : {}),
       ...(servidor ? { 'x-servidor': String(servidor) } : {}),
+      ...(agente ? { 'user-agent': agente } : {}),
     },
     body: corpo && metodo !== 'GET' ? JSON.stringify(corpo) : undefined,
   });
@@ -1776,6 +1777,26 @@ test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, co
   const fim = await naArena(tkp.token, { id, acao: 'abandonar' });
   assert.deepEqual([fim.corpo.arena.estado, fim.corpo.arena.vencedor], ['fim', 1]);
   assert.deepEqual((await naArena(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
+});
+
+test('dragão quadrado: a Saga antiga não recebe lutador que não conhece, pela versão no User-Agent', async () => {
+  const tkp = (await cadastrar('dqv_tkp')).corpo;
+  const juninho = (await cadastrar('dqv_juninho')).corpo;
+  const casa = tkp.servidor.id;
+  // O User-Agent de verdade do Electron: o `%s/%s Chrome/%s Electron/…` com o nome e a versão do app.
+  const saga = (v) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Saga/${v} Chrome/142.0.7444.265 Electron/39.8.10 Safari/537.36`;
+  const { id } = (await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { protocolo: 6 }, agente: saga('0.57.0') })).corpo.arena;
+  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'escolher', lutador: 'goteira', protocolo: 6 } });
+  assert.equal((await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'chamar', alvo: juninho.eu.id } })).status, 200);
+
+  const convite = async (agente) => (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa, agente })).corpo.lutas.convites[0];
+  assert.equal((await convite(saga('0.56.2'))).oponente, null);
+  assert.equal((await convite(saga('0.57.0'))).oponente.lutador, 'goteira');
+  const vista = await chamar('GET', `/lutas/arena?id=${id}`, { sessao: juninho.token, servidor: casa, agente: saga('0.56.2') });
+  assert.equal(vista.status, 409);
+  assert.match(vista.corpo.error, /atualize/);
+  assert.equal((await chamar('GET', `/lutas/arena?id=${id}`, { sessao: juninho.token, servidor: casa, agente: saga('0.57.0') })).corpo.arena.lados[0].lutador, 'goteira');
+  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'fechar' } });
 });
 
 // --- relatos -----------------------------------------------------------------------

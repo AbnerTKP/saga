@@ -246,6 +246,15 @@ const naMesa = (sid, eu) => ({
 });
 
 /**
+ * A versão da Saga que fez o pedido, tirada do User-Agent, que o Electron monta com o nome e a
+ * versão do app (`… Saga/0.57.0 Chrome/… Electron/…`). Null para quem não é a Saga. Serve para não
+ * mandar a um app antigo o que ele não sabe desenhar — ver `LUTADOR_DESDE`, em lutas.mjs.
+ */
+const versaoDoApp = (req) => /\bSaga\/(\d+\.\d+\.\d+)\b/.exec(req.headers['user-agent'] ?? '')?.[1] ?? null;
+/** O `naMesa` das arenas: com a versão do app, que diz que lutadores ele conhece. */
+const naArena = (req, sid, eu) => ({ ...naMesa(sid, eu), app: versaoDoApp(req) });
+
+/**
  * A pessoa vista sem servidor nenhum: só a conta.
  *
  * Existe porque agora dá para estar na Saga sem estar em servidor algum — quem acaba de
@@ -721,7 +730,7 @@ const ROTAS = {
       // tem de chegar a quem está em qualquer tela — inclusive olhando outro servidor.
       corridas: grids.resumo(naMesa(sid, eu), foraDaqui(eu)),
       // As arenas do Dragão Quadrado, pela mesma carona e pelo mesmo motivo.
-      lutas: arenas.resumo(naMesa(sid, eu), foraDaqui(eu)),
+      lutas: arenas.resumo(naArena(req, sid, eu), foraDaqui(eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
@@ -1139,18 +1148,18 @@ const ROTAS = {
   // numa sala só dela; aqui ficam os lados, o começo e o resultado.
   'POST /lutas/abrir': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
-    return { arena: arenas.abrir(naMesa(sid, eu), await lerCorpo(req)) };
+    return { arena: arenas.abrir(naArena(req, sid, eu), await lerCorpo(req)) };
   },
 
   'GET /lutas/arena': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const id = new URL(req.url, 'http://x').searchParams.get('id');
-    return { arena: arenas.ver(naMesa(sid, eu), id) };
+    return { arena: arenas.ver(naArena(req, sid, eu), id) };
   },
 
   'POST /lutas/arena': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
-    return arenas.agir(naMesa(sid, eu), await lerCorpo(req));
+    return arenas.agir(naArena(req, sid, eu), await lerCorpo(req));
   },
 
   // O passe da sala da luta, como o da corrida: só dados. Quem assiste entra para LER os botões;
