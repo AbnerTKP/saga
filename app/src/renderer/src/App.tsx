@@ -67,6 +67,7 @@ import { aoDespertar } from './despertar';
 import { derrubouASessao } from './resposta';
 import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
+import { mesmoSeIgual } from './igual';
 import type { UpdateState } from './desktop';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -477,20 +478,22 @@ export function App() {
         if (!vivo) return;
         // Resposta de OUTRO servidor: o aberto não é mais seu.
         if (lista.servidorId && lista.servidorId !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
-        setSalasDoServidor({ servidorId, rooms: lista.rooms, categorias: lista.categorias });
+        // Só troca o que mudou: a resposta chega igual quase sempre, e objeto novo redesenha o
+        // app inteiro para mostrar a mesma tela (ver igual.ts).
+        setSalasDoServidor((a) => mesmoSeIgual(a, { servidorId, rooms: lista.rooms, categorias: lista.categorias }));
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
-        setJogos({ servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] });
+        setJogos((a) => mesmoSeIgual(a, { servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] }));
         // Os grids de Fórmula 1, pelo mesmo caminho. Servidor antigo não manda: não há corrida.
-        setCorridas({ servidorId, grids: lista.corridas?.grids ?? [], convites: lista.corridas?.convites ?? [] });
+        setCorridas((a) => mesmoSeIgual(a, { servidorId, grids: lista.corridas?.grids ?? [], convites: lista.corridas?.convites ?? [] }));
         // As arenas do Dragão Quadrado, idem. Servidor antigo não manda: não há luta.
-        setLutas({ servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] });
+        setLutas((a) => mesmoSeIgual(a, { servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] }));
         // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
         // elas são da conta. Servidor antigo não manda o campo — aí não há conversa
         // nenhuma na tela e nada quebra, como o "está digitando".
         const daConta = lista.conversas ?? [];
-        setConversas(daConta);
-        setAmigos(lista.amigos ?? { pedidos: 0, ids: [] });
+        setConversas((a) => mesmoSeIgual(a, daConta));
+        setAmigos((a) => mesmoSeIgual(a, lista.amigos ?? { pedidos: 0, ids: [] }));
         // Mensagem privada é dirigida a VOCÊ: ela avisa mesmo com a janela noutro lugar.
         // A que está aberta na tela não avisa — você está lendo.
         for (const c of conversasComNovidade(conversasVistas.current, daConta, conversaAbertaRef.current)) {
@@ -694,7 +697,7 @@ export function App() {
         // Pedir por um servidor de que você não faz mais parte devolve outro: o aberto
         // sumiu, e a lista de lá não entra como se fosse a daqui.
         if (r.servidor.id !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
-        setDadosDoServidor({ servidorId: r.servidor.id, cargos: r.cargos, membros: r.membros });
+        setDadosDoServidor((a) => mesmoSeIgual(a, { servidorId: r.servidor.id, cargos: r.cargos, membros: r.membros }));
         setSessao((atual) => {
           if (!atual) return atual;
           // Você também está nessa lista, e é por ela que chega o que mudou em você com o app
@@ -702,9 +705,10 @@ export function App() {
           // servidor — quem ganhava cargo seguia sem os botões dele até reabrir o app. Só
           // troca se mudou: é a identidade do objeto que mantém a tela quieta.
           const euAgora = r.membros.find((m) => m.id === atual.eu?.id);
-          return euAgora && JSON.stringify(euAgora) !== JSON.stringify(atual.eu)
-            ? { ...atual, servidores: r.servidores, eu: euAgora }
-            : { ...atual, servidores: r.servidores };
+          const servidores = mesmoSeIgual(atual.servidores, r.servidores);
+          if (euAgora && JSON.stringify(euAgora) !== JSON.stringify(atual.eu)) return { ...atual, servidores, eu: euAgora };
+          // A sessão é lida pelo app inteiro: trocá-la por uma cópia igual redesenhava tudo de 10 em 10 s.
+          return servidores === atual.servidores ? atual : { ...atual, servidores };
         });
       })
       .catch(() => undefined);

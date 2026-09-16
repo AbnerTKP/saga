@@ -307,15 +307,14 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .quem-assiste span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quem-assiste .assiste-resto { flex: none; opacity: .85; }
 
-/* O selo do que está no ar. Vermelho é a convenção, e o ponto pisca devagar: é para
-   avisar, não para puxar o olho o tempo todo. */
+/* O selo do que está no ar. Vermelho é a convenção, e o ponto fica PARADO, como o do Discord.
+   Ele piscava devagar, e medido na Saga do dono, numa call com uma live: só esse ponto de 6 px
+   custava 18,5% de GPU (de 22,8% para 4,3% ao parar) — animação que nunca termina faz o macOS
+   recompor a janela inteira a cada quadro. Ver imagemParada.ts. */
 .selo-ao-vivo { display: inline-flex; align-items: center;
   gap: 5px; padding: 3px 8px; border-radius: 999px; background: rgba(224,72,82,.16);
   color: #ff8a90; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.selo-ao-vivo .ponto { width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
-  animation: pulso-ao-vivo 2s ease-in-out infinite; }
-@keyframes pulso-ao-vivo { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .selo-ao-vivo .ponto { animation: none; } }
+.selo-ao-vivo .ponto { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
 /* Quem já está assistindo vê o selo em azul: a live é dele agora, não um aviso. */
 .selo-ao-vivo.assistindo { background: rgba(63,127,224,.16); color: var(--accent-claro); }
 
@@ -1044,11 +1043,13 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 .perfil-banner { height: 168px; overflow: hidden; background: var(--bg4); flex: none; }
 .perfil-banner.vazio { background: linear-gradient(135deg, var(--bg4), var(--bg3)); }
-/* Sem banner próprio, o Berserk ganha a faixa colorida — é a distinção que ele compra. */
+/* Sem banner próprio, o Berserk ganha a faixa colorida — é a distinção que ele compra. Anda com
+   o mouse sobre o cartão, como o nome: parado no cartão aberto, repintava sem parar. */
 .perfil-banner.berserk.vazio { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6ee7b7, #60a5fa, #c084fc, #ff5f6d);
-  background-size: 300% 100%; animation: arco-iris 8s linear infinite; }
+  background-size: 300% 100%; background-position: 30% 0; }
+.modal.perfil:hover .perfil-banner.berserk.vazio { animation: arco-iris 8s linear infinite; }
 .perfil-banner img { width: 100%; height: 100%; display: block; cursor: zoom-in; }
-@media (prefers-reduced-motion: reduce) { .perfil-banner.berserk.vazio { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .modal.perfil:hover .perfil-banner.berserk.vazio { animation: none; } }
 
 .perfil-corpo { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px; }
 

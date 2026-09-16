@@ -277,3 +277,15 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   MEIO, porque a foto do FelipeTKP entra aparecendo e o primeiro quadro dela é branco inteiro. O
   cartão de perfil aberto e o visualizador de imagem continuam animando: são abertos de propósito, e
   fecham. **Coisa nova que se mexe sozinha na tela tem de ser medida parada** antes de subir.
+  Na mesma noite, medido na Saga DO DONO pela porta de diagnóstico (`--remote-debugging-port`),
+  numa call com uma live: o ponto pulsante do "ao vivo", de 6 px, custava sozinho 18,5% de GPU (de
+  22,8% para 4,3% ao parar). Hoje ele é parado, como o do Discord, o banner em arco-íris do cartão
+  anda só com o mouse no cartão, e `animacoes.test.ts` falha se uma animação infinita aparecer sem
+  `:hover` — regra escrita aqui dura até o primeiro dia corrido. O resto da call, por thread do
+  processo de desenho (29% de um núcleo): a página 6%, a saída de som 5%, o filtro de ruído 3,5%,
+  a rede 2,6%. A parte da página tinha desperdício: as buscas de relógio (salas de 4 em 4 s,
+  "digitando" de 2 em 2, servidor de 10 em 10) gravavam a resposta como objeto novo mesmo igual, e o
+  app inteiro redesenhava para mostrar a mesma tela — hoje só troca o que mudou (`igual.ts`).
+  **Não medido e fica para depois:** quem toca um som do soundboard continua publicando uma faixa
+  de silêncio sem DTX pelo resto da sessão (o DTX cortava o começo do som), e cada pessoa da call a
+  decodifica; e o nível de quem está falando abre um segundo `AudioContext`, além do do microfone.

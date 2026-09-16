@@ -4,6 +4,7 @@ import {
   type Digitando, type Mensagem, type Onde,
 } from './api';
 import { aoDespertar } from './despertar';
+import { mesmoSeIgual } from './igual';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
 // e para cinco amigos, dois segundos passam por instantâneo.
@@ -63,7 +64,7 @@ export function useChat(onde: Onde | null) {
         const r = await lerMensagens(aqui, ultima.current || undefined, apagadasDesde.current || undefined);
         if (!vivo) return;
         // Servidor antigo não manda o campo: aí ninguém aparece digitando, e nada quebra.
-        setDigitando(r.digitando ?? []);
+        setDigitando((antes) => mesmoSeIgual(antes, r.digitando ?? []));
         setErro(null);
         if (r.agora) apagadasDesde.current = r.agora;
         // Apagada por alguém noutra tela: sai desta também. A busca só traz o que é NOVO, e
