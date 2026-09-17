@@ -218,3 +218,24 @@ test('em fluxo, arquivo vazio e recusado', async () => {
   await assert.rejects(() => salvarArquivoEmFluxo(pasta, []), /Nenhum arquivo/);
   assert.deepEqual(readdirSync(pasta), []);
 });
+
+test('envio grande demais em pedaços pequenos é recusado sem derrubar o processo nem deixar o parcial', async () => {
+  // Com escritas na fila, recusar destruía o arquivo no meio de um `write`, e o erro sem ouvinte
+  // derrubava o servidor: 30 quedas em 30 antes do conserto. Aqui uma queda vira falha do teste.
+  const quedas = [];
+  const anotar = (e) => quedas.push(e);
+  process.on('uncaughtException', anotar);
+  try {
+    for (let k = 0; k < 10; k++) {
+      const pasta = mkdtempSync(join(tmpdir(), 'fluxo-'));
+      async function* fonte() { const p = Buffer.alloc(1024, 7); for (let i = 0; i < 2000; i++) yield p; }
+      await assert.rejects(salvarArquivoEmFluxo(pasta, fonte(), 100 * 1024), (e) => e.status === 413);
+      await new Promise((r) => setTimeout(r, 20));
+      assert.deepEqual(readdirSync(pasta), [], 'o .parcial não fica');
+      rmSync(pasta, { recursive: true, force: true });
+    }
+  } finally {
+    process.off('uncaughtException', anotar);
+  }
+  assert.deepEqual(quedas.map((e) => e.code ?? e.message), []);
+});

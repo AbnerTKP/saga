@@ -121,8 +121,16 @@ export async function salvarArquivoEmFluxo(pasta, fonte, limite = LIMITES.arquiv
   let total = 0;
 
   const saida = createWriteStream(temporario);
+  // Sem ouvinte, um erro de gravação DERRUBA O PROCESSO. E ele acontecia sempre que o envio era
+  // recusado com escritas ainda na fila: `destroy` com o disco no meio de um `write` dispara
+  // ERR_STREAM_DESTROYED no evento 'error', e ninguém ouvia. Medido: 30 quedas em 30 envios
+  // grandes demais em pedaços pequenos; na produção, com pedaços maiores, só às vezes — foi o
+  // servidor do teste morrendo no meio do api.test que travou duas versões no CI em 16/09/2026.
+  let erroDeGravacao = null;
+  saida.on('error', (e) => { erroDeGravacao ??= e; });
   try {
     for await (const pedaco of fonte) {
+      if (erroDeGravacao) throw erroDeGravacao;
       total += pedaco.length;
       if (total > limite) {
         throw new ErroDeArquivo(`${oQue} passa de ${Math.round(limite / 1024 / 1024)} MB.`, 413);
@@ -130,9 +138,11 @@ export async function salvarArquivoEmFluxo(pasta, fonte, limite = LIMITES.arquiv
       hash.update(pedaco);
       if (!saida.write(pedaco)) await once(saida, 'drain');
     }
+    if (erroDeGravacao) throw erroDeGravacao;
     await new Promise((ok, falha) => saida.end((e) => (e ? falha(e) : ok())));
   } catch (e) {
-    saida.destroy();
+    // Fecha o arquivo antes de apagá-lo: apagar com escrita em curso deixava o `.parcial` voltar.
+    await new Promise((ok) => { if (saida.closed) ok(); else { saida.once('close', ok); saida.destroy(); } });
     rmSync(temporario, { force: true });
     throw e;
   }
