@@ -174,4 +174,8 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   dono. **Os três de 16/09/2026** (Goiaba e Vegetal da Super Feira, Goteira) só foram vistos em
   imagem e simulados: a ficha de cada um — vida, velocidade, a bola lenta no especial — foi
   conferida por dano medido contra um alvo parado, e nunca jogada. O mesmo vale para o **Gotinha e o
-  Tronco**, e a fileira de nove retratos só foi vista na prévia, nunca no app aberto.
+  Tronco**, e a fileira de nove retratos só foi vista na prévia, nunca no app aberto. **As telas de
+  jogo em pixel (17/09/2026)** — título, escolha, convite, opções, VS, desistir, fim e o cartão —
+  foram percorridas pela Saga escondida contra servidor e LiveKit locais, por teclado e por clique,
+  com o amigo respondendo pela rede. **Não foram exercidos**: duas pessoas de verdade, o Windows, os
+  bipes de menu (nunca ouvidos) e a tela numa janela pequena.
