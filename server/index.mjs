@@ -1285,11 +1285,8 @@ const ROTAS = {
   },
 
   // --- Urna --------------------------------------------------------------------
-  // A apuração é do servidor do pedido, e só diz totais: o voto é secreto.
-  'GET /urna': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    return urnas.apuracao(db, sid, eu.id);
-  },
+  // A apuração é da Saga inteira, e só diz totais: o voto é secreto. Votar é num servidor.
+  'GET /urna': async (req) => urnas.apuracao(db, exigirConta(req).id),
 
   'POST /urna/votos': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);

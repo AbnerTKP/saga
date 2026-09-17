@@ -4,6 +4,12 @@
 // soma. Pode votar quantas vezes quiser — foi o pedido —, com um freio de alguns segundos entre
 // um voto e outro, que o caminho da porta até a urna leva mais do que isso: é contra laço, não
 // contra quem joga. O voto é secreto no banco (ver as migrações `urna_*`).
+//
+// A apuração é da SAGA INTEIRA, e não de cada servidor. Nasceu por servidor (v0.60.0), e o dono
+// corrigiu: "o resultado deve ser para todo o Saga". As tabelas continuam anotando o servidor em
+// que o voto foi dado — elas já estavam na produção, e trocar de tabela só para apagar uma coluna
+// seria migração sem ganho —, mas a leitura soma todos, e o "você votou N vezes" e o freio
+// também contam a pessoa em qualquer servidor.
 import { ErroDeConta } from './contas.mjs';
 import * as votos from './repositorios/urna_votos.mjs';
 import * as eleitores from './repositorios/urna_eleitores.mjs';
@@ -23,21 +29,22 @@ export function escolhaValida(escolha) {
   throw new ErroDeConta('Essa escolha não existe na urna.', 400);
 }
 
-export function apuracao(db, servidorId, usuarioId) {
-  const contagem = votos.contagem(db, servidorId).map((l) => ({
+export function apuracao(db, usuarioId) {
+  const contagem = votos.contagem(db).map((l) => ({
     numero: l.escolha === 'branco' || l.escolha === 'nulo' ? l.escolha : Number(l.escolha),
     votos: l.votos,
   }));
-  return { contagem, meus: eleitores.buscar(db, servidorId, usuarioId)?.votos ?? 0 };
+  return { contagem, meus: eleitores.buscar(db, usuarioId)?.votos ?? 0 };
 }
 
+/** O voto é dado num servidor (é lá que se é membro), e conta para a apuração da Saga inteira. */
 export function votar(db, servidorId, usuarioId, escolha, agora = Date.now()) {
   const valida = escolhaValida(escolha);
-  const antes = eleitores.buscar(db, servidorId, usuarioId);
+  const antes = eleitores.buscar(db, usuarioId);
   if (antes && agora - antes.ultimo_em < INTERVALO) {
     throw new ErroDeConta('Calma: a urna ainda está gravando o seu último voto.', 429);
   }
   votos.somar(db, servidorId, valida);
   eleitores.contar(db, servidorId, usuarioId, agora);
-  return apuracao(db, servidorId, usuarioId);
+  return apuracao(db, usuarioId);
 }

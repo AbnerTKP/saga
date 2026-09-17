@@ -1,5 +1,5 @@
 /**
- * A apuração da Saga: os votos de todo mundo do servidor, somados, do mais votado para o menos. O
+ * A apuração da Saga: os votos de todo mundo, de todos os servidores, somados, do mais votado para o menos. O
  * voto é secreto como o de verdade — aparece quanto cada chapa tem, nunca quem votou em quem.
  * Branco e nulo contam no total e vêm no fim, fora da disputa.
  */
@@ -47,7 +47,7 @@ export function desenharApuracao(q: Quadro, d: DadosDaApuracao): Regiao[] {
   const lista = ordenar(d.contagem);
   const total = lista.reduce((s, c) => s + c.votos, 0);
   const sub = d.aviso ? caber(d.aviso, W - 16)
-    : d.carregando ? 'CONTANDO OS VOTOS...' : `${total} ${total === 1 ? 'VOTO' : 'VOTOS'} NO SERVIDOR - VOTO SECRETO`;
+    : d.carregando ? 'CONTANDO OS VOTOS...' : `${total} ${total === 1 ? 'VOTO' : 'VOTOS'} NA SAGA - VOTO SECRETO`;
   escrever(q, sub, W / 2, 24, d.aviso ? C.bronze : C.apagado, { alinhar: 'centro' });
   const maior = Math.max(1, ...lista.map((c) => c.votos));
   const porColuna = 8, alt = 20, x0 = [8, 196], y0 = 34, largura = 180;

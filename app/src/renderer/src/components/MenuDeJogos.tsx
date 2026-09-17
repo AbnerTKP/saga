@@ -30,7 +30,7 @@ export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onL
 }) {
   useFecharComEsc(onClose);
   const caixa = useRef<HTMLDivElement>(null);
-  /** Os votos da Urna no servidor aberto: um pedido só, ao abrir o menu. */
+  /** Os votos da Urna na Saga inteira: um pedido só, ao abrir o menu. */
   const [votos, setVotos] = useState<number | null>(null);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onL
       capa: <QuadroNaTela chave="icone" className="capa-de-luta" quadro={() => retratoPronto('goiaba')} />,
     },
     {
-      nome: 'Urna', sub: votos === null ? 'votar para presidente' : `${votos} ${votos === 1 ? 'voto' : 'votos'} no servidor`,
+      nome: 'Urna', sub: votos === null ? 'votar para presidente' : `${votos} ${votos === 1 ? 'voto' : 'votos'} na Saga`,
       fundo: '#2e6fb0', abrir: onUrna,
       capa: <QuadroNaTela chave="capa" className="capa-de-urna" quadro={() => { const q = criarQuadro(48, 32); desenharCapa(q); return q; }} />,
     },

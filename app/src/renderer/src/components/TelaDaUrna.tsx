@@ -15,7 +15,7 @@ import somDoFim from '../urna/sons/fim.ogg';
 
 /**
  * A Urna: a seção eleitoral, a urna em primeira pessoa e a apuração, numa canvas só, como o Dragão
- * Quadrado. É um jogo de uma pessoa — o que é de todos é a apuração, que vem do servidor aberto e,
+ * Quadrado. É um jogo de uma pessoa — o que é de todos é a apuração, que soma a Saga inteira e,
  * enquanto está na tela, é buscada de novo a cada 3 s para os votos dos outros aparecerem.
  *
  * Nada anima sozinho: o laço só roda enquanto o bonequinho anda, uma tecla sobe ou o FIM conta; o

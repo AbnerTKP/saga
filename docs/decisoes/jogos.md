@@ -184,7 +184,10 @@ Pedido do dono: "um minigame de urna eletrônica, em pixel art: um bonequinho pa
 título fake e vai até a urna; na urna, primeira pessoa para votar", com os candidatos a Presidente de
 verdade; depois, "deixa votar várias vezes e faça um rank multiplayer do mais votado" e "reformule a
 escolha dos minigames para não ficar uma lista enorme". Ele viu as telas feitas pelo motor e escolheu
-o **menu em grade de capas** (opção A), a **apuração por servidor com voto secreto**, e aprovou o resto.
+o **menu em grade de capas** (opção A), a apuração por servidor com voto secreto, e aprovou o resto. Depois de
+publicado, corrigiu: **"o resultado deve ser para todo o Saga e não separado por servidor"** — a apuração soma
+todos os servidores. As tabelas seguem anotando o servidor de cada voto (já estavam na produção; tirar a
+coluna seria migração sem ganho), e a leitura soma; o freio de 3 s e o "você votou N vezes" também.
 
 - **Os candidatos são os do TSE em 17/09/2026** (`urna/candidatos.ts`): 13 chapas, conferidas por dois
   levantamentos separados (a API do DivulgaCandContas e a imprensa) que bateram nome a nome. Pablo

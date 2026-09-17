@@ -22,7 +22,7 @@ test('cada voto soma na chapa, e cada um vê só quantas vezes ELE votou', () =>
   const r = votar(db, sid, beto.id, 'branco', 20_000);
   assert.deepEqual(r.contagem, [{ numero: 13, votos: 2 }, { numero: 22, votos: 1 }, { numero: 'branco', votos: 1 }]);
   assert.equal(r.meus, 2);
-  assert.equal(apuracao(db, sid, ana.id).meus, 2);
+  assert.equal(apuracao(db, ana.id).meus, 2);
 });
 
 test('o voto é secreto no banco: nenhuma tabela liga uma pessoa a um candidato', () => {
@@ -47,11 +47,14 @@ test('escolha que não existe é recusada; nulo e branco valem', () => {
   assert.equal(votar(db, sid, ana.id, 'nulo', 0).contagem[0].numero, 'nulo');
 });
 
-test('a apuração é de cada servidor', () => {
-  const { db, sid, ana } = montar();
+test('a apuração soma a Saga inteira: os votos de todos os servidores, e os seus em qualquer um', () => {
+  const { db, sid, ana, beto } = montar();
   const outro = Number(db.prepare("INSERT INTO servidores (nome, criado_em) VALUES ('Outro', 0)").run().lastInsertRowid);
   votar(db, sid, ana.id, 13, 0);
-  assert.deepEqual(apuracao(db, outro, ana.id), { contagem: [], meus: 0 });
+  votar(db, outro, beto.id, 13, 0);
+  votar(db, outro, ana.id, 'nulo', 10_000);
+  assert.deepEqual(apuracao(db, ana.id), { contagem: [{ numero: 13, votos: 2 }, { numero: 'nulo', votos: 1 }], meus: 2 });
+  assert.throws(() => votar(db, sid, ana.id, 13, 10_000 + INTERVALO - 1), recusa(429), 'o freio vale trocando de servidor');
 });
 
 test('os números do servidor são os mesmos da urna do app', () => {
