@@ -4,7 +4,7 @@
  * ao servidor; tudo aqui é testado sem `canvas`.
  *
  * O caminho é o de uma seção de verdade: chegar à mesa e entregar o título (a mesária pede, o título
- * FAKE aparece, o mesário libera), ir à cabine, digitar o número, CONFIRMA, FIM — e a apuração. Pode
+ * da Saga aparece, o mesário libera), ir à cabine, digitar o número, CONFIRMA, FIM — e a apuração. Pode
  * votar de novo quantas vezes quiser, e a mesária repara.
  */
 import type { Fala } from './secao.ts';

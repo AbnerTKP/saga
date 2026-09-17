@@ -43,7 +43,7 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
   fechar.current = onFechar;
   const surdoRef = useRef(surdo);
   surdoRef.current = surdo;
-  // A inscrição do título FAKE sai da conta: a mesma pessoa tem sempre o mesmo título.
+  // A inscrição do título sai da conta: a mesma pessoa tem sempre o mesmo título.
   const inscricao = `${String((euId * 7919) % 10000).padStart(4, '0')} ${String((euId * 104729) % 10000).padStart(4, '0')} 2026`;
 
   const tocar = (som: Som | null) => {

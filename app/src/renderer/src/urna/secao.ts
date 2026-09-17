@@ -52,7 +52,7 @@ const C = {
   colete: cor('#f2c230'), coleteSombra: cor('#c99a17'), camisaMesario: cor('#f4f4ef'), camisaMesarioSombra: cor('#cfd0cb'),
   olho: cor('#1b1b1f'), boca: cor('#9a4f3a'),
   caixaFala: cor('#1f2330'), caixaFalaBorda: cor('#f4f1e6'), textoFala: cor('#f4f1e6'), nomeFala: cor('#f2c230'),
-  tituloPapel: cor('#e5efd8'), tituloVerde: cor('#2f6b4a'), tituloLinha: cor('#b8cba9'), carimbo: cor('#c23a2e'),
+  tituloPapel: cor('#e5efd8'), tituloVerde: cor('#2f6b4a'), tituloLinha: cor('#b8cba9'),
   adesivo: cor('#f2c230'),
 };
 
@@ -243,7 +243,10 @@ function fala(q: Quadro, f: Fala) {
   escrever(q, 'ESPAÇO', x + l - 8, y + 24, C.nomeFala, { alinhar: 'direita' });
 }
 
-/** O título de eleitor da Saga: verde como o de papel, com os campos dele — e o carimbo de FAKE. */
+/**
+ * O título de eleitor da Saga: verde como o de papel, com os campos dele. Nasceu com um carimbo de FAKE
+ * por cima, e o dono mandou tirar: é pixel art de jogo, e todo mundo sabe que não vale.
+ */
 export function desenharTitulo(q: Quadro, apelido: string, inscricao: string) {
   const l = 200, a = 116, x = Math.round((W - l) / 2), y = 46;
   retangulo(q, x + 3, y + 3, l, a, C.contorno);
@@ -270,15 +273,6 @@ export function desenharTitulo(q: Quadro, apelido: string, inscricao: string) {
     pixel(q, px, py, C.contorno);
   }
   escrever(q, 'ASSINATURA', x + 12, y + 108, C.tituloVerde);
-  // O carimbo torto de FAKE: cada linha deslocada meio pixel, que é o torto possível em pixel.
-  const carimbo = criarQuadro(84, 26);
-  retangulo(carimbo, 0, 0, 84, 26, C.carimbo);
-  retangulo(carimbo, 2, 2, 80, 22, 0);
-  escrever(carimbo, 'FAKE', 42, 7, C.carimbo, { tamanho: 'grande', alinhar: 'centro' });
-  for (let yy = 0; yy < carimbo.altura; yy++) for (let xx = 0; xx < carimbo.largura; xx++) {
-    const c = carimbo.px[yy * carimbo.largura + xx];
-    if (c && pontilhar(xx, yy, 0.85)) pixel(q, x + 108 + xx + Math.floor((carimbo.altura - yy) / 3), y + 84 + yy, c);
-  }
 }
 
 export function desenharSecao(q: Quadro, d: DadosDaSecao): Regiao[] {

@@ -196,7 +196,7 @@ o **menu em grade de capas** (opção A), a **apuração por servidor com voto s
 - **O voto é secreto no BANCO, não só na tela.** `urna_votos` guarda o total de cada escolha por
   servidor; `urna_eleitores` guarda quantas vezes cada pessoa votou, sem a escolha. Não existe linha
   que ligue alguém a um candidato. Votar de novo pode, sem limite, com um freio de 3 s contra laço.
-- **A regra do jogo é pura e testada** (`urna/jogo.ts`): etapas da mesa (pede o documento → título FAKE
+- **A regra do jogo é pura e testada** (`urna/jogo.ts`): etapas da mesa (pede o documento → título da Saga
   → libera), cabine, CORRIGE, BRANCO só com a tela vazia (como na urna), número inexistente vira NULO, e
   a mesária repara em quem volta. A urna é a UE2020: teclado 3x3 com o 0 embaixo do 8 e a coluna
   BRANCO/CORRIGE/CONFIRMA. Os sons são o arquivo que o dono mandou: o bipe da tecla e o som do FIM.
