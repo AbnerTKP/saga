@@ -10,7 +10,7 @@ import {
   type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
   abrirGrid, agirNoGrid, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
-  abrirArena, agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
+  agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde,
 } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
@@ -145,7 +145,8 @@ export function App() {
   const [jogoAberto, setJogoAberto] = useState<
     | { tipo: 'xadrez'; mesaId: number; servidorId: number }
     | { tipo: 'corrida'; gridId: number; servidorId: number }
-    | { tipo: 'luta'; arenaId: number; servidorId: number }
+    // sem arena é o título do Dragão Quadrado, que oferece abrir uma ou entrar na de alguém
+    | { tipo: 'luta'; arenaId: number | null; servidorId: number }
     | null
   >(null);
   const [conviteDeCorridaRespondido, setConviteDeCorridaRespondido] = useState<number | null>(null);
@@ -1088,18 +1089,18 @@ export function App() {
   const textoDaLuta = minhaArena
     ? (minhaArena.estado === 'lutando' ? 'voltar à sua luta' : 'voltar à sua arena')
     : arenaDoServidor
-      ? (arenaDoServidor.estado === 'lutando' ? `assistir a luta de ${nomeDoJogador(arenaDoServidor.anfitriao)}` : `entrar na arena de ${nomeDoJogador(arenaDoServidor.anfitriao)}`)
-      : 'abrir uma arena e chamar alguém';
+      ? (arenaDoServidor.estado === 'lutando' ? `luta de ${nomeDoJogador(arenaDoServidor.anfitriao)} andando` : `arena de ${nomeDoJogador(arenaDoServidor.anfitriao)} aberta`)
+      : 'abrir o jogo e chamar alguém';
 
-  const abrirLuta = useCallback(async () => {
+  /**
+   * O jogo abre no título — o dono pediu o Dragão Quadrado como um jogo completo, com início. Quem já
+   * tem arena (a sua, ou a luta em que está) volta direto a ela.
+   */
+  const abrirLuta = useCallback(() => {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
-    if (arenaDoServidor) { setJogoAberto({ tipo: 'luta', arenaId: arenaDoServidor.id, servidorId }); return; }
-    try {
-      const arena = await abrirArena({}, servidorId);
-      setJogoAberto({ tipo: 'luta', arenaId: arena.id, servidorId });
-    } catch (e) { notas.mostrarFalha(e, 'Dragão Quadrado'); }
-  }, [sessao?.servidor?.id, arenaDoServidor, notas]);
+    setJogoAberto({ tipo: 'luta', arenaId: minhaArena?.id ?? null, servidorId });
+  }, [sessao?.servidor?.id, minhaArena]);
 
   const responderConviteDeLuta = useCallback(async (c: ConviteParaLutar, lutar: boolean) => {
     const servidorId = c.servidor ?? lutas?.servidorId;
@@ -1357,16 +1358,17 @@ export function App() {
         // coluna dela — flutuando no canto, taparia o tabuleiro.
         jogo={jogoAberto?.tipo === 'luta' ? (live) => (
           <TelaDaLuta
-            key={`luta-${jogoAberto.arenaId}`}
+            key={`luta-${jogoAberto.servidorId}`}
             arenaId={jogoAberto.arenaId}
             servidorId={jogoAberto.servidorId}
             euId={eu.id}
             membros={membrosDoServidor}
             naCall={naMinhaCall}
+            arenas={lutas?.servidorId === jogoAberto.servidorId ? lutas.arenas : SEM_ARENAS}
             surdo={rm.deafened}
             live={live}
+            onArena={(id) => setJogoAberto((j) => (j?.tipo === 'luta' ? { ...j, arenaId: id } : j))}
             onFechar={() => setJogoAberto(null)}
-            onAviso={notas.mostrar}
           />
         ) : jogoAberto?.tipo === 'corrida' ? (live) => (
           <TelaDaCorrida

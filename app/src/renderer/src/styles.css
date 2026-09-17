@@ -2152,46 +2152,23 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 }
 
 /* ---- Dragão Quadrado ----------------------------------------------------------------------
-   A arena segue a casa (a coluna do grid da Fórmula 1 e da mesa do xadrez); o jogo, não: a luta é
-   pixel art numa canvas de 384x216 ampliada sem suavizar, e em múltiplo inteiro quando cabe. */
-.luta-arena { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--e4); overflow-y: auto; container-type: inline-size; }
-.luta-lados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e3); }
-.luta-lado { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 12px 14px;
-  border-radius: 10px; background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); min-height: 250px; justify-content: flex-end; }
-.luta-lado.meu { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
-.luta-lado-rotulo { position: absolute; left: 12px; top: 10px; font-size: 11px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--text3); }
-.luta-sprite { width: 256px; height: 240px; margin-bottom: -18px; }
-.luta-lado-nome { font-size: 16px; font-weight: 700; color: var(--white); letter-spacing: -.01em; }
-.luta-lado-vazio { margin: auto 0; color: var(--text3); font-size: 13px; text-align: center; }
-/* A escolha é uma fileira de retratos, como nos jogos de luta: com sete lutadores, a grade de quatro
-   deixava um buraco, e o dono escolheu a fileira. O estilo de cada um fica no title. Com nove, o rosto
-   encolhe até caber (64 px com a janela larga); a quebra em 5 + 4 é pela largura da ARENA, e não da
-   janela, porque a live aberta ao lado come 260 px dela. */
-.luta-escolha { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
-.luta-escolher { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 9px 4px 8px; border-radius: 10px;
-  background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
-.luta-escolher:hover:not(:disabled) { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--bg4); }
-.luta-escolher.escolhido { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
-.luta-escolher:disabled { cursor: default; }
-.luta-retrato { width: 100%; max-width: 64px; height: auto; aspect-ratio: 1; flex: none; border-radius: 6px; background: var(--bg3); }
-.luta-escolher-nome { font-size: 12.5px; font-weight: 650; color: var(--white); text-align: center; line-height: 1.2; text-wrap: balance; }
-@container (max-width: 700px) { .luta-escolha { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--e2); } }
-.luta-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text2); margin-top: auto; }
-.luta-legenda kbd { font: 600 11px/1 inherit; padding: 3px 6px; border-radius: 5px; background: var(--bg3); color: var(--white);
-  box-shadow: inset 0 -1px 0 var(--bg4); }
-.luta-miniatura { display: block; width: 100%; height: 44px; object-fit: cover; border-radius: 5px; }
-.luta-area { gap: var(--e3); }
-.luta-palco { position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; background: #000; border-radius: 6px; }
+   O jogo inteiro é uma canvas de 384x216 ampliada sem suavizar, e em múltiplo inteiro quando cabe:
+   título, escolha de lutador, convite, opções, luta e fim são desenhados no motor do jogo
+   (`dragao/interface.ts`), sem HTML da Saga por cima — o dono pediu um jogo completo dentro. */
+.tela-da-luta { display: flex; flex: 1; min-height: 0; gap: var(--e3); padding: var(--e3); background: #000; }
+.luta-palco { position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; background: #000; }
 .luta-canvas { display: block; image-rendering: pixelated; }
-.luta-aviso { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 12px; border-radius: 8px;
-  background: rgba(20,22,27,.88); color: var(--white); font-size: 13px; font-weight: 600; pointer-events: none; }
 .tela-da-luta .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
-/* O Dragão Quadrado no menu de jogos: o rosto do Goiaba no quadrado; e a capa do convite, o cenário. */
+/* O Dragão Quadrado no menu de jogos: o rosto do Goiaba no quadrado. */
 .luta-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: #6fa8dc; display: grid; place-items: center; overflow: hidden; }
 .luta-icone { width: 32px; height: 32px; }
-.luta-capa { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
-/* O som do jogo na arena: o volume e o teste, antes de lutar. */
-.luta-volume { display: flex; align-items: center; gap: 8px; }
-.luta-volume input[type="range"] { flex: 1; min-width: 0; padding: 0; border: none; background: none; accent-color: var(--accent); }
-.luta-volume-numero { width: 36px; text-align: right; font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+/* O convite para lutar, em pixel (184x72 ampliado 2x), na pilha dos avisos. Os botões de verdade ficam
+   escondidos da vista, para o teclado e o leitor de tela. */
+.convite-em-pixel { pointer-events: auto; position: relative; width: 368px; filter: drop-shadow(0 12px 24px rgba(0,0,0,.55));
+  animation: aviso-entra .18s ease-out; }
+.convite-em-pixel canvas { display: block; width: 368px; height: 144px; image-rendering: pixelated; }
+.convite-em-pixel-botao { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+.convite-em-pixel-botao:focus-visible { width: auto; height: auto; clip: auto; margin: 0; left: 8px; bottom: 8px; padding: 4px 8px;
+  background: var(--bg1); color: var(--white); border-radius: 6px; outline: 2px solid var(--accent); }
+@media (prefers-reduced-motion: reduce) { .convite-em-pixel { animation: none; } }

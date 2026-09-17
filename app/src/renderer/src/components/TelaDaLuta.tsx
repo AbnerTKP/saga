@@ -1,38 +1,37 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { Room, RoomEvent, type RemoteParticipant } from 'livekit-client';
-import { agirNaArena, pedirTokenDaLuta, verArena, type AcaoNaArena, type Arena, type Membro } from '../api';
+import { abrirArena, agirNaArena, pedirTokenDaLuta, urlDoArquivo, verArena, type AcaoNaArena, type Arena, type Membro, type ResumoDaArena } from '../api';
 import { quemChamar } from '../jogos';
 import { contaDaIdentidade } from '../pessoas';
 import { anotar } from '../registro';
 import { volumeGuardado } from '../volume';
-import { preaquecer, spriteParado } from '../dragao/animacoes';
-import { desenharCenario } from '../dragao/cenario';
-import { cenarioPronto, desenharLuta, retratoPronto } from '../dragao/desenho';
+import { preaquecer } from '../dragao/animacoes';
+import { desenharLuta } from '../dragao/desenho';
 import { FICHAS } from '../dragao/fichas';
+import { fotoEmPixel } from '../dragao/fotoEmPixel';
+import {
+  type DadosDaPergunta, type Regiao, desenharAvisoNaLuta, desenharConvite, desenharEscolha, desenharFim, desenharOpcoes,
+  desenharPergunta, desenharTitulo, desenharVs, regiaoEm,
+} from '../dragao/interface';
 import { avancar, clonar, criarLuta, impressao } from '../dragao/luta';
-import { MUNDO, TELA } from '../dragao/medidas';
+import { TELA } from '../dragao/medidas';
+import {
+  type Comando, andarNaGrade, andarNaLista, aoConfirmarNaGrade, aoConfirmarPessoa, cenarioAoLado, comandoDaTecla, ehPessoa, itensDoFim,
+  itensDoTitulo, ladoDoCursor, linhasDoConvite, montarEscolha, volumeAoLado, type ArenaNaTela,
+} from '../dragao/menu';
 import { sonsNovos } from '../dragao/ouvidos';
 import { PROTOCOLO_DA_LUTA } from '../dragao/protocolo';
-import { criarQuadro, limpar, type Quadro } from '../dragao/quadro';
+import { criarQuadro, type Quadro } from '../dragao/quadro';
 import { EspectadorDaLuta, SessaoDaLuta, type Jogo, type Transporte } from '../dragao/rede';
-import { criarSonsDaLuta } from '../dragao/sons';
+import { criarSonsDaLuta, type SomDaLuta } from '../dragao/sons';
 import { criarSonsGravados, ehGravado } from '../dragao/somDeArquivo';
-import { LEGENDA, ouvirTeclado } from '../dragao/teclado';
-import { IDS_DOS_CENARIOS, IDS_DOS_LUTADORES, type EstadoDaLuta, type IdDoCenario, type IdDoLutador } from '../dragao/tipos';
-import { Avatar } from './Avatar';
-import { Icon } from './Icon';
+import { ouvirTeclado } from '../dragao/teclado';
+import type { EstadoDaLuta, IdDoLutador } from '../dragao/tipos';
 
 const JOGO: Jogo<EstadoDaLuta> = { avancar, clonar, impressao };
 const TOPICO = 'luta';
 /** O volume do jogo neste computador. Prefixo antigo de propósito: é o de todas as chaves da Saga. */
 const CHAVE_DO_VOLUME = 'cantinho.volumeDaLuta';
-const NOMES_DOS_CENARIOS: Record<IdDoCenario, string> = { torneio: 'Torneio', planeta: 'Planeta Verde', ilha: 'Ilha da Tartaruga', canion: 'Cânion' };
-const nomeDoLutador = (id: IdDoLutador) => FICHAS[id].nome;
-/**
- * O rosto na escolha. Os da Super Feira aparecem no Blue: no normal o rosto deles é o mesmo do
- * Goiaba e do Vegetal, e a fileira teria dois pares de gêmeos.
- */
-const formaNaEscolha = (id: IdDoLutador) => (id === 'goiabaSuper' || id === 'vegetalSuper' ? 1 : 0);
 
 /** Um quadro de pixels numa `<canvas>`, ampliado sem suavizar. `desenhar` roda quando `chave` muda. */
 export function QuadroNaTela({ quadro, chave, className, style, liso }: {
@@ -52,57 +51,106 @@ export function QuadroNaTela({ quadro, chave, className, style, liso }: {
   return <canvas ref={ref} className={className} style={{ imageRendering: liso ? 'auto' : 'pixelated', ...style }} />;
 }
 
-/** O lutador de corpo inteiro, parado (o do lado 1 olha para a esquerda). */
-function LutadorDePe({ id, espelhar }: { id: IdDoLutador; espelhar?: boolean }) {
-  return (
-    <QuadroNaTela chave={`${id}`} className="luta-sprite" style={espelhar ? { transform: 'scaleX(-1)' } : undefined}
-      quadro={() => spriteParado(id)} />
-  );
+/** Leva um quadro para a canvas (que tem o tamanho da tela do jogo). */
+function mostrar(c: HTMLCanvasElement | null, q: Quadro) {
+  if (!c) return;
+  c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(q.px.buffer as ArrayBuffer, q.px.byteOffset, q.px.byteLength), q.largura, q.altura), 0, 0);
 }
 
-/** Um pedaço do cenário, para escolher: o meio dele, onde se luta. */
-export function miniaturaDoCenario(id: IdDoCenario): Quadro {
-  const q = criarQuadro(TELA.largura, TELA.altura);
-  desenharCenario(q, cenarioPronto(id), Math.round((MUNDO - TELA.largura) / 2), 0);
-  return q;
+type QualPergunta = 'fechar' | 'sairDaArena' | 'desistir' | 'pararDeAssistir';
+type Camada =
+  | { tipo: 'convite'; sel: number }
+  | { tipo: 'opcoes'; linha: number }
+  | { tipo: 'pergunta'; qual: QualPergunta; sel: number }
+  | null;
+type LadoNoFim = { jogador: string; lutador: IdDoLutador } | null;
+
+const PERGUNTAS: Record<QualPergunta, Omit<DadosDaPergunta, 'selecionado'>> = {
+  fechar: { titulo: 'FECHAR A ARENA?', detalhe: 'QUEM ESTÁ NELA VOLTA AO TÍTULO', itens: [{ rotulo: 'CONTINUAR NA ARENA' }, { rotulo: 'FECHAR A ARENA' }] },
+  sairDaArena: { titulo: 'SAIR DA ARENA?', detalhe: 'O SEU LUGAR FICA LIVRE', itens: [{ rotulo: 'FICAR' }, { rotulo: 'SAIR DA ARENA' }] },
+  desistir: { titulo: 'DESISTIR?', detalhe: 'A LUTA CONTA COMO DERROTA', itens: [{ rotulo: 'CONTINUAR LUTANDO' }, { rotulo: 'DESISTIR' }] },
+  pararDeAssistir: { titulo: 'PARAR DE ASSISTIR?', detalhe: 'A LUTA CONTINUA SEM VOCÊ', itens: [{ rotulo: 'CONTINUAR ASSISTINDO' }, { rotulo: 'PARAR' }] },
+};
+
+/** As fotos das pessoas em pixel, carregadas aos poucos: cada uma que chega pede um desenho novo. */
+function useFotosEmPixel(urls: (string | null)[]) {
+  const [, versao] = useState(0);
+  const fotos = useRef(new Map<string, Quadro | null>());
+  const chave = urls.filter(Boolean).join('|');
+  useEffect(() => {
+    let vivo = true;
+    for (const url of new Set(urls.filter((u): u is string => !!u))) {
+      if (fotos.current.has(url)) continue;
+      fotos.current.set(url, null);
+      void fotoEmPixel(url).then((q) => { if (!vivo) return; fotos.current.set(url, q); versao((v) => v + 1); });
+    }
+    return () => { vivo = false; };
+  }, [chave]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (url: string | null) => (url ? fotos.current.get(url) ?? null : null);
 }
 
 /**
- * O Dragão Quadrado de uma arena, do começo ao fim: a arena (quem luta com quem, onde, e quem
- * chamar), a luta e o fim. Como a corrida, é a mesma tela, e ela pergunta ao servidor da arena.
+ * O Dragão Quadrado inteiro, num palco só de pixel: título, escolha de lutador, convite, opções, VS,
+ * luta e fim. Nada de HTML da Saga por cima do jogo — o dono pediu "como se fosse um jogo completo
+ * dentro". Sem arena (`arenaId` nulo) é o título; com arena, a tela sai do estado dela no servidor.
+ *
+ * Os menus são desenhados quando algo muda, e não num laço: a tela parada não gasta nada (ver
+ * `interface.ts`). Só a luta tem laço, e é o de sempre.
  */
-export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, live, onFechar, onAviso }: {
-  arenaId: number;
+export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, arenas, surdo, live, onArena, onFechar }: {
+  arenaId: number | null;
   servidorId: number;
   euId: number;
   membros: Membro[];
   naCall: Set<number>;
+  /** As arenas deste servidor, da busca de salas: é o que o título oferece para entrar ou assistir. */
+  arenas: ResumoDaArena[];
   surdo: boolean;
   live?: ReactNode;
+  /** Troca a arena na tela; nulo volta ao título. */
+  onArena: (id: number | null) => void;
+  /** Sai do jogo, de volta à Saga. */
   onFechar: () => void;
-  onAviso: (tipo: 'erro' | 'info', texto: string) => void;
 }) {
   const [arena, setArena] = useState<Arena | null>(null);
   const [falhou, setFalhou] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const fecharRef = useRef(onFechar);
-  fecharRef.current = onFechar;
-  const avisarRef = useRef(onAviso);
-  avisarRef.current = onAviso;
+  const [aviso, setAviso] = useState<string | null>(null);
+  const avisoRelogio = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const avisar = useCallback((texto: string) => {
+    setAviso(texto.toUpperCase());
+    clearTimeout(avisoRelogio.current);
+    avisoRelogio.current = setTimeout(() => setAviso(null), 4500);
+  }, []);
+  useEffect(() => () => clearTimeout(avisoRelogio.current), []);
+  const onArenaRef = useRef(onArena);
+  onArenaRef.current = onArena;
+  /**
+   * As arenas que sumiram daqui (fechadas, ou que responderam "não existe"). A lista do título vem da
+   * busca de salas, de quatro em quatro segundos: sem isto, logo depois de fechar, o título ainda
+   * oferecia "VOLTAR À SUA ARENA" para uma arena que já não existe.
+   */
+  const sumidas = useRef(new Set<number>());
   const saindo = useRef(false);
+  const arenaIdRef = useRef(arenaId);
+  arenaIdRef.current = arenaId;
   /** A diferença entre o relógio do servidor e o daqui: a maior vista é a mais certa (a resposta chega depois de escrita). */
   const diferenca = useRef<number | null>(null);
 
+  // ---- o servidor: a arena na tela, perguntada de segundo em segundo (de dois em dois na luta)
   const receber = useCallback((a: Arena | null) => {
-    if (!a) { fecharRef.current(); return; }
+    if (!a) { if (arenaIdRef.current !== null) sumidas.current.add(arenaIdRef.current); setArena(null); onArenaRef.current(null); return; }
     const d = a.agora - Date.now();
     diferenca.current = diferenca.current === null ? d : Math.max(diferenca.current, d);
     setArena(a);
     setFalhou(null);
   }, []);
 
+  useEffect(() => { setArena(null); setFalhou(null); saindo.current = false; }, [arenaId]);
+
   const intervalo = arena?.estado === 'lutando' ? 2000 : 1000;
   useEffect(() => {
+    if (arenaId === null) return;
     let vivo = true;
     const buscar = async () => {
       try {
@@ -111,8 +159,8 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
       } catch (e) {
         if (!vivo) return;
         if ((e as { status?: number }).status === 404) {
-          if (!saindo.current) avisarRef.current('info', 'A arena foi fechada.');
-          fecharRef.current();
+          if (!saindo.current) avisar('A arena foi fechada.');
+          receber(null);
           return;
         }
         setFalhou((e as Error).message);
@@ -121,25 +169,25 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
     buscar();
     const id = setInterval(buscar, intervalo);
     return () => { vivo = false; clearInterval(id); };
-  }, [arenaId, servidorId, receber, intervalo]);
+  }, [arenaId, servidorId, receber, intervalo, avisar]);
 
   const agir = useCallback(async (a: AcaoNaArena) => {
+    if (arenaId === null) return;
     if (a.acao === 'fechar') saindo.current = true;
     setOcupado(true);
     try {
       receber(await agirNaArena(arenaId, a, servidorId));
+      return true;
     } catch (e) {
       saindo.current = false;
-      avisarRef.current('erro', (e as Error).message);
+      avisar((e as Error).message);
+      return false;
     } finally {
       setOcupado(false);
     }
-  }, [arenaId, servidorId, receber]);
+  }, [arenaId, servidorId, receber, avisar]);
 
-  /**
-   * O volume do jogo, de 0 a 1, guardado neste computador. Passa por `volumeGuardado`: uma chave
-   * vazia viraria `Number('')`, que é zero — o jogo mudo sem ninguém saber por quê.
-   */
+  // ---- o volume do jogo, deste computador
   const [volume, setVolume] = useState(() => {
     try { return volumeGuardado(localStorage.getItem(CHAVE_DO_VOLUME)); } catch { return 1; }
   });
@@ -148,76 +196,21 @@ export function TelaDaLuta({ arenaId, servidorId, euId, membros, naCall, surdo, 
     try { localStorage.setItem(CHAVE_DO_VOLUME, String(v)); } catch { /* sem armazenamento, vale só agora */ }
   }, []);
 
-  const [armado, setArmado] = useState(false);
-  useEffect(() => {
-    if (!armado) return;
-    const id = setTimeout(() => setArmado(false), 4000);
-    return () => clearTimeout(id);
-  }, [armado]);
-
-  const lutador = arena?.meuLado !== null && arena?.meuLado !== undefined;
-  const nome = (i: 0 | 1) => arena?.lados[i]?.pessoa.nome ?? '…';
-  const titulo = !arena ? null : arena.estado === 'arena' ? `arena de ${arena.anfitriao.nome}` : `${nome(0)} × ${nome(1)}`;
-
-  return (
-    <div className="tela-do-xadrez tela-da-corrida tela-da-luta">
-      <header className="stage-head">
-        <Icon name="controle" />
-        <span className="strong">Dragão Quadrado</span>
-        {titulo && <span className="xadrez-titulo">{titulo}</span>}
-        {arena && arena.estado !== 'arena' && !lutador && <span className="selo-assistindo"><Icon name="olho" size={12} /> assistindo</span>}
-        <span style={{ flex: 1 }} />
-        {arena && arena.plateia.length > 0 && (
-          <span className="xadrez-plateia" title={`Assistindo: ${arena.plateia.map((p) => p.nome).join(', ')}`}>
-            <Icon name="olho" size={13} />
-            <span>{arena.plateia.length === 1 ? `${arena.plateia[0].nome} assistindo` : `${arena.plateia.length} assistindo`}</span>
-          </span>
-        )}
-        {arena?.estado === 'lutando' && (lutador ? (
-          armado ? (
-            <button type="button" className="primary destrutivo sm" disabled={ocupado} autoFocus
-              onClick={() => { setArmado(false); void agir({ acao: 'abandonar' }); }}>
-              Confirmar: desistir
-            </button>
-          ) : (
-            <button type="button" className="perigo sm" disabled={ocupado} onClick={() => setArmado(true)}>Desistir</button>
-          )
-        ) : (
-          <button type="button" className="secundario sm" onClick={onFechar}>Parar de assistir</button>
-        ))}
-      </header>
-      {!arena ? (
-        <div className="corrida-area">
-          <div className="xadrez-carregando muted">{falhou ? `Não consegui abrir a arena (${falhou}). Tentando de novo…` : 'Abrindo a arena…'}</div>
-        </div>
-      ) : arena.estado === 'arena' ? (
-        <div className="corrida-area">
-          <ArenaDeEscolha arena={arena} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} onSair={onFechar}
-            volume={volume} onVolume={mudarVolume} />
-        </div>
-      ) : (
-        <Luta key={`${arena.id}-${arena.rodada}`} arena={arena} servidorId={servidorId} diferenca={diferenca} surdo={surdo}
-          volume={volume} ocupado={ocupado} live={live} onAgir={agir} onSair={onFechar} />
-      )}
-    </div>
-  );
-}
-
-// ---- a arena: quem luta com quem, onde e quantos rounds -----------------------------------------
-
-function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair, volume, onVolume }: {
-  arena: Arena; euId: number; ocupado: boolean; membros: Membro[]; naCall: Set<number>;
-  onAgir: (a: AcaoNaArena) => void; onSair: () => void;
-  volume: number; onVolume: (v: number) => void;
-}) {
-  // O teste de som: um soco, uma rajada e um raio, no volume escolhido — é o que se ouve na luta.
-  const amostra = useRef<{ gravados: ReturnType<typeof criarSonsGravados>; sons: ReturnType<typeof criarSonsDaLuta> } | null>(null);
-  useEffect(() => () => { amostra.current?.gravados.fechar(); amostra.current?.sons.fechar(); }, []);
+  // ---- os sons dos menus e o teste de som (o mesmo soco, rajada e raio da luta, no volume escolhido)
+  const surdoRef = useRef(surdo);
+  surdoRef.current = surdo;
+  const sonsDoMenu = useRef<{ sons: ReturnType<typeof criarSonsDaLuta>; gravados: ReturnType<typeof criarSonsGravados> } | null>(null);
+  useEffect(() => () => { sonsDoMenu.current?.sons.fechar(); sonsDoMenu.current?.gravados.fechar(); }, []);
+  const saidaDoMenu = () => {
+    sonsDoMenu.current ??= { sons: criarSonsDaLuta(volume), gravados: criarSonsGravados(volume) };
+    sonsDoMenu.current.sons.volume = volume;
+    sonsDoMenu.current.gravados.volume = volume;
+    return sonsDoMenu.current;
+  };
+  const bip = (som: SomDaLuta) => { if (!surdoRef.current && volume > 0) saidaDoMenu().sons.tocar(som); };
   const testarSom = () => {
-    amostra.current ??= { gravados: criarSonsGravados(volume), sons: criarSonsDaLuta(volume) };
-    const { gravados, sons } = amostra.current;
-    gravados.volume = volume;
-    sons.volume = volume;
+    if (volume <= 0) return;
+    const { gravados, sons } = saidaDoMenu();
     gravados.tocar('golpe-soco');
     setTimeout(() => gravados.tocar('golpe-chute'), 320);
     setTimeout(() => gravados.tocar('golpe-ar'), 480);
@@ -226,153 +219,319 @@ function ArenaDeEscolha({ arena, euId, ocupado, membros, naCall, onAgir, onSair,
     setTimeout(() => gravados.tocar('disparo-ki'), 1350);
     setTimeout(() => gravados.tocar('raio-disparo'), 1750);
   };
-  const sentados = arena.lados.filter(Boolean).length;
-  const naArena = new Set(arena.lados.flatMap((l) => (l ? [l.pessoa.id] : [])));
-  const chamados = new Set(arena.chamados.map((p) => p.id));
-  const lista = quemChamar(membros, { euId, naCall, jogando: naArena, convidado: null, recusou: null });
-  const meu = arena.meuLado !== null ? arena.lados[arena.meuLado]?.lutador ?? null : null;
-  const podeEscolher = arena.meuLado !== null || arena.lados.some((l) => !l);
-  const escolher = (id: IdDoLutador) => onAgir({ acao: 'escolher', lutador: id, protocolo: PROTOCOLO_DA_LUTA });
-  const miniaturas = useMemo(() => Object.fromEntries(IDS_DOS_CENARIOS.map((id) => [id, () => miniaturaDoCenario(id)])), []);
 
-  const linha = (m: Membro) => {
-    const situacao = naArena.has(m.id) ? 'naArena' : chamados.has(m.id) ? 'chamado' : arena.recusaram.includes(m.id) ? 'recusou' : 'livre';
-    return (
-      <div key={m.id} className={`xadrez-chamavel ${situacao === 'naArena' ? 'apagada' : ''}`}>
-        <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} />
-        <span className="xadrez-chamavel-nome">{m.nome}</span>
-        {situacao === 'naArena' ? (
-          <span className="xadrez-jogando">na arena</span>
-        ) : situacao === 'chamado' ? (
-          <span className="xadrez-chamado">
-            chamado…
-            <button type="button" className="link" disabled={ocupado} onClick={() => onAgir({ acao: 'cancelarConvite', alvo: m.id })}>cancelar</button>
-          </span>
-        ) : (
-          <span className="xadrez-chamado">
-            {situacao === 'recusou' && <span>recusou</span>}
-            <button type="button" className="botao-de-linha" disabled={ocupado || sentados === 2} onClick={() => onAgir({ acao: 'chamar', alvo: m.id })}>
-              {situacao === 'recusou' ? 'De novo' : 'Chamar'}
-            </button>
-          </span>
-        )}
-      </div>
-    );
+  // ---- o palco: a canvas do tamanho do jogo, ampliada em múltiplo inteiro quando não desperdiça muito
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const caixa = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const div = caixa.current, c = canvas.current;
+    if (!div || !c) return;
+    const ajustar = () => {
+      const k = Math.min(div.clientWidth / TELA.largura, div.clientHeight / TELA.altura);
+      const escala = Math.floor(k) >= 1 && Math.floor(k) >= k * 0.85 ? Math.floor(k) : k;
+      c.style.width = `${Math.floor(TELA.largura * escala)}px`;
+      c.style.height = `${Math.floor(TELA.altura * escala)}px`;
+    };
+    ajustar();
+    const obs = new ResizeObserver(ajustar);
+    obs.observe(div);
+    return () => obs.disconnect();
+  }, []);
+
+  // ---- o estado dos menus
+  const tela = arenaId === null ? 'titulo' : !arena ? 'abrindo' : arena.estado === 'arena' ? 'escolha' : arena.estado === 'lutando' ? 'luta' : 'fim';
+  const [selTitulo, setSelTitulo] = useState(0);
+  const [selFim, setSelFim] = useState(0);
+  const [cursor, setCursor] = useState<IdDoLutador>('goiaba');
+  const [camada, setCamada] = useState<Camada>(null);
+  const [piscar, setPiscar] = useState(false);
+  useEffect(() => { setCamada(null); setSelFim(0); }, [tela]);
+
+  const meuNome = membros.find((m) => m.id === euId)?.nome ?? 'VOCÊ';
+  const nomeDe = useCallback((id: number) => membros.find((m) => m.id === id)?.nome ?? 'ALGUÉM', [membros]);
+  // a arena que já saiu da lista do servidor deixa de ser lembrada: o número pode voltar depois que ele reinicia
+  useEffect(() => { for (const id of sumidas.current) if (!arenas.some((a) => a.id === id)) sumidas.current.delete(id); }, [arenas]);
+  const itensTitulo = useMemo(() => itensDoTitulo(arenas.filter((a) => !sumidas.current.has(a.id)), euId, nomeDe), [arenas, euId, nomeDe, arenaId]);
+
+  // o cursor começa no lutador em que você já está sentado
+  const sentadoCom = arena && arena.meuLado !== null ? arena.lados[arena.meuLado]?.lutador ?? null : null;
+  const cursorDaArena = useRef<number | null>(null);
+  useEffect(() => {
+    if (!arena || cursorDaArena.current === arena.id) return;
+    cursorDaArena.current = arena.id;
+    if (sentadoCom) setCursor(sentadoCom);
+  }, [arena, sentadoCom]);
+
+  const naTela: ArenaNaTela | null = arena && {
+    lados: arena.lados.map((l) => (l ? { pessoa: { id: l.pessoa.id, nome: l.pessoa.nome }, lutador: l.lutador } : null)) as ArenaNaTela['lados'],
+    meuLado: arena.meuLado,
+    souAnfitriao: arena.souAnfitriao,
+    anfitriao: arena.anfitriao.nome,
+    cenario: arena.cenario,
+    rounds: arena.rounds,
+  };
+
+  const convidaveis = useMemo(() => {
+    if (!arena) return [];
+    const naArena = new Set(arena.lados.flatMap((l) => (l ? [l.pessoa.id] : [])));
+    const g = quemChamar(membros, { euId, naCall, jogando: naArena, convidado: null, recusou: null });
+    const simples = (c: { membro: Membro }) => ({ id: c.membro.id, nome: c.membro.nome, foto: urlDoArquivo(c.membro.foto) });
+    return linhasDoConvite({ naCall: g.naCall.map(simples), online: g.online.map(simples) }, {
+      lados: naTela!.lados, chamados: arena.chamados.map((p) => p.id), recusaram: arena.recusaram,
+    });
+  }, [arena, membros, euId, naCall]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fotoDe = useFotosEmPixel(camada?.tipo === 'convite' ? convidaveis.map((l) => (ehPessoa(l) ? l.foto : null)) : []);
+
+  // o botão LUTAR pisca duas vezes por segundo — e só ele, e só quando está na tela
+  const botaoPisca = tela === 'escolha' && !!naTela?.souAnfitriao && !!naTela.lados[0] && !!naTela.lados[1] && !camada;
+  useEffect(() => {
+    if (!botaoPisca) return;
+    const id = setInterval(() => setPiscar((p) => !p), 500);
+    return () => clearInterval(id);
+  }, [botaoPisca]);
+
+  const opcoesMudaArena = tela === 'escolha' && !!arena?.souAnfitriao;
+
+  // ---- o desenho dos menus: a cada mudança, e não em laço
+  const quadro = useMemo(() => criarQuadro(TELA.largura, TELA.altura), []);
+  const regioes = useRef<Regiao[]>([]);
+  useLayoutEffect(() => {
+    if (tela === 'luta') return;
+    let r: Regiao[] = [];
+    if (tela === 'titulo' || tela === 'abrindo') {
+      const recado = tela === 'abrindo' ? (falhou ? `NÃO CONSEGUI ABRIR A ARENA: ${falhou}` : 'ABRINDO A ARENA...') : aviso;
+      r = desenharTitulo(quadro, { itens: tela === 'titulo' ? itensTitulo : [], selecionado: Math.min(selTitulo, itensTitulo.length - 1), aviso: recado });
+    } else if (tela === 'escolha' && naTela) {
+      r = desenharEscolha(quadro, { ...montarEscolha(naTela, cursor, meuNome, piscar), aviso });
+    } else if (tela === 'fim' && arena) {
+      r = desenharFim(quadro, {
+        vencedor: arena.vencedor, motivo: arena.motivo, cenario: arena.cenario,
+        lados: arena.lados.map((l): LadoNoFim => (l ? { jogador: l.pessoa.nome, lutador: l.lutador } : null)) as [LadoNoFim, LadoNoFim],
+        itens: itensDoFim(arena.meuLado !== null), selecionado: selFim, aviso,
+      });
+    }
+    if (camada?.tipo === 'convite') {
+      r = desenharConvite(quadro, {
+        selecionada: camada.sel,
+        linhas: convidaveis.map((l) => (ehPessoa(l) ? { tipo: 'pessoa' as const, nome: l.nome, foto: fotoDe(l.foto), situacao: l.situacao } : l)),
+      });
+    } else if (camada?.tipo === 'opcoes') {
+      r = desenharOpcoes(quadro, { linha: camada.linha, cenario: arena?.cenario ?? 'torneio', rounds: arena?.rounds ?? 2, volume, mudaArena: opcoesMudaArena });
+    } else if (camada?.tipo === 'pergunta') {
+      r = desenharPergunta(quadro, { ...PERGUNTAS[camada.qual], selecionado: camada.sel });
+    }
+    regioes.current = r;
+    mostrar(canvas.current, quadro);
+  });
+
+  // ---- o que cada comando faz, tela por tela
+  const perguntaNaLuta = useRef<DadosDaPergunta | null>(null);
+  perguntaNaLuta.current = tela === 'luta' && camada?.tipo === 'pergunta' ? { ...PERGUNTAS[camada.qual], selecionado: camada.sel } : null;
+
+  const primeiraPessoa = () => Math.max(0, convidaveis.findIndex((l) => ehPessoa(l)));
+  const linhaPode = (i: number) => opcoesMudaArena || i >= 2;
+
+  const executar = (c: Comando) => {
+    // as camadas por cima valem primeiro
+    if (camada?.tipo === 'pergunta') {
+      if (c === 'cima' || c === 'baixo') { bip('cursor'); setCamada({ ...camada, sel: camada.sel === 0 ? 1 : 0 }); }
+      else if (c === 'voltar') { bip('voltar'); setCamada(null); }
+      else if (c === 'confirmar') {
+        if (camada.sel === 0) { bip('voltar'); setCamada(null); return; }
+        bip('escolher');
+        setCamada(null);
+        if (camada.qual === 'fechar') void agir({ acao: 'fechar' }).then((ok) => { if (ok) onArena(null); });
+        else if (camada.qual === 'sairDaArena') void agir({ acao: 'levantar' }).then(() => onArena(null));
+        else if (camada.qual === 'desistir') void agir({ acao: 'abandonar' });
+        else onArena(null);
+      }
+      return;
+    }
+    if (camada?.tipo === 'convite') {
+      if (c === 'cima' || c === 'baixo') {
+        bip('cursor');
+        setCamada({ ...camada, sel: andarNaLista(camada.sel, c === 'baixo' ? 1 : -1, convidaveis.length, (i) => ehPessoa(convidaveis[i])) });
+      } else if (c === 'voltar' || c === 'convidar') { bip('voltar'); setCamada(null); }
+      else if (c === 'confirmar') {
+        const l = convidaveis[camada.sel];
+        const o = ehPessoa(l) ? aoConfirmarPessoa(l) : null;
+        if (!o || !ehPessoa(l)) return;
+        bip('escolher');
+        void agir({ acao: o, alvo: l.id });
+      }
+      return;
+    }
+    if (camada?.tipo === 'opcoes') {
+      const mudar = (passo: 1 | -1) => {
+        if (camada.linha === 0 && arena) { bip('cursor'); void agir({ acao: 'configurar', cenario: cenarioAoLado(arena.cenario, passo) }); }
+        else if (camada.linha === 1 && arena) { bip('cursor'); void agir({ acao: 'configurar', rounds: arena.rounds === 1 ? 2 : 1 }); }
+        else if (camada.linha === 2) { mudarVolume(volumeAoLado(volume, passo)); bip('cursor'); }
+      };
+      if (c === 'cima' || c === 'baixo') { bip('cursor'); setCamada({ ...camada, linha: andarNaLista(camada.linha, c === 'baixo' ? 1 : -1, 4, linhaPode) }); }
+      else if (c === 'esquerda' || c === 'direita') mudar(c === 'direita' ? 1 : -1);
+      else if (c === 'testar') testarSom();
+      else if (c === 'voltar' || c === 'opcoes') { bip('voltar'); setCamada(null); }
+      else if (c === 'confirmar') {
+        if (camada.linha === 3) { bip('voltar'); setCamada(null); }
+        else if (camada.linha === 2) testarSom();
+        else mudar(1);
+      }
+      return;
+    }
+    // as telas
+    if (tela === 'titulo') {
+      if (c === 'cima' || c === 'baixo') { bip('cursor'); setSelTitulo((s) => andarNaLista(s, c === 'baixo' ? 1 : -1, itensTitulo.length)); }
+      else if (c === 'voltar') onFechar();
+      else if (c === 'opcoes') { bip('escolher'); setCamada({ tipo: 'opcoes', linha: 2 }); }
+      else if (c === 'confirmar') {
+        const item = itensTitulo[Math.min(selTitulo, itensTitulo.length - 1)];
+        if (!item) return;
+        bip('escolher');
+        if (item.acao === 'sair') onFechar();
+        else if (item.acao === 'opcoes') setCamada({ tipo: 'opcoes', linha: 2 });
+        else if (item.acao === 'arena' && item.arena !== undefined) onArena(item.arena);
+        else if (item.acao === 'lutar' && !ocupado) {
+          setOcupado(true);
+          abrirArena({}, servidorId)
+            .then((a) => { setCursor('goiaba'); onArena(a.id); })
+            .catch((e) => avisar((e as Error).message))
+            .finally(() => setOcupado(false));
+        }
+      }
+      return;
+    }
+    if (tela === 'abrindo') {
+      if (c === 'voltar') onArena(null);
+      return;
+    }
+    if (tela === 'escolha' && naTela) {
+      const lado = ladoDoCursor(naTela);
+      if (c === 'cima' || c === 'baixo' || c === 'esquerda' || c === 'direita') {
+        if (lado === null) return;
+        bip('cursor');
+        setCursor((id) => andarNaGrade(id, c));
+      } else if (c === 'confirmar') {
+        const o = aoConfirmarNaGrade(naTela, cursor);
+        if (!o || ocupado) return;
+        bip('escolher');
+        void agir(o === 'comecar' ? { acao: 'comecar' } : { acao: 'escolher', lutador: cursor, protocolo: PROTOCOLO_DA_LUTA });
+      } else if (c === 'convidar') {
+        if (!naTela.souAnfitriao) return;
+        bip('escolher');
+        setCamada({ tipo: 'convite', sel: primeiraPessoa() });
+      } else if (c === 'opcoes') {
+        bip('escolher');
+        setCamada({ tipo: 'opcoes', linha: naTela.souAnfitriao ? 0 : 2 });
+      } else if (c === 'voltar') {
+        bip('voltar');
+        if (naTela.souAnfitriao) setCamada({ tipo: 'pergunta', qual: 'fechar', sel: 0 });
+        else if (naTela.meuLado !== null) setCamada({ tipo: 'pergunta', qual: 'sairDaArena', sel: 0 });
+        else onArena(null);
+      }
+      return;
+    }
+    if (tela === 'luta' && arena) {
+      if (c === 'voltar') { bip('voltar'); setCamada({ tipo: 'pergunta', qual: arena.meuLado !== null ? 'desistir' : 'pararDeAssistir', sel: 0 }); }
+      return;
+    }
+    if (tela === 'fim' && arena) {
+      const itens = itensDoFim(arena.meuLado !== null);
+      if (c === 'cima' || c === 'baixo') { bip('cursor'); setSelFim((s) => andarNaLista(s, c === 'baixo' ? 1 : -1, itens.length)); }
+      else if (c === 'confirmar' || c === 'voltar') {
+        const item = c === 'voltar' ? itens[itens.length - 1] : itens[Math.min(selFim, itens.length - 1)];
+        bip(c === 'voltar' ? 'voltar' : 'escolher');
+        if (item.acao === 'revanche' || item.acao === 'trocar') {
+          const comecarJa = item.acao === 'revanche' && arena.souAnfitriao;
+          void agir({ acao: 'revanche' }).then((ok) => { if (ok && comecarJa) void agir({ acao: 'comecar' }); });
+        } else if (arena.souAnfitriao) void agir({ acao: 'fechar' }).then((ok) => { if (ok) onArena(null); });
+        else onArena(null);
+      }
+    }
+  };
+  const executarRef = useRef(executar);
+  executarRef.current = executar;
+
+  // ---- o teclado: nos menus, as teclas de menu; na luta, só o Esc (J, K e O lá são golpes)
+  useEffect(() => {
+    const aoApertar = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable)) return;
+      const c = comandoDaTecla(e.code);
+      if (!c) return;
+      const naLuta = telaRef.current === 'luta' && camadaRef.current?.tipo !== 'pergunta';
+      if (naLuta && e.code !== 'Escape') return;
+      e.preventDefault();
+      if (e.repeat && (c === 'confirmar' || c === 'voltar')) return;
+      executarRef.current(c);
+    };
+    window.addEventListener('keydown', aoApertar);
+    return () => window.removeEventListener('keydown', aoApertar);
+  }, []);
+  const telaRef = useRef(tela);
+  telaRef.current = tela;
+  const camadaRef = useRef(camada);
+  camadaRef.current = camada;
+
+  // ---- o mouse: apontar escolhe, clicar confirma — pelas regiões que o desenho devolveu
+  const pontoNoJogo = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return [((e.clientX - r.left) * TELA.largura) / r.width, ((e.clientY - r.top) * TELA.altura) / r.height] as const;
+  };
+  const apontar = (e: React.MouseEvent<HTMLCanvasElement>, clicou: boolean) => {
+    const [x, y] = pontoNoJogo(e);
+    const reg = regiaoEm(regioes.current, x, y);
+    e.currentTarget.style.cursor = reg ? 'pointer' : 'default';
+    if (!reg) return;
+    const a = reg.alvo;
+    if (a.tipo === 'item') {
+      if (camada?.tipo === 'pergunta') { if (camada.sel !== a.indice) setCamada({ ...camada, sel: a.indice }); }
+      else if (tela === 'titulo' && selTitulo !== a.indice) setSelTitulo(a.indice);
+      else if (tela === 'fim' && selFim !== a.indice) setSelFim(a.indice);
+      if (clicou) {
+        // o clique confirma o item apontado, e não o que estava escolhido antes
+        if (camada?.tipo === 'pergunta') { const nova = { ...camada, sel: a.indice }; camadaRef.current = nova; setCamada(nova); }
+        setTimeout(() => executarRef.current('confirmar'), 0);
+      }
+    } else if (a.tipo === 'lutador') {
+      if (naTela && ladoDoCursor(naTela) !== null && cursor !== a.id) setCursor(a.id);
+      if (clicou) setTimeout(() => executarRef.current('confirmar'), 0);
+    } else if (a.tipo === 'pessoa') {
+      if (camada?.tipo === 'convite' && camada.sel !== a.indice) setCamada({ ...camada, sel: a.indice });
+      if (clicou) setTimeout(() => executarRef.current('confirmar'), 0);
+    } else if (a.tipo === 'linha') {
+      if (camada?.tipo === 'opcoes' && camada.linha !== a.indice && linhaPode(a.indice)) setCamada({ ...camada, linha: a.indice });
+      if (clicou) setTimeout(() => executarRef.current(a.passo ? (a.passo === 1 ? 'direita' : 'esquerda') : 'confirmar'), 0);
+    } else if (clicou) {
+      if (a.tipo === 'botao') executar(naTela?.lados[0] && naTela.lados[1] ? 'confirmar' : 'convidar');
+      else if (a.tipo === 'opcoes') executar('opcoes');
+      else if (a.tipo === 'testar') testarSom();
+    }
   };
 
   return (
-    <>
-      <div className="luta-arena">
-        <div className="luta-lados">
-          {([0, 1] as const).map((i) => {
-            const lado = arena.lados[i];
-            return (
-              <div key={i} className={`luta-lado ${arena.meuLado === i ? 'meu' : ''} ${lado ? '' : 'livre'}`}>
-                <span className="luta-lado-rotulo">{i === 0 ? 'Jogador 1' : 'Jogador 2'}</span>
-                {lado ? (
-                  <>
-                    <LutadorDePe id={lado.lutador} espelhar={i === 1} />
-                    <span className="luta-lado-nome">{nomeDoLutador(lado.lutador)}</span>
-                    <span className="corrida-quem">
-                      <Avatar nome={lado.pessoa.nome} foto={lado.pessoa.foto} />
-                      <span className="corrida-quem-nome">{lado.pessoa.nome}</span>
-                      {lado.pessoa.id === euId && <span className="muted">· você</span>}
-                    </span>
-                  </>
-                ) : (
-                  <span className="luta-lado-vazio">{arena.meuLado === null ? 'Lugar livre: escolha um lutador abaixo.' : 'Esperando alguém chegar.'}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="luta-escolha">
-          {IDS_DOS_LUTADORES.map((id) => (
-            <button key={id} type="button" className={`luta-escolher ${meu === id ? 'escolhido' : ''}`} disabled={ocupado || !podeEscolher}
-              onClick={() => meu !== id && escolher(id)} title={FICHAS[id].estilo}>
-              <QuadroNaTela chave={`r-${id}`} className="luta-retrato" quadro={() => retratoPronto(id, formaNaEscolha(id))} />
-              <span className="luta-escolher-nome">{nomeDoLutador(id)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="luta-legenda">
-          {LEGENDA.map(([tecla, faz]) => <span key={tecla}><kbd>{tecla}</kbd> {faz}</span>)}
-        </div>
-      </div>
-      <div className="xadrez-lateral xadrez-lobby corrida-lateral">
-        <div className="xadrez-cabecalho">Arena</div>
-        <div className="xadrez-escolha">
-          <span className="xadrez-rotulo">Cenário</span>
-          <div className="corrida-pistas">
-            {IDS_DOS_CENARIOS.map((id) => (
-              <button key={id} type="button" className={`corrida-pista-opcao ${arena.cenario === id ? 'escolhida' : ''}`}
-                disabled={ocupado || !arena.souAnfitriao} onClick={() => arena.cenario !== id && onAgir({ acao: 'configurar', cenario: id })}>
-                <QuadroNaTela chave={`c-${id}`} className="luta-miniatura" liso quadro={miniaturas[id]} />
-                <span className="corrida-pista-nome">{NOMES_DOS_CENARIOS[id]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="xadrez-escolha">
-          <span className="xadrez-rotulo">Rounds</span>
-          <div className="xadrez-chips">
-            {([1, 2] as const).map((r) => (
-              <button key={r} type="button" className={`xadrez-escolher ${arena.rounds === r ? 'escolhido' : ''}`}
-                disabled={ocupado || !arena.souAnfitriao} onClick={() => arena.rounds !== r && onAgir({ acao: 'configurar', rounds: r })}>
-                {r === 1 ? 'Luta única' : 'Melhor de 3'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="xadrez-escolha">
-          <label className="xadrez-rotulo" htmlFor="volume-da-luta">Som do jogo</label>
-          <div className="luta-volume">
-            <input id="volume-da-luta" type="range" min={0} max={100} step={5} value={Math.round(volume * 100)}
-              onChange={(e) => onVolume(Number(e.target.value) / 100)} />
-            <span className="luta-volume-numero">{Math.round(volume * 100)}%</span>
-            <button type="button" className="botao-de-linha" disabled={volume <= 0} onClick={testarSom}>Testar</button>
-          </div>
-        </div>
-        {arena.souAnfitriao ? (
-          <>
-            <div className="xadrez-risco" />
-            <div className="xadrez-cabecalho">Chamar para lutar</div>
-            <div className="xadrez-chamaveis">
-              {lista.naCall.length > 0 && <span className="xadrez-grupo">Na call</span>}
-              {lista.naCall.map((c) => linha(c.membro))}
-              {lista.online.length > 0 && <span className="xadrez-grupo">Online no servidor</span>}
-              {lista.online.map((c) => linha(c.membro))}
-              {lista.naCall.length === 0 && lista.online.length === 0 && <span className="muted small">Ninguém online para chamar agora.</span>}
-            </div>
-          </>
-        ) : (
-          <span className="muted small corrida-espera">
-            {arena.meuLado !== null ? `Esperando ${arena.anfitriao.nome} começar.` : 'Escolha um lutador para entrar no lugar livre.'}
-          </span>
+    <div className="tela-da-luta">
+      <div ref={caixa} className="luta-palco">
+        <canvas ref={canvas} width={TELA.largura} height={TELA.altura} className="luta-canvas"
+          onMouseMove={(e) => apontar(e, false)} onClick={(e) => apontar(e, true)} />
+        {tela === 'luta' && arena && (
+          <Luta key={`${arena.id}-${arena.rodada}`} arena={arena} servidorId={servidorId} diferenca={diferenca} surdo={surdo}
+            volume={volume} canvas={canvas} pergunta={perguntaNaLuta} regioes={regioes} onAgir={agir} />
         )}
-        <span className="corrida-contagem">{sentados} de 2 na arena</span>
-        <div className="xadrez-botoes">
-          {arena.souAnfitriao && (
-            <button type="button" className="primary" disabled={ocupado || sentados < 2} onClick={() => onAgir({ acao: 'comecar' })}>Lutar</button>
-          )}
-          {arena.souAnfitriao ? (
-            <button type="button" className="secundario" disabled={ocupado} onClick={() => onAgir({ acao: 'fechar' })}>Fechar arena</button>
-          ) : arena.meuLado !== null ? (
-            <button type="button" className="secundario" disabled={ocupado} onClick={() => { onAgir({ acao: 'levantar' }); onSair(); }}>Sair da arena</button>
-          ) : (
-            <button type="button" className="secundario" onClick={onSair}>Fechar</button>
-          )}
-        </div>
       </div>
-    </>
+      {live && <div className="xadrez-live">{live}</div>}
+    </div>
   );
 }
 
 // ---- a luta ---------------------------------------------------------------------------------
 
-function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAgir, onSair }: {
-  arena: Arena; servidorId: number; diferenca: MutableRefObject<number | null>; surdo: boolean; ocupado: boolean;
-  volume: number; live?: ReactNode; onAgir: (a: AcaoNaArena) => void; onSair: () => void;
+function Luta({ arena, servidorId, diferenca, surdo, volume, canvas, pergunta, regioes, onAgir }: {
+  arena: Arena; servidorId: number; diferenca: MutableRefObject<number | null>; surdo: boolean; volume: number;
+  canvas: MutableRefObject<HTMLCanvasElement | null>;
+  /** A pergunta de desistir, desenhada por cima da luta enquanto está aberta. */
+  pergunta: MutableRefObject<DadosDaPergunta | null>;
+  regioes: MutableRefObject<Regiao[]>;
+  onAgir: (a: AcaoNaArena) => void;
 }) {
   const [l0, l1] = arena.lados;
   const volumeRef = useRef(volume);
@@ -394,30 +553,10 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
   surdoRef.current = surdo;
   const agirRef = useRef(onAgir);
   agirRef.current = onAgir;
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const caixa = useRef<HTMLDivElement>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
-  const [conexao, setConexao] = useState<'conectando' | 'ok' | 'caiu'>('conectando');
-
-  // O canvas cresce em múltiplo inteiro quando isso não desperdiça muito palco (pixel do mesmo
-  // tamanho); senão ocupa o palco inteiro — pixel um pouco desigual é melhor que luta pequena.
-  useLayoutEffect(() => {
-    const div = caixa.current, c = canvas.current;
-    if (!div || !c) return;
-    const ajustar = () => {
-      const k = Math.min(div.clientWidth / TELA.largura, div.clientHeight / TELA.altura);
-      const escala = Math.floor(k) >= 1 && Math.floor(k) >= k * 0.85 ? Math.floor(k) : k;
-      c.style.width = `${Math.floor(TELA.largura * escala)}px`;
-      c.style.height = `${Math.floor(TELA.altura * escala)}px`;
-    };
-    ajustar();
-    const obs = new ResizeObserver(ajustar);
-    obs.observe(div);
-    return () => obs.disconnect();
-  }, []);
 
   useEffect(() => {
     let vivo = true;
+    let conexao: 'conectando' | 'ok' | 'caiu' = 'conectando';
     preaquecer(inicial.lutadores[0].id, inicial.lutadores[0].cor);
     preaquecer(inicial.lutadores[1].id, inicial.lutadores[1].cor);
 
@@ -448,12 +587,12 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
       const room = new Room({ adaptiveStream: false, dynacast: false });
       sala = room;
       room.on(RoomEvent.DataReceived, aoDado);
-      room.on(RoomEvent.Reconnecting, () => { if (sala === room) setConexao('caiu'); });
-      room.on(RoomEvent.Reconnected, () => { if (sala === room) setConexao('ok'); });
+      room.on(RoomEvent.Reconnecting, () => { if (sala === room) conexao = 'caiu'; });
+      room.on(RoomEvent.Reconnected, () => { if (sala === room) conexao = 'ok'; });
       room.on(RoomEvent.Disconnected, (motivo) => {
         if (!vivo || sala !== room) return;
         anotar('aviso', 'luta', `caí da sala da luta (motivo ${motivo ?? 'nenhum'}); tentando de novo`);
-        setConexao('caiu');
+        conexao = 'caiu';
         agendar();
       });
       try {
@@ -462,10 +601,10 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
         await room.connect(url, token, { autoSubscribe: false });
         if (!vivo || sala !== room) { void room.disconnect(); return; }
         tentativa = 0;
-        setConexao('ok');
+        conexao = 'ok';
       } catch (e) {
         anotar('erro', 'luta', `não entrei na sala da luta (tentativa ${tentativa + 1}): ${(e as Error).message}`);
-        if (vivo && sala === room) { setConexao('caiu'); agendar(); }
+        if (vivo && sala === room) { conexao = 'caiu'; agendar(); }
       }
     };
     const agendar = () => {
@@ -495,9 +634,12 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
     saidas.current = { sons, gravados };
     const vistos = new Set<string>();
     const quadro = criarQuadro(TELA.largura, TELA.altura);
-    const imagem = new ImageData(new Uint8ClampedArray(quadro.px.buffer as ArrayBuffer), TELA.largura, TELA.altura);
     let resultadoMandado = false;
     let tique = 0;
+    const vs = {
+      lados: arena.lados.map((l) => ({ jogador: l?.pessoa.nome ?? '?', lutador: l?.lutador ?? 'goiaba' })) as [{ jogador: string; lutador: IdDoLutador }, { jogador: string; lutador: IdDoLutador }],
+      cenario: arena.cenario, rounds: arena.rounds,
+    };
 
     const quadroDoRelogio = () => {
       const inicio = arenaRef.current.inicioEm ?? 0;
@@ -505,24 +647,27 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
     };
 
     // A simulação anda num relógio próprio, e não no do desenho: com a janela escondida o
-    // `requestAnimationFrame` para, e a luta do outro lado ficaria esperando por nós.
+    // `requestAnimationFrame` para, e a luta do outro lado ficaria esperando por nós. Com a
+    // pergunta de desistir aberta, os botões ficam soltos: quem pensa em sair não luta sem querer.
     const passo = setInterval(() => {
       const alvo = quadroDoRelogio();
-      if (sessao) { if (alvo > 0) sessao.avancarAte(alvo, teclado!.botoes()); }
+      if (sessao) { if (alvo > 0) sessao.avancarAte(alvo, pergunta.current ? 0 : teclado!.botoes()); }
       else plateia!.avancar();
     }, 8);
 
     let pedido = 0;
     const desenhar = () => {
       pedido = requestAnimationFrame(desenhar);
-      const c = canvas.current;
       const estado = sessao ? sessao.estado : plateia!.estado;
       tique++;
-      if (!c) return;
-      if (!estado) {
-        limpar(quadro, 0xff1a1216);
+      const antes = quadroDoRelogio() < 0;
+      if (antes) {
+        // os segundos entre o começar e a luta valer: a apresentação do confronto
+        desenharVs(quadro, vs);
+      } else if (!estado) {
+        quadro.px.fill(0xff16121a);
       } else {
-        const nomes: [string, string] = [nomeDoLutador(estado.lutadores[0].id).toUpperCase(), nomeDoLutador(estado.lutadores[1].id).toUpperCase()];
+        const nomes: [string, string] = [FICHAS[estado.lutadores[0].id].nome.toUpperCase(), FICHAS[estado.lutadores[1].id].nome.toUpperCase()];
         desenharLuta(quadro, estado, { nomes, tique });
         const toques = sonsNovos(estado, vistos);
         if (!surdoRef.current) {
@@ -539,13 +684,15 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
           agirRef.current({ acao: 'resultado', vencedor: estado.vencedor as 0 | 1 | 2, quadros: estado.quadro, impressao: impressao(estado) });
         }
       }
-      c.getContext('2d')!.putImageData(imagem, 0, 0);
       const semOuvir = sessao ? sessao.msSemOuvir() : plateia ? Date.now() - plateia.ouvidoEm : 0;
-      const antes = quadroDoRelogio() < 0;
-      setAviso(antes ? null
-        : !estado ? 'Pegando a luta…'
-          : estado.fase !== 'fimDaLuta' && semOuvir > 2500 ? (sessao ? 'Sem sinal do outro lutador…' : 'Sem sinal dos lutadores…')
-            : null);
+      const recado = conexao === 'caiu' ? 'A CONEXÃO CAIU. VOLTANDO...'
+        : antes ? null
+          : !estado ? 'PEGANDO A LUTA...'
+            : estado.fase !== 'fimDaLuta' && semOuvir > 2500 ? (sessao ? 'SEM SINAL DO OUTRO LUTADOR...' : 'SEM SINAL DOS LUTADORES...')
+              : null;
+      if (recado) desenharAvisoNaLuta(quadro, recado);
+      regioes.current = pergunta.current ? desenharPergunta(quadro, pergunta.current) : [];
+      mostrar(canvas.current, quadro);
     };
     pedido = requestAnimationFrame(desenhar);
 
@@ -563,40 +710,9 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, ocupado, live, onAg
       sala = null;
       room?.removeAllListeners();
       void room?.disconnect();
+      regioes.current = [];
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const vencedor = arena.vencedor;
-  const nomeDoLado = (i: 0 | 1) => arena.lados[i]?.pessoa.nome ?? '?';
-
-  return (
-    <div className="corrida-area luta-area">
-      <div ref={caixa} className="luta-palco">
-        <canvas ref={canvas} width={TELA.largura} height={TELA.altura} className="luta-canvas" />
-        {(aviso || conexao === 'caiu') && arena.estado === 'lutando' && (
-          <div className="luta-aviso">{conexao === 'caiu' ? 'A conexão caiu. Voltando…' : aviso}</div>
-        )}
-        {arena.estado === 'fim' && (
-          <div className="xadrez-fim">
-            <div className="xadrez-fim-cartao">
-              <span className="xadrez-fim-titulo">
-                {vencedor === 2 || vencedor === null ? 'Empate' : `Vitória de ${nomeDoLado(vencedor)}`}
-              </span>
-              <span className="muted small">
-                {arena.motivo === 'abandono' ? 'Alguém desistiu da luta.' : arena.motivo === 'semResultado' ? 'A luta terminou sem resultado.' : `${nomeDoLutador(arena.lados[vencedor === 1 ? 1 : 0]?.lutador ?? 'goiaba')} venceu no ${NOMES_DOS_CENARIOS[arena.cenario]}.`}
-              </span>
-              <div className="xadrez-fim-botoes">
-                {souLutador && <button type="button" className="primary" disabled={ocupado} onClick={() => onAgir({ acao: 'revanche' })}>Revanche</button>}
-                {arena.souAnfitriao
-                  ? <button type="button" className="secundario" disabled={ocupado} onClick={() => onAgir({ acao: 'fechar' })}>Fechar arena</button>
-                  : <button type="button" className="secundario" onClick={onSair}>Sair</button>}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {live && <div className="xadrez-live">{live}</div>}
-    </div>
-  );
+  return null;
 }
-

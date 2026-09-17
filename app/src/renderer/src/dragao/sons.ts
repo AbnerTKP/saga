@@ -7,7 +7,9 @@
  * Tudo passa por um compressor antes da saída: dois golpes e um raio juntos não estouram.
  */
 
-export type SomDaLuta = 'soco' | 'chute' | 'forte' | 'defesa' | 'rajada' | 'raio' | 'sumir' | 'nocaute' | 'round' | 'lutem' | 'vitoria';
+export type SomDaLuta = 'soco' | 'chute' | 'forte' | 'defesa' | 'rajada' | 'raio' | 'sumir' | 'nocaute' | 'round' | 'lutem' | 'vitoria'
+  // os menus: o cursor que anda, o que escolhe e o que volta — bipes de fliperama, curtos e baixos
+  | 'cursor' | 'escolher' | 'voltar';
 
 type Receita = (ctx: AudioContext, saida: AudioNode, t: number) => void;
 
@@ -96,6 +98,9 @@ const RECEITAS: Record<SomDaLuta, Receita> = {
   round: (c, s, t) => { nota(c, s, t, 523, 0.12, 0.12); nota(c, s, t + 0.14, 784, 0.18, 0.12); },
   lutem: (c, s, t) => { [523, 659, 784, 1046].forEach((f, i) => nota(c, s, t + i * 0.06, f, 0.14, 0.11)); },
   vitoria: (c, s, t) => { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => nota(c, s, t + i * 0.11, f, 0.16, 0.1)); },
+  cursor: (c, s, t) => { nota(c, s, t, 988, 0.035, 0.05); },
+  escolher: (c, s, t) => { nota(c, s, t, 784, 0.05, 0.07); nota(c, s, t + 0.055, 1175, 0.09, 0.07); },
+  voltar: (c, s, t) => { nota(c, s, t, 659, 0.05, 0.06); nota(c, s, t + 0.055, 440, 0.08, 0.06); },
 };
 
 /** O mesmo som não toca duas vezes em menos disto: dois quadros refeitos pela rede viram um. */

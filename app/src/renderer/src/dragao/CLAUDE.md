@@ -182,3 +182,21 @@ Vegetal da Super Feira, a Goteira, o Gotinha e o Tronco —, vida e ki, quatro c
   `@container` na largura da ARENA, e não da janela: a live aberta ao lado come 260 px dela, e com a
   lista de pessoas escondida pela luta a arena tem a janela menos uns 610 px. `PROTOCOLO` 7, e os
   dois em `LUTADOR_DESDE` com a 0.58.0.
+- **O jogo inteiro em pixel (17/09/2026).** O pedido foi clicar no jogo e poder convidar, "porém tudo
+  no estilo de arte do jogo, como se fosse um jogo completo dentro, start, configurações, seleção de
+  personagens… o nome, apresentação, tudo". Vendo as telas feitas por este motor, o dono escolheu o
+  **título com o Torneio e os nove em fila**, a **escolha com a grade 3x3 no meio** (e não a fileira
+  com os dois grandes) e **o cartão de convite em pixel também**. Hoje a `TelaDaLuta` é UMA canvas:
+  título → escolha (C convida, O opções, Esc pergunta se fecha ou sai) → VS nos segundos entre o
+  começar e a luta valer → luta (Esc pergunta se desiste) → fim (revanche, trocar lutador, sair). O
+  desenho mora em `interface.ts` e cada tela devolve as REGIÕES clicáveis que desenhou — o mouse
+  acerta o que se vê porque sai da mesma conta; a navegação, sem tela e testada, em `menu.ts`. O
+  servidor e o protocolo não mudaram: ENTER na grade é o `escolher` de sempre, e no próprio lutador
+  com os dois sentados é o `comecar`. O menu de jogos abre no título (quem já tem arena volta direto
+  a ela) e o "Lutar" do cartão cai direto na escolha. As fotos do convite viram pixel de 14x14
+  (`fotoEmPixel.ts`, com o quadro parado dos GIFs). **Os menus não têm laço**: desenham quando algo
+  muda, e o botão LUTAR pisca duas vezes por segundo. Medido com a Saga escondida contra um servidor e
+  um LiveKit locais: título parado 0,2 quadro por segundo e 0,3% de CPU; escolha parada 1 e 0,5% (é a
+  busca da arena, de segundo em segundo); escolha com o botão piscando 3 e 0,8%. O mesmo roteiro
+  percorreu a tela inteira por teclado (e o amigo aceitando pela rede) e por clique. Os bipes de menu
+  (`cursor`, `escolher`, `voltar`, em `sons.ts`) são sintetizados e nunca foram ouvidos aqui.

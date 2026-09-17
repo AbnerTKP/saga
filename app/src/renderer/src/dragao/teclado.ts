@@ -16,15 +16,6 @@ export const TECLAS: Record<string, number> = {
   KeyI: BOTAO.CARREGAR, KeyO: BOTAO.ESPECIAL, KeyU: BOTAO.SUMIR, KeyP: BOTAO.TRANSFORMAR,
 };
 
-/** A legenda dos controles, na ordem em que se aprende. */
-export const LEGENDA: [string, string][] = [
-  ['Setas ou WASD', 'andar, pular, agachar'],
-  ['segurar para trás', 'defender'],
-  ['J', 'soco'], ['K', 'chute'], ['L', 'rajada de ki'], ['I (segurar)', 'carregar ki'],
-  ['O', 'especial (1 barra)'], ['↓ + O', 'super (3 barras)'], ['U', 'sumir (meia barra)'],
-  ['P', 'transformar (1 barra e meia)'],
-];
-
 /** Botões segurados a partir das teclas apertadas. */
 export function botoesDe(apertadas: Iterable<string>): number {
   let b = 0;
