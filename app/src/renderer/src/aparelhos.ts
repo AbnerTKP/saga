@@ -91,6 +91,17 @@ export function decidirMicrofone(o: {
 }
 
 /**
+ * A saída de som e a câmera escolhidas na Saga, de volta ao abrir e ao entrar na call: o id para
+ * trocar, ou null quando não há escolha, ela não está conectada ou já é a que está em uso. Mais
+ * simples que o microfone — não há faixa aberta a reabrir quando o sistema troca o padrão: a saída
+ * vale para o próximo som e a câmera, para quando for ligada.
+ */
+export function escolhaParaVoltar(o: { escolhido: string | undefined; ativo: string | undefined; disponiveis: Aparelho[] }): string | null {
+  if (!o.escolhido || o.ativo === o.escolhido) return null;
+  return o.disponiveis.some((a) => a.deviceId === o.escolhido) ? o.escolhido : null;
+}
+
+/**
  * Troca o aparelho em uso. O LiveKit fecha o microfone (ou a câmera) de antes ANTES de abrir o
  * novo; se abrir o novo falhar — ocupado por outro programa, desconectado no meio —, a pessoa fica
  * muda sem saber. Então a troca que falha volta ao padrão do sistema, e o erro segue para quem

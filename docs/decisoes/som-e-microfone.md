@@ -73,8 +73,17 @@ Supressão de ruído, corte automático, soundboard e os sons de aviso.
   fica presa ao aparelho de quando abriu (no Mac, trocar o microfone do sistema não mudava nada),
   e quando o grupo do `default` na lista deixa de ser o da faixa, ela reabre. **Isso não foi
   medido em aparelho de verdade** — os microfones falsos do Chromium não mudam o padrão nem
-  desconectam —, e está em `confirmar-com-o-dono.md`. Só o microfone é lembrado; saída de som e
-  câmera trocam na hora e esquecem ao fechar, como antes.
+  desconectam —, e está em `confirmar-com-o-dono.md`. **Os ids dos aparelhos não mudam de uma
+  abertura para outra**: medido com o Electron do projeto, uma página `file://` e a mesma pasta de
+  dados, aberta duas vezes — os mesmos ids. É o que deixa a escolha guardada valer depois de fechar.
+- **Saída de som, câmera e o volume de cada pessoa também são lembrados** (16/09/2026). Os amigos
+  do dono reclamaram que tudo voltava ao padrão ao fechar a Saga: o volume de quem eles tinham
+  abaixado vivia só na memória, e só o microfone era guardado. Hoje a saída e a câmera escolhidas
+  voltam nos mesmos momentos do microfone (`conferirSaidaECamera`, `escolhaParaVoltar`), e o volume
+  de cada pessoa e o de cada live ficam em `cantinho.volumes` e `cantinho.volumesDaTela`, pela
+  identidade da conta (`u` + id, que não muda), sem guardar quem está em 100% (`volume.ts`).
+  **Testado só por fora**: a leitura e a escrita, com teste; voltar a ouvir alguém baixo numa call
+  de verdade depois de fechar e abrir, e a saída de som voltando ao fone, não foram exercidos.
 - **Os eventos da sala do microfone entram pelo efeito do `useRoom`.** Ele limpa TODOS os
   ouvintes da sala quando se refaz (`removeAllListeners`); um ouvinte registrado à parte
   sumiria calado e o microfone voltaria a ir cru sem erro nenhum.

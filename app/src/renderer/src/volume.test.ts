@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VOLUME, alternarMudo, volumeGuardado } from './volume.ts';
+import { VOLUME, alternarMudo, textoDosVolumes, volumeGuardado, volumesGuardados } from './volume.ts';
 
 test('cortar o som guarda o volume, e devolver volta a ele', () => {
   const cortado = alternarMudo(0.4, 1);
@@ -54,3 +54,17 @@ test('volume guardado: o que se entende é respeitado, inclusive o silêncio', (
   assert.equal(volumeGuardado('2'), 1, 'acima de 100% o navegador lança');
   assert.equal(volumeGuardado('-1'), 0);
 });
+
+test('o volume de cada pessoa sobrevive a fechar e abrir, e lixo não vira volume', () => {
+  const guardado = textoDosVolumes(new Map([['u3', 0.35], ['u24', 1], ['u8', 0]]));
+  const lido = volumesGuardados(guardado);
+  assert.equal(lido.get('u3'), 0.35);
+  assert.equal(lido.get('u8'), 0, 'mudo continua mudo');
+  assert.equal(lido.has('u24'), false, '100% é o padrão e não é guardado');
+  assert.deepEqual([...volumesGuardados(null)], []);
+  assert.deepEqual([...volumesGuardados('')], []);
+  assert.deepEqual([...volumesGuardados('lixo{')], []);
+  assert.deepEqual([...volumesGuardados('[0.5]')], []);
+  assert.deepEqual([...volumesGuardados('{"u1":"0.5","u2":null,"u4":7,"u5":-1}')], [['u4', 1], ['u5', 0]]);
+});
+

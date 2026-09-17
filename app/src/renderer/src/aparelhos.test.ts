@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { comEscolha, decidirMicrofone, escolhasGuardadas, idParaTrocar, opcoesDoSeletor, trocarAparelho, valorNoSeletor } from './aparelhos.ts';
+import { comEscolha, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, idParaTrocar, opcoesDoSeletor, trocarAparelho, valorNoSeletor } from './aparelhos.ts';
 
 const mic = (deviceId: string, groupId: string, label = deviceId) => ({ deviceId, groupId, label });
 
@@ -78,3 +78,12 @@ test('a troca que falha volta ao padrão, em vez de deixar o microfone fechado',
   await assert.rejects(trocarAparelho(room, 'audiooutput', 'ocupado'));
   assert.deepEqual(pedidos, [['audiooutput', 'ocupado', true]]);
 });
+
+test('saída de som e câmera escolhidas voltam ao abrir, se estiverem conectadas e não em uso', () => {
+  const disponiveis = [{ deviceId: 'default', label: 'Padrão - Alto-falantes' }, { deviceId: 'fone', label: 'Fone USB' }];
+  assert.equal(escolhaParaVoltar({ escolhido: 'fone', ativo: 'default', disponiveis }), 'fone');
+  assert.equal(escolhaParaVoltar({ escolhido: 'fone', ativo: 'fone', disponiveis }), null, 'já em uso');
+  assert.equal(escolhaParaVoltar({ escolhido: 'fone', ativo: undefined, disponiveis: disponiveis.slice(0, 1) }), null, 'desconectado');
+  assert.equal(escolhaParaVoltar({ escolhido: undefined, ativo: 'default', disponiveis }), null, 'sem escolha, fica o padrão');
+});
+

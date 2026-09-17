@@ -161,7 +161,9 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   a Saga voltar sozinha para o microfone escolhido quando ele é conectado de novo; trocar o
   microfone do SISTEMA com a Saga no "Padrão do sistema" e ela acompanhar (a conta é pelo grupo do
   aparelho, e o Chromium pode não mudar o grupo do `default` do mesmo jeito nos dois sistemas); e
-  o microfone escolhido continuar valendo depois de fechar e abrir a Saga.
+  o microfone escolhido continuar valendo depois de fechar e abrir a Saga (os ids dos aparelhos
+  não mudam entre aberturas, medido; a escolha voltando numa call de verdade, não). Nem o volume
+  de cada pessoa, a saída de som e a câmera voltando depois de fechar e abrir.
 - **O Dragão Quadrado entre duas pessoas de verdade.** O que está medido está na seção do
   jogo. **Não foram exercidos**: dois computadores com gente no teclado, pela produção e com
   a latência real entre as casas; o som (sintetizado em `sons.ts`, nunca ouvido — os testes

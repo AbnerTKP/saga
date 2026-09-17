@@ -183,10 +183,9 @@ export function PainelDaConta({
     setErroDoAparelho((s) => ({ ...s, [kind]: undefined }));
     try {
       await trocarAparelho(room, kind, valor);
-      // Só o microfone é lembrado: é ele que a Saga põe de volta ao abrir e quando o aparelho volta.
-      if (kind === 'audioinput') {
-        try { localStorage.setItem(CHAVE_DOS_APARELHOS, comEscolha(localStorage.getItem(CHAVE_DOS_APARELHOS), kind, valor)); } catch { /* vale até fechar */ }
-      }
+      // Os três são lembrados: a Saga os põe de volta ao abrir, ao entrar na call e quando o
+      // aparelho volta a ser conectado (`conferirMicrofone` e `conferirSaidaECamera`, no useRoom).
+      try { localStorage.setItem(CHAVE_DOS_APARELHOS, comEscolha(localStorage.getItem(CHAVE_DOS_APARELHOS), kind, valor)); } catch { /* vale até fechar */ }
     } catch (e) {
       anotar('erro', 'aparelhos', e);
       const motivo = (e as Error).message ? `: ${(e as Error).message}` : '.';

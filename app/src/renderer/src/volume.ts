@@ -34,3 +34,27 @@ export function alternarMudo(volume: number, guardado: number): { volume: number
   const antes = VOLUME(guardado);
   return antes > 0 ? { volume: antes, guardado: antes } : { volume: 1, guardado: 1 };
 }
+
+/**
+ * O volume de cada pessoa, guardado neste computador pela identidade dela (`u` + o id da conta,
+ * que não muda). Vivia só na memória: quem abaixava um amigo alto o ouvia alto de novo a cada
+ * vez que fechava e abria a Saga. Lixo, número fora de 0 a 1 e chave vazia não viram volume.
+ */
+export function volumesGuardados(texto: string | null): Map<string, number> {
+  let bruto: unknown;
+  try { bruto = texto ? JSON.parse(texto) : null; } catch { bruto = null; }
+  const saida = new Map<string, number>();
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return saida;
+  for (const [quem, v] of Object.entries(bruto as Record<string, unknown>)) {
+    if (quem && typeof v === 'number' && Number.isFinite(v)) saida.set(quem, VOLUME(v));
+  }
+  return saida;
+}
+
+/** Para guardar: 100% é o padrão e não ocupa lugar, então quem volta a 100% sai da lista. */
+export function textoDosVolumes(volumes: Map<string, number>): string {
+  const o: Record<string, number> = {};
+  for (const [quem, v] of volumes) if (VOLUME(v) !== 1) o[quem] = Math.round(VOLUME(v) * 1000) / 1000;
+  return JSON.stringify(o);
+}
+

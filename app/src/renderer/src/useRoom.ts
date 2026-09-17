@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { anotar } from './registro';
 import { explicarFalhaDeAudio, explicarTelaMuda, pareceMixagemDoSistema } from './erros';
-import { VOLUME, volumeGuardado } from './volume';
+import { VOLUME, textoDosVolumes, volumeGuardado, volumesGuardados } from './volume';
 import { qualidadeValida, prioridadeDe, type Qualidade } from './qualidades';
 import { criarAvisos } from './avisos';
 import { mudo } from './audivel';
@@ -12,7 +12,7 @@ import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
-import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhasGuardadas, trocarAparelho } from './aparelhos';
+import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, trocarAparelho } from './aparelhos';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -135,6 +135,19 @@ function guardarVolumeDoSoundboard(v: number) {
   try { localStorage.setItem(CHAVE_VOLUME_DO_SOUNDBOARD, String(v)); } catch { /* sem storage */ }
 }
 
+/**
+ * O volume de cada pessoa e o de cada live, deste computador, como o do soundboard. Viviam só na
+ * memória: fechar a Saga devolvia todo mundo a 100% (ver `volumesGuardados`).
+ */
+const CHAVE_DOS_VOLUMES = 'cantinho.volumes';
+const CHAVE_DOS_VOLUMES_DA_TELA = 'cantinho.volumesDaTela';
+function lerVolumes(chave: string): Map<string, number> {
+  try { return volumesGuardados(localStorage.getItem(chave)); } catch { return new Map(); }
+}
+function guardarVolumes(chave: string, volumes: Map<string, number>) {
+  try { localStorage.setItem(chave, textoDosVolumes(volumes)); } catch { /* sem storage, vale até fechar */ }
+}
+
 // Quanto esperar o servidor de voz antes de desistir. Sem um limite, uma rede que
 // engole a porta 7880 deixa o app em "conectando" para sempre: as salas ficam
 // desabilitadas e nada é dito, que por fora parece o clique não ter funcionado.
@@ -212,7 +225,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   // Volume por pessoa. Aplicado nos elementos de áudio que nós mesmos criamos, e não pelo
   // setVolume do LiveKit: aquele só alcança microfone e áudio de tela, e deixaria o
   // soundboard de fora, que anda numa faixa própria.
-  const volumes = useRef(new Map<string, number>());
+  const volumes = useRef(lerVolumes(CHAVE_DOS_VOLUMES));
 
   /**
    * Qual transmissão esta pessoa escolheu assistir. Uma, ou nenhuma.
@@ -238,7 +251,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   // Volume de cada transmissão, separado da voz e separado entre si: dá para baixar o
   // filme de um sem mexer no de outro, nem em quem está comentando.
-  const volumesDaTela = useRef(new Map<string, number>());
+  const volumesDaTela = useRef(lerVolumes(CHAVE_DOS_VOLUMES_DA_TELA));
   const [, redesenharVolumes] = useReducer((x: number) => x + 1, 0);
 
 
@@ -323,6 +336,28 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     }
   }, [room]);
   useEffect(() => { conferirMicrofone(); }, [conferirMicrofone]);
+
+  /**
+   * A saída de som e a câmera escolhidas, de volta: só o microfone era lembrado, e quem ouvia no
+   * fone voltava a ouvir na caixa a cada vez que abria a Saga. Roda nos mesmos momentos do
+   * microfone. Escolha que não está conectada fica guardada e vale quando o aparelho voltar.
+   */
+  const conferirSaidaECamera = useCallback(async () => {
+    let texto: string | null = null;
+    try { texto = localStorage.getItem(CHAVE_DOS_APARELHOS); } catch { /* sem storage, sem escolha */ }
+    const escolhas = escolhasGuardadas(texto);
+    if (!escolhas.audiooutput && !escolhas.videoinput) return;
+    let aparelhos: MediaDeviceInfo[];
+    try { aparelhos = await navigator.mediaDevices.enumerateDevices(); } catch { return; }
+    for (const tipo of ['audiooutput', 'videoinput'] as const) {
+      const id = escolhaParaVoltar({
+        escolhido: escolhas[tipo], ativo: room.getActiveDevice(tipo), disponiveis: aparelhos.filter((d) => d.kind === tipo),
+      });
+      if (!id) continue;
+      try { await room.switchActiveDevice(tipo, id, true); } catch (e) { anotar('erro', 'aparelhos', e); }
+    }
+  }, [room]);
+  useEffect(() => { conferirSaidaECamera(); }, [conferirSaidaECamera]);
 
   // Um por sala, criado uma vez: é ele que guarda quando cada aviso tocou pela última vez.
   const tocarAviso = useMemo(() => criarAvisos(ARQUIVOS, undefined,
@@ -453,7 +488,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           .then((nome) => anotar('info', 'microfone', `em uso: ${nome}`));
       })
       // Aparelho que chega ou sai: a lista muda, e a escolha guardada pode voltar a valer.
-      .on(RoomEvent.MediaDevicesChanged, () => { conferirMicrofone(); bump(); })
+      .on(RoomEvent.MediaDevicesChanged, () => { conferirMicrofone(); conferirSaidaECamera(); bump(); })
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
         // Transmissão que começa não entra sozinha: ela aparece apagada na lista, e só
@@ -476,7 +511,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar, conferirMicrofone]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar, conferirMicrofone, conferirSaidaECamera]);
 
   const join = useCallback(async (url: string, token: string, sala: SalaDaVoz, comMicrofone = true) => {
     setError(null);
@@ -501,6 +536,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // anúncio nasce vazio a cada sala nova, e sem isto a marca só apareceria se a
       // pessoa mexesse no fone de novo.
       anunciar();
+      await conferirSaidaECamera();
       // `comMicrofone` só vem quando é uma VOLTA depois de queda: aí o microfone volta
       // como estava, e quem tinha se mutado não reaparece falando sem saber.
       if (!deafenedRef.current && comMicrofone) {
@@ -515,7 +551,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room, tocarAviso, anunciar, conferirMicrofone, falhouOMicrofone]);
+  }, [room, tocarAviso, anunciar, conferirMicrofone, conferirSaidaECamera, falhouOMicrofone]);
 
   const leave = useCallback(async () => {
     desligueiDeProposito.current = true;
@@ -927,6 +963,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   const definirVolume = useCallback((identity: string, valor: number) => {
     volumes.current.set(identity, VOLUME(valor));
+    guardarVolumes(CHAVE_DOS_VOLUMES, volumes.current);
     aplicarAudio();
     bump();
   }, [aplicarAudio]);
@@ -945,6 +982,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   const definirVolumeDaTela = useCallback((identity: string, valor: number) => {
     volumesDaTela.current.set(identity, VOLUME(valor));
+    guardarVolumes(CHAVE_DOS_VOLUMES_DA_TELA, volumesDaTela.current);
     aplicarAudio();
     redesenharVolumes();
   }, [aplicarAudio]);
