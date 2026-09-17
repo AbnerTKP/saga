@@ -20,6 +20,7 @@ import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as amigos from './amigos.mjs';
 import { relatar } from './relatos.mjs';
+import * as urnas from './urnas.mjs';
 import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
@@ -1281,6 +1282,21 @@ const ROTAS = {
   'POST /relatos': async (req) => {
     const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
     return { relato: relatar(db, usuario, await lerCorpo(req)) };
+  },
+
+  // --- Urna --------------------------------------------------------------------
+  // A apuração é do servidor do pedido, e só diz totais: o voto é secreto.
+  'GET /urna': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return urnas.apuracao(db, sid, eu.id);
+  },
+
+  'POST /urna/votos': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { escolha } = await lerCorpo(req);
+    return urnas.votar(db, sid, eu.id, escolha);
   },
 
   // --- Fórmula 1 ---------------------------------------------------------------

@@ -23,6 +23,7 @@ import { FaixaDaPartida } from './components/FaixaDaPartida';
 import { TelaDaCorrida } from './components/TelaDaCorrida';
 import { ConviteDeCorrida } from './components/ConviteDeCorrida';
 import { TelaDaLuta } from './components/TelaDaLuta';
+import { TelaDaUrna } from './components/TelaDaUrna';
 import { ConviteDeLuta } from './components/ConviteDeLuta';
 import type { Aviso } from './avisos';
 import { BotaoDeRelatar, EVENTO_DO_AVISO } from './components/Relatar';
@@ -159,6 +160,7 @@ export function App() {
     | { tipo: 'corrida'; gridId: number; servidorId: number }
     // sem arena é o título do Dragão Quadrado, que oferece abrir uma ou entrar na de alguém
     | { tipo: 'luta'; arenaId: number | null; servidorId: number }
+    | { tipo: 'urna'; servidorId: number }
     | null
   >(null);
   const [conviteDeCorridaRespondido, setConviteDeCorridaRespondido] = useState<number | null>(null);
@@ -1105,12 +1107,18 @@ export function App() {
     ? (minhaArena.estado === 'lutando' ? 'voltar à sua luta' : 'voltar à sua arena')
     : arenaDoServidor
       ? (arenaDoServidor.estado === 'lutando' ? `luta de ${nomeDoJogador(arenaDoServidor.anfitriao)} andando` : `arena de ${nomeDoJogador(arenaDoServidor.anfitriao)} aberta`)
-      : 'abrir o jogo e chamar alguém';
+      : 'abrir uma arena';
 
   /**
    * O jogo abre no título — o dono pediu o Dragão Quadrado como um jogo completo, com início. Quem já
    * tem arena (a sua, ou a luta em que está) volta direto a ela.
    */
+  /** A Urna é de uma pessoa só: abre na porta da seção eleitoral do servidor aberto. */
+  const abrirUrna = useCallback(() => {
+    const servidorId = sessao?.servidor?.id;
+    if (servidorId) setJogoAberto({ tipo: 'urna', servidorId });
+  }, [sessao?.servidor?.id]);
+
   const abrirLuta = useCallback(() => {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
@@ -1331,7 +1339,7 @@ export function App() {
         servidor aberto para ter gente. */}
     {/* A corrida também tira a lista de pessoas: a pista precisa da largura, e foi a escolha do
         dono no desenho — o placar por cima da pista já diz quem está correndo. */}
-    <div className={`app ${modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' ? 'sem-pessoas' : ''}`}>
+    <div className={`app ${modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' ? 'sem-pessoas' : ''}`}>
       <Sidebar
         rooms={rooms}
         categorias={categorias}
@@ -1357,6 +1365,7 @@ export function App() {
         onCorrida={abrirCorrida}
         textoDaLuta={textoDaLuta}
         onLuta={abrirLuta}
+        onUrna={abrirUrna}
         // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
         // aqui" sobre um lugar que não é o que se está vendo.
         salaAbertaId={jogoAberto ? null : salaAbertaId}
@@ -1398,7 +1407,17 @@ export function App() {
         onAssistirLive={assistirLive}
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro.
-        jogo={jogoAberto?.tipo === 'luta' ? (live) => (
+        jogo={jogoAberto?.tipo === 'urna' ? (live) => (
+          <TelaDaUrna
+            key={`urna-${jogoAberto.servidorId}`}
+            servidorId={jogoAberto.servidorId}
+            euId={eu.id}
+            apelido={eu.nome}
+            surdo={rm.deafened}
+            live={live}
+            onFechar={() => setJogoAberto(null)}
+          />
+        ) : jogoAberto?.tipo === 'luta' ? (live) => (
           <TelaDaLuta
             key={`luta-${jogoAberto.servidorId}`}
             arenaId={jogoAberto.arenaId}
@@ -1541,7 +1560,7 @@ export function App() {
       )}
       {/* A lista de pessoas é do SERVIDOR aberto. No modo conversas não há um: a coluna
           sai inteira, em vez de mostrar gente que não tem nada com o que está na tela. */}
-      {!modoConversas && jogoAberto?.tipo !== 'corrida' && jogoAberto?.tipo !== 'luta' && (
+      {!modoConversas && jogoAberto?.tipo !== 'corrida' && jogoAberto?.tipo !== 'luta' && jogoAberto?.tipo !== 'urna' && (
       <ListaDeMembros
         membros={membrosDoServidor}
         cargos={cargos}

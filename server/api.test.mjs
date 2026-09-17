@@ -1817,6 +1817,21 @@ test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {
   assert.equal(invalido.status, 400);
 });
 
+// --- urna ---------------------------------------------------------------------------
+
+test('urna pela rede: vota, soma e só devolve totais', async () => {
+  const quem = (await cadastrar('urna_quem')).corpo;
+  const antes = await chamar('GET', '/urna', { sessao: quem.token });
+  assert.equal(antes.status, 200, JSON.stringify(antes.corpo));
+  const votou = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } });
+  assert.equal(votou.status, 200, JSON.stringify(votou.corpo));
+  const samara = votou.corpo.contagem.find((c) => c.numero === 80);
+  assert.equal(samara.votos, (antes.corpo.contagem.find((c) => c.numero === 80)?.votos ?? 0) + 1);
+  assert.equal(votou.corpo.meus, 1);
+  assert.equal((await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } })).status, 429);
+  assert.equal((await chamar('POST', '/urna/votos', { corpo: { escolha: 80 } })).status, 401);
+});
+
 // --- e-mail, com o envio desligado ----------------------------------------------------
 //
 // É a produção enquanto não houver um domínio verificado no Resend: sem `RESEND_KEY` e

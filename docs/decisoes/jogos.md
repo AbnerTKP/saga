@@ -1,4 +1,4 @@
-# Xadrez e Fórmula 1
+# Xadrez, Fórmula 1 e Urna
 
 App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/CLAUDE.md`.
 
@@ -177,3 +177,33 @@ App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/C
   e motor pelos alto-falantes do dono — com ele ao vivo na Saga, e a live levou o som junto:
   o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
   do teste leva `mute-audio`.
+
+## A Urna (17/09/2026)
+
+Pedido do dono: "um minigame de urna eletrônica, em pixel art: um bonequinho passa na mesa, dá o
+título fake e vai até a urna; na urna, primeira pessoa para votar", com os candidatos a Presidente de
+verdade; depois, "deixa votar várias vezes e faça um rank multiplayer do mais votado" e "reformule a
+escolha dos minigames para não ficar uma lista enorme". Ele viu as telas feitas pelo motor e escolheu
+o **menu em grade de capas** (opção A), a **apuração por servidor com voto secreto**, e aprovou o resto.
+
+- **Os candidatos são os do TSE em 17/09/2026** (`urna/candidatos.ts`): 13 chapas, conferidas por dois
+  levantamentos separados (a API do DivulgaCandContas e a imprensa) que bateram nome a nome. Pablo
+  Marçal foi indeferido e trocado por Leonardo Avalanche, com registro ainda pendente. **Se alguém sair
+  da disputa, sai de `candidatos.ts`, de `retratos.ts` e de `NUMEROS` em `server/urnas.mjs`** — o teste
+  do servidor confere que as duas listas de números são a mesma. A ordem é sempre a do número.
+- **Os rostos são as fotos oficiais do TSE em pixel** (`urna/retratos.ts`, 30x42 e 22x31, 16 e 14 tons
+  por k-means), porque a urna de verdade mostra a foto. Gerado por script, não à mão.
+- **O voto é secreto no BANCO, não só na tela.** `urna_votos` guarda o total de cada escolha por
+  servidor; `urna_eleitores` guarda quantas vezes cada pessoa votou, sem a escolha. Não existe linha
+  que ligue alguém a um candidato. Votar de novo pode, sem limite, com um freio de 3 s contra laço.
+- **A regra do jogo é pura e testada** (`urna/jogo.ts`): etapas da mesa (pede o documento → título FAKE
+  → libera), cabine, CORRIGE, BRANCO só com a tela vazia (como na urna), número inexistente vira NULO, e
+  a mesária repara em quem volta. A urna é a UE2020: teclado 3x3 com o 0 embaixo do 8 e a coluna
+  BRANCO/CORRIGE/CONFIRMA. Os sons são o arquivo que o dono mandou: o bipe da tecla e o som do FIM.
+- **O menu de jogos virou grade de capas** (`MenuDeJogos.tsx`): duas por linha, com a frase do que
+  acontece embaixo e um ponto azul quando há algo de pé. A classe `.menu-de-jogos-item` ficou nas capas
+  porque os roteiros da bancada procuram por ela.
+- **Medido** com a Saga escondida e muda contra servidor e LiveKit locais: menu, porta, mesa, título,
+  cabine, voto, FIM, apuração, votar de novo e fechar, por teclado e clique. Parada: seção 0 quadro/s e
+  0,3% de CPU; urna com o cursor piscando, 2 quadros/s e 0,5%. **Não foi ouvido** nenhum som (a bancada é
+  muda) nem visto no Windows.

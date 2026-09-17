@@ -1574,6 +1574,26 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 .menu-de-jogos-textos { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .peca-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px;
   background: #eed8b4; display: grid; place-items: center; font-size: 26px; }
+/* A grade de capas (opção A do dono): duas por linha, capa de 56 px com o desenho do jogo, o nome e
+   o que acontece ali. O ponto e a frase azul são o "tem algo de pé para voltar". */
+.menu-de-jogos-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.menu-de-jogos-item.menu-de-jogos-capa { flex-direction: column; align-items: stretch; gap: 5px; padding: 6px;
+  background: transparent; min-width: 0; }
+.menu-de-jogos-item.menu-de-jogos-capa:hover { background: var(--bg4); }
+.menu-de-jogos-imagem { position: relative; height: 56px; border-radius: 6px; overflow: hidden;
+  display: grid; place-items: center; }
+.menu-de-jogos-nome { font-size: 13px; font-weight: 600; color: var(--white); line-height: 1.2; }
+.menu-de-jogos-sub { font-size: 11.5px; color: var(--text3); line-height: 1.25; overflow-wrap: anywhere; }
+.menu-de-jogos-sub.agora { color: var(--accent-claro); }
+.menu-de-jogos-ponto { position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent-claro); box-shadow: 0 0 0 2px var(--bg2); }
+.capa-de-xadrez { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px;
+  background: repeating-conic-gradient(#b58863 0 25%, #f0d9b5 0 50%) 0 0 / 28px 28px; }
+.capa-de-pista { width: 100%; height: 100%; object-fit: cover; }
+.capa-de-luta { width: 48px; height: 48px; }
+.capa-de-urna { width: 96px; height: 64px; }
+.tela-da-urna { display: flex; flex: 1; min-height: 0; gap: var(--e3); padding: var(--e3); background: #000; }
+.tela-da-urna .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
 
 /* O convite para jogar, na pilha dos avisos — mas ele não some sozinho: quem chamou espera. */
 /* O convite para jogar: o cartão grande no canto (a opção C do dono), para o xadrez e a Fórmula 1.

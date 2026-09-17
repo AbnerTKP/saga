@@ -244,6 +244,12 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown, servidorD
   return leitura.dados as T;
 }
 
+/** A apuração da Urna no servidor: o total de cada escolha (o voto é secreto) e quantas vezes VOCÊ votou. */
+export type ApuracaoDaUrna = { contagem: { numero: number | 'branco' | 'nulo'; votos: number }[]; meus: number };
+export const apuracaoDaUrna = (servidorId?: number) => pedir<ApuracaoDaUrna>('GET', '/urna', undefined, servidorId);
+export const votarNaUrna = (escolha: number | 'branco' | 'nulo', servidorId?: number) =>
+  pedir<ApuracaoDaUrna>('POST', '/urna/votos', { escolha }, servidorId);
+
 /** `email` só vai quando o servidor manda e-mail — ver `servidorMandaEmail`. */
 export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string; email?: string }) =>
   pedir<Sessao>('POST', '/cadastrar', c);

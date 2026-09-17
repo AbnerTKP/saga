@@ -164,7 +164,7 @@ errado":
 | Voz, call, live, palco, quadro flutuante, quem está falando (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`) | `docs/decisoes/voz-e-live.md` | não — leia |
 | Microfone, supressão de ruído, soundboard, sons de aviso (`useMicrofone`, `sensibilidade`, `embutir`, `sons/`) | `docs/decisoes/som-e-microfone.md` | não — leia |
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
-| Xadrez e Fórmula 1, app e servidor (`xadrez`, `corrida`, `pista`, `motor`, `jogos.mjs`, `corridas.mjs`) | `docs/decisoes/jogos.md` | não — leia |
+| Xadrez, Fórmula 1, Urna e o menu de jogos, app e servidor (`xadrez`, `corrida`, `pista`, `motor`, `urna/`, `jogos.mjs`, `corridas.mjs`, `urnas.mjs`) | `docs/decisoes/jogos.md` | não — leia |
 | Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`) | `docs/decisoes/telas-e-visual.md` | não — leia |
 | O que foi medido e o que falta o dono confirmar | `docs/confirmar-com-o-dono.md` | não — leia antes de dizer "pronto" |
 

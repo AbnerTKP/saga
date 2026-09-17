@@ -351,6 +351,28 @@ export const MIGRACOES = [
      expira_em   INTEGER NOT NULL,
      erros       INTEGER NOT NULL DEFAULT 0
    )`,
+
+  // A Urna: quantos votos cada chapa tem em cada servidor. O voto é secreto como o de
+  // verdade, e por isso é secreto NO BANCO também, não só na tela: aqui mora o total de cada
+  // escolha (o número da chapa, `branco` ou `nulo`), e quem votou fica noutra tabela, sem a
+  // escolha. Não há linha que ligue uma pessoa a um candidato. 17/09/2026: a produção na 52,
+  // o e-mail na 53, e estas são a 54 e a 55.
+  `CREATE TABLE urna_votos (
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     escolha     TEXT    NOT NULL,
+     votos       INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (servidor_id, escolha)
+   )`,
+
+  // Quem votou na Urna e quantas vezes (pode votar de novo), e quando foi o último: é o
+  // freio contra laço, e é o "você votou N vezes" da apuração.
+  `CREATE TABLE urna_eleitores (
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+     votos       INTEGER NOT NULL DEFAULT 0,
+     ultimo_em   INTEGER NOT NULL,
+     PRIMARY KEY (servidor_id, usuario_id)
+   )`,
 ];
 
 export function abrirBanco(caminho) {
