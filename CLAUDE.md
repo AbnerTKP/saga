@@ -42,6 +42,7 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Repositório | `AbnerTKP/saga`, link fixo `/releases/latest` |
 | Dono | apelido `TKP` |
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
+| E-mail (Resend) | `RESEND_KEY` + `EMAIL_DE` no `.env` da VPS; vazios, a Saga não pede e-mail a ninguém. **Desligado desde que nasceu (17/09/2026): a conta do Resend não tem domínio verificado** e, assim, só entrega no e-mail do dono — ligar antes disso trava o grupo inteiro fora. Ver `server/CLAUDE.md`, "O e-mail da conta" |
 | Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
 
 **Publicar servidor: `cd server && ./publicar.sh`** — nunca o `scp` na mão. Cada trava
@@ -253,7 +254,7 @@ para o arquivo da área, não para cá — aqui só entra o que vale em qualquer
 ## Testes
 
 ```bash
-pnpm test        # servidor (460) + app (395), segundos, sem nada externo
+pnpm test        # servidor (516) + app (427), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

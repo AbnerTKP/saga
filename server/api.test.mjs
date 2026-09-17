@@ -1436,7 +1436,7 @@ test('servidor que não existe, ou número que nem é número, dá 404', async (
 // alguém que outro teste usa (abner, bruno…) mataria o crachá guardado dele, com o erro
 // aparecendo num teste que não tem nada a ver com senha.
 
-const RECUSA_DO_CODIGO = 'Código inválido ou vencido. Peça outro ao dono da Saga.';
+const RECUSA_DO_CODIGO = 'Código inválido ou vencido. Peça outro.';
 
 const recuperarPorHttp = (apelido, codigo, senha = 'novasenha789') =>
   chamar('POST', '/recuperar', { corpo: { apelido, codigo, senha, senhaRepetida: senha } });
@@ -1815,4 +1815,34 @@ test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {
 
   const invalido = await chamar('POST', '/relatos', { sessao: quem.token, corpo: { tipo: 'erro', texto: '' } });
   assert.equal(invalido.status, 400);
+});
+
+// --- e-mail, com o envio desligado ----------------------------------------------------
+//
+// É a produção enquanto não houver um domínio verificado no Resend: sem `RESEND_KEY` e
+// `EMAIL_DE`, a Saga não pede e-mail a ninguém. O caminho com o envio ligado mora em
+// api-email.test.mjs, com outro servidor.
+
+test('sem envio de e-mail, nada muda: cadastro sem e-mail entra e ninguém é mandado confirmar', async () => {
+  assert.deepEqual((await chamar('GET', '/health')).corpo, { ok: true, email: false });
+
+  const r = await cadastrar('sem_envio');
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.equal(r.corpo.precisaDeEmail, false);
+  assert.equal(r.corpo.email, null);
+  assert.equal((await chamar('GET', '/eu', { sessao: r.corpo.token })).corpo.precisaDeEmail, false);
+
+  const entrou = await chamar('POST', '/entrar', { corpo: { apelido: 'sem_envio', senha: 'segredo123' } });
+  assert.equal(entrou.corpo.precisaDeEmail, false);
+});
+
+test('sem envio de e-mail, pedir código diz por quê — e nunca é 401', async () => {
+  const esqueci = await chamar('POST', '/esqueci', { corpo: { conta: 'abner' } });
+  assert.equal(esqueci.status, 503);
+  assert.match(esqueci.corpo.error, /dono da Saga/, 'a saída que continua existindo é o código do dono');
+
+  const quem = (await cadastrar('sem_envio2')).corpo;
+  const pedir = await chamar('POST', '/eu/email', { sessao: quem.token, corpo: { email: 'x@gmail.com' } });
+  assert.equal(pedir.status, 503);
+  assert.equal((await chamar('GET', '/eu', { sessao: quem.token })).corpo.emailPendente, null);
 });

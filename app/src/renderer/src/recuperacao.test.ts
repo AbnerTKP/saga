@@ -65,6 +65,12 @@ test('oito símbolos com O, I, 0 ou 1 não são um código: o botão não acende
   assert.equal(avisoDoCodigo(''), null);
 });
 
+test('o aviso manda conferir onde o código chegou: o dono ou o e-mail', () => {
+  assert.match(avisoDoCodigo('K7QM-2XP0') ?? '', /o que o dono mandou/);
+  assert.match(avisoDoCodigo('K7QM-2XP0', 'email') ?? '', /Confira o e-mail\.$/);
+  assert.doesNotMatch(avisoDoCodigo('K7QM-2XP0', 'email') ?? '', /dono/);
+});
+
 test('colar a mensagem inteira pega o código de dentro dela', () => {
   assert.equal(codigoNoColado('Código: K7QM-2XPA'), 'K7QM-2XPA');
   assert.equal(codigoNoColado('Oi Ana, segue o código k7qm-2xpa, vale uma hora'), 'K7QM-2XPA');
@@ -115,7 +121,7 @@ test('o 404 do roteador vira "atualize o servidor"; o resto passa como veio', ()
     'O servidor ainda não sabe fazer isso: ele precisa ser atualizado.',
   );
   assert.equal(explicarFalha(404, 'Essa conta não existe.'), 'Essa conta não existe.');
-  const recusa = 'Código inválido ou vencido. Peça outro ao dono da Saga.';
+  const recusa = 'Código inválido ou vencido. Peça outro.';
   assert.equal(explicarFalha(400, recusa), recusa);
   assert.equal(explicarFalha(403, 'A senha atual não confere.'), 'A senha atual não confere.');
   const semRede = 'Não consegui falar com o servidor. Confira sua internet.';

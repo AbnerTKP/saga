@@ -1,14 +1,15 @@
 // Contas, sessões e estado de moderação.
 //
-// A identidade é o apelido — escolhido uma vez e fixo. A coluna de e-mail existe no banco
-// mas ainda não é pedida a ninguém: fica reservada para quando fizer sentido atrelar. É por
-// isso que a senha esquecida se recupera pelo dono da Saga, e não por e-mail — ver
-// "recuperar e trocar a senha", no fim.
+// A identidade é o apelido — escolhido uma vez e fixo. O e-mail é outra coisa: não serve
+// para entrar, não aparece para ninguém e existe por um motivo só, recuperar a senha sem
+// depender de o dono da Saga estar acordado. Ele entra na conta CONFIRMADO por código, e
+// nunca cru — ver "o e-mail", mais abaixo.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { gerarCodigo, limparCodigo } from './codigos.mjs';
 import * as usuarios from './repositorios/usuarios.mjs';
 import * as sessoes from './repositorios/sessoes.mjs';
 import * as recuperacoes from './repositorios/recuperacoes.mjs';
+import * as emailsPendentes from './repositorios/emails_pendentes.mjs';
 
 export class ErroDeConta extends Error {
   /**
@@ -81,7 +82,21 @@ function exigirSenhaNova(senha, senhaRepetida) {
 
 const chaveDoApelido = (apelido) => apelido.trim().toLowerCase();
 
-export function criarConta(db, { apelido, senha, senhaRepetida }) {
+/**
+ * `pedeEmail` é o servidor dizendo se o envio está ligado; com ele, cadastro sem e-mail é
+ * recusado ali, antes de existir conta. Sem envio, o campo nem aparece na tela e a conta
+ * nasce como sempre nasceu — é o que mantém a Saga inteira funcionando enquanto não houver
+ * um domínio para mandar de verdade (ver o cabeçalho de email.mjs).
+ *
+ * O e-mail NÃO é gravado aqui: quem chama manda o código e guarda o pendente. Conta nova
+ * com e-mail cru na coluna seria exatamente o endereço não conferido que esta feature
+ * existe para não ter. Ele é CONFERIDO aqui, antes de a conta existir: recusado depois,
+ * deixaria um apelido tomado por uma conta que ninguém quis.
+ *
+ * A ordem das recusas é a dos campos na tela — apelido, e-mail, senha —, para o primeiro
+ * erro que aparece ser o do campo mais de cima.
+ */
+export function criarConta(db, { apelido, senha, senhaRepetida, email }, { pedeEmail = false } = {}) {
   // Sem `String()` no que veio do JSON: um array com milhares de níveis passa pelo
   // `JSON.parse`, mas estoura a pilha ao virar texto — medido, 5000 níveis em 10 KB —, e
   // cada pedido desses seria um 500 com a pilha inteira no registro.
@@ -89,6 +104,7 @@ export function criarConta(db, { apelido, senha, senhaRepetida }) {
   if (!APELIDO_VALIDO.test(nome)) {
     throw new ErroDeConta('O apelido precisa ter de 3 a 24 caracteres, sem espaços.');
   }
+  if (pedeEmail) exigirEmail(db, email, 0);
   exigirSenhaNova(senha, senhaRepetida);
 
   const chave = chaveDoApelido(nome);
@@ -129,6 +145,140 @@ export const buscarPorId = (db, id) => usuarios.buscarPorId(db, id);
 export const buscarPorApelido = (db, apelido) =>
   (typeof apelido === 'string' ? usuarios.buscarPorApelidoChave(db, chaveDoApelido(apelido)) : null);
 
+// --- o e-mail ---------------------------------------------------------------
+//
+// O e-mail existe para uma coisa só: a pessoa recuperar a própria senha sem depender de o
+// dono da Saga estar acordado. Ele não entra na conta como veio digitado — vai para
+// `emails_pendentes` com um código, e só vira `usuarios.email` quando o código volta certo.
+// Sem isso, um dígito trocado seria uma porta fechada em silêncio, descoberta no pior dia
+// possível, e o endereço de OUTRA pessoa seria a chave da conta.
+//
+// O código é o mesmo de `recuperacoes` — 8 letras, XXXX-XXXX, uma hora, cinco erros —, e é
+// de propósito: dois formatos diferentes para a mesma pessoa, na mesma semana, é como se
+// ensina alguém a digitar um no campo do outro. O app já sabe formatar, colar e conferir
+// esse; um de seis dígitos seria uma segunda cópia de tudo isso.
+
+/**
+ * Régua de e-mail: um arroba, um ponto depois dele, sem espaços.
+ *
+ * De propósito mais frouxa que a gramática do RFC — endereço válido de verdade tem forma
+ * que nenhum regex razoável cobre, e recusar o e-mail bom de alguém é pior do que aceitar
+ * um torto: quem prova que o endereço existe é o código que chega nele, não isto aqui.
+ */
+const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const EMAIL_MAXIMO = 254;   // o limite do endereço no SMTP
+
+/**
+ * O endereço como ele é guardado: sem espaços em volta e em minúsculas.
+ *
+ * Minúsculas porque o índice único é o que impede duas contas de dividirem a mesma caixa, e
+ * "Ana@gmail" e "ana@gmail" são a mesma caixa em todo provedor que este grupo usa. O que
+ * NÃO se faz é tirar o ponto ou o "+algo" do Gmail: seria adivinhar a regra de um provedor
+ * específico e passar a recusar como "repetido" o endereço legítimo de quem usa outro.
+ */
+export const normalizarEmail = (email) =>
+  (typeof email === 'string' ? email.trim().toLowerCase() : '');
+
+/**
+ * O e-mail pronto para guardar, ou a recusa com motivo.
+ *
+ * `usuarioId` é quem está pedindo: sem ele, confirmar o próprio endereço de novo seria
+ * "esse e-mail já é de outra conta".
+ */
+function exigirEmail(db, email, usuarioId) {
+  const limpo = normalizarEmail(email);
+  if (!limpo) throw new ErroDeConta('Falta o e-mail.');
+  if (limpo.length > EMAIL_MAXIMO || !EMAIL_VALIDO.test(limpo)) {
+    throw new ErroDeConta('Esse e-mail não parece um e-mail.');
+  }
+  if (usuarios.emailDeOutraConta(db, limpo, usuarioId)
+    || emailsPendentes.deOutraConta(db, limpo, usuarioId)) {
+    // Dizer que o endereço já está em uso entrega que alguém do grupo o usa. É o preço de
+    // não deixar a pessoa bater de novo no mesmo muro sem entender — e quem digita o
+    // e-mail de outro por engano é bem mais comum aqui do que quem está pescando.
+    throw new ErroDeConta('Esse e-mail já é de outra conta.', 409);
+  }
+  return limpo;
+}
+
+/**
+ * Guarda o pedido e devolve o código para quem vai mandá-lo por e-mail.
+ *
+ * O código volta em texto UMA vez, como o do dono: aqui ninguém o vê numa tela, ele vai
+ * direto para o e-mail. No banco fica só o hash, pelo mesmo scrypt da senha.
+ *
+ * Quem chama manda o e-mail DEPOIS, e é por isso que esta função não o manda: falhando o
+ * envio, a rota apaga o pendente e devolve o motivo — um pendente que ficasse de pé com o
+ * código que ninguém recebeu faria a tela pedir para sempre um código que não existe.
+ */
+export function pedirEmail(db, usuarioId, email) {
+  const conta = buscarPorId(db, usuarioId);
+  if (!conta) throw new ErroDeConta('Essa conta não existe.', 404);
+  const endereco = exigirEmail(db, email, conta.id);
+
+  const codigo = gerarCodigo();
+  const criadoEm = Date.now();
+  emailsPendentes.guardar(db, {
+    usuarioId: conta.id,
+    email: endereco,
+    codigoHash: hashDaSenha(codigo),
+    criadoEm,
+    expiraEm: criadoEm + VALIDADE_DO_CODIGO,
+  });
+  return { codigo, email: endereco, apelido: conta.apelido };
+}
+
+/** O pedido de e-mail que ainda vale, ou null. Serve à tela saber por onde parou. */
+export function emailPendente(db, usuarioId, agora = Date.now()) {
+  const p = emailsPendentes.daConta(db, usuarioId);
+  if (!p || p.expira_em <= agora || p.erros >= ERROS_POR_CODIGO) return null;
+  return { email: p.email, expiraEm: p.expira_em };
+}
+
+/** Desistir do endereço digitado, para pôr outro. Sem isto, trocar exigiria esperar a hora passar. */
+export const desistirDoEmail = (db, usuarioId) => emailsPendentes.apagar(db, usuarioId);
+
+/**
+ * Confirma o endereço com o código que chegou nele.
+ *
+ * Mesma ordem e mesmo freio da recuperação de senha, pelos mesmos motivos: cinco erros
+ * matam o CÓDIGO (não a conta), o pendente é apagado antes de a conta mudar, e a recusa é
+ * uma só. A diferença é que aqui a pessoa já está logada — errar não a tranca do lado de
+ * fora, só a manda pedir outro código.
+ *
+ * Nenhuma sessão cai: confirmar e-mail não é trocar senha. Quem chegou aqui já era dono da
+ * sessão antes de começar.
+ */
+export function confirmarEmail(db, usuarioId, codigo) {
+  const conta = buscarPorId(db, usuarioId);
+  if (!conta) throw new ErroDeConta('Essa conta não existe.', 404);
+
+  const pendente = emailsPendentes.daConta(db, conta.id);
+  if (!pendente) recusarCodigo();
+  if (pendente.expira_em <= Date.now() || pendente.erros >= ERROS_POR_CODIGO) {
+    emailsPendentes.apagar(db, conta.id);
+    recusarCodigo();
+  }
+
+  if (!senhaConfere(limparCodigo(codigo), pendente.codigo_hash)) {
+    if (emailsPendentes.contarErro(db, conta.id) >= ERROS_POR_CODIGO) {
+      emailsPendentes.apagar(db, conta.id);
+    }
+    recusarCodigo();
+  }
+
+  // Entre o pedido e a confirmação alguém pode ter confirmado o mesmo endereço: o índice
+  // único recusaria com um erro de banco, que viraria 500 com a pilha no registro.
+  if (usuarios.emailDeOutraConta(db, pendente.email, conta.id)) {
+    emailsPendentes.apagar(db, conta.id);
+    throw new ErroDeConta('Esse e-mail já é de outra conta.', 409);
+  }
+
+  usuarios.definirEmail(db, conta.id, pendente.email);
+  emailsPendentes.apagar(db, conta.id);
+  return buscarPorId(db, conta.id);
+}
+
 // --- sessões ----------------------------------------------------------------
 //
 // Sessões não expiram por tempo: o app abre já logado. Somem quando a pessoa sai, quando
@@ -160,8 +310,10 @@ export function entrar(db, { apelido, senha }) {
  * O `/cadastrar` fazia isso chamando `entrar` com a senha que acabara de gravar: um segundo
  * scrypt, num processo de um núcleo, para conferir o que ninguém duvidava.
  */
-export function criarContaEEntrar(db, pedido) {
-  return abrirSessao(db, criarConta(db, pedido ?? {}));
+export function criarContaEEntrar(db, pedido, opcoes = {}) {
+  const conta = criarConta(db, pedido ?? {}, opcoes);
+  // O endereço volta junto, já do jeito que se guarda, para a rota mandar o código.
+  return { ...abrirSessao(db, conta), email: opcoes.pedeEmail ? normalizarEmail(pedido?.email) : null };
 }
 
 /**
@@ -226,9 +378,14 @@ export const ERROS_POR_CODIGO = 5;
  * Uma recusa só, com o mesmo 400, para apelido que não existe, conta sem código e código
  * vencido, esgotado ou errado: dizer qual é entregaria, a quem estiver chutando, quem
  * existe e quem tem código pendente. 400 e nunca 401, que no app quer dizer "a sessão caiu".
+ *
+ * A frase dizia "Peça outro ao dono da Saga", e deixou de dizer quando o código passou a
+ * chegar também por e-mail: ela serve ao código do dono, ao código de senha que veio por
+ * e-mail e ao de confirmar o endereço, e "peça ao dono" mandaria duas dessas três pessoas
+ * pedir no lugar errado. Quem sabe de onde veio o código é a tela.
  */
 const recusarCodigo = () => {
-  throw new ErroDeConta('Código inválido ou vencido. Peça outro ao dono da Saga.', 400);
+  throw new ErroDeConta('Código inválido ou vencido. Peça outro.', 400);
 };
 
 /**
@@ -238,12 +395,15 @@ const recusarCodigo = () => {
  * volta em texto UMA vez, para a tela de quem gerou. No banco fica o hash, pelo mesmo
  * scrypt da senha: são 40 bits, e num sha256 quem lesse o banco os quebraria em minutos.
  */
-export function emitirCodigoDeRecuperacao(db, usuarioId, criadoPor) {
+export function emitirCodigoDeRecuperacao(db, usuarioId, criadoPor, agora = Date.now()) {
   const conta = buscarPorId(db, usuarioId);
   if (!conta) throw new ErroDeConta('Essa conta não existe.', 404);
 
   const codigo = gerarCodigo();
-  const criadoEm = Date.now();
+  // O relógio de quem pediu, e não um segundo `Date.now()`: o "esqueci a senha" confere o
+  // intervalo contra o `agora` dele, e uma leitura feita depois do scrypt ficava alguns
+  // milissegundos à frente — o bastante para o pedido seguinte cair no freio sem motivo.
+  const criadoEm = agora;
   const expiraEm = criadoEm + VALIDADE_DO_CODIGO;
   recuperacoes.guardar(db, {
     usuarioId: conta.id, codigoHash: hashDaSenha(codigo), criadoPor, criadoEm, expiraEm,
@@ -251,6 +411,66 @@ export function emitirCodigoDeRecuperacao(db, usuarioId, criadoPor) {
   // O hífen é da tela, para ler e ditar em dois pedaços; quem confere o tira de volta.
   return { codigo: `${codigo.slice(0, 4)}-${codigo.slice(4)}`, expiraEm, apelido: conta.apelido };
 }
+
+/**
+ * Quanto tempo entre dois códigos de senha pedidos pela MESMA conta.
+ *
+ * Sem isto, um clique repetido no "Mandar código" — ou alguém que saiba um apelido — enche
+ * a caixa de e-mail de quem nem estava tentando entrar, e queima a cota de envio do grupo
+ * no caminho. Dois minutos é o bastante para não incomodar quem clicou duas vezes por
+ * ansiedade: o código antigo continua valendo, e é ele que está na caixa.
+ */
+export const INTERVALO_ENTRE_CODIGOS = 2 * 60_000;
+
+/**
+ * A conta pelo apelido ou pelo e-mail CONFIRMADO, num campo só.
+ *
+ * Com arroba é e-mail, sem arroba é apelido: o apelido não aceita "@" (`APELIDO_VALIDO`),
+ * então não há texto que possa ser os dois. O "esqueci a senha" e o "trocar e entrar" que
+ * vem depois passam por aqui, e é isso que deixa quem digitou o e-mail no primeiro passo
+ * chegar ao segundo sem que a tela precise saber qual é o apelido — ela não sabe, porque a
+ * resposta do primeiro passo é a mesma para todo mundo.
+ */
+function contaPorApelidoOuEmail(db, texto) {
+  if (typeof texto !== 'string' || !texto.trim()) return null;
+  return texto.includes('@')
+    ? usuarios.buscarPorEmail(db, normalizarEmail(texto))
+    : buscarPorApelido(db, texto);
+}
+
+/**
+ * "Esqueci a senha", por e-mail: acha a conta e devolve o código para quem vai mandá-lo.
+ *
+ * Devolve `null` — sem erro — para apelido que não existe, conta sem e-mail confirmado e
+ * pedido cedo demais. A rota responde a MESMA frase nos quatro casos, porque cada resposta
+ * diferente aqui conta a um estranho quem existe, quem tem e-mail e quem acabou de pedir
+ * um código. É a mesma escolha do `/entrar` e da recuperação pelo código do dono.
+ *
+ * Aceita apelido OU e-mail no mesmo campo: quem esqueceu a senha às vezes esqueceu também
+ * qual dos dois usou, e dois campos com "preencha um" é o formulário que ninguém entende.
+ */
+export function pedirCodigoDeSenha(db, apelidoOuEmail, agora = Date.now()) {
+  const conta = contaPorApelidoOuEmail(db, apelidoOuEmail);
+  if (!conta?.email) return null;
+
+  const pendente = recuperacoes.daConta(db, conta.id);
+  if (pendente && agora - pendente.criado_em < INTERVALO_ENTRE_CODIGOS) return null;
+
+  const { codigo } = emitirCodigoDeRecuperacao(db, conta.id, null, agora);
+  // Sem o hífen que a tela do dono põe: quem formata o texto do e-mail é `email.mjs`, e
+  // duas formatações do mesmo código é como elas passam a divergir.
+  return { conta, codigo: limparCodigo(codigo), email: conta.email };
+}
+
+/**
+ * O código de senha que não chegou a sair — o envio falhou depois de emitido.
+ *
+ * Ficando, ele valeria uma hora sem ninguém tê-lo e seguraria o intervalo entre códigos: a
+ * pessoa tentaria de novo meio minuto depois, com o envio já de volta, e leria "mandei" sem
+ * nada ter saído. O código que ele substituiu não volta — gerar outro sempre matou o
+ * anterior —, mas esse já não era o caminho de quem pede por e-mail.
+ */
+export const esquecerCodigoDeSenha = (db, usuarioId) => recuperacoes.apagar(db, usuarioId);
 
 /**
  * Esqueci a senha: com o código do dono, a pessoa escolhe a senha nova e já entra.
@@ -277,10 +497,11 @@ export function emitirCodigoDeRecuperacao(db, usuarioId, criadoPor) {
  * pede; é o registro que deixa o dono separar "errou a digitação" de "estão queimando".
  */
 export function recuperarSenha(db, pedido, { aoEsgotar } = {}) {
+  // `apelido` pode ser o e-mail: é o nome do campo no protocolo, e o app antigo o manda.
   const { apelido, codigo, senha, senhaRepetida } = pedido ?? {};
   exigirSenhaNova(senha, senhaRepetida);
 
-  const conta = buscarPorApelido(db, apelido);
+  const conta = contaPorApelidoOuEmail(db, apelido);
   const pendente = conta ? recuperacoes.daConta(db, conta.id) : null;
   if (!pendente) recusarCodigo();
   if (pendente.expira_em <= Date.now() || pendente.erros >= ERROS_POR_CODIGO) {

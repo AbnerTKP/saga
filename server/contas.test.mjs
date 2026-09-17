@@ -167,7 +167,7 @@ test('cadastrar já entra: a sessão devolvida vale, e é uma só', () => {
 
 // --- recuperar e trocar a senha -----------------------------------------------
 
-const RECUSA = { status: 400, mensagem: 'Código inválido ou vencido. Peça outro ao dono da Saga.' };
+const RECUSA = { status: 400, mensagem: 'Código inválido ou vencido. Peça outro.' };
 const SENHA_NOVA = 'novasenha789';
 
 /** O que foi recusado, e com que status. Erro que não é de conta é erro de programa — um 500. */

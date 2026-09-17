@@ -1,10 +1,12 @@
 /**
  * Recuperar a senha, no que dá para fazer longe da tela.
  *
- * As contas não têm e-mail, então quem atesta que é a pessoa é o dono da Saga: ele gera um
- * código no painel dele, manda por fora, e a pessoa usa o código para escolher outra senha.
- * O código são 8 letras e dígitos, mostrados como XXXX-XXXX. O servidor ignora maiúsculas,
- * espaços e hífens; o campo daqui só deixa o que se digita com a cara do que chegou.
+ * O código chega por um de dois caminhos: o e-mail da conta, que a própria pessoa pede na
+ * tela de entrar, ou o dono da Saga, que o gera no painel dele e manda por fora — o caminho
+ * de quem não tem e-mail. Com ele se escolhe outra senha. É o mesmo código nos dois casos, e
+ * também o de confirmar o e-mail: 8 letras e dígitos, mostrados como XXXX-XXXX. O servidor
+ * ignora maiúsculas, espaços e hífens; o campo daqui só deixa o que se digita com a cara do
+ * que chegou.
  */
 import { rotaQueNaoExiste } from './resposta.ts';
 
@@ -49,10 +51,14 @@ export const codigoCompleto = (texto: string): boolean =>
  * Por que o botão não acende com oito letras no campo. Botão apagado sem motivo parece
  * defeito, e quem digitou "0" no lugar de "O" não tem como adivinhar que nenhum dos dois existe.
  */
-export const avisoDoCodigo = (texto: string): string | null =>
+export const avisoDoCodigo = (texto: string, veioDe: 'dono' | 'email' = 'dono'): string | null =>
   // Por extenso, "zero" e "um": escritos como algarismos, ao lado das letras O e I, o aviso
-  // teria a mesma confusão que ele existe para desfazer.
-  (foraDoAlfabeto(texto) ? 'Esse código não existe: ele não usa as letras O e I, nem zero e um. Confira o que o dono mandou.' : null);
+  // teria a mesma confusão que ele existe para desfazer. O fim da frase diz onde conferir: o
+  // mesmo código chega pelo dono ou pelo e-mail, e "o que o dono mandou" mandaria quem
+  // recebeu por e-mail procurar uma mensagem que não existe.
+  (foraDoAlfabeto(texto)
+    ? `Esse código não existe: ele não usa as letras O e I, nem zero e um. ${veioDe === 'email' ? 'Confira o e-mail.' : 'Confira o que o dono mandou.'}`
+    : null);
 
 /**
  * O código que está num texto colado, ou null se não houver um inteiro ali.

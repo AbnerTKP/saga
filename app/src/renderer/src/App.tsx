@@ -7,7 +7,7 @@ import {
   guardarServidorAtual, lerServidorAtual, meusServidores, sairDoServidor,
   type Acao,
   verServidor,
-  type Cargo, type Categoria, type RoomInfo, type Sessao, type Membro, type Servidor, type Mensagem,
+  type Cargo, type Categoria, type RoomInfo, type Sessao, type EstadoDoEmail, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
   abrirGrid, agirNoGrid, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
   agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
@@ -36,6 +36,7 @@ import { lerGuardado, guardar, marcarLido, paraParametro, ONDE, type Marcadores 
 import { comAPessoa, conversasComNovidade, ultimasVistas, type ComAPessoa } from './amizade';
 import { TelaDeAmigos } from './components/TelaDeAmigos';
 import { ConnectScreen } from './components/ConnectScreen';
+import { ConfirmarEmail } from './components/ConfirmarEmail';
 import { Sidebar } from './components/Sidebar';
 import { MenuDeSalas, type AcaoDeSala } from './components/MenuDeSalas';
 import { MenuDoServidor, type AcaoNoServidor } from './components/MenuDoServidor';
@@ -89,6 +90,17 @@ type PessoaAberta = { pessoa: PessoaNaCall; servidorId: number; servidorNome: st
 export function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [conferindo, setConferindo] = useState(!!lerToken());
+  /**
+   * A Saga está pedindo o e-mail desta conta — e, vindo do cadastro, por que o código não saiu.
+   *
+   * É um estado à parte, e não `sessao.precisaDeEmail` lido direto, por causa de QUANDO o
+   * pedido aparece: só ao entrar e ao abrir o app já logado. A sessão é relida a cada troca
+   * de servidor, e o dia em que o envio de e-mail for ligado na VPS encontra gente no meio de
+   * uma call: lido direto, clicar noutro servidor trocaria o app inteiro por este cartão — e
+   * a voz seguiria rodando atrás dele, sem botão nenhum para desligar, que é justamente o que
+   * já aconteceu uma vez com a tela de entrar. O pedido do dono é "no próximo acesso".
+   */
+  const [pedidoDeEmail, setPedidoDeEmail] = useState<{ erro: string | null } | null>(null);
   /**
    * Tudo que é DE UM SERVIDOR anda com o servidor junto — as salas aqui, cargos e pessoas
    * logo abaixo.
@@ -264,6 +276,7 @@ export function App() {
         // Sem servidor nenhum não é erro: é a tela inicial vazia, e o crachá continua
         // valendo. Só o 401 abaixo derruba a sessão.
         setSessao({ token: lerToken()!, ...r });
+        if (r.precisaDeEmail) setPedidoDeEmail({ erro: null });
       })
       .catch(() => { guardarToken(null); })
       .finally(() => { if (vivo) setConferindo(false); });
@@ -274,6 +287,7 @@ export function App() {
     if (s.eu) { try { localStorage.setItem(ULTIMO_APELIDO, s.eu.apelido); } catch { /* sem storage */ } }
     if (s.servidor) guardarServidorAtual(s.servidor.id);
     setSessao(s);
+    setPedidoDeEmail(s.precisaDeEmail ? { erro: s.emailErro ?? null } : null);
   }, []);
 
   /**
@@ -426,6 +440,7 @@ export function App() {
   const esquecerAConta = useCallback(() => {
     guardarToken(null);
     setSessao(null);
+    setPedidoDeEmail(null);
     setSalasDoServidor(null);
     setDadosDoServidor(null);
     setJogos(null);
@@ -1151,6 +1166,11 @@ export function App() {
     setSessao((s) => (s ? { ...s, eu } : s));
     recarregarServidor();
   }, [recarregarServidor]);
+  // O e-mail confirmado ou pedido em "Sua conta" vale na sessão na hora — é de lá que o painel
+  // o lê ao abrir de novo.
+  const atualizarEmail = useCallback(({ emailLigado, email, emailPendente, precisaDeEmail }: EstadoDoEmail) => {
+    setSessao((s) => (s ? { ...s, emailLigado, email, emailPendente, precisaDeEmail } : s));
+  }, []);
   const atualizarServidor = useCallback((servidor: Servidor) => {
     setSessao((s) => (s ? { ...s, servidor } : s));
     recarregarServidor();
@@ -1170,6 +1190,26 @@ export function App() {
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
         <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
       <UpdateToast estado={atualizacao} />
+        <Versao />
+      </>
+    );
+  }
+
+  // Antes de qualquer tela da conta: é a continuação do login, no mesmo cartão.
+  if (pedidoDeEmail) {
+    return (
+      <>
+        <ConfirmarEmail
+          emailPendente={sessao.emailPendente ?? null}
+          erroInicial={pedidoDeEmail.erro}
+          onConfirmado={(estado) => { atualizarEmail(estado); setPedidoDeEmail(null); }}
+          onEntrarSemEmail={() => setPedidoDeEmail(null)}
+          onSair={logout}
+          onRegistro={() => setRegistro(true)}
+        />
+        {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
+        <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
+        <UpdateToast estado={atualizacao} />
         <Versao />
       </>
     );
@@ -1230,6 +1270,8 @@ export function App() {
             volumeDoSoundboard={rm.volumeDoSoundboard}
             onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
             onEu={atualizarEu}
+            email={sessao}
+            onEmail={atualizarEmail}
             onRegistro={() => { setDevices(false); setRegistro(true); }}
             onAdministracao={() => { setDevices(false); setAdministracao(true); }}
             onClose={() => setDevices(false)}
@@ -1450,6 +1492,8 @@ export function App() {
           volumeDoSoundboard={rm.volumeDoSoundboard}
           onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
           onEu={atualizarEu}
+          email={sessao}
+          onEmail={atualizarEmail}
           onRegistro={() => { setDevices(false); setRegistro(true); }}
           onAdministracao={() => { setDevices(false); setAdministracao(true); }}
           onClose={() => setDevices(false)}

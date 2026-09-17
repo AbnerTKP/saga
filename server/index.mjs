@@ -32,8 +32,10 @@ import * as tabelaDeUsuarios from './repositorios/usuarios.mjs';
 import * as tabelaDeMembros from './repositorios/membros.mjs';
 import {
   ErroDeConta, criarContaEEntrar, entrar, usuarioDaSessao, buscarPorId, sair, recuperarSenha, trocarMinhaSenha,
-  ERROS_POR_CODIGO,
+  ERROS_POR_CODIGO, pedirEmail, confirmarEmail, emailPendente, desistirDoEmail, pedirCodigoDeSenha,
+  esquecerCodigoDeSenha,
 } from './contas.mjs';
+import * as email from './email.mjs';
 import { temPermissao, PERMISSOES } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
@@ -58,6 +60,62 @@ const BANCO = process.env.BANCO ?? './dados/cantinho.db';
  */
 const ARQUIVOS = process.env.ARQUIVOS ?? pastaDosArquivos(BANCO);
 const GIPHY = process.env.GIPHY_KEY ?? '';   // vazio = busca de GIF desligada
+/*
+ * O envio de e-mail: as duas linhas andam juntas, e vazias desligam tudo.
+ *
+ * Desligado, a Saga não pede e-mail a ninguém e o cadastro continua só com apelido e
+ * senha — é como o grupo sempre usou. Ligar sem um domínio verificado no Resend seria
+ * pior do que deixar desligado: a conta em modo de teste entrega só no endereço do dono
+ * dela e responde 403 para todos os outros, e a Saga passaria a exigir a confirmação de
+ * um código que nunca chega. Ver o cabeçalho de email.mjs.
+ */
+const RESEND = process.env.RESEND_KEY ?? '';
+const EMAIL_DE = process.env.EMAIL_DE ?? '';   // ex.: Saga <saga@seudominio.com.br>
+const EMAIL_LIGADO = () => email.envioLigado({ chave: RESEND, remetente: EMAIL_DE });
+
+/**
+ * Manda um código por e-mail, com o teto do servidor no caminho.
+ *
+ * Devolve `false` quando o teto estourou — quem chamou segue como se tivesse mandado, que
+ * é o que a resposta neutra do "esqueci a senha" exige. Falha de verdade (chave recusada,
+ * Resend fora) sobe como erro: aí o pedido não aconteceu, e dizer que aconteceu deixaria
+ * alguém esperando para sempre um e-mail que ninguém mandou.
+ */
+async function mandarCodigo(para, { assunto, texto }) {
+  if (!email.haVagaNoTeto()) return false;
+  email.anotarEnvio();
+  await email.mandar({ chave: RESEND, remetente: EMAIL_DE, para, assunto, texto });
+  return true;
+}
+
+/**
+ * Guarda o endereço como pendente e manda o código de confirmação para ele.
+ *
+ * NUNCA lança: devolve `{ emailPendente }` quando deu, e `{ emailErro, emailErroStatus }`
+ * quando não. É o que permite o mesmo caminho servir ao cadastro — onde a conta já foi
+ * criada e um erro jogado fora da rota a esconderia atrás de "não deu" — e ao `/eu/email`,
+ * que transforma o aviso em erro de verdade porque ali não há nada a perder.
+ *
+ * Falhando, o pendente é apagado: um código que ninguém recebeu faria a tela seguinte pedir
+ * para sempre um código que não existe, e o "mandar outro" seria a única saída de uma tela
+ * que não diz que ela existe.
+ */
+async function avisarPorEmail(usuario, endereco) {
+  let pedido;
+  try {
+    pedido = pedirEmail(db, usuario.id, endereco);
+  } catch (e) {
+    return { emailErro: e.message, emailErroStatus: e.status ?? 400 };
+  }
+  try {
+    const saiu = await mandarCodigo(pedido.email, email.textoDeConfirmacao(pedido.apelido, pedido.codigo));
+    if (!saiu) throw new ErroDeConta('A Saga já mandou e-mails demais nesta hora. Tente daqui a pouco.', 429);
+    return { emailPendente: pedido.email };
+  } catch (e) {
+    desistirDoEmail(db, usuario.id);
+    return { emailErro: e.message, emailErroStatus: e.status ?? 502 };
+  }
+}
 const KEY = process.env.LIVEKIT_API_KEY;
 const SECRET = process.env.LIVEKIT_API_SECRET;
 const HOST = process.env.LIVEKIT_HOST ?? 'http://localhost:7880';
@@ -319,6 +377,26 @@ function semServidor(usuario) {
   };
 }
 
+/**
+ * Como está o e-mail DESTA conta, para a tela saber o que pedir.
+ *
+ * Vai em tudo que devolve "quem sou": `/entrar`, `/cadastrar`, `/recuperar` e `/eu`. Quem
+ * decide se a Saga pede e-mail é o SERVIDOR, e não o app — com o envio desligado,
+ * `precisaDeEmail` nunca é verdade e o app antigo, que não conhece o campo, continua
+ * entrando como sempre entrou.
+ *
+ * O endereço vai inteiro porque quem lê isto é o dono da conta. Na tela de recuperar, onde
+ * quem digitou o apelido pode não ser a pessoa, nem uma parte dele viaja: a resposta é a
+ * mesma para todo mundo.
+ */
+const estadoDoEmail = (usuario) => ({
+  // Se este servidor manda e-mail: é o que decide se "Sua conta" oferece trocar o endereço.
+  emailLigado: EMAIL_LIGADO(),
+  email: usuario.email ?? null,
+  emailPendente: emailPendente(db, usuario.id)?.email ?? null,
+  precisaDeEmail: EMAIL_LIGADO() && !usuario.email,
+});
+
 /** Entra na conta e já a vincula ao servidor, devolvendo o que o app precisa para desenhar tudo. */
 function sessaoCompleta(usuario, token) {
   // Também aqui, e não só no arranque: num servidor novo o `.env` já traz o apelido do
@@ -328,11 +406,12 @@ function sessaoCompleta(usuario, token) {
   garantirCasaDoDono(usuario);
 
   const meus = servidoresM.meusServidores(db, usuario.id);
-  if (meus.length === 0) return { token, ...semServidor(usuario) };
+  if (meus.length === 0) return { token, ...estadoDoEmail(usuario), ...semServidor(usuario) };
 
   const sid = meus[0].id;
   return {
     token,
+    ...estadoDoEmail(usuario),
     eu: verMembro(membros.buscarMembro(db, sid, usuario.id)),
     servidor: verServidor(sid),
     servidores: meus,
@@ -583,8 +662,20 @@ const ROTAS = {
     // A senha do grupo saiu por pedido do dono. Ela era o convite: sem ela, quem souber
     // o endereço do servidor cria conta. O que continua barrando é o convite por servidor
     // (`/servidores/entrar`) — a conta nova não cai em servidor nenhum.
-    const { usuario, token } = criarContaEEntrar(db, await lerCorpo(req));
-    return sessaoDeQuemEntrou(usuario, token);
+    const { usuario, token, email: endereco } = criarContaEEntrar(db, await lerCorpo(req), {
+      pedeEmail: EMAIL_LIGADO(),
+    });
+    /*
+     * A conta já existe, e o e-mail é o próximo passo — não uma condição para ela nascer.
+     *
+     * Falhando o envio, a resposta continua sendo a sessão, com o motivo junto: devolver
+     * erro aqui deixaria a conta criada atrás de uma tela que diz "não deu", e a segunda
+     * tentativa esbarraria em "esse apelido já está em uso" — com a pessoa sem entender
+     * que o apelido em uso é o dela mesma. O pendente é apagado no caminho, senão a tela
+     * seguinte pediria um código que ninguém recebeu.
+     */
+    const { emailErroStatus, ...aviso } = endereco ? await avisarPorEmail(usuario, endereco) : {};
+    return { ...sessaoDeQuemEntrou(usuario, token), ...aviso };
   },
 
   'POST /entrar': async (req) => {
@@ -616,6 +707,86 @@ const ROTAS = {
     return sessaoDeQuemEntrou(usuario, token);
   },
 
+  /**
+   * "Esqueci a senha", pelo e-mail da conta.
+   *
+   * Sem sessão, como o `/entrar`: quem chega aqui é quem não consegue entrar. A resposta é
+   * SEMPRE a mesma — apelido que não existe, conta sem e-mail, pedido cedo demais, teto do
+   * servidor estourado: `{ ok: true }` em todos. Qualquer diferença aqui conta a um
+   * estranho quem existe no grupo e quem tem e-mail.
+   *
+   * O registro anota a conta quando um código sai, e nunca o código nem o endereço: é o
+   * mesmo que já se faz com o código do dono, e é o que deixa "estão pedindo código da
+   * minha conta" ser visível depois.
+   */
+  'POST /esqueci': async (req) => {
+    const { conta } = await lerCorpo(req);
+    if (!EMAIL_LIGADO()) {
+      throw new ErroDeConta('Este servidor ainda não manda e-mail. Peça um código ao dono da Saga.', 503);
+    }
+    // Sem vaga no teto, nem se emite código: emitido e não mandado, ele mataria o anterior
+    // e seguraria o intervalo à toa.
+    const pedido = email.haVagaNoTeto() ? pedirCodigoDeSenha(db, conta) : null;
+    if (pedido) {
+      try {
+        await mandarCodigo(pedido.email, email.textoDeSenha(pedido.conta.apelido, pedido.codigo));
+      } catch (e) {
+        // Falha de envio sobe como erro — dizer "mandei" para quem vai esperar em vão é o
+        // pior dos dois lados — e leva junto o código que ninguém recebeu.
+        esquecerCodigoDeSenha(db, pedido.conta.id);
+        throw e;
+      }
+      console.log(`recuperação: código de senha mandado por e-mail para ${pedido.conta.apelido}`);
+    }
+    return { ok: true };
+  },
+
+  /**
+   * O e-mail da conta: pede o endereço e manda o código para ele.
+   *
+   * Serve às três portas — o pedido ao entrar, o "mandar outro código" e o "trocar o
+   * e-mail" de "Sua conta" —, porque as três são a mesma coisa: um endereço novo esperando
+   * prova. Pedir de novo substitui o pendente anterior, e é assim que se troca de endereço
+   * sem esperar a hora do código velho passar.
+   *
+   * NÃO pede a senha atual, ao contrário de trocar a senha. Pedir e-mail não muda nada
+   * sozinho: o que muda a conta é o código que chega NO ENDEREÇO NOVO, e quem não abre
+   * aquela caixa não confirma nada. Uma Saga aberta e esquecida num computador alheio não
+   * vira conta tomada por aqui — vira, no máximo, um pendente que morre em uma hora.
+   */
+  'POST /eu/email': async (req) => {
+    const eu = exigirConta(req);
+    if (!EMAIL_LIGADO()) throw new ErroDeConta('Este servidor ainda não manda e-mail.', 503);
+    const { email: endereco } = await lerCorpo(req);
+    const aviso = await avisarPorEmail(eu, endereco);
+    if (aviso.emailErro) throw new ErroDeConta(aviso.emailErro, aviso.emailErroStatus ?? 502);
+    return { ok: true, emailPendente: aviso.emailPendente };
+  },
+
+  /** O código que chegou no endereço. Acertando, ele vira o e-mail da conta. */
+  'POST /eu/email/confirmar': async (req) => {
+    const eu = exigirConta(req);
+    const { codigo } = await lerCorpo(req);
+    const conta = confirmarEmail(db, eu.id, codigo);
+    // Só o apelido: o endereço é dado de quem o deu, e o registro do servidor circula em
+    // captura de tela quando alguém vai atrás de um problema.
+    console.log(`e-mail: ${conta.apelido} confirmou o e-mail da conta`);
+    return { ok: true, ...estadoDoEmail(conta) };
+  },
+
+  /**
+   * Desistir do endereço digitado, para pôr outro.
+   *
+   * Sem isto, quem errou o endereço veria a tela do código até a hora passar: o app volta
+   * ao passo do e-mail na hora, mas o `/eu` da próxima abertura o mandaria de volta para o
+   * código que nunca vai chegar.
+   */
+  'POST /eu/email/desistir': async (req) => {
+    const eu = exigirConta(req);
+    desistirDoEmail(db, eu.id);
+    return { ok: true, ...estadoDoEmail(buscarPorId(db, eu.id)) };
+  },
+
   'POST /sair': async (req) => {
     // Apaga o sinal de vida junto: sem isto, quem sai fica "online" até o silêncio vencer.
     const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
@@ -629,10 +800,11 @@ const ROTAS = {
     // Sem servidor nenhum não é erro: é a tela inicial vazia. Respondendo 404 aqui, o app
     // entendia "essa sessão não vale mais" e deslogava quem tinha acabado de se cadastrar.
     const meus = servidoresM.meusServidores(db, usuario.id);
-    if (meus.length === 0) return semServidor(usuario);
+    if (meus.length === 0) return { ...estadoDoEmail(usuario), ...semServidor(usuario) };
 
     const { sid, membro: eu } = exigirMembro(req);
     return {
+      ...estadoDoEmail(usuario),
       eu: verMembro(eu),
       servidor: verServidor(sid),
       // A lista vai junto porque a barra de servidores se desenha com ela, e este é o
@@ -1354,7 +1526,10 @@ const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
 
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
-  if (url.pathname === '/health') return json(res, 200, { ok: true });
+  // `email` é o que a tela de criar conta consulta antes de desenhar o campo: ela não tem
+  // sessão para perguntar de outro jeito, e um campo obrigatório num servidor que não manda
+  // e-mail seria uma porta trancada sem chave.
+  if (url.pathname === '/health') return json(res, 200, { ok: true, email: EMAIL_LIGADO() });
 
   // As imagens são públicas de propósito: o <img> do app não manda cabeçalho de sessão.
   // O nome é o hash do conteúdo, então não dá para descobrir a de alguém por adivinhação.

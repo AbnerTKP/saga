@@ -113,11 +113,12 @@ O que vale para quem mexe em `server/`: regras que não são óbvias no código.
   dono ficou 10 minutos de fora por errar a senha, e foi por isso que ele saiu. Um freio
   que vale a pena contaria só o que falhou, por CONTA e não por IP, e atrasaria a resposta
   em vez de fechar a porta — quem erra a senha é quase sempre quem a esqueceu.
-- **Quem esqueceu a senha recupera com um código que o DONO DA SAGA gera.** As contas não
-  têm e-mail — a coluna existe e nunca foi pedida —, então não há como o app provar sozinho
-  que alguém é quem diz: quem atesta é o dono, que conhece o grupo e manda o código por
-  fora. E-mail foi descartado de propósito: pediria provedor, chave na VPS e cadastro de
-  e-mail que ninguém fez, e e-mail que não chega é mais um jeito de parar em silêncio.
+- **Quem esqueceu a senha recupera com um código — pelo e-mail da conta, ou do DONO DA
+  SAGA.** O caminho do dono nasceu primeiro, quando as contas não tinham e-mail e alguém
+  precisava atestar que a pessoa é a pessoa: ele conhece o grupo e manda o código por
+  fora. Continua existindo, por decisão do dono em 17/09/2026, para quem não tem e-mail ou
+  perdeu o acesso a ele — ver "O e-mail da conta", logo abaixo. Os dois caminhos dão no
+  MESMO código e na mesma rota (`/recuperar`, que aceita o e-mail no campo do apelido).
   O código tem 8 letras do alfabeto dos convites, vale **uma hora e uma vez**, e gerar
   outro mata o anterior (`recuperacoes`, uma linha por conta). As regras, cada uma com o
   seu motivo:
@@ -185,6 +186,47 @@ O que vale para quem mexe em `server/`: regras que não são óbvias no código.
   - Na tela de entrar, **colar a mensagem inteira** ("Código: K7QM-2XPA") acha o código
     no meio do texto (`recuperacao.ts`, pura e testada): colar e somar letras formava um
     código completo e errado, que gastava tentativa.
+- **O e-mail da conta existe para uma coisa só: recuperar a senha sem depender do dono.**
+  Pedido do dono em 17/09/2026, com a trava que ele escolheu — sem e-mail confirmado não
+  se entra. O que não é óbvio, cada um com o motivo:
+  - **Só entra CONFIRMADO.** O endereço digitado vai para `emails_pendentes` (migração 53)
+    com um código, e só vira `usuarios.email` quando o código volta certo. Gravado cru, um
+    dígito trocado seria porta fechada descoberta no dia da emergência — o motivo que fez o
+    e-mail ser descartado da primeira vez —, e o endereço de OUTRA pessoa viraria a chave da
+    conta. Endereço só pendente não recebe código de senha nem serve de apelido.
+  - **O código é o mesmo da recuperação** — 8 letras, uma hora, cinco erros, scrypt no
+    banco, recusa única. Dois formatos para a mesma pessoa na mesma semana é como se ensina
+    a digitar um no campo do outro; e o app já sabia formatar, colar e conferir este.
+  - **O envio só liga com `RESEND_KEY` E `EMAIL_DE`**, e desligado a Saga não pede e-mail a
+    ninguém (`precisaDeEmail` nunca é verdade; `/health` diz `email: false` e o cadastro
+    nem mostra o campo). **Não ligue sem domínio verificado no Resend**: medido em
+    17/09/2026 com a conta da Saga, sem domínio ele entrega SÓ no endereço do dono da conta
+    e responde 403 ("You can only send testing emails to your own email address") para
+    qualquer outro — com a trava ligada, o grupo inteiro pediria um código que nunca chega.
+  - **Quem decide pedir é o servidor, e o app só pede ao ENTRAR** (login, cadastro, abrir já
+    logado) — nunca ao reler a sessão. O dia em que o envio for ligado encontra gente numa
+    call: lido a cada troca de servidor, o pedido trocaria o app inteiro por um cartão com
+    a voz rodando atrás e sem botão, como já aconteceu com a tela de entrar.
+  - **A trava cede quando o defeito é nosso.** Resend fora, modo de teste, chave recusada ou
+    teto estourado chegam como 5xx/429, e o cartão oferece "entrar sem e-mail por agora" —
+    o pedido volta no acesso seguinte. Erro de quem digitou (400, 409) não abre essa porta.
+    Travar alguém por falha do envio é deixá-lo de fora sem nada que ele possa fazer.
+  - **`/esqueci` responde `{ ok: true }` para tudo**: conta que não existe, conta sem
+    e-mail, pedido repetido em menos de 2 minutos, teto estourado. A tela não diz PARA ONDE
+    mandou, pela mesma razão. Freio duplo: `INTERVALO_ENTRE_CODIGOS` por conta, e
+    `TETO_POR_HORA` (30) no servidor inteiro, porque sem ele varrer as 33 contas a cada dois
+    minutos daria mil e-mails por hora — a cota do plano grátis e a caixa de todo mundo.
+  - **Falha de envio apaga o pendente.** Um código que ninguém recebeu faria a tela pedir
+    para sempre um código que não existe. No cadastro a conta já nasceu, então a resposta
+    continua sendo a sessão, com `emailErro` junto — erro ali esconderia a conta criada e a
+    segunda tentativa daria "esse apelido já está em uso", com o apelido sendo o da pessoa.
+  - **Pedir e-mail não pede a senha atual**, ao contrário de trocar a senha: pedir não muda
+    nada sozinho, e confirmar exige abrir a caixa do endereço novo. Trocar de e-mail mantém
+    o antigo valendo até o novo confirmar.
+  - **O registro anota a conta, nunca o endereço nem o código.** `api-email.test.mjs` lê
+    stdout e stderr e trava as duas coisas, e a chave junto.
+  - A recusa do código dizia "Peça outro ao dono da Saga" e passou a dizer "Peça outro.":
+    ela serve aos três códigos, e duas das três pessoas pediriam no lugar errado.
 - **Corpo que não é JSON é 400, não 500**, em toda rota. A mensagem do `JSON.parse` traz
   um pedaço do corpo (medido no Node 24), e o `console.error` do 500 escreveria no registro
   a senha do `/entrar` ou o código do `/recuperar`. **JSON que não é objeto também**:

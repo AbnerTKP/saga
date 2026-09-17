@@ -1,12 +1,15 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ClipboardEvent, type FormEvent } from 'react';
 import { Room } from 'livekit-client';
 import {
   mudarMeuNome, minhaFoto, meuBanner, usarGif, salvarEnquadramento, trocarMinhaSenha,
-  ErroDoServidor, type Membro,
+  pedirCodigoDoEmail, confirmarEmail, desistirDoEmail, ErroDoServidor, type EstadoDoEmail, type Membro,
 } from '../api';
 import { lerQualidadeGuardada, guardarQualidade } from '../useRoom';
 import { qualidadesDe, qualidadeValida, COMO_SE_LE, TODAS, type Qualidade } from '../qualidades';
-import { avisoDaTroca, explicarFalha } from '../recuperacao';
+import {
+  avisoDaTroca, avisoDoCodigo, codigoCompleto, codigoDepoisDeColar, explicarFalha, formatarCodigo,
+} from '../recuperacao';
+import { pareceEmail } from '../email';
 import { Icon } from './Icon';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocoDoMicrofone } from './AjustesDoMicrofone';
@@ -86,6 +89,142 @@ function AtalhoDoOverlay() {
 }
 
 /**
+ * O e-mail da conta: o que está valendo, e o jeito de trocar.
+ *
+ * O endereço novo passa pelo mesmo caminho do pedido ao entrar — código no endereço, e só
+ * então ele vale. Até confirmar, continua valendo o de antes: trocar para um endereço que não
+ * recebe deixaria a conta sem saída justo no dia em que a senha for esquecida.
+ *
+ * Não pede a senha atual, ao contrário da troca de senha: sozinho, pedir não muda nada, e
+ * confirmar exige abrir a caixa do endereço novo. Ver a rota `/eu/email`, no servidor.
+ */
+function BlocoDoEmail({ estado, onEmail }: { estado: EstadoDoEmail; onEmail: (e: EstadoDoEmail) => void }) {
+  const [passo, setPasso] = useState<'fechado' | 'email' | 'codigo'>(estado.emailPendente ? 'codigo' : 'fechado');
+  const [endereco, setEndereco] = useState(estado.emailPendente ?? '');
+  const [codigo, setCodigo] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [confirmado, setConfirmado] = useState(false);
+
+  const tentar = async (acao: () => Promise<void>) => {
+    setErro(null); setConfirmado(false); setOcupado(true);
+    try { await acao(); }
+    catch (e) { setErro(explicarFalha(e instanceof ErroDoServidor ? e.status : 0, (e as Error).message)); }
+    finally { setOcupado(false); }
+  };
+
+  const enviar = (e: FormEvent) => {
+    e.preventDefault();
+    if (passo === 'email') {
+      tentar(async () => {
+        const r = await pedirCodigoDoEmail(endereco.trim());
+        setEndereco(r.emailPendente);
+        setCodigo('');
+        setPasso('codigo');
+        onEmail({ ...estado, emailPendente: r.emailPendente });
+      });
+    } else {
+      tentar(async () => {
+        const { emailLigado, email, emailPendente, precisaDeEmail } = await confirmarEmail(codigo);
+        onEmail({ emailLigado, email, emailPendente, precisaDeEmail });
+        setPasso('fechado');
+        setCodigo('');
+        setConfirmado(true);
+      });
+    }
+  };
+
+  // Desistir no servidor, e não só fechar: senão o pendente reabriria este passo na próxima vez.
+  const desistir = () => {
+    if (passo === 'codigo') {
+      desistirDoEmail().then(({ emailLigado, email, emailPendente, precisaDeEmail }) =>
+        onEmail({ emailLigado, email, emailPendente, precisaDeEmail })).catch(() => undefined);
+    }
+    setErro(null);
+    setCodigo('');
+    setPasso('fechado');
+  };
+
+  const colarCodigo = (e: ClipboardEvent<HTMLInputElement>) => {
+    const campo = e.currentTarget;
+    e.preventDefault();
+    setCodigo(codigoDepoisDeColar(
+      campo.value, campo.selectionStart ?? campo.value.length, campo.selectionEnd ?? campo.value.length,
+      e.clipboardData.getData('text'),
+    ));
+  };
+
+  const aviso = passo === 'codigo' ? avisoDoCodigo(codigo, 'email') : null;
+  const pronto = passo === 'email' ? pareceEmail(endereco) : codigoCompleto(codigo);
+
+  return (
+    <section className="painel-bloco">
+      <h3>E-mail</h3>
+      <form className="form bloco-da-senha" onSubmit={enviar}>
+        {estado.email ? (
+          <p className="muted small">
+            Confirmado: <b>{estado.email}</b>. É por ele que você recupera a senha sozinho. Ninguém mais o vê.
+          </p>
+        ) : (
+          <p className="muted small">
+            A conta ainda não tem e-mail. Sem ele, quem esquece a senha depende do dono da Saga.
+          </p>
+        )}
+
+        {passo === 'email' && (
+          <label>
+            {estado.email ? 'E-mail novo' : 'E-mail'}
+            <input
+              type="email" value={endereco} onChange={(e) => setEndereco(e.target.value)}
+              autoComplete="email" spellCheck={false} maxLength={254} autoFocus
+            />
+          </label>
+        )}
+
+        {passo === 'codigo' && (
+          <>
+            <p className="muted small">
+              Mandei um código para <b>{endereco}</b>. Ele vale uma hora.
+              {estado.email && ' Até confirmar, continua valendo o de cima.'}
+            </p>
+            <label>
+              Código
+              <input
+                className="connect-codigo" value={codigo} placeholder="XXXX-XXXX" maxLength={9}
+                onChange={(e) => setCodigo(formatarCodigo(e.target.value))} onPaste={colarCodigo}
+                autoComplete="one-time-code" spellCheck={false} autoFocus
+              />
+              {aviso && <small className="muted">{aviso}</small>}
+            </label>
+          </>
+        )}
+
+        {erro && <div className="error">{erro}</div>}
+        {confirmado && <div className="aviso-ok">E-mail confirmado.</div>}
+
+        <div className="linha-campo">
+          {passo === 'fechado' ? (
+            // Só com o envio ligado: sem ele, não há como confirmar endereço nenhum.
+            estado.emailLigado && (
+              <button type="button" className="primary sm" onClick={() => { setConfirmado(false); setEndereco(''); setPasso('email'); }}>
+                {estado.email ? 'Trocar o e-mail' : 'Pôr um e-mail'}
+              </button>
+            )
+          ) : (
+            <>
+              <button type="submit" className="primary sm" disabled={ocupado || !pronto}>
+                {passo === 'email' ? (ocupado ? 'Mandando…' : 'Mandar código') : (ocupado ? 'Confirmando…' : 'Confirmar')}
+              </button>
+              <button type="button" className="link" onClick={desistir}>cancelar</button>
+            </>
+          )}
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/**
  * Tudo que é seu, num lugar só, atrás da engrenagem.
  *
  * A sua foto e o seu nome moravam dentro das configurações do SERVIDOR, junto de salas e
@@ -96,8 +235,12 @@ function AtalhoDoOverlay() {
  */
 export function PainelDaConta({
   eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onAdministracao, onClose,
+  email, onEmail,
 }: {
   eu: Membro;
+  /** O e-mail da conta, como veio na sessão. Sem envio e sem endereço, o bloco não aparece. */
+  email: EstadoDoEmail;
+  onEmail: (e: EstadoDoEmail) => void;
   room: Room;
   /** Supressão de ruído e sensibilidade — o mesmo ajuste do botão direito no microfone. */
   microfone: MicrofoneDaCall;
@@ -263,6 +406,8 @@ export function PainelDaConta({
               </>
             )}
           </section>
+
+          {(email.emailLigado || email.email) && <BlocoDoEmail estado={email} onEmail={onEmail} />}
 
           <section className="painel-bloco">
             <h3>Senha</h3>

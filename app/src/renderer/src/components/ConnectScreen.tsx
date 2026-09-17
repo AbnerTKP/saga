@@ -1,13 +1,24 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from 'react';
-import { cadastrar, entrar, guardarToken, recuperarSenha, ErroDoServidor, type Sessao } from '../api';
+import {
+  cadastrar, entrar, esqueciASenha, guardarToken, recuperarSenha, servidorMandaEmail, ErroDoServidor, type Sessao,
+} from '../api';
 import { avisoDoCodigo, codigoCompleto, codigoDepoisDeColar, explicarFalha, formatarCodigo } from '../recuperacao';
+import { pareceEmail } from '../email';
 
 /**
- * 'recuperar' é o "Esqueci a senha": as contas não têm e-mail, então quem atesta que é a
- * pessoa é o dono da Saga, que gera um código e manda por fora. Com ele se escolhe uma
- * senha nova e já se entra.
+ * 'recuperar' é o "Esqueci a senha". Com um código se escolhe uma senha nova e já se entra.
  */
 type Modo = 'entrar' | 'criar' | 'recuperar';
+
+/**
+ * De onde vem o código de quem esqueceu a senha.
+ *
+ * - 'pedir': o primeiro passo pelo e-mail — apelido ou e-mail, e "Mandar código".
+ * - 'email': o código que chegou no e-mail, e a senha nova.
+ * - 'dono': o código que o dono da Saga gerou e mandou por fora. É o caminho de quem não tem
+ *   e-mail, e o único num servidor que não manda e-mail — onde a tela é a de antes.
+ */
+type Recuperacao = 'pedir' | 'email' | 'dono';
 
 export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   apelidoInicial: string;
@@ -15,18 +26,35 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   onRegistro: () => void;
 }) {
   const [modo, setModo] = useState<Modo>(apelidoInicial ? 'entrar' : 'criar');
+  const [recuperacao, setRecuperacao] = useState<Recuperacao>('dono');
   const [apelido, setApelido] = useState(apelidoInicial);
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [senhaRepetida, setSenhaRepetida] = useState('');
   const [codigo, setCodigo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * Se este servidor manda e-mail — perguntado uma vez, ao abrir. Até a resposta chegar vale
+   * `false`, a tela de antes do e-mail: é a que funciona com qualquer servidor, e o campo que
+   * aparece um instante depois é melhor do que um campo obrigatório que o servidor ignora.
+   */
+  const [mandaEmail, setMandaEmail] = useState(false);
   const campoApelido = useRef<HTMLInputElement>(null);
   const campoCodigo = useRef<HTMLInputElement>(null);
   const cartao = useRef<HTMLFormElement>(null);
 
   const criando = modo === 'criar';
   const recuperando = modo === 'recuperar';
+  const pedindoCodigo = recuperando && recuperacao === 'pedir';
+  const peloEmail = recuperando && recuperacao === 'email';
+  const peloDono = recuperando && recuperacao === 'dono';
+
+  useEffect(() => {
+    let vivo = true;
+    servidorMandaEmail().then((sim) => { if (vivo) setMandaEmail(sim); });
+    return () => { vivo = false; };
+  }, []);
 
   // O erro entra ACIMA do botão e o empurra para baixo: numa janela baixa, quem acabou de
   // clicar perdia o botão de vista junto com a resposta. O cartão rola até o FIM, e não só
@@ -38,23 +66,32 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
     if (erro && el) el.scrollTop = el.scrollHeight;
   }, [erro]);
 
-  // Quem chega pelo "Esqueci a senha" já digitou o apelido: o que falta é o código. A dep é
-  // o MODO, nunca o apelido — com ele, cada letra digitada no apelido jogaria o cursor para
-  // o campo do código.
+  // Quem chega pelo "Esqueci a senha" já digitou o apelido: o que falta é o código — ou, pelo
+  // e-mail, o botão de mandar, que já está logo abaixo. A dep é o PASSO, nunca o apelido —
+  // com ele, cada letra digitada no apelido jogaria o cursor para o campo do código.
   useEffect(() => {
-    if (modo !== 'recuperar') return;
-    (apelido.trim() ? campoCodigo : campoApelido).current?.focus();
-  }, [modo]);
+    if (!recuperando) return;
+    if (pedindoCodigo) { campoApelido.current?.focus(); return; }
+    (peloEmail || apelido.trim() ? campoCodigo : campoApelido).current?.focus();
+  }, [modo, recuperacao]);
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
     setErro(null);
     setOcupado(true);
     try {
+      if (pedindoCodigo) {
+        // A resposta é a mesma para toda conta, então não há o que ler dela: segue-se para o
+        // código de qualquer jeito, e a frase de lá diz "se essa conta tiver e-mail".
+        await esqueciASenha(apelido.trim());
+        setCodigo('');
+        setRecuperacao('email');
+        return;
+      }
       const sessao = recuperando
         ? await recuperarSenha({ apelido, codigo, senha, senhaRepetida })
         : criando
-          ? await cadastrar({ apelido, senha, senhaRepetida })
+          ? await cadastrar({ apelido, senha, senhaRepetida, ...(mandaEmail ? { email: email.trim() } : {}) })
           : await entrar({ apelido, senha });
       guardarToken(sessao.token);
       onPronto(sessao);
@@ -71,6 +108,18 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
   // esperando noutra tela. O apelido fica: quem clica em "Esqueci a senha" já o digitou.
   const trocarModo = (novo: Modo) => {
     setModo(novo);
+    // Pelo e-mail quando o servidor manda: é o caminho que não depende de ninguém acordado.
+    setRecuperacao(mandaEmail ? 'pedir' : 'dono');
+    setErro(null);
+    setSenha('');
+    setSenhaRepetida('');
+    setCodigo('');
+  };
+
+  // Entre os caminhos da recuperação, a mesma limpeza: um código pela metade do e-mail não
+  // pode ficar esperando no campo do código do dono.
+  const trocarRecuperacao = (nova: Recuperacao) => {
+    setRecuperacao(nova);
     setErro(null);
     setSenha('');
     setSenhaRepetida('');
@@ -93,15 +142,22 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
 
   // Recuperando, o botão só acende com tudo preenchido, como em "Sua conta": com o código
   // completo e as senhas vazias, o clique não mandava nada e deixava o aviso por conta do
-  // balão nativo do navegador.
-  const faltaAlgo = recuperando && (!codigoCompleto(codigo) || !senha || !senhaRepetida);
-  const aviso = recuperando ? avisoDoCodigo(codigo) : null;
+  // balão nativo do navegador. Criando com e-mail, o mesmo vale para o endereço: o botão
+  // apagado diz "falta" antes de o servidor dizer "isso não é um e-mail".
+  const faltaAlgo = pedindoCodigo
+    ? !apelido.trim()
+    : recuperando
+      ? (!codigoCompleto(codigo) || !senha || !senhaRepetida)
+      : criando && mandaEmail && !pareceEmail(email);
+  const aviso = recuperando && !pedindoCodigo ? avisoDoCodigo(codigo, peloEmail ? 'email' : 'dono') : null;
 
-  const rotulo = recuperando
-    ? (ocupado ? 'Trocando…' : 'Trocar e entrar')
-    : criando
-      ? (ocupado ? 'Criando…' : 'Criar conta')
-      : (ocupado ? 'Entrando…' : 'Entrar');
+  const rotulo = pedindoCodigo
+    ? (ocupado ? 'Mandando…' : 'Mandar código')
+    : recuperando
+      ? (ocupado ? 'Trocando…' : 'Trocar e entrar')
+      : criando
+        ? (ocupado ? 'Criando…' : 'Criar conta')
+        : (ocupado ? 'Entrando…' : 'Entrar');
 
   return (
     <div className="connect">
@@ -127,25 +183,51 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
         {recuperando && (
           <div className="connect-recuperar">
             <h2>Recuperar a senha</h2>
-            <p className="muted">Peça um código ao dono da Saga. Ele vale uma hora e serve uma vez só.</p>
+            <p className="muted">
+              {pedindoCodigo && 'Mando um código para o e-mail da conta. Ele vale uma hora e serve uma vez só.'}
+              {/* Não diz PARA ONDE mandou: a resposta é a mesma para toda conta, e dizer
+                  contaria a quem digitou o apelido de outro que ela existe e tem e-mail. */}
+              {peloEmail && 'Se essa conta tiver e-mail, o código foi para lá. Ele vale uma hora e serve uma vez só. Não chegou? Olhe o spam.'}
+              {peloDono && 'Peça um código ao dono da Saga. Ele vale uma hora e serve uma vez só.'}
+            </p>
           </div>
         )}
 
-        <label>
-          Apelido
-          <input
-            ref={campoApelido}
-            value={apelido}
-            onChange={(e) => setApelido(e.target.value)}
-            autoComplete="username"
-            maxLength={24}
-            required
-            autoFocus
-          />
-          {criando && <small className="muted">De 3 a 24 caracteres, sem espaços. Não dá para mudar depois — mas o nome que os outros veem, sim.</small>}
-        </label>
+        {/* Pelo e-mail, o apelido foi digitado no passo anterior e continua valendo por trás:
+            pedi-lo de novo seria perguntar duas vezes a mesma coisa. */}
+        {!peloEmail && (
+          <label>
+            {pedindoCodigo ? 'Apelido ou e-mail' : 'Apelido'}
+            <input
+              ref={campoApelido}
+              value={apelido}
+              onChange={(e) => setApelido(e.target.value)}
+              autoComplete="username"
+              maxLength={pedindoCodigo ? 254 : 24}
+              required
+              autoFocus
+            />
+            {criando && <small className="muted">De 3 a 24 caracteres, sem espaços. Não dá para mudar depois — mas o nome que os outros veem, sim.</small>}
+          </label>
+        )}
 
-        {recuperando && (
+        {criando && mandaEmail && (
+          <label>
+            E-mail
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              spellCheck={false}
+              maxLength={254}
+              required
+            />
+            <small className="muted">Serve para recuperar a senha. Chega um código para confirmar.</small>
+          </label>
+        )}
+
+        {recuperando && !pedindoCodigo && (
           <label>
             Código
             <input
@@ -164,16 +246,18 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
           </label>
         )}
 
-        <label>
-          {recuperando ? 'Senha nova' : 'Senha'}
-          <input
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'}
-            required
-          />
-        </label>
+        {!pedindoCodigo && (
+          <label>
+            {recuperando ? 'Senha nova' : 'Senha'}
+            <input
+              type="password"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'}
+              required
+            />
+          </label>
+        )}
 
         {modo === 'entrar' && (
           <div className="connect-esqueci">
@@ -181,7 +265,7 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
           </div>
         )}
 
-        {(criando || recuperando) && (
+        {(criando || (recuperando && !pedindoCodigo)) && (
           <label>
             {recuperando ? 'Repita a senha nova' : 'Repita a senha'}
             <input
@@ -200,7 +284,21 @@ export function ConnectScreen({ apelidoInicial, onPronto, onRegistro }: {
           {rotulo}
         </button>
 
-        <div className="registro-link">
+        {/* Os dois caminhos se alcançam um ao outro: quem não tem e-mail vai ao código do dono,
+            e quem pediu pelo e-mail pode pedir de novo. Num servidor sem e-mail, nenhum aparece.
+            Num bloco só com o "ver o registro": como itens soltos do cartão, cada link ganhava o
+            vão inteiro do grid e o pé virava uma escada — visto na Saga escondida, a 1200x760. */}
+        <div className="connect-links">
+          {mandaEmail && pedindoCodigo && (
+            <button type="button" className="link" onClick={() => trocarRecuperacao('dono')}>
+              sem e-mail na conta? peça o código ao dono
+            </button>
+          )}
+          {mandaEmail && (peloEmail || peloDono) && (
+            <button type="button" className="link" onClick={() => trocarRecuperacao('pedir')}>
+              {peloEmail ? 'não chegou? pedir outro código' : 'receber o código por e-mail'}
+            </button>
+          )}
           <button type="button" className="link" onClick={onRegistro}>deu erro? ver o registro</button>
         </div>
       </form>

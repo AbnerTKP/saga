@@ -131,13 +131,31 @@ export type Sala = {
 /** A gaveta onde as salas ficam guardadas. Não guarda conversa: só agrupa. */
 export type Categoria = { id: number; nome: string; ordem: number };
 
-export type Sessao = {
+/**
+ * O e-mail da conta, como o servidor o vê. Vai em tudo que diz "quem sou".
+ *
+ * Opcional inteiro: servidor antigo não manda nada disto, e aí a Saga não pede e-mail a
+ * ninguém — `precisaDeEmail` ausente é "não". Quem decide pedir é o servidor, e ele só pede
+ * com o envio ligado.
+ */
+export type EstadoDoEmail = {
+  /** Este servidor manda e-mail. Desligado, não há o que trocar em "Sua conta". */
+  emailLigado?: boolean;
+  /** O endereço CONFIRMADO. O que foi só digitado está em `emailPendente`. */
+  email?: string | null;
+  emailPendente?: string | null;
+  precisaDeEmail?: boolean;
+};
+
+export type Sessao = EstadoDoEmail & {
   token: string;
   eu: Membro | null;
   servidor: Servidor | null;
   servidores: Servidor[];
   salas: Sala[];
   impedimento?: string | null;
+  /** Só no cadastro: a conta nasceu, mas o código não saiu — e o motivo. */
+  emailErro?: string;
 };
 
 // --- guardar a sessão -------------------------------------------------------
@@ -226,7 +244,8 @@ async function pedir<T>(metodo: string, rota: string, corpo?: unknown, servidorD
   return leitura.dados as T;
 }
 
-export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string }) =>
+/** `email` só vai quando o servidor manda e-mail — ver `servidorMandaEmail`. */
+export const cadastrar = (c: { apelido: string; senha: string; senhaRepetida: string; email?: string }) =>
   pedir<Sessao>('POST', '/cadastrar', c);
 
 export const entrar = (c: { apelido: string; senha: string }) =>
@@ -235,13 +254,54 @@ export const entrar = (c: { apelido: string; senha: string }) =>
 export const sair = () => pedir<{ ok: true }>('POST', '/sair');
 
 /**
- * Escolhe uma senha nova com o código que o dono da Saga gerou, e já entra: a resposta é a
- * mesma de `entrar`. As contas não têm e-mail, então quem atesta que é a pessoa é o dono,
- * que manda o código por fora. Toda recusa DO CÓDIGO traz a mesma mensagem — apelido que
- * não existe, código errado, vencido ou gasto —, para ela não contar qual conta tem código.
+ * Escolhe uma senha nova com um código, e já entra: a resposta é a mesma de `entrar`.
+ *
+ * O código chega por um de dois caminhos — o e-mail da conta, pedido em `esqueciASenha`, ou
+ * o dono da Saga, que o gera e manda por fora —, e daqui em diante os dois são o mesmo.
+ * `apelido` aceita o e-mail no lugar: é o que a pessoa digitou no primeiro passo. Toda
+ * recusa DO CÓDIGO traz a mesma mensagem, para ela não contar qual conta tem código.
  */
 export const recuperarSenha = (c: { apelido: string; codigo: string; senha: string; senhaRepetida: string }) =>
   pedir<Sessao>('POST', '/recuperar', c);
+
+/**
+ * "Esqueci a senha": pede que o código vá para o e-mail da conta.
+ *
+ * A resposta é a mesma para tudo — conta que não existe, conta sem e-mail, pedido repetido
+ * cedo demais —, e por isso não diz para onde mandou: dizer seria contar a quem digitou o
+ * apelido de outro que aquela conta existe e tem e-mail.
+ */
+export const esqueciASenha = (conta: string) =>
+  pedir<{ ok: true }>('POST', '/esqueci', { conta });
+
+/**
+ * Se este servidor manda e-mail. É a pergunta da tela de entrar, que ainda não tem sessão:
+ * a de criar conta decide se desenha o campo, e a de recuperar, por onde começa.
+ *
+ * Falhar em perguntar é "não": sem saber, a tela fica como era antes do e-mail existir, e
+ * esse é o caminho que funciona com qualquer servidor.
+ */
+export async function servidorMandaEmail(): Promise<boolean> {
+  try {
+    const r = await fetch(`${BASE}/health`, { cache: 'no-store' });
+    const corpo = await r.json();
+    return corpo?.email === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Manda o código de confirmar para o endereço. Pedir de novo, ou outro endereço, substitui o anterior. */
+export const pedirCodigoDoEmail = (email: string) =>
+  pedir<{ ok: true; emailPendente: string }>('POST', '/eu/email', { email });
+
+/** O código que chegou. Certo, o endereço passa a ser o da conta. */
+export const confirmarEmail = (codigo: string) =>
+  pedir<EstadoDoEmail & { ok: true }>('POST', '/eu/email/confirmar', { codigo });
+
+/** Esquece o endereço digitado, para pôr outro — sem isso a tela voltaria ao código ao reabrir. */
+export const desistirDoEmail = () =>
+  pedir<EstadoDoEmail & { ok: true }>('POST', '/eu/email/desistir');
 
 /**
  * Troca a senha de quem está logado, pedindo a atual. As OUTRAS sessões da conta caem e esta
@@ -260,7 +320,7 @@ export const trocarMinhaSenha = (c: { senhaAtual: string; senha: string; senhaRe
  * troca de servidor.
  */
 export const quemSou = () =>
-  pedir<{
+  pedir<EstadoDoEmail & {
     eu: Membro; servidor: Servidor | null; servidores: Servidor[];
     salas: Sala[]; impedimento: string | null;
   }>('GET', '/eu');

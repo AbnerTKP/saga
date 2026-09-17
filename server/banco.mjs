@@ -335,6 +335,22 @@ export const MIGRACOES = [
      expira_em   INTEGER NOT NULL,
      erros       INTEGER NOT NULL DEFAULT 0
    )`,
+
+  // O e-mail que alguém digitou e ainda não provou receber. A conta só fica com o endereço
+  // (`usuarios.email`, coluna que existia desde a primeira migração e nunca foi pedida a
+  // ninguém) quando o código volta certo — assim o que está lá é sempre uma caixa que
+  // entrega, e não um dígito errado que só apareceria no dia da emergência. Uma linha por
+  // conta, porque pedir de novo, ou pedir para outro endereço, substitui o anterior. O
+  // código é guardado pelo mesmo scrypt da senha, pelo mesmo motivo de `recuperacoes`.
+  // Em 17/09/2026 a produção estava na migração 52, e esta é a 53.
+  `CREATE TABLE emails_pendentes (
+     usuario_id  INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+     email       TEXT    NOT NULL,
+     codigo_hash TEXT    NOT NULL,
+     criado_em   INTEGER NOT NULL,
+     expira_em   INTEGER NOT NULL,
+     erros       INTEGER NOT NULL DEFAULT 0
+   )`,
 ];
 
 export function abrirBanco(caminho) {

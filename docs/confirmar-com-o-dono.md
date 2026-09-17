@@ -3,6 +3,23 @@
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
 
+- **O e-mail da conta, com um e-mail de verdade chegando a alguém que não é o dono.** Está
+  DESLIGADO na produção até existir um domínio verificado no Resend. O que está medido: a
+  chave do Resend, em 17/09/2026 — é válida, restrita a enviar, entrega em `abnertkp@gmail.com`
+  e responde 403 ("You can only send testing emails to your own email address") para qualquer
+  outro endereço, inclusive `abnertkp+saga@gmail.com`; as regras (`email-conta.test.mjs`), o
+  envio contra um Resend de mentira com as respostas reais (`email.test.mjs`) e o caminho
+  inteiro pela rede, com o código lido da caixa falsa (`api-email.test.mjs`); doze garantias
+  quebradas de propósito, uma a uma, até o teste delas falhar; e as telas na Saga escondida
+  contra servidor local e Resend falso, por clique — ver `docs/decisoes/telas-e-visual.md`. **Não
+  foi exercido**: o e-mail saindo pelo Resend de verdade com um domínio, caindo ou não no spam
+  do Gmail e do Outlook; alguém do grupo confirmando o código no próprio computador; o pedido
+  aparecendo para as 33 contas antigas no dia em que o envio for ligado; e nada disso no
+  Windows. **O servidor sobe junto**: app novo com servidor antigo não pede e-mail (o servidor
+  antigo não manda `precisaDeEmail`), e app antigo com servidor novo também não — ele não
+  conhece o campo. **Ligar é o dono pôr `RESEND_KEY` e `EMAIL_DE` no `.env` da VPS e reiniciar**
+  — e só depois de verificar o domínio: sem ele, a trava fica de pé para o grupo inteiro e só
+  cede pela saída de "entrar sem e-mail por agora".
 - A atualização abrindo já atualizada no Windows (v0.16.2) — exige uma atualização real
   acontecendo com alguém do outro lado.
 - **Recuperar a senha, de ponta a ponta, no app de verdade.** O que está medido: as rotas

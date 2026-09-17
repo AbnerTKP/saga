@@ -30,6 +30,23 @@ export function inserir(db, { apelido, chave, senhaHash, criadoEm }) {
 export const trocarSenha = (db, usuarioId, senhaHash) =>
   db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(senhaHash, Number(usuarioId)).changes;
 
+// --- e-mail -----------------------------------------------------------------
+//
+// A coluna nasceu com a tabela e ficou anos sem ser pedida a ninguém. O que entra aqui é
+// sempre um endereço JÁ confirmado por código — quem espera confirmação mora em
+// `emails_pendentes`. Guardado em minúsculas, como o apelido: o índice único é o que
+// impede duas contas de dividirem a mesma caixa, e "Ana@" e "ana@" são a mesma caixa.
+
+export const buscarPorEmail = (db, email) =>
+  db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email) ?? null;
+
+/** O endereço já é de outra conta? O índice único recusaria, mas sem dizer o motivo. */
+export const emailDeOutraConta = (db, email, usuarioId) =>
+  !!db.prepare('SELECT 1 FROM usuarios WHERE email = ? AND id <> ?').get(email, Number(usuarioId));
+
+export const definirEmail = (db, usuarioId, email) =>
+  db.prepare('UPDATE usuarios SET email = ? WHERE id = ?').run(email, Number(usuarioId)).changes;
+
 // --- imagens da conta -------------------------------------------------------
 //
 // `papel` é 'foto' ou 'banner' e entra no SQL por interpolação; quem chama é o servidor,

@@ -97,11 +97,22 @@ a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
 .connect-recuperar h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; color: var(--white); }
 /* `.connect-card p` puxa o subtítulo para junto do título; aqui não há título colado acima. */
 .connect-card .connect-recuperar p { margin: 0; font-size: 13.5px; line-height: 1.45; }
-/* O código na mesma letra em que o dono o lê no painel dele. */
-.connect-card input.connect-codigo { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
+/* O código na mesma letra em que o dono o lê no painel dele — e em "Sua conta", onde se
+   confirma o e-mail novo: sem o painel aqui, o mesmo código aparecia em duas letras. */
+.connect-card input.connect-codigo, .painel-bloco input.connect-codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
 /* Sem o versalete do rótulo: em maiúsculas o O e o 0 ficam iguais, e o aviso fala justo deles. */
 .connect-card label .connect-aviso-codigo { text-transform: none; letter-spacing: normal; font-weight: 500;
   font-size: 12.5px; line-height: 1.4; }
+/* Dois caminhos lado a lado no pé do cartão — "sair da conta" e "ver o registro", "mandar
+   outro código" e "trocar o e-mail". Empilhados e centralizados, são o `.connect-links`. */
+.connect-rodape { display: flex; justify-content: space-between; gap: var(--e3); margin-top: 4px; }
+/* O pé da tela de entrar: um ou mais caminhos de texto, centralizados e juntos. */
+.connect-links { display: grid; gap: 6px; justify-items: center; margin-top: 4px; }
+/* A saída de quem ficou preso por defeito nosso mora colada no erro que a explica. */
+.connect-adiar { display: flex; justify-content: flex-end; margin-top: calc(-1 * var(--e2)); }
+/* O `.aviso-ok` tem a margem do alto de um painel; no cartão, o espaço é o do grid. */
+.connect-card .aviso-ok { margin: 0; }
 
 /* A Saga sem servidor nenhum -------------------------------------------------
    Onde toda conta nova começa. O mesmo fundo da tela de entrada, porque é a mesma
@@ -810,7 +821,6 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   padding: 10px 12px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text2); white-space: pre-wrap; word-break: break-word;
 }
-.registro-link { margin-top: 4px; text-align: center; }
 
 /* ---- sinal de conexão ---- */
 

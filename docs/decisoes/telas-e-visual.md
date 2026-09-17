@@ -27,6 +27,21 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   cartão rola até o fim**, e não só até o botão: `scrollIntoView({ block: 'nearest' })`
   deixava o botão encostado na borda, sem o respiro do cartão e com o "ver o registro"
   escondido. Medido a 900x560, no Mac e com a barra do Windows: 78 px abaixo do botão.
+- **O pedido de e-mail mora no cartão de entrar, e não numa tela nova nem numa caixa sobre o
+  app.** Escolha do dono em 17/09/2026 (opção A) entre três desenhadas com o `styles.css` de
+  verdade: A no cartão, B numa tela própria com a foto e o nome, C num modal sem saída por
+  cima do app. É a continuação do login — o app só aparece depois, e nada dele se desenha pela
+  metade atrás de um pedido. Dois passos no mesmo cartão (endereço, código), com o pé em duas
+  pontas (`.connect-rodape`): "sair da conta" é a saída de quem entrou na conta errada, já que
+  o cartão TRAVA. O cadastro ganhou o campo entre apelido e senha, e só quando o servidor manda
+  e-mail (`/health`); o "Esqueci a senha" começa por "apelido ou e-mail" e alcança o caminho do
+  código do dono por um link. **Conferido na Saga escondida**, contra servidor local e um Resend
+  de mentira, percorrendo tudo por clique: cadastro, código, código errado, "mandar outro",
+  "trocar o e-mail", "Sua conta", esqueci a senha pelo e-mail digitando o e-mail no lugar do
+  apelido, o caminho do dono, a trava cedendo no modo de teste do Resend e a janela de 900x560.
+  Duas coisas só apareceram nas imagens: os links do pé da recuperação, soltos como itens do
+  grid, viravam uma escada (hoje `.connect-links`, um bloco só), e o código em "Sua conta" saía
+  na letra comum porque a monoespaçada só valia dentro do cartão.
 - **Reordenar sala é só dado, e por isso não derruba ninguém da call.** A sala do LiveKit
   é o id; arrastar mexe em `ordem` e `categoria_id`, e em id nenhum. A lista muda na hora
   e a busca seguinte confirma — dando errado, é ela que devolve a ordem de verdade.
