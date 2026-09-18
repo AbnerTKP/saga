@@ -488,17 +488,39 @@ export function enviarArquivoNoChat(
   texto = '',
   aoProgredir?: (fracao: number) => void,
 ): Promise<Mensagem> {
+  return subirNoChat('/mensagens/arquivo', onde, arquivo, { nome: arquivo.name, texto }, aoProgredir);
+}
+
+/**
+ * Manda uma imagem que aparece NA conversa, como o GIF — e não num cartão de baixar. O
+ * servidor confere os bytes; servidor antigo, sem a rota, responde 404 (ver `useChat`).
+ */
+export function enviarImagemNoChat(
+  onde: Onde,
+  imagem: File,
+  texto = '',
+  aoProgredir?: (fracao: number) => void,
+): Promise<Mensagem> {
+  return subirNoChat('/mensagens/imagem', onde, imagem, { texto }, aoProgredir);
+}
+
+function subirNoChat(
+  rota: string,
+  onde: Onde,
+  arquivo: File,
+  campos: Record<string, string>,
+  aoProgredir?: (fracao: number) => void,
+): Promise<Mensagem> {
   const q = new URLSearchParams({
     ...('sala' in onde ? { sala: String(onde.sala) } : { conversa: String(onde.conversa) }),
-    nome: arquivo.name,
-    texto,
+    ...campos,
   });
   const servidor = lerServidorAtual();
   const token = lerToken();
 
   return new Promise((ok, falha) => {
     const req = new XMLHttpRequest();
-    req.open('POST', `${BASE}/mensagens/arquivo?${q}`);
+    req.open('POST', `${BASE}${rota}?${q}`);
     req.setRequestHeader('content-type', 'application/octet-stream');
     if (token) req.setRequestHeader('x-sessao', token);
     if (servidor) req.setRequestHeader('x-servidor', String(servidor));

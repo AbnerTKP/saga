@@ -116,6 +116,22 @@ test('mandar, ler e ver quem está digitando — tudo pela porta de sempre', asy
   assert.ok(lida.corpo.agora > 0);
 });
 
+test('imagem colada na conversa privada aparece como imagem, e só para os dois', async () => {
+  const a = await conta('colou_a'), b = await conta('colou_b'), estranho = await conta('colou_c');
+  await amigos(a, b);
+  const { corpo } = await chamar('POST', '/conversas/abrir', { sessao: a.sessao, corpo: { alvo: b.id } });
+  const id = corpo.conversa.id;
+  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(56)]);
+  const colar = (sessao) => fetch(`${base}/mensagens/imagem?conversa=${id}`, {
+    method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-sessao': sessao }, body: PNG,
+  });
+
+  const r = await colar(a.sessao);
+  assert.equal(r.status, 200);
+  assert.match((await r.json()).mensagem.imagem, /^[0-9a-f]{32}\.png$/);
+  assert.equal((await colar(estranho.sessao)).status, 404);
+});
+
 test('desfazer a amizade fecha o campo de escrever e guarda o que foi dito', async () => {
   const a = await conta('hugo'), b = await conta('ines');
   await amigos(a, b);

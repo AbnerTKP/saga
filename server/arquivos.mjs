@@ -24,6 +24,10 @@ export const LIMITES = {
   banner: 8 * 1024 * 1024,   // 8 MB — banner é maior, e GIF pesa
   som: 2 * 1024 * 1024,      // 2 MB — soundboard é efeito curto, não música
   chat: 5 * 1024 * 1024,     // 5 MB — GIF de chat é maior que avatar e menor que banner
+  // Imagem colada ou anexada no chat, que aparece NA conversa. Print de tela em PNG passa
+  // fácil dos 5 MB do GIF (uma tela Retina inteira chega a 10); acima disto, o app manda
+  // como arquivo comum, e nada se perde. Vai para a memória inteira, então não cresce muito.
+  imagemDoChat: 15 * 1024 * 1024,
   // Arquivo qualquer no chat. Só é grande assim porque ele vai para o disco EM FLUXO:
   // juntar na memória, como os outros fazem, estouraria o teto de 512 MB do contêiner —
   // e foi falta de memória que já derrubou a máquina inteira uma vez.

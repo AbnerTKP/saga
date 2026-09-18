@@ -12,6 +12,7 @@ import { mudouDeDia, rotuloDoDia } from '../dias';
 import { ehContinuacao } from '../agrupamento';
 import { fraseDeQuemDigita } from '../digitando';
 import type { LiveNoChat } from '../lives';
+import { arquivoColado, vaiComoImagem } from '../anexos';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -263,6 +264,21 @@ export function Chat({
     if (a) { setAnexo(a); setErroDoAnexo(null); }
   };
 
+  /**
+   * Colar uma imagem (Ctrl+V, Cmd+V) escolhe — não manda, igual a arrastar: vira a mesma
+   * ficha, onde dá para escrever junto ou desistir. Colar texto segue normal no campo.
+   */
+  const colar = (e: React.ClipboardEvent) => {
+    const a = arquivoColado(e.clipboardData);
+    if (!a) return;
+    // O texto que às vezes vem junto (o nome do arquivo, o endereço da imagem) não vai
+    // para o campo: quem colou uma imagem colou a imagem.
+    e.preventDefault();
+    setAnexo(a);
+    setErroDoAnexo(null);
+  };
+
+  const ehImagem = !!anexo && vaiComoImagem(anexo);
   const frase = fraseDeQuemDigita(digitando.map((q) => q.nome));
 
   return (
@@ -382,12 +398,14 @@ export function Chat({
 
       {anexo && (
         <div className={`anexo-pendente ${erroDoAnexo ? 'com-erro' : ''}`}>
-          <span className="anexo-icone"><Icon name="anexo" size={18} /></span>
+          {ehImagem
+            ? <Miniatura arquivo={anexo} />
+            : <span className="anexo-icone"><Icon name="anexo" size={18} /></span>}
           <span className="anexo-quem">
-            <span className="strong">{anexo.name}</span>
+            <span className="strong">{ehImagem ? 'Imagem' : anexo.name}</span>
             <span className="muted small">
               {erroDoAnexo ?? (progresso === null
-                ? `${peso(anexo.size)} · escreva algo se quiser e clique em enviar`
+                ? `${peso(anexo.size)} · ${ehImagem ? 'aparece na conversa · ' : ''}escreva algo se quiser e clique em enviar`
                 : `${peso(anexo.size)} · enviando ${Math.round(progresso * 100)}%`)}
             </span>
           </span>
@@ -397,7 +415,7 @@ export function Chat({
           <button
             type="button"
             className="icon"
-            title="Tirar o arquivo"
+            title={ehImagem ? 'Tirar a imagem' : 'Tirar o arquivo'}
             disabled={progresso !== null}
             onClick={() => { setAnexo(null); setErroDoAnexo(null); }}
           >
@@ -447,6 +465,7 @@ export function Chat({
           }
           disabled={travado || progresso !== null}
           maxLength={2000}
+          onPaste={colar}
         />
         {/* `rotulo-gif`, e não `gif`: `gif` já era a classe do QUADRADINHO da busca, com
             fundo preto e proporção 1:1 — e ela caiu inteira neste botão, que virou uma
@@ -464,7 +483,7 @@ export function Chat({
         <button
           className="enviar"
           disabled={travado || progresso !== null || (!texto.trim() && !anexo)}
-          title={anexo ? 'Enviar o arquivo' : 'Enviar'}
+          title={anexo ? (ehImagem ? 'Enviar a imagem' : 'Enviar o arquivo') : 'Enviar'}
         >
           <Icon name="send" size={17} />
         </button>
@@ -499,11 +518,25 @@ export function Chat({
 }
 
 /**
+ * A imagem escolhida, ainda na ficha: é o que diz "é esta aqui" antes de mandar, e o que
+ * separa o print colado agora do que estava na área de transferência desde ontem.
+ */
+function Miniatura({ arquivo }: { arquivo: File }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const u = URL.createObjectURL(arquivo);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [arquivo]);
+  return url ? <img className="anexo-miniatura" src={url} alt="" /> : null;
+}
+
+/**
  * O GIF da conversa anima com a Saga em foco, como no Discord, e para quando ela vai para trás
  * de outra janela: animando o tempo todo, cada GIF na tela redesenhava a janela inteira sem
  * parar (ver imagemParada.ts).
  */
 function ImagemDoChat({ url }: { url: string }) {
   const src = useImagemParada(url, useJanelaEmFoco());
-  return <img src={src ?? undefined} alt="GIF" draggable={false} />;
+  return <img src={src ?? undefined} alt="Imagem" draggable={false} />;
 }

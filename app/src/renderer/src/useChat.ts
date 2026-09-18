@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, avisarQueDigito, apagarMensagem,
-  type Digitando, type Mensagem, type Onde,
+  lerMensagens, enviarMensagem, enviarGifNoChat, enviarArquivoNoChat, enviarImagemNoChat, avisarQueDigito, apagarMensagem,
+  type Digitando, type Mensagem, type Onde, type ErroDoServidor,
 } from './api';
+import { vaiComoImagem } from './anexos';
 import { aoDespertar } from './despertar';
 import { mesmoSeIgual } from './igual';
 
@@ -148,6 +149,19 @@ export function useChat(onde: Onde | null) {
     if (!aqui) return;
     // O erro sobe para quem chamou: é lá, ao lado do arquivo escolhido, que ele precisa
     // aparecer — e não numa tarja no alto, longe do que a pessoa estava fazendo.
+    //
+    // Imagem aparece NA conversa, e não num cartão de baixar (ver anexos.ts). Servidor
+    // antigo não tem a rota e responde 404: aí ela vai como arquivo, que é como ia antes —
+    // app e servidor sobem separados, e colar um print não pode falhar por isso.
+    if (vaiComoImagem(arquivo)) {
+      try {
+        mostrarJa(await enviarImagemNoChat(aqui, arquivo, texto, aoProgredir));
+        mandou();
+        return;
+      } catch (e) {
+        if ((e as ErroDoServidor).status !== 404) throw e;
+      }
+    }
     mostrarJa(await enviarArquivoNoChat(aqui, arquivo, texto, aoProgredir));
     mandou();
   }, [chave, mostrarJa, mandou]);

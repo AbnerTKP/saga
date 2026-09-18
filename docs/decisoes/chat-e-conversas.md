@@ -19,6 +19,17 @@ Mensagens, anexos, "está digitando", amigos e o modo conversas (a regra do serv
   corrida ele pode cair na de cima. O vermelho cheio fica só ali, onde apagar É a ação da
   caixa; o foco nasce nele, então Enter apaga e Esc desiste. O desenho foi escolhido pelo
   dono entre opções renderizadas, antes do código.
+- **Imagem aparece NA conversa; o resto é cartão de baixar.** Colar um print com Ctrl+V
+  (ou arrastar, ou escolher no botão) vira a mesma ficha do anexo — escolher não é mandar
+  —, agora com a miniatura no lugar do ícone. Ao enviar, PNG, JPG, GIF e WEBP de até 15 MB
+  vão por `POST /mensagens/imagem`, o caminho do GIF: o servidor confere a assinatura dos
+  bytes e a guarda como imagem, não como o `.bin` inerte do anexo. O teto é maior que os
+  5 MB do GIF porque um print de tela Retina inteira passa disso; acima dele, e em
+  qualquer outro tipo, continua cartão, e nada se perde. **App novo com servidor antigo**
+  recebe 404 da rota e manda como arquivo, que é como ia antes. A regra do que vai como
+  imagem é pura e testada (`anexos.ts`). Medido: rota e regra nos testes, e a tela
+  renderizada com o `styles.css` de verdade. **O Ctrl+V com a área de transferência do
+  sistema, no app de verdade, não foi exercido** — é o `clipboardData` padrão do Chromium.
 - **O envio mostra o quanto já subiu, e por isso usa `XMLHttpRequest`.** O `fetch` não
   conta o que SUBIU — só o que desce. Sem a barra, mandar 20 MB era um botão apagado e
   nada acontecendo: não dava para saber se estava indo, se travou ou se deu errado.

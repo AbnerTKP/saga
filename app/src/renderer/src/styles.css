@@ -1141,6 +1141,10 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .anexo-icone { display: grid; place-items: center; width: 34px; height: 34px; flex: none;
   border-radius: 8px; background: var(--accent-tenue); color: var(--accent-claro); }
 .anexo-quem { display: grid; gap: 1px; min-width: 0; flex: 1; }
+/* Na ficha, a imagem é ela mesma no lugar do ícone — um pouco maior, porque é por ela que
+   se confere se o print certo foi colado. */
+.anexo-miniatura { width: 48px; height: 48px; flex: none; object-fit: cover;
+  border-radius: 8px; background: var(--bg3); }
 /* A seta não é outro botão: o cartão inteiro salva, e ela é o que diz isso. */
 .anexo-baixar { display: grid; place-items: center; flex: none; color: var(--text3); }
 .msg-anexo:hover:not(:disabled) .anexo-baixar { color: var(--accent-claro); }

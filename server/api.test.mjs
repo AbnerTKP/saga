@@ -1253,6 +1253,39 @@ test('arquivo dentro do limite entra, com o nome que a pessoa deu', async () => 
   assert.match(mensagem.arquivo.url, /^[0-9a-f]{32}\.bin$/, 'no disco vira hash inerte');
 });
 
+test('imagem colada entra NA conversa, como imagem, com o texto junto', async () => {
+  const { token } = await sessaoDe('abner');
+  const sala = (await chamar('GET', '/rooms', { sessao: token })).corpo.rooms.find((r) => r.tipo === 'texto');
+  const r = await subir(`/mensagens/imagem?sala=${sala.id}&texto=${encodeURIComponent('olha isso')}`, token, PNG);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const { mensagem } = r.corpo;
+  assert.match(mensagem.imagem, /^[0-9a-f]{32}\.png$/, 'vira imagem, não anexo');
+  assert.equal(mensagem.arquivo, null);
+  assert.equal(mensagem.texto, 'olha isso');
+
+  // É servida como imagem — o anexo comum sai como octet-stream para baixar.
+  const img = await fetch(`${base}/arquivos/${mensagem.imagem}`);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+});
+
+test('imagem colada que não é imagem é recusada, e não vira anexo escondido', async () => {
+  const { token } = await sessaoDe('abner');
+  const sala = (await chamar('GET', '/rooms', { sessao: token })).corpo.rooms.find((r) => r.tipo === 'texto');
+  const r = await subir(`/mensagens/imagem?sala=${sala.id}`, token, Buffer.from('<html><script>alert(1)</script></html>'));
+  assert.equal(r.status, 400);
+  assert.match(r.corpo.error, /PNG, JPG, GIF ou WEBP/);
+});
+
+test('imagem colada passa dos 5 MB do GIF: print de tela inteira cabe', async () => {
+  const { token } = await sessaoDe('abner');
+  const sala = (await chamar('GET', '/rooms', { sessao: token })).corpo.rooms.find((r) => r.tipo === 'texto');
+  const print = Buffer.concat([PNG, Buffer.alloc(8 * 1024 * 1024, 1)]);
+  const r = await subir(`/mensagens/imagem?sala=${sala.id}`, token, print);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const grande = await subir(`/mensagens/imagem?sala=${sala.id}`, token, Buffer.concat([PNG, Buffer.alloc(16 * 1024 * 1024, 1)]));
+  assert.equal(grande.status, 413);
+});
+
 // --- xadrez -------------------------------------------------------------------
 
 test('xadrez pela rede: abrir, chamar, o convite no /rooms, aceitar, jogar, assistir e o número noutro servidor', async () => {

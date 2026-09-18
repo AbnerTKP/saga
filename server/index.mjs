@@ -1218,6 +1218,33 @@ const ROTAS = {
     return { mensagem };
   },
 
+  // Imagem colada (ou anexada) que aparece NA conversa, como o GIF — e não num cartão de
+  // baixar. Por isso ela NÃO é o arquivo inerte de cima: passa pela conferência de bytes
+  // das imagens (PNG, JPG, GIF, WEBP) e é servida como imagem. Quem pode mandar é conferido
+  // antes de ler os bytes, igual ao arquivo.
+  'POST /mensagens/imagem': async (req) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const conversa = q.get('conversa');
+    const texto = q.get('texto') ?? '';
+    if (conversa) {
+      const usuario = exigirConta(req);
+      if (!conversas.ver(db, usuario, conversa).podeEscrever) {
+        throw new ErroDeConta('Vocês não são mais amigos. Só dá para mandar mensagem para amigos.', 403);
+      }
+      const nome = salvarImagem(ARQUIVOS, await lerBinario(req, LIMITES.imagemDoChat, 'A imagem'), 'imagemDoChat');
+      const mensagem = conversas.enviar(db, usuario, conversa, texto, nome);
+      digitando.parou(chaveDaConversa(conversa), usuario.id);
+      return { mensagem };
+    }
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const nome = salvarImagem(ARQUIVOS, await lerBinario(req, LIMITES.imagemDoChat, 'A imagem'), 'imagemDoChat');
+    const mensagem = mensagens.enviarMensagem(db, sid, eu, q.get('sala'), texto, nome);
+    pararDeDigitar(sid, eu.id, q.get('sala'));
+    return { mensagem };
+  },
+
   // --- amigos e conversas privadas ---------------------------------------------
   //
   // Nenhuma destas rotas pede servidor: amizade e conversa são da CONTA, que é o que
