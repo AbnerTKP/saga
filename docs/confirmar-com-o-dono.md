@@ -2,6 +2,23 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A reestruturação da interface (18/09/2026): trilha à esquerda, configurações em páginas,
+  tema Noite, Figtree, foto do servidor enquadrável, barra da call no palco.** O que está medido:
+  typecheck, os testes (os novos: `design.test.ts`, `configurar.test.ts`,
+  `paginasDeConfiguracao.test.ts`, `ultimaSala.test.ts` e o de `PATCH /servidor/enquadramento`
+  no `api.test.mjs`), e cada tela fotografada no RENDERER de verdade, num Chrome headless contra
+  servidor e LiveKit locais, a 1280×800 e a 900×560, entrando pela tela de login e clicando:
+  o menu do botão direito com o submenu, as seis páginas do servidor, as cinco das suas, a busca,
+  o "…" de uma pessoa, a sala privada, a foto larga enquadrada aparecendo na trilha e no alto da
+  barra, e a barra da call no palco. **Não foi exercido**: o app no ELECTRON (a janela, a faixa
+  do Mac com os semáforos por cima, a barra do Windows acima da caixa de configurações); nada no
+  WINDOWS (a Figtree lá, a caixa grande virando tela cheia sob a barra de 34 px); uma call com
+  gente, câmera e live de verdade usando a barra do palco; o enquadramento feito ARRASTANDO no
+  editor (a rota foi chamada direto); o soundboard e os jogos abertos pela call nova. **O servidor
+  sobe junto**: a migração 56 roda na primeira subida; app novo com servidor antigo não enquadra
+  a foto do servidor (diz por quê) e o resto funciona; app antigo com servidor novo ignora o
+  campo novo.
+
 
 - **O e-mail da conta, com um e-mail de verdade chegando a alguém que não é o dono.** Está
   DESLIGADO na produção até existir um domínio verificado no Resend. O que está medido: a

@@ -227,8 +227,9 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   global: a foto vai com você para todos eles. Trocar de cara pelo painel de UM servidor
   era o único caminho que existia. Hoje a engrenagem abre "Sua conta" (perfil, qualidade,
   microfone, câmera, registro de erros) e o servidor se configura pelo nome dele, no topo,
-  ou pelo botão direito no quadrado à direita. Botão direito noutro servidor troca ANTES
-  de abrir: o painel lê o servidor da sessão ao montar.
+  pela engrenagem ao lado do nome ou pelo botão direito no quadrado da trilha (desde
+  18/09/2026, ver "A reestruturação da interface", abaixo). Botão direito noutro servidor
+  troca ANTES de abrir o menu: ele lê o servidor da sessão.
 - **A administração da Saga abre por uma porta na trilha que só o dono vê.** O painel da
   Saga já morou numa janela escondida no menu de status, e o dono teve de perguntar onde
   ficava; depois virou um bloco de "Sua conta", apertado para uma lista de servidores e que
@@ -304,3 +305,72 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   **Não medido e fica para depois:** quem toca um som do soundboard continua publicando uma faixa
   de silêncio sem DTX pelo resto da sessão (o DTX cortava o começo do som), e cada pessoa da call a
   decodifica; e o nível de quem está falando abre um segundo `AudioContext`, além do do microfone.
+
+## A reestruturação da interface (18/09/2026)
+
+O dono pediu uma reestruturação total: "a tela de configurações é extremamente confusa […]
+configurações do servidor difícil de localizar", com o Discord como régua de "funciona" e o
+Trivo como referência de acabamento — "não tem problema ser semelhante ao Discord em vários
+aspectos […] inspiração funcional sem perder identidade". O levantamento, as três direções e a
+proposta final estão em `docs/reestruturacao-da-interface.md`; aqui fica o que foi decidido e o
+porquê.
+
+- **As escolhas foram dele, vendo as telas desenhadas lado a lado** (Artifact "Saga nova —
+  propostas de interface"): trilha à ESQUERDA, configurações numa CAIXA GRANDE (não tela cheia),
+  tema NOITE, e o botão direito no quadrado abrindo um MENU com "Configurações do servidor" em
+  primeiro. A fonte (Figtree) e "quem não configura nada não vê" foram a recomendação, sem
+  objeção dele.
+- **A queixa era do outro lado da porta, não da porta.** "Configurações do servidor" já estava
+  onde o Discord a põe (o nome do servidor). O que atrapalhava era abrir e cair numa rolagem de
+  720 px sem índice, sem a palavra "Configurações" no título, com botões que viravam texto solto.
+  Hoje são casas com menu lateral agrupado, uma página por assunto, busca por título e
+  sinônimo e o caminho no cabeçalho (`Configuracoes.tsx`). A lista de páginas é UMA
+  (`paginasDeConfiguracao.ts`) e alimenta o menu lateral, a busca e o submenu do botão direito —
+  o `generateSections` do Discord: três caminhos que não têm como divergir. **O dono não sabia
+  que o botão direito no quadrado já abria as configurações**: a única pista era o balão do
+  `title`. Foi o que decidiu o menu.
+- **Quem não pode, não vê** (`configurar.ts`, `paginasDoServidor`). Convidar e apagar mensagem
+  não contam como "configurar": com eles, o item abria uma lista de pessoas e um botão de sair.
+- **O que só existia no botão direito ganhou lugar nas configurações** — sala privada,
+  categorias, tirar o castigo, desbanir —, e o botão direito continua como atalho. Nada surge
+  com o mouse sobre uma linha de conteúdo (a lixeira recusada vale aqui também): na árvore de
+  salas as setas e o "…" ficam sempre à vista, apagados.
+- **Destrutivo arma no próprio botão e diz o nome**: "Expulsar Bia" → "Expulsar mesmo Bia".
+  Apagar sala e apagar cargo eram um clique sem pergunta no painel antigo.
+- **A trilha foi para a esquerda.** Ficou à direita da v0.15.0 até aqui, "de propósito diferente
+  do Discord"; trocar de servidor era ir à borda direita e voltar, ~1.050 px por troca. A
+  identidade ficou no FORMATO (quadrado é servidor), na caixa das conversas no topo e no risco.
+  A grade a põe na frente por `order`, sem depender da ordem do JSX.
+- **"Você está aqui" é o mesmo risco em todo lugar**: na sala da voz, no quadrado da trilha (no
+  lugar do anel azul) e na página aberta das configurações. A novidade numa sala é o nome forte e
+  um risco curto; **a contagem da SALA é neutra**, e o vermelho ficou para erro, desligar, ao vivo
+  e conversa privada — numa comunidade movimentada, a barra inteira ficava vermelha.
+- **A foto do servidor é quadrada em todo lugar e se enquadra.** Saía redonda no alto da barra
+  (usava o Avatar de pessoa) e cortada pelo meio no quadrado da trilha, sem como escolher —
+  a queixa do dono: "é recortada errada". Migração 56 (`servidores.enquadramento`), rota
+  `PATCH /servidor/enquadramento`, a mesma régua do enquadramento da conta; trocar a foto zera
+  o dela. App novo com servidor antigo diz que o servidor ainda não sabe enquadrar.
+- **Na call, a lista de pessoas sai da frente** e um botão no cabeçalho do palco a traz; a
+  escolha é do computador (`cantinho.pessoasNaCall`). **Os controles da call também moram no
+  palco**, surgindo com o mouse como os da live; o painel da esquerda continua.
+- **Cada servidor lembra a última sala de texto** (`ultimaSala.ts`), por conta, neste
+  computador. Antes: trocar de servidor caía sempre em "Escolha uma sala".
+- **O design system mora em tokens** (`tokens.css`): primitivos da logo e semânticos (superfície,
+  texto, borda, acento, estado), escala de letra, espaço, raios, sombras, a escada de camadas
+  como variável. Os nomes antigos (`--bg0`, `--text2`, `--accent`…) viraram PONTE para os tokens,
+  e por isso o tema Noite pegou no app inteiro sem reescrever o `styles.css`. O contraste mudou
+  onde não passava: o texto 3 era 2,90:1 em qualquer fundo (hoje 4,60:1) e o branco no botão cheio
+  era 3,94:1 (hoje 4,55:1).
+- **Travas no `pnpm test`** (`design.test.ts`): cor escrita à mão só no `tokens.css`, e o
+  `styles.css` não ganha nenhuma (240 hoje — baixe o número ao migrar, nunca suba); `var()` de
+  variável que não existe; a escada de camadas em ordem; a fonte como arquivo. O
+  `animacoes.test.ts` passou a ler TODO `.css`: lendo só o `styles.css`, uma animação num
+  arquivo novo escaparia calada.
+- **CSS novo tem prefixo e arquivo próprio**: `configuracoes.css` (`cfg-…`) e `palco.css`. Nome
+  curto é variável global, e o `styles.css` já teve três colisões.
+- **Figtree embutida** (OFL, 20 KB, `fontes/`): a mesma letra no Mac e no Windows. **Fonte nunca
+  vira `data:`** (`embutir.ts`): o CSP recusaria — a `pecas.woff2` do xadrez tinha 2.960 bytes e
+  caía no limite de 4 KB do Vite.
+- **Foi conferido em imagem, no renderer de verdade** num Chrome headless contra servidor e
+  LiveKit locais (o roteiro de fotos da sessão, em 1280×800 e 900×560) — não no Electron, e não no
+  Windows. Ver `docs/confirmar-com-o-dono.md`.

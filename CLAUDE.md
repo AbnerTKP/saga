@@ -167,6 +167,7 @@ errado":
 | Xadrez, Fórmula 1, Urna e o menu de jogos, app e servidor (`xadrez`, `corrida`, `pista`, `motor`, `urna/`, `jogos.mjs`, `corridas.mjs`, `urnas.mjs`) | `docs/decisoes/jogos.md` | não — leia |
 | Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`) | `docs/decisoes/telas-e-visual.md` | não — leia |
 | O que foi medido e o que falta o dono confirmar | `docs/confirmar-com-o-dono.md` | não — leia antes de dizer "pronto" |
+| A reestruturação da interface (set/2026): o levantamento, as decisões do dono, o design system e o que falta (hub de comunidades, selo de verificado) | `docs/reestruturacao-da-interface.md` | não — leia antes de mexer em tela |
 
 O `app/src/renderer/src` é uma pasta plana: um `CLAUDE.md` ali carregaria as cinco áreas de
 tela juntas em qualquer mudança. Por isso elas ficam em `docs/decisoes/`. Decisão nova vai
@@ -254,7 +255,7 @@ para o arquivo da área, não para cá — aqui só entra o que vale em qualquer
 ## Testes
 
 ```bash
-pnpm test        # servidor (516) + app (427), segundos, sem nada externo
+pnpm test        # servidor (528) + app (459), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

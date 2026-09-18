@@ -1,0 +1,22 @@
+# LiveKit LOCAL, só para as fotos (entrar numa call para o painel da voz e o menu de jogos).
+# Chave e segredo de mentira; nada daqui é o de produção. Só escuta em 127.0.0.1.
+port: 7901
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  # Sem ICE por TCP: a porta TCP do rtc não respeita bind_addresses e abriria para a rede.
+  tcp_port: 0
+  udp_port: 7903
+  use_external_ip: false
+  # Candidato em 127.0.0.1: o pion (ICE do LiveKit) descarta o loopback sem isto.
+  enable_loopback_candidate: true
+  interfaces:
+    includes:
+      - lo0
+keys:
+  fotokey: segredo-de-mentira-so-para-as-fotos-da-saga-local
+room:
+  auto_create: true
+  empty_timeout: 30
+logging:
+  level: warn
