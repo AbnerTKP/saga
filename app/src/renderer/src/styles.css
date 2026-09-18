@@ -146,7 +146,7 @@ a, .link { color: var(--link); font-size: 12px; padding: 0; }
 .sidebar { background: var(--bg1); display: flex; flex-direction: column; min-height: 0; }
 /* O nome do servidor é onde você está: merece peso de título, não de legenda. */
 .sidebar-head {
-  height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 var(--e4);
+  height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 var(--e4);
   font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; color: var(--white);
   border-bottom: 1px solid var(--line); -webkit-app-region: drag; flex: none;
 }
@@ -205,9 +205,17 @@ a, .link { color: var(--link); font-size: 12px; padding: 0; }
 /* Aviso de mensagem nova. O nome em branco e forte é o que se vê de canto de olho; o
    número é para quem já olhou. Fica antes da contagem de gente, que é outra informação. */
 .room.nova { color: var(--white); font-weight: 600; }
+/* A contagem da SALA é neutra: vermelho é "alguém escreveu para VOCÊ" (as conversas), erro,
+   desligar e ao vivo. Numa comunidade movimentada, a barra inteira ficava vermelha. A
+   novidade se vê pelo nome forte e por um risco curto à esquerda — o mesmo risco do "você
+   está aqui", mais curto. */
 .room .nao-lidas { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
-  display: grid; place-items: center; border-radius: 9px; background: var(--danger);
-  color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  display: grid; place-items: center; border-radius: 9px; background: var(--bg4);
+  color: var(--white); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.room.nova:not(.active)::before {
+  content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 8px; border-radius: 0 3px 3px 0; background: var(--white);
+}
 .room .nao-lidas + .count { margin-left: 6px; }
 /* Quem está dentro fica pendurado na sala por um fio: sem ele, a lista vira uma coluna
    só e não se sabe quem está com quem. */
@@ -232,7 +240,8 @@ a, .link { color: var(--link); font-size: 12px; padding: 0; }
 .avatar.huge.speaking { box-shadow: 0 0 0 4px var(--falando); }
 
 .voice-panel { background: var(--bg1); border-top: 1px solid var(--line); padding: var(--e3) var(--e3) var(--e2); }
-.voice-status { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.voice-status { display: flex; align-items: center; gap: 8px; margin: 0 -6px 8px; padding: 4px 6px; width: calc(100% + 12px); border-radius: 6px; text-align: left; }
+.voice-status:hover { background: var(--bg3); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
 .dot.warn { background: var(--warn); }
 .voice-actions { display: flex; gap: 6px; }

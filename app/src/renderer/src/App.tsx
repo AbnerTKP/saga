@@ -60,6 +60,7 @@ import { Versao } from './components/Versao';
 import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
 import { podeConfigurar } from './configurar';
+import { CHAVE_DA_ULTIMA_SALA, comASala, salaGuardada } from './ultimaSala';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { Administracao } from './components/Administracao';
@@ -265,6 +266,25 @@ export function App() {
   const dadosDaqui = dadosDoServidor?.servidorId === servidorAberto ? dadosDoServidor : null;
   const cargos = dadosDaqui?.cargos ?? SEM_CARGOS;
   const membrosDoServidor = dadosDaqui?.membros ?? SEM_MEMBROS;
+
+  // A última sala de texto de cada servidor: guardada ao abrir, devolvida ao voltar (ultimaSala.ts).
+  const contaId = sessao?.eu?.id ?? null;
+  useEffect(() => {
+    if (!contaId || !servidorAberto || salaAbertaId == null) return;
+    try { localStorage.setItem(CHAVE_DA_ULTIMA_SALA, comASala(localStorage.getItem(CHAVE_DA_ULTIMA_SALA), contaId, servidorAberto, salaAbertaId)); }
+    catch { /* sem storage: vale até fechar */ }
+  }, [contaId, servidorAberto, salaAbertaId]);
+  /** Em que servidor a sala lembrada já foi devolvida: uma vez por chegada, não a cada busca. */
+  const salaDevolvidaEm = useRef<number | null>(null);
+  useEffect(() => {
+    if (!contaId || !servidorAberto || !salasDaqui || salaDevolvidaEm.current === servidorAberto) return;
+    salaDevolvidaEm.current = servidorAberto;
+    if (salaAbertaId != null || jogoAberto || modoConversas) return;
+    let id: number | null = null;
+    try { id = salaGuardada(localStorage.getItem(CHAVE_DA_ULTIMA_SALA), contaId, servidorAberto); } catch { /* sem storage */ }
+    // Só sala de TEXTO, e só se ela ainda existe e você ainda a vê.
+    if (id != null && salasDaqui.rooms.some((r) => r.id === id && r.tipo === 'texto')) setSalaAbertaId(id);
+  }, [contaId, servidorAberto, salasDaqui, salaAbertaId, jogoAberto, modoConversas]);
 
   useEffect(() => { window.desktop.usaSeletorDoSistema().then(setSeletorDoSistema).catch(() => undefined); }, []);
 

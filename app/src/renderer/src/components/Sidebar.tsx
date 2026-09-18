@@ -255,7 +255,9 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
    */
   const painelDaCall = connected && (
     <div className="voice-panel" ref={painelDaVoz}>
-      <div className="voice-status">
+      {/* O estado é um BOTÃO: leva de volta à call de qualquer tela — nas conversas a call
+          sumia da tela, e o caminho de volta era trilha, servidor e sala. */}
+      <button className="voice-status" title="Voltar para a call" onClick={onAbrirPalco}>
         <span className={`dot ${rm.status === 'connected' ? 'ok' : 'warn'}`} />
         <div className="voice-texto">
           <div className="strong">{rm.status === 'connected' ? 'Voz conectada' : rm.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}</div>
@@ -267,7 +269,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
           </div>
         </div>
         {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
-      </div>
+      </button>
       <div className="voice-actions">
         <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
         <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
