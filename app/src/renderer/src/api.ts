@@ -344,6 +344,11 @@ export type Convite = { codigo: string; expiraEm: number | null; maxUsos: number
 export const criarConvite = async (maxUsos?: number) =>
   (await pedir<{ convite: Convite }>('POST', '/servidores/convite', { maxUsos })).convite;
 
+/** Os convites vivos deste servidor. Só para `gerirServidor`: o código é a chave da porta. */
+export type ConviteVivo = { codigo: string; criadoEm: number; expiraEm: number | null; usos: number; maxUsos: number | null };
+export const verConvites = async () =>
+  (await pedir<{ convites: ConviteVivo[] }>('GET', '/servidores/convites')).convites;
+
 export const entrarComConvite = (codigo: string) =>
   pedir<{ servidor: Servidor }>('POST', '/servidores/entrar', { codigo });
 
@@ -355,6 +360,8 @@ export const verServidor = (servidorId?: number) =>
   pedir<{
     servidor: Servidor; salas: Sala[]; membros: Membro[];
     cargos: Cargo[]; permissoes: Record<Permissao, string>; servidores: Servidor[];
+    /** Servidor antigo pode não mandar: aí as salas aparecem todas soltas. */
+    categorias?: Categoria[];
   }>('GET', '/servidor', undefined, servidorId);
 
 // --- cargos -----------------------------------------------------------------

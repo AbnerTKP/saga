@@ -11,7 +11,8 @@ import { estilo, type Enquadramento, type Papel } from '../enquadramento';
 export function EscolherImagem({ rotulo, atual, formato, papel, enquadramento, onEnviar, onGif, onEnquadrar }: {
   rotulo: string;
   atual: string | null;
-  formato: 'redondo' | 'faixa';
+  /** Redondo é pessoa; quadrado é servidor; faixa é a capa. */
+  formato: 'redondo' | 'quadrado' | 'faixa';
   /** Ausente esconde o botão de enquadrar: a imagem do servidor não é enquadrável. */
   papel?: Papel;
   enquadramento?: Enquadramento | null;

@@ -48,10 +48,11 @@ import { PedirNome } from './components/PedirNome';
 import { statusParaMandar, type Status } from './presenca';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
-import { PainelDaConta } from './components/PainelDaConta';
+import { ConfiguracoesDaConta } from './components/ConfiguracoesDaConta';
 import { UpdateToast } from './components/UpdateToast';
 import { TelaDeAtualizacao } from './components/TelaDeAtualizacao';
-import { PainelDoServidor } from './components/PainelDoServidor';
+import { ConfiguracoesDoServidor } from './components/ConfiguracoesDoServidor';
+import type { PaginaDoServidor } from './paginasDeConfiguracao';
 import { Soundboard } from './components/Soundboard';
 import { MenuDaPessoa, type PessoaNaCall } from './components/MenuDaPessoa';
 import { RegistroDeErros } from './components/RegistroDeErros';
@@ -125,7 +126,8 @@ export function App() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [devices, setDevices] = useState(false);
-  const [painel, setPainel] = useState(false);
+  /** As Configurações do servidor abertas: `true` abre na primeira página que a pessoa usa. */
+  const [painel, setPainel] = useState<PaginaDoServidor | boolean>(false);
   const [menuDoServidor, setMenuDoServidor] = useState<{ x: number; y: number } | null>(null);
   const [convidando, setConvidando] = useState(false);
   const [soundboard, setSoundboard] = useState(false);
@@ -763,7 +765,7 @@ export function App() {
   /** O que o menu do nome do servidor faz. */
   const fazerNoServidor = useCallback(async (a: AcaoNoServidor) => {
     if (a.tipo === 'convidar') { setConvidando(true); return; }
-    if (a.tipo === 'configurar') { setPainel(true); return; }
+    if (a.tipo === 'configurar') { setPainel(a.pagina ?? true); return; }
     if (a.tipo === 'criarSala') { setPedido({ tipo: 'criar', sala: a.sala }); return; }
     // Sair já foi confirmado no próprio botão do menu. Quem CRIOU não chega aqui — o item
     // nem aparece —, e o servidor recusa de todo jeito.
@@ -1270,8 +1272,9 @@ export function App() {
           />
         )}
         {devices && sessao.eu && (
-          <PainelDaConta
+          <ConfiguracoesDaConta
             eu={sessao.eu}
+            onSair={() => { setDevices(false); logout(); }}
             room={rm.room}
             microfone={rm.microfone}
             souBerserk={sessao.eu.turbo}
@@ -1503,8 +1506,9 @@ export function App() {
         />
       )}
       {devices && (
-        <PainelDaConta
+        <ConfiguracoesDaConta
           eu={eu}
+          onSair={() => { setDevices(false); logout(); }}
           room={rm.room}
           microfone={rm.microfone}
           servidorNome={servidor.nome}
@@ -1538,10 +1542,12 @@ export function App() {
         />
       )}
       {painel && (
-        <PainelDoServidor
+        <ConfiguracoesDoServidor
           eu={eu}
           servidor={servidor}
+          categoriasDaBarra={categorias}
           donoDaSaga={!!eu.donoDaSaga}
+          inicial={typeof painel === 'string' ? painel : undefined}
           onServidor={atualizarServidor}
           onSaiu={() => { setPainel(false); recarregarSessao(); }}
           // Cargos e pessoas mexidos lá dentro aparecem na lista da direita ao fechar.

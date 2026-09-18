@@ -1,0 +1,297 @@
+/*
+ * As três casas de configuração — Configurações (as suas), Configurações do servidor e,
+ * depois, a Administração da Saga — num componente só (Configuracoes.tsx).
+ *
+ * Antes eram modais de 720 px com uma rolagem só: sete blocos no do servidor, dez no da
+ * conta, sem índice, sem a palavra "Configurações" no título. O dono: "a tela de
+ * configurações é extremamente confusa […] configurações do servidor difícil de localizar"
+ * (18/09/2026). Agora: uma caixa grande com menu lateral agrupado pelo que a pessoa quer
+ * fazer, uma página por assunto, o caminho no cabeçalho e uma busca — o jeito do Discord de
+ * 2026, que é a régua de "funciona" do grupo.
+ *
+ * Tudo aqui é token (tokens.css): o design.test.ts falha com cor escrita à mão. E toda classe
+ * começa por `cfg-`: nome curto é variável global, e o styles.css já teve três colisões.
+ */
+
+/* ---- a caixa ------------------------------------------------------------------------- */
+
+/* Tudo o que cobre a janela começa abaixo da barra do Windows (--topo-da-janela), e fica no
+   degrau dos painéis da escada — menus (35) e avisos (40) abertos de dentro dela ficam por
+   cima sem mexer em nada. */
+.cfg-veu {
+  position: fixed; inset: var(--topo-da-janela, 0px) 0 0 0; z-index: var(--z-painel);
+  display: grid; place-items: center; padding: var(--e5);
+  background: var(--veu); -webkit-app-region: no-drag;
+}
+/* Caixa grande, e não tela cheia (escolha do dono): o app continua à vista nas bordas. */
+.cfg-caixa {
+  width: min(1080px, 100%); height: min(720px, 100%);
+  display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 0;
+  background: var(--superficie-2); border: 1px solid var(--borda-sutil);
+  border-radius: var(--raio-5); box-shadow: var(--sombra-3); overflow: hidden;
+}
+/* Janela pequena (a mínima é 900 × 560, e no Windows sobram 526 de altura): a caixa vira a
+   tela inteira sozinha, e o menu estreita. */
+@media (max-width: 1000px), (max-height: 640px) {
+  .cfg-veu { padding: 0; }
+  .cfg-caixa { width: 100%; height: 100%; border-radius: 0; border: 0; box-shadow: none; grid-template-columns: 200px minmax(0, 1fr); }
+}
+
+/* ---- o menu lateral ------------------------------------------------------------------- */
+
+.cfg-menu {
+  display: flex; flex-direction: column; gap: var(--e0); min-height: 0; overflow-y: auto;
+  padding: var(--e4) var(--e2); background: var(--superficie-1); border-right: 1px solid var(--borda-sutil);
+}
+/* De QUEM é o que se mexe aqui: você, o servidor, a Saga. Nunca há dúvida. */
+.cfg-escopo { display: flex; align-items: center; gap: var(--e2); padding: var(--e1m) var(--e2); }
+.cfg-escopo-quadro {
+  width: 40px; height: 40px; flex: none; border-radius: var(--raio-3); overflow: hidden;
+  display: grid; place-items: center; background: var(--superficie-3); color: var(--texto-forte);
+  font-size: var(--letra-menu); font-weight: var(--peso-forte);
+}
+.cfg-escopo-quadro img { width: 100%; height: 100%; object-fit: cover; }
+.cfg-escopo-quadro[data-pessoa] { border-radius: 50%; }
+.cfg-escopo-texto { min-width: 0; display: grid; gap: var(--e0); line-height: 1.2; }
+.cfg-escopo-nome { font-size: var(--letra-texto); font-weight: var(--peso-forte); color: var(--texto-forte); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfg-escopo-meta { font-size: var(--letra-legenda); color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cfg-busca { position: relative; margin: var(--e2) 0 var(--e1); }
+.cfg-busca svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--texto-3); pointer-events: none; }
+.cfg-busca input {
+  width: 100%; height: 32px; padding: 0 var(--e2) 0 32px; font-size: var(--letra-menu);
+  border-radius: var(--raio-3); background: var(--superficie-0); border: 1px solid var(--borda-campo); color: var(--texto-forte);
+}
+.cfg-busca input:focus { border-color: var(--acento); }
+.cfg-busca input::placeholder { color: var(--texto-3); }
+
+.cfg-grupo {
+  padding: var(--e4) var(--e2) var(--e1m);
+  font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--texto-3);
+}
+.cfg-item {
+  position: relative; display: flex; align-items: center; gap: var(--e2); width: 100%;
+  min-height: 32px; padding: 0 var(--e2); border-radius: var(--raio-2); text-align: left;
+  font-size: var(--letra-painel); font-weight: var(--peso-medio); color: var(--texto-2);
+}
+.cfg-item > svg { flex: none; opacity: .9; }
+.cfg-item-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfg-item-fim { margin-left: auto; display: flex; align-items: center; gap: var(--e1); font-size: var(--letra-legenda); color: var(--texto-3); }
+.cfg-item:hover { background: var(--superficie-3); color: var(--texto); }
+/* "Você está aqui": o mesmo fundo tingido e o mesmo risco à esquerda da sala. */
+.cfg-item[aria-current="page"] { background: var(--acento-tenue); color: var(--texto-forte); font-weight: var(--peso-semi); }
+.cfg-item[aria-current="page"] > svg { color: var(--acento-texto); opacity: 1; }
+.cfg-item[aria-current="page"]::before {
+  content: ''; position: absolute; left: calc(-1 * var(--e2)); top: 50%; transform: translateY(-50%);
+  width: 3px; height: 16px; border-radius: 0 var(--raio-1) var(--raio-1) 0; background: var(--acento-texto);
+}
+.cfg-item mark { background: none; color: var(--acento-texto); }
+.cfg-item[data-tom="perigo"] { color: var(--perigo-texto); }
+.cfg-item[data-tom="perigo"]:hover { background: var(--perigo-tenue); }
+/* Armado: o segundo clique confirma, e desarma sozinho. */
+.cfg-item[data-armado] { background: var(--perigo-cheio); color: var(--sobre-acento); }
+.cfg-risco { height: 1px; margin: var(--e3) var(--e2); background: var(--borda-sutil); flex: none; }
+.cfg-nada { padding: var(--e2); font-size: var(--letra-menu); color: var(--texto-3); }
+
+/* ---- o conteúdo ------------------------------------------------------------------------ */
+
+.cfg-conteudo { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.cfg-cabeca {
+  flex: none; display: flex; align-items: center; gap: var(--e3);
+  height: 56px; padding: 0 var(--e3) 0 var(--e6); border-bottom: 1px solid var(--borda-sutil);
+}
+@media (max-width: 1000px) { .cfg-cabeca { padding-left: var(--e5); } }
+/* O caminho: "Configurações do servidor › Cargos". */
+.cfg-migalhas { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--e1m); font-size: var(--letra-painel); color: var(--texto-2); white-space: nowrap; overflow: hidden; }
+.cfg-migalhas svg { flex: none; color: var(--texto-3); }
+.cfg-migalhas b { color: var(--texto-forte); font-weight: var(--peso-semi); overflow: hidden; text-overflow: ellipsis; }
+.cfg-fechar { display: flex; align-items: center; gap: var(--e2); flex: none; }
+.cfg-tecla {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--e1m);
+  border-radius: var(--raio-1); border: 1px solid var(--borda); background: var(--superficie-1);
+  color: var(--texto-2); font-size: var(--letra-selo); font-weight: var(--peso-forte); letter-spacing: .07em;
+}
+.cfg-botao-icone {
+  width: 32px; height: 32px; flex: none; display: grid; place-items: center;
+  border-radius: var(--raio-3); color: var(--texto-2);
+}
+.cfg-botao-icone:hover:not(:disabled) { background: var(--superficie-3); color: var(--texto-forte); }
+.cfg-botao-icone:disabled { opacity: .45; }
+
+.cfg-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e5) var(--e6) var(--e7); }
+@media (max-width: 1000px) { .cfg-corpo { padding: var(--e4m) var(--e5) var(--e7); } }
+.cfg-pagina { max-width: 720px; }
+.cfg-pagina[data-largura="cheia"] { max-width: 880px; }
+.cfg-titulo { margin: 0; font-size: var(--letra-destaque); font-weight: var(--peso-forte); letter-spacing: -.01em; line-height: 1.2; color: var(--texto-forte); }
+.cfg-descricao { margin: var(--e1) 0 var(--e5); font-size: var(--letra-painel); color: var(--texto-2); line-height: 1.45; }
+
+.cfg-secao { padding: var(--e4m) 0; border-top: 1px solid var(--borda-sutil); }
+.cfg-secao:first-of-type { border-top: 0; padding-top: 0; }
+.cfg-secao-titulo {
+  margin: 0 0 var(--e3); display: flex; align-items: center; gap: var(--e2);
+  font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--texto-3);
+}
+.cfg-secao-titulo .cfg-selo { margin-left: auto; }
+
+/* Linha de ajuste: o que é · o que faz · o controle à direita. */
+.cfg-linha {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: var(--e1) var(--e4); padding: var(--e3) 0;
+}
+.cfg-linha + .cfg-linha { border-top: 1px solid var(--borda-sutil); }
+.cfg-linha[data-empilhada] { grid-template-columns: minmax(0, 1fr); }
+.cfg-linha-texto { display: grid; gap: var(--e0); min-width: 0; }
+.cfg-rotulo { font-size: var(--letra-painel); font-weight: var(--peso-semi); color: var(--texto-forte); display: flex; align-items: center; gap: var(--e1m); }
+.cfg-explica { font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.45; }
+.cfg-controle { display: flex; align-items: center; gap: var(--e2); justify-self: end; }
+.cfg-linha[data-empilhada] .cfg-controle { justify-self: stretch; }
+.cfg-controle select { min-width: 260px; }
+.cfg-linha[aria-disabled="true"] .cfg-rotulo { color: var(--texto-2); }
+.cfg-linha[aria-disabled="true"] .cfg-controle { opacity: .45; }
+.cfg-motivo { font-size: var(--letra-legenda); color: var(--texto-3); }
+
+/* Botões: um de cada, com a mesma altura lado a lado. Os botões sem classe dos painéis
+   antigos viravam texto solto ao lado de um campo — o "Salvar" do nome do servidor era um. */
+.cfg-botao {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--e2); flex: none;
+  height: 36px; padding: 0 var(--e4); border: 1px solid transparent; border-radius: var(--raio-3);
+  background: var(--superficie-3); color: var(--texto-forte);
+  font-size: var(--letra-painel); font-weight: var(--peso-semi); line-height: 1; white-space: nowrap;
+}
+.cfg-botao:hover:not(:disabled) { background: var(--superficie-4); }
+.cfg-botao:disabled { opacity: .45; }
+.cfg-botao[data-variante="primario"] { background: var(--acento-cheio); color: var(--sobre-acento); }
+.cfg-botao[data-variante="primario"]:hover:not(:disabled) { background: var(--acento-cheio-hover); }
+.cfg-botao[data-variante="fantasma"] { background: transparent; color: var(--texto); }
+.cfg-botao[data-variante="fantasma"]:hover:not(:disabled) { background: var(--superficie-3); }
+.cfg-botao[data-variante="perigo"] { background: transparent; border-color: var(--perigo-borda); color: var(--perigo-texto); }
+.cfg-botao[data-variante="perigo"]:hover:not(:disabled) { background: var(--perigo-tenue); }
+.cfg-botao[data-armado] { background: var(--perigo-cheio); border-color: transparent; color: var(--sobre-acento); }
+.cfg-botao[data-tamanho="pequeno"] { height: 28px; padding: 0 var(--e3); font-size: var(--letra-menu); border-radius: var(--raio-2); }
+
+.cfg-campo { display: grid; gap: var(--e1m); min-width: 0; }
+.cfg-campo > label, .cfg-campo-rotulo { font-size: var(--letra-painel); font-weight: var(--peso-semi); color: var(--texto-forte); }
+.cfg-campo-linha { display: flex; gap: var(--e2); align-items: center; }
+.cfg-campo-linha > input { flex: 1; min-width: 0; }
+.cfg-ajuda { font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.45; }
+
+/* Chave (switch): liga e desliga na hora. <input type="checkbox" role="switch">. */
+.cfg-chave {
+  appearance: none; flex: none; position: relative; margin: 0; cursor: pointer; padding: 0;
+  width: 36px; height: 20px; border-radius: var(--raio-cheio);
+  background: var(--superficie-4); border: 1px solid var(--borda-campo);
+}
+.cfg-chave::before {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--texto-2); transition: transform .12s;
+}
+.cfg-chave:checked { background: var(--acento-cheio); border-color: var(--acento-cheio); }
+.cfg-chave:checked::before { transform: translateX(16px); background: var(--sobre-acento); }
+.cfg-chave:disabled { opacity: .45; cursor: default; }
+
+.cfg-selo {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 var(--e1m); border-radius: var(--raio-1);
+  background: var(--superficie-4); color: var(--texto); font-size: var(--letra-selo);
+  font-weight: var(--peso-versalete); letter-spacing: .07em; text-transform: uppercase; flex: none;
+}
+.cfg-selo[data-tom="acento"] { background: var(--acento-tenue); color: var(--acento-texto); }
+.cfg-selo[data-tom="aviso"] { background: var(--aviso-tenue); color: var(--aviso); }
+
+.cfg-alerta {
+  display: flex; align-items: flex-start; gap: var(--e2); padding: var(--e2) var(--e3); margin-bottom: var(--e3);
+  border-radius: var(--raio-3); border: 1px solid var(--borda); background: var(--superficie-1);
+  font-size: var(--letra-menu); line-height: 1.45; color: var(--texto);
+}
+.cfg-alerta[data-tom="perigo"] { background: var(--perigo-tenue); border-color: var(--perigo-borda); color: var(--perigo-texto); }
+.cfg-alerta[data-tom="ok"] { background: var(--ok-tenue); border-color: transparent; color: var(--ok-texto); }
+.cfg-alerta[data-tom="aviso"] { background: var(--aviso-tenue); border-color: var(--aviso-borda); }
+
+/* A frase de ponte: diz onde mora o que parece que devia estar aqui. */
+.cfg-ponte {
+  display: flex; align-items: center; gap: var(--e2); margin-top: var(--e4);
+  padding: var(--e2) var(--e3); border-radius: var(--raio-3);
+  border: 1px dashed var(--borda); font-size: var(--letra-menu); color: var(--texto-2);
+}
+.cfg-ponte > span { flex: 1; min-width: 0; }
+.cfg-ponte b { color: var(--texto-forte); }
+
+/* ---- listas: pessoas, banidos, convites, salas ------------------------------------------ */
+
+.cfg-filtros { display: flex; align-items: center; gap: var(--e2); margin-bottom: var(--e3); }
+.cfg-filtros > .cfg-busca { flex: 1; margin: 0; }
+.cfg-filtros > .cfg-busca input { height: 36px; font-size: var(--letra-painel); }
+
+.cfg-tabela { display: grid; }
+.cfg-tabela-cabeca, .cfg-tabela-linha {
+  display: grid; grid-template-columns: minmax(0, 1fr) 160px 150px 32px; gap: var(--e3); align-items: center;
+  padding: var(--e1m) var(--e2);
+}
+.cfg-tabela-cabeca {
+  padding-bottom: var(--e2); border-bottom: 1px solid var(--borda-sutil);
+  font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); letter-spacing: .07em; text-transform: uppercase; color: var(--texto-3);
+}
+.cfg-tabela-linha { border-radius: var(--raio-3); min-height: 52px; }
+.cfg-tabela-linha:hover, .cfg-tabela-linha[aria-selected="true"] { background: var(--superficie-3); }
+.cfg-tabela-linha select { height: 32px; padding: 0 var(--e2); font-size: var(--letra-menu); width: 100%; }
+@container (max-width: 600px) { .cfg-tabela-cabeca, .cfg-tabela-linha { grid-template-columns: minmax(0, 1fr) 132px 32px; } .cfg-estado { display: none; } }
+.cfg-corpo { container-type: inline-size; }
+
+.cfg-quem { display: flex; align-items: center; gap: var(--e3); min-width: 0; }
+.cfg-quem-texto { min-width: 0; display: grid; gap: var(--e0); line-height: 1.25; }
+.cfg-quem-nome { font-size: var(--letra-painel); font-weight: var(--peso-semi); color: var(--texto-forte); display: flex; align-items: center; gap: var(--e1m); overflow: hidden; white-space: nowrap; }
+.cfg-quem-meta { font-size: var(--letra-legenda); color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfg-estado { font-size: var(--letra-legenda); color: var(--texto-2); }
+.cfg-estado[data-tom="aviso"] { color: var(--aviso); }
+
+/* Lista à esquerda, detalhe à direita (cargos, salas). */
+.cfg-lista-e-detalhe { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: var(--e5); align-items: start; }
+@container (max-width: 600px) { .cfg-lista-e-detalhe { grid-template-columns: 168px minmax(0, 1fr); gap: var(--e4); } }
+.cfg-lista { display: grid; gap: var(--e0); position: sticky; top: 0; }
+.cfg-lista-linha {
+  display: flex; align-items: center; gap: var(--e2); width: 100%; min-height: 34px;
+  padding: var(--e1) var(--e2); border-radius: var(--raio-3); text-align: left;
+  font-size: var(--letra-painel); font-weight: var(--peso-medio); color: var(--texto);
+}
+.cfg-lista-linha:hover { background: var(--superficie-3); }
+.cfg-lista-linha[aria-selected="true"] { background: var(--acento-tenue); color: var(--texto-forte); font-weight: var(--peso-semi); }
+.cfg-lista-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfg-lista-grupo { padding: var(--e3) var(--e2) var(--e1); font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); letter-spacing: .07em; text-transform: uppercase; color: var(--texto-3); }
+.cfg-cor { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--cor-do-cargo, var(--texto-3)); }
+.cfg-cores { display: flex; flex-wrap: wrap; gap: var(--e1m); align-items: center; }
+.cfg-amostra { width: 28px; height: 28px; border-radius: var(--raio-2); background: var(--cor-do-cargo); border: 2px solid transparent; padding: 0; }
+.cfg-amostra[aria-pressed="true"] { border-color: var(--texto-forte); }
+.cfg-cores input[type="color"] { width: 36px; height: 28px; padding: 0 2px; border-radius: var(--raio-2); cursor: pointer; }
+
+/* O menu do "…" numa linha: o mesmo gesto do botão direito, à vista. */
+.cfg-menu-acoes {
+  position: fixed; z-index: var(--z-menu); min-width: 232px; padding: var(--e1m);
+  border-radius: var(--raio-4); background: var(--superficie-2); border: 1px solid var(--borda);
+  box-shadow: var(--sombra-2); display: grid; gap: var(--e0);
+}
+.cfg-menu-acoes-cabeca { padding: var(--e1m) var(--e2) var(--e2); font-size: var(--letra-menu); color: var(--texto-2); }
+.cfg-menu-acoes-cabeca b { color: var(--texto-forte); }
+.cfg-menu-acoes button {
+  display: flex; align-items: center; gap: var(--e2); width: 100%; min-height: 32px;
+  padding: 0 var(--e2); border-radius: var(--raio-2); text-align: left;
+  font-size: var(--letra-menu); font-weight: var(--peso-medio); color: var(--texto);
+}
+.cfg-menu-acoes button:hover:not(:disabled) { background: var(--superficie-3); color: var(--texto-forte); }
+.cfg-menu-acoes button[data-tom="perigo"] { color: var(--perigo-texto); }
+.cfg-menu-acoes button[data-tom="perigo"]:hover { background: var(--perigo-tenue); }
+.cfg-menu-acoes button[data-armado] { background: var(--perigo-cheio); color: var(--sobre-acento); }
+.cfg-menu-acoes-grupo { padding: var(--e2) var(--e2) var(--e1); font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); letter-spacing: .07em; text-transform: uppercase; color: var(--texto-3); }
+.cfg-menu-acoes-risco { height: 1px; margin: var(--e1) var(--e1m); background: var(--borda-sutil); }
+.cfg-chips { display: flex; flex-wrap: wrap; gap: var(--e1); padding: 0 var(--e2) var(--e2); }
+.cfg-chip {
+  height: 26px; padding: 0 var(--e2); border-radius: var(--raio-cheio); border: 1px solid var(--borda);
+  background: var(--superficie-1); color: var(--texto); font-size: var(--letra-legenda); font-weight: var(--peso-semi);
+}
+.cfg-chip:hover { border-color: var(--acento); color: var(--texto-forte); }
+/* Dentro do menu, o chip não é linha de menu: sem a largura inteira dos itens. */
+.cfg-menu-acoes .cfg-chip { width: auto; min-height: 26px; padding: 0 var(--e2); justify-content: center; border-radius: var(--raio-cheio); }
+.cfg-menu-acoes { max-height: calc(100vh - 16px); overflow-y: auto; }
+
+.cfg-vazio { padding: var(--e4) 0; font-size: var(--letra-menu); color: var(--texto-3); }
+.cfg-codigo { font-family: var(--fonte-mono); letter-spacing: .12em; color: var(--texto-forte); }

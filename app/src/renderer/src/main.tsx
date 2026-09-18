@@ -4,6 +4,7 @@ import { App } from './App';
 import { BarraDaJanela } from './components/BarraDaJanela';
 import './tokens.css';
 import './styles.css';
+import './configuracoes.css';
 import { capturarErrosGlobais } from './registro';
 
 capturarErrosGlobais();

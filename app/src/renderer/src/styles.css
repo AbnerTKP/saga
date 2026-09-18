@@ -723,6 +723,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   background: var(--bg1); border: 1px solid var(--bg4); color: var(--text3);
 }
 .escolher-imagem .previa.redondo { width: 56px; height: 56px; border-radius: 50%; }
+.escolher-imagem .previa.quadrado { width: 56px; height: 56px; border-radius: 12px; }
 .escolher-imagem .previa.faixa { width: 140px; height: 56px; border-radius: 6px; }
 .escolher-imagem .previa img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .escolher-imagem .escolher-acoes { display: flex; flex-direction: column; gap: 4px; }
@@ -1341,6 +1342,11 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    genérico é o botão de sair do servidor, com contorno — dentro de um menu essa borda vira
    um retângulo vermelho no meio da lista. Já aconteceu com o "Banir" e com o "Apagar
    mensagem", e o `.menu-acoes` teve de aprender o mesmo. */
+/* O submenu com as páginas das configurações, ao lado do item. */
+.menu-do-servidor .com-submenu { position: relative; }
+.menu-do-servidor .com-submenu > .configurar { width: 100%; }
+.seta-do-submenu { margin-left: auto; display: grid; color: var(--text3); }
+.menu-do-servidor .submenu-do-servidor { position: absolute; left: 100%; top: -10px; margin-left: 6px; width: 224px; }
 /* "Configurações do servidor" vem em primeiro e em peso de título: é a porta que o dono
    procurava no botão direito do quadrado. */
 .menu-do-servidor .configurar { color: var(--white); font-weight: 600; }

@@ -38,7 +38,7 @@ export function BotaoDeRelatar() {
   );
 }
 
-function CaixaDeRelato({ onClose }: { onClose: () => void }) {
+export function CaixaDeRelato({ onClose }: { onClose: () => void }) {
   useFecharComEsc(onClose);
   const [tipo, setTipo] = useState<TipoDeRelato>('erro');
   const [texto, setTexto] = useState('');

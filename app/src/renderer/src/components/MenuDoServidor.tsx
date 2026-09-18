@@ -3,10 +3,11 @@ import { Icon } from './Icon';
 import { useFecharComEsc } from '../useFechar';
 import { pode, type Membro } from '../api';
 import { podeConfigurar } from '../configurar';
+import { paginasDoServidor, type PaginaDoServidor } from '../paginasDeConfiguracao';
 
 export type AcaoNoServidor =
   | { tipo: 'convidar' }
-  | { tipo: 'configurar' }
+  | { tipo: 'configurar'; pagina?: PaginaDoServidor }
   | { tipo: 'criarSala'; sala: 'voz' | 'texto' }
   | { tipo: 'sair' };
 
@@ -42,6 +43,9 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
   // Sair arma no próprio botão, como o desistir do xadrez: é decisão de um segundo, e uma
   // janela a mais seria ruído — mas um clique só é fácil demais de errar num menu.
   const [confirmandoSaida, setConfirmandoSaida] = useState(false);
+  // O submenu com as páginas: qualquer uma a dois cliques de qualquer tela (como no Discord).
+  const [submenu, setSubmenu] = useState(false);
+  const paginas = paginasDoServidor(eu.cargo);
 
   useEffect(() => {
     const fora = (e: MouseEvent) => { if (!caixa.current?.contains(e.target as Node)) onClose(); };
@@ -72,9 +76,20 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
       <div className="menu-titulo">{nomeDoServidor}</div>
 
       {configura && (
-        <button className="configurar" onClick={() => fazer({ tipo: 'configurar' })}>
-          <Icon name="gear" size={15} /> Configurações do servidor
-        </button>
+        <div className="com-submenu" onMouseEnter={() => setSubmenu(true)} onMouseLeave={() => setSubmenu(false)}>
+          <button className="configurar" aria-haspopup="menu" aria-expanded={submenu} onClick={() => fazer({ tipo: 'configurar' })}>
+            <Icon name="gear" size={15} /> Configurações do servidor <span className="seta-do-submenu"><Icon name="setaDir" size={15} /></span>
+          </button>
+          {submenu && paginas.length > 1 && (
+            <div className="menu-pessoa menu-salas submenu-do-servidor" role="menu">
+              {paginas.map((pg) => (
+                <button key={pg.id} onClick={() => fazer({ tipo: 'configurar', pagina: pg.id })}>
+                  <Icon name={pg.icone} size={15} /> {pg.titulo}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {podeConvidar && (

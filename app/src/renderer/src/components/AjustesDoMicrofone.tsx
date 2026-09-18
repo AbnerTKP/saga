@@ -91,12 +91,12 @@ function AvisoDoFiltro({ microfone }: { microfone: MicrofoneDaCall }) {
 }
 
 /** O bloco de "Sua conta". */
-export function BlocoDoMicrofone({ microfone }: { microfone: MicrofoneDaCall }) {
+export function BlocoDoMicrofone({ microfone, semTitulo }: { microfone: MicrofoneDaCall; semTitulo?: boolean }) {
   const { ajustes, definir } = microfone;
   const atual = OPCOES.find((o) => o.id === ajustes.supressao)!;
   return (
-    <section className="painel-bloco">
-      <h3>Seu microfone</h3>
+    <section className={semTitulo ? undefined : 'painel-bloco'}>
+      {!semTitulo && <h3>Seu microfone</h3>}
       <div className="form">
         <div className="campo-do-microfone">
           <span className="rotulo-da-sensibilidade">Supressão de ruído</span>
