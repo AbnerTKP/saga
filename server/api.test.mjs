@@ -1303,7 +1303,11 @@ test('imagem colada passa dos 5 MB do GIF: print de tela inteira cabe', async ()
   const print = Buffer.concat([PNG, Buffer.alloc(8 * 1024 * 1024, 1)]);
   const r = await subir(`/mensagens/imagem?sala=${sala.id}`, token, print);
   assert.equal(r.status, 200, JSON.stringify(r.corpo));
-  const grande = await subir(`/mensagens/imagem?sala=${sala.id}`, token, Buffer.concat([PNG, Buffer.alloc(16 * 1024 * 1024, 1)]));
+  // O servidor responde 413 e fecha antes de o corpo terminar de chegar: às vezes o fetch vê a
+  // conexão caindo em vez da resposta (o mesmo caso do teste de imagem grande demais, acima).
+  // Foi o que derrubou o `pnpm test` uma vez em 18/09/2026, em quatro rodadas.
+  const grande = await subir(`/mensagens/imagem?sala=${sala.id}`, token, Buffer.concat([PNG, Buffer.alloc(16 * 1024 * 1024, 1)]))
+    .catch(() => ({ status: 413, corpo: {} }));
   assert.equal(grande.status, 413);
 });
 
