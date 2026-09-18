@@ -494,6 +494,12 @@ export function PainelDaConta({
 
           <BlocoDoMicrofone microfone={microfone} />
 
+          {/* A régua do soundboard ficou só para o DONO DA SAGA, por enquanto — pedido dele em
+              18/09/2026. Quem não é dono continua ouvindo no volume guardado no próprio
+              computador (100% para quem nunca mexeu), e nada muda para quem toca os sons: o que
+              sai para a sala é tirado antes do ganho. Para devolvê-la a todo mundo, é só apagar
+              esta condição. */}
+          {donoDaSaga && (
           <section className="painel-bloco">
             <h3>Soundboard</h3>
             <div className="form">
@@ -511,6 +517,7 @@ export function PainelDaConta({
               </label>
             </div>
           </section>
+          )}
 
           <section className="painel-bloco">
             <h3>Ao ligar o computador</h3>

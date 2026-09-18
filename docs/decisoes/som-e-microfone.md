@@ -98,6 +98,11 @@ Supressão de ruído, corte automático, soundboard e os sons de aviso.
   pela FONTE da faixa: medido com o `livekit-client` deste projeto contra um LiveKit de
   verdade, o que é publicado como `Track.Source.Unknown` chega do outro lado como
   `unknown`, com o nome `soundboard` junto.
+- **A régua ficou só para o dono da Saga (18/09/2026).** Pedido dele: "que não tenha mais
+  regulagem de volume de som por enquanto, somente para mim". A chave, o ganho e a conta
+  continuam iguais para todo mundo — quem não é dono ouve no que estiver guardado no próprio
+  computador, 100% para quem nunca mexeu —; o que sumiu é o bloco "Soundboard" de "Sua conta".
+  É uma condição só em `PainelDaConta`, e devolvê-la a todos é apagar essa linha.
 - **`Number('')` é ZERO, e zero é silêncio.** O volume guardado passa por `volumeGuardado`:
   chave vazia, lixo ou nada voltam a 100%. Ler direto do `localStorage` calaria o
   soundboard inteiro por causa de uma chave vazia — sem erro nenhum, e sem ninguém ligar
