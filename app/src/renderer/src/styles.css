@@ -734,6 +734,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   border: 1px solid var(--line); cursor: grab; touch-action: none; margin: 0 auto; }
 .enquadrar-quadro:active { cursor: grabbing; }
 .enquadrar-quadro.foto { width: 200px; height: 200px; border-radius: 50%; }
+.enquadrar-quadro.foto.quadrado { border-radius: 28px; }
 .enquadrar-quadro.banner { width: 100%; aspect-ratio: 5 / 2; border-radius: 8px; }
 .enquadrar-quadro img { width: 100%; height: 100%; display: block; pointer-events: none;
   -webkit-user-select: none; user-select: none; }

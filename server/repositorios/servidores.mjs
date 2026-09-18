@@ -27,6 +27,16 @@ export const renomear = (db, id, nome) =>
 export const trocarImagem = (db, id, papel, nome) =>
   db.prepare(`UPDATE servidores SET ${papel} = ? WHERE id = ?`).run(nome, id);
 
+/** Troca a imagem e o enquadramento na mesma ida: trocar a imagem zera o enquadramento dela. */
+export const trocarImagemEEnquadramento = (db, id, papel, nome, enquadramento) =>
+  db.prepare(`UPDATE servidores SET ${papel} = ?, enquadramento = ? WHERE id = ?`).run(nome, enquadramento, id);
+
+export const lerEnquadramento = (db, id) =>
+  db.prepare('SELECT enquadramento FROM servidores WHERE id = ?').get(Number(id))?.enquadramento ?? null;
+
+export const guardarEnquadramento = (db, id, enquadramento) =>
+  db.prepare('UPDATE servidores SET enquadramento = ? WHERE id = ?').run(enquadramento, Number(id));
+
 export const quemCriou = (db, id) =>
   db.prepare('SELECT criado_por FROM servidores WHERE id = ?').get(id)?.criado_por ?? null;
 

@@ -258,7 +258,7 @@ const verMembro = (m) => m && ({
 
 const verServidor = (sid) => {
   const s = tabelaDeServidores.buscar(db, sid);
-  return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null };
+  return { id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null, enquadramento: enquadramento.ler(s.enquadramento) };
 };
 
 /**
@@ -635,7 +635,9 @@ async function trocarImagem(req, de, papel) {
   const nome = bruto.length ? guardarComRegraDoTurbo(eu, bruto, papel, de) : null;
 
   if (de === 'servidor') {
-    tabelaDeServidores.trocarImagem(db, sid, papel, nome);
+    // Trocar a imagem zera o enquadramento DELA, como na da pessoa (logo abaixo).
+    const semOAntigo = enquadramento.guardar(tabelaDeServidores.lerEnquadramento(db, sid), papel, null);
+    tabelaDeServidores.trocarImagemEEnquadramento(db, sid, papel, nome, semOAntigo);
     return { servidor: verServidor(sid) };
   }
   /*
@@ -1162,6 +1164,21 @@ const ROTAS = {
     const novo = enquadramento.guardar(atual, papel, valor);
     tabelaDeUsuarios.guardarEnquadramento(db, usuario.id, novo);
     return { eu: euDepois(usuario, sid) };
+  },
+
+  // O enquadramento da foto e da capa do SERVIDOR: de quem pode mudar a imagem dele.
+  'PATCH /servidor/enquadramento': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    if (!temPermissao(eu.cargo, 'gerirServidor')) {
+      throw new ErroDeConta('Seu cargo não permite mudar a imagem do servidor.', 403);
+    }
+    const { papel, valor } = await lerCorpo(req);
+    if (!['foto', 'banner'].includes(papel)) {
+      throw new ErroDeConta('Só dá para enquadrar a foto ou a capa.', 400);
+    }
+    const novo = enquadramento.guardar(tabelaDeServidores.lerEnquadramento(db, sid), papel, valor);
+    tabelaDeServidores.guardarEnquadramento(db, sid, novo);
+    return { servidor: verServidor(sid) };
   },
 
   'POST /mensagens/gif': async (req) => {

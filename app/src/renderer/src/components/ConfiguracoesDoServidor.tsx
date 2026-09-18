@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   pode, podeSobre, verServidor, renomearServidor, moderar, urlDoArquivo,
-  fotoDoServidor, bannerDoServidor, usarGif,
+  fotoDoServidor, bannerDoServidor, usarGif, salvarEnquadramentoDoServidor, ErroDoServidor,
   criarSala, renomearSala, apagarSala, editarSala, reordenarSalas,
   criarCategoria, renomearCategoria, apagarCategoria,
   criarCargo, editarCargo, apagarCargo, criarConvite, verConvites, sairDoServidor,
@@ -9,6 +9,7 @@ import {
   type Membro, type Permissao, type Servidor, type Sala, type TipoDeSala,
 } from '../api';
 import { destronados, empatadosCom, nivelParaCargoNovo } from '../cargos';
+import type { Enquadramento } from '../enquadramento';
 import { moverSala } from '../ordenacao';
 import { paginasDoServidor, type Pagina, type PaginaDoServidor } from '../paginasDeConfiguracao';
 import { useFecharComEsc } from '../useFechar';
@@ -137,7 +138,7 @@ export function ConfiguracoesDoServidor({ eu, servidor, categoriasDaBarra, donoD
   ];
 
   const escopo = {
-    quadro: urlDoArquivo(servidor.foto) ? <FotoDoServidor url={urlDoArquivo(servidor.foto)!} /> : servidor.nome.slice(0, 2).toUpperCase(),
+    quadro: urlDoArquivo(servidor.foto) ? <FotoDoServidor url={urlDoArquivo(servidor.foto)!} enquadramento={servidor.enquadramento?.foto} /> : servidor.nome.slice(0, 2).toUpperCase(),
     nome: servidor.nome,
     meta: carregou ? `${membros.filter((m) => !m.banido).length} pessoas` : 'Configurações do servidor',
   };
@@ -189,6 +190,18 @@ function PaginaPerfil({ servidor, ocupado, onServidor, setErro, setAviso }: Ctx)
     try { onServidor((await renomearServidor(nome)).servidor); setAviso('Nome do servidor salvo.'); }
     catch (e) { setErro((e as Error).message); }
   };
+  /**
+   * Enquadrar a foto do servidor é novo (v0.62): o servidor de antes não conhece a rota e
+   * responde 404. O app e o servidor sobem separados, então isso acontece de verdade por
+   * alguns minutos — e a frase diz o que é, em vez de um "não encontrado".
+   */
+  const enquadrar = async (papel: 'foto' | 'banner', v: Enquadramento) => {
+    try { onServidor(await salvarEnquadramentoDoServidor(papel, v)); }
+    catch (e) {
+      if (e instanceof ErroDoServidor && e.status === 404) throw new Error('O servidor ainda não sabe enquadrar a imagem dele: chega junto com a versão nova do servidor.');
+      throw e;
+    }
+  };
   return (
     <Folha titulo="Perfil do servidor" descricao={`Nome, foto e capa do ${servidor.nome}. É o que aparece na trilha, no convite e no alto do menu do servidor.`}>
       <Secao>
@@ -205,11 +218,15 @@ function PaginaPerfil({ servidor, ocupado, onServidor, setErro, setAviso }: Ctx)
         <div className="imagens">
           <EscolherImagem
             rotulo="Foto do servidor" formato="quadrado" atual={servidor.foto}
+            papel="foto" enquadramento={servidor.enquadramento?.foto}
+            onEnquadrar={(v) => enquadrar('foto', v)}
             onEnviar={async (a) => { setErro(null); try { onServidor((await fotoDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
             onGif={async (url) => { setErro(null); const r = await usarGif('servidor.foto', url); if (r.servidor) onServidor(r.servidor); }}
           />
           <EscolherImagem
             rotulo="Capa do servidor" formato="faixa" atual={servidor.banner}
+            papel="banner" enquadramento={servidor.enquadramento?.banner}
+            onEnquadrar={(v) => enquadrar('banner', v)}
             onEnviar={async (a) => { setErro(null); try { onServidor((await bannerDoServidor(a)).servidor); } catch (e) { setErro((e as Error).message); } }}
             onGif={async (url) => { setErro(null); const r = await usarGif('servidor.banner', url); if (r.servidor) onServidor(r.servidor); }}
           />

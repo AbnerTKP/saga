@@ -524,6 +524,27 @@ test('só o dono troca a imagem do servidor', async () => {
   assert.match(r.corpo.servidor.foto, /\.png$/);
 });
 
+test('a foto do servidor se enquadra, e trocar a foto zera o enquadramento dela', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const valor = { x: 20, y: 50, zoom: 1.5 };
+  // Quem não pode trocar a imagem do servidor também não a enquadra.
+  const negado = await chamar('PATCH', '/servidor/enquadramento', { sessao: bruno.token, corpo: { papel: 'foto', valor } });
+  assert.equal(negado.status, 403);
+  const r = await chamar('PATCH', '/servidor/enquadramento', { sessao: dono.token, corpo: { papel: 'foto', valor } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.corpo.servidor.enquadramento.foto, valor);
+  // Viaja junto do servidor em toda parte: na lista de servidores de quem é membro também.
+  const eu = await chamar('GET', '/servidor', { sessao: dono.token });
+  assert.deepEqual(eu.corpo.servidores.find((s) => s.id === r.corpo.servidor.id).enquadramento.foto, valor);
+  // A foto nova não herda a aproximação da antiga.
+  const nova = await subir('/servidor/foto', dono.token, PNG);
+  assert.equal(nova.status, 200);
+  assert.equal(nova.corpo.servidor.enquadramento.foto, undefined);
+  // Papel que não existe é recusado.
+  assert.equal((await chamar('PATCH', '/servidor/enquadramento', { sessao: dono.token, corpo: { papel: 'nome', valor } })).status, 400);
+});
+
 test('não dá para pescar arquivo de fora da pasta', async () => {
   for (const tentativa of [
     '../../../etc/passwd', '..%2F..%2Fetc%2Fpasswd', '%2e%2e%2f%2e%2e%2fetc%2fpasswd',

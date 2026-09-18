@@ -66,6 +66,7 @@ export function EscolherImagem({ rotulo, atual, formato, papel, enquadramento, o
         <Enquadrar
           url={url}
           papel={papel}
+          quadrado={formato === 'quadrado'}
           inicial={enquadramento}
           onSalvar={onEnquadrar}
           onClose={() => setEnquadrando(false)}

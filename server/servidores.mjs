@@ -1,5 +1,6 @@
 // Vários servidores. O banco já era assim desde o começo — cargo e banimento pertencem ao
 // vínculo entre pessoa e servidor, não à pessoa — então aqui é só criar, convidar e entrar.
+import * as enquadramento from './enquadramento.mjs';
 import { ErroDeConta } from './contas.mjs';
 import { gerarCodigo, limparCodigo } from './codigos.mjs';
 import { garantirCargos } from './banco.mjs';
@@ -13,7 +14,9 @@ import * as tabelaDeSalas from './repositorios/salas.mjs';
 const NOME_VALIDO = /^[^\r\n]{2,40}$/;
 const DURACAO_DO_CONVITE = 7 * 24 * 60 * 60 * 1000;   // uma semana
 
-const paraFora = (s) => s && ({ id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null });
+// O enquadramento viaja junto da imagem: sem ele, a mesma foto apareceria enquadrada num
+// lugar e cortada pelo meio no outro.
+const paraFora = (s) => s && ({ id: s.id, nome: s.nome, foto: s.foto ?? null, banner: s.banner ?? null, enquadramento: enquadramento.ler(s.enquadramento) });
 
 /** Os servidores de que a pessoa faz parte, sem os que a baniram. */
 export const meusServidores = (db, usuarioId) => tabela.doUsuario(db, usuarioId).map(paraFora);

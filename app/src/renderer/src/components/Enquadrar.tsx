@@ -13,9 +13,11 @@ import { useFecharComEsc } from '../useFechar';
  * É o que deixa o GIF continuar animado depois de enquadrado. A prévia usa exatamente a
  * mesma conta do resto do app, então o que se vê aqui é o que aparece lá fora.
  */
-export function Enquadrar({ url, papel, inicial, onSalvar, onClose }: {
+export function Enquadrar({ url, papel, quadrado, inicial, onSalvar, onClose }: {
   url: string;
   papel: Papel;
+  /** A foto do SERVIDOR: o quadro tem o formato de onde ela aparece — quadrado, não redondo. */
+  quadrado?: boolean;
   inicial: Enquadramento | null | undefined;
   onSalvar: (valor: Enquadramento) => Promise<void>;
   onClose: () => void;
@@ -62,7 +64,7 @@ export function Enquadrar({ url, papel, inicial, onSalvar, onClose }: {
         <div className="pad form">
           <div
             ref={quadro}
-            className={`enquadrar-quadro ${papel}`}
+            className={`enquadrar-quadro ${papel} ${quadrado ? 'quadrado' : ''}`}
             onPointerDown={comecar}
             onPointerMove={mover}
             onPointerUp={soltar}

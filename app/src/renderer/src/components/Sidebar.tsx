@@ -449,7 +449,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
               recortada de dois jeitos a um palmo de distância. */}
           <span className="quadro-da-cabeca">
             {urlDoArquivo(servidor.foto)
-              ? <FotoDoServidor url={urlDoArquivo(servidor.foto)!} />
+              ? <FotoDoServidor url={urlDoArquivo(servidor.foto)!} enquadramento={servidor.enquadramento?.foto} />
               : servidor.nome.slice(0, 2).toUpperCase()}
           </span>
           <span className="nome-do-servidor">{servidor.nome}</span>

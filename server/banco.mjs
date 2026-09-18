@@ -373,6 +373,12 @@ export const MIGRACOES = [
      ultimo_em   INTEGER NOT NULL,
      PRIMARY KEY (servidor_id, usuario_id)
    )`,
+
+  // A foto do servidor ganha enquadramento, como a da conta: onde a imagem foi arrastada e o
+  // quanto foi aproximada (enquadramento.mjs). Sem isto, imagem que não é quadrada saía
+  // cortada pelo meio no quadrado da trilha, e o dono não tinha como escolher o que aparece
+  // (18/09/2026). 18/09/2026: a produção na 55; esta é a 56.
+  `ALTER TABLE servidores ADD COLUMN enquadramento TEXT`,
 ];
 
 export function abrirBanco(caminho) {

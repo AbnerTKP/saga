@@ -91,7 +91,11 @@ export type Membro = {
   entrouEm: number | null;
 };
 
-export type Servidor = { id: number; nome: string; foto: string | null; banner: string | null };
+export type Servidor = {
+  id: number; nome: string; foto: string | null; banner: string | null;
+  /** Onde a foto e a capa ficam no quadrado. Servidor antigo não manda: fica pelo meio. */
+  enquadramento?: Enquadramentos;
+};
 
 export type RoomParticipant = {
   identity: string; name: string; camera: boolean; screen: boolean; muted: boolean;
@@ -908,6 +912,10 @@ export type OndeAImagemVai = 'usuario.foto' | 'usuario.banner' | 'servidor.foto'
 /** Grava só a posição e a aproximação: o arquivo enviado não é tocado. */
 export const salvarEnquadramento = async (papel: Papel, valor: Enquadramento | null) =>
   (await pedir<{ eu: Membro }>('PATCH', '/eu/enquadramento', { papel, valor })).eu;
+
+/** O enquadramento da imagem do SERVIDOR (de quem pode mudar a imagem dele). */
+export const salvarEnquadramentoDoServidor = async (papel: Papel, valor: Enquadramento | null) =>
+  (await pedir<{ servidor: Servidor }>('PATCH', '/servidor/enquadramento', { papel, valor })).servidor;
 
 export const usarGif = (onde: OndeAImagemVai, url: string) =>
   pedir<{ eu?: Membro; servidor?: Servidor }>('POST', '/giphy/usar', { onde, url });

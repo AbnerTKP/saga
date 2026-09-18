@@ -1,5 +1,6 @@
 import { urlDoArquivo, type Servidor } from '../api';
 import { useApontado, useImagemParada } from '../imagemParada';
+import { estilo, type Enquadramento } from '../enquadramento';
 import { Icon } from './Icon';
 
 /**
@@ -60,7 +61,7 @@ export function TrilhaDeServidores({ servidores, atual, servidorDaVoz, onEscolhe
             onClick={() => onEscolher(s.id)}
             onContextMenu={(e) => { e.preventDefault(); onAjustar(s.id, { x: e.clientX, y: e.clientY }); }}
           >
-            {foto ? <FotoDoServidor url={foto} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
+            {foto ? <FotoDoServidor url={foto} enquadramento={s.enquadramento?.foto} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
             {/* Onde a sua voz está: o painel da call dizia em texto; a trilha não dizia nada. */}
             {s.id === servidorDaVoz && (
               <span className="quadro-voz" aria-label="Sua voz está aqui"><Icon name="speaker" size={10} /></span>
@@ -87,9 +88,12 @@ export function TrilhaDeServidores({ servidores, atual, servidorDaVoz, onEscolhe
   );
 }
 
-/** A foto do servidor: GIF parado, animando com o mouse em cima (ver imagemParada.ts). */
-export function FotoDoServidor({ url }: { url: string }) {
+/**
+ * A foto do servidor: GIF parado, animando com o mouse em cima (ver imagemParada.ts), e no
+ * enquadramento que quem gere o servidor escolheu — a mesma conta da prévia do editor.
+ */
+export function FotoDoServidor({ url, enquadramento }: { url: string; enquadramento?: Enquadramento | null }) {
   const [apontado, apontar] = useApontado();
   const src = useImagemParada(url, apontado);
-  return <img ref={apontar} src={src ?? undefined} alt="" draggable={false} />;
+  return <img ref={apontar} src={src ?? undefined} alt="" draggable={false} style={estilo(enquadramento)} />;
 }
