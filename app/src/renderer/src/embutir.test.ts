@@ -17,7 +17,11 @@ test('os três que caíam abaixo dos 4 KB, pelo nome', () => {
   }
 });
 
+test('fonte nunca vira data: — o CSP não tem font-src e a recusaria', () => {
+  assert.equal(podeEmbutir('/x/fontes/pecas.woff2'), false);
+  assert.equal(podeEmbutir('/x/fontes/figtree.woff2'), false);
+});
+
 test('o resto continua com a regra de sempre do Vite', () => {
   assert.equal(podeEmbutir('/x/marca.png'), undefined);
-  assert.equal(podeEmbutir('/x/fontes/pecas.woff2'), undefined);
 });

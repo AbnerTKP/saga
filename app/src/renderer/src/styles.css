@@ -7,19 +7,8 @@
  * meio, marinho #17336d na ponta. Os fundos acompanham, puxados para o frio — os cinzas
  * de antes também eram os do Discord, neutros.
  */
-:root {
-  --bg0: #14161b; --bg1: #1a1d24; --bg2: #1f232b; --bg3: #272c36; --bg4: #313745;
-  --line: #252a33; --text: #d3d9e3; --text2: #8b93a3; --text3: #626a7a; --white: #f4f7fb;
-  --accent: #3f7fe0; --accent-h: #356fc9;
-  /* Para texto e ícone sobre fundo escuro, onde o acento cheio fica pesado. */
-  --accent-claro: #6ba3f5;
-  /* Fundo tingido: o estado "aqui" sem virar um bloco cinza. */
-  --falando:#6ba3f5; --accent-tenue: rgba(63, 127, 224, .16);
-  --ok: #2ea36a; --warn: #e0a233; --danger: #e04852;
-
-  /* Escada de espaço. Antes era tudo 4 e 8, e por isso nada tinha grupo nem respiro. */
-  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px;
-}
+/* As cores, a escada de espaço, as camadas e a fonte moram no tokens.css, que carrega antes
+   deste arquivo. Os nomes daqui (--bg0, --text2, --accent…) são a PONTE para os tokens. */
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 
@@ -54,17 +43,17 @@ html, body, #root { height: 100%; margin: 0; }
 /* Vermelho cheio só aqui: é o gesto que todo mundo no Windows reconhece como "fechar". */
 .barra-da-janela-botoes .fechar:hover { background: var(--danger); color: #fff; }
 .app-raiz > .app { flex: 1; min-height: 0; }
-body { background: var(--bg0); color: var(--text); font: 15px/1.4 -apple-system, 'Segoe UI', system-ui, sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; user-select: none; }
+body { background: var(--bg0); color: var(--text); font: 15px/1.4 var(--fonte-texto); overflow: hidden; -webkit-font-smoothing: antialiased; user-select: none; }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 input, select { font: inherit; color: var(--white); background: var(--bg0); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; outline: none; }
 input:focus, select:focus { border-color: var(--accent); }
-a, .link { color: #00a8fc; font-size: 12px; padding: 0; }
+a, .link { color: var(--link); font-size: 12px; padding: 0; }
 .muted { color: var(--text2); } .small { font-size: 12px; } .strong { font-weight: 600; color: var(--white); } .pad { padding: 12px 16px; }
-.error { color: #fa777c; background: rgba(242,63,67,.12); border: 1px solid rgba(242,63,67,.35); border-radius: 4px; padding: 8px 10px; font-size: 13px; }
+.error { color: var(--perigo-texto); background: var(--perigo-tenue); border: 1px solid var(--perigo-borda); border-radius: 4px; padding: 8px 10px; font-size: 13px; }
 .error.inline { margin-left: auto; padding: 4px 10px; }
-.primary { background: var(--accent); color: #fff; border-radius: 8px; padding: 11px 20px; font-weight: 650; letter-spacing: -.01em; }
-.primary:hover:not(:disabled) { background: var(--accent-h); }
+.primary { background: var(--acento-cheio); color: var(--sobre-acento); border-radius: 8px; padding: 11px 20px; font-weight: 650; letter-spacing: -.01em; }
+.primary:hover:not(:disabled) { background: var(--acento-cheio-hover); }
 .spacer { flex: 1; }
 
 /* Tela de entrada */
@@ -666,9 +655,9 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    conteúdo para fora do modal conforme o servidor crescia. */
 .painel .modal-head { flex: none; }
 .painel-corpo { flex: 1; min-height: 0; overflow-y: auto; }
-.painel .painel-bloco { padding: 14px 18px; border-top: 1px solid #2b2d31; }
+.painel .painel-bloco { padding: 14px 18px; border-top: 1px solid var(--line); }
 .painel .painel-bloco:first-of-type { border-top: none; }
-.painel .painel-bloco h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #b5bac1; }
+.painel .painel-bloco h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text2); }
 .painel .painel-bloco h3 .count { margin-left: 6px; }
 
 .linha-campo { display: flex; gap: 8px; }
@@ -680,7 +669,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 .membros { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .membros li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; flex-wrap: wrap; }
-.membros li:hover { background: #2b2d31; }
+.membros li:hover { background: var(--bg3); }
 .membros li.banido { opacity: .55; }
 .membros .quem { flex: 1; min-width: 0; }
 .membros .quem .strong { font-size: 14px; }
@@ -689,17 +678,17 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .membros .acoes { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .membros .acoes button,
 .membros .acoes select {
-  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  background: var(--bg3); color: var(--text); border: none; border-radius: 4px;
   padding: 4px 8px; font-size: 12px; cursor: pointer; line-height: 1.5;
 }
-.membros .acoes button:hover:not(:disabled) { background: #4a4d55; }
+.membros .acoes button:hover:not(:disabled) { background: var(--bg4); }
 .membros .acoes button:disabled { opacity: .5; cursor: default; }
 .membros .acoes button.danger { background: #6a2b2b; color: #f5c4c4; }
 .membros .acoes button.danger:hover:not(:disabled) { background: #8a3535; }
 
 /* ---- avulsos ---- */
 
-.carregando { display: grid; place-items: center; height: 100%; color: #b5bac1; }
+.carregando { display: grid; place-items: center; height: 100%; color: var(--text2); }
 
 /* Discreta de propósito: serve para conferir a versão, não para ser lida. */
 .marca-versao {
@@ -718,7 +707,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .escolher-imagem { display: flex; align-items: center; gap: 10px; }
 .escolher-imagem .previa {
   display: grid; place-items: center; overflow: hidden; flex: none;
-  background: #232428; border: 1px solid #3a3c42; color: #7c828c;
+  background: var(--bg1); border: 1px solid var(--bg4); color: var(--text3);
 }
 .escolher-imagem .previa.redondo { width: 56px; height: 56px; border-radius: 50%; }
 .escolher-imagem .previa.faixa { width: 140px; height: 56px; border-radius: 6px; }
@@ -727,7 +716,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 /* Enquadrador. O quadro tem o mesmo formato do lugar onde a imagem vai aparecer, e a
    prévia usa a mesma conta do resto do app — o que se vê aqui é o que sai lá fora. */
-.enquadrar-quadro { position: relative; overflow: hidden; background: #17181b;
+.enquadrar-quadro { position: relative; overflow: hidden; background: var(--bg0);
   border: 1px solid var(--line); cursor: grab; touch-action: none; margin: 0 auto; }
 .enquadrar-quadro:active { cursor: grabbing; }
 .enquadrar-quadro.foto { width: 200px; height: 200px; border-radius: 50%; }
@@ -736,27 +725,27 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   -webkit-user-select: none; user-select: none; }
 .escolher-imagem .escolher-acoes > div { display: flex; align-items: center; gap: 8px; }
 .escolher-imagem button {
-  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  background: var(--bg3); color: var(--text); border: none; border-radius: 4px;
   padding: 4px 10px; font-size: 12px; cursor: pointer;
 }
-.escolher-imagem button:hover:not(:disabled) { background: #4a4d55; }
+.escolher-imagem button:hover:not(:disabled) { background: var(--bg4); }
 .escolher-imagem button:disabled { opacity: .5; cursor: default; }
-.escolher-imagem button.link { background: none; padding: 0; color: #949ba4; text-decoration: underline; }
+.escolher-imagem button.link { background: none; padding: 0; color: var(--text2); text-decoration: underline; }
 
 /* ---- soundboard ---- */
 
 .sons { display: flex; flex-wrap: wrap; gap: 8px; }
-.som { display: flex; align-items: stretch; border-radius: 6px; overflow: hidden; background: #383a40; }
+.som { display: flex; align-items: stretch; border-radius: 6px; overflow: hidden; background: var(--bg3); }
 .som .tocar {
   display: flex; align-items: center; gap: 7px; background: none; border: none;
-  color: #dbdee1; padding: 8px 12px; font-size: 13px; cursor: pointer; max-width: 15rem;
+  color: var(--text); padding: 8px 12px; font-size: 13px; cursor: pointer; max-width: 15rem;
 }
 .som .tocar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.som .tocar:hover:not(:disabled) { background: #4a4d55; }
+.som .tocar:hover:not(:disabled) { background: var(--bg4); }
 .som .tocar:disabled { opacity: .5; cursor: default; }
 .som .apagar {
-  background: none; border: none; border-left: 1px solid #4a4d55;
-  color: #949ba4; padding: 0 8px; cursor: pointer;
+  background: none; border: none; border-left: 1px solid var(--bg4);
+  color: var(--text2); padding: 0 8px; cursor: pointer;
 }
 .som .apagar:hover:not(:disabled) { background: #6a2b2b; color: #f5c4c4; }
 
@@ -785,8 +774,8 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .menu-acoes button:hover:not(:disabled) { background: var(--bg3); }
 /* Texto vermelho, e só: sem `border` e `font-weight` aqui, o `.perigo` genérico — o contorno
    do botão de sair de um servidor — vazava a borda para dentro do menu. */
-.menu-acoes button.perigo { color: #fa777c; border: 0; font-weight: inherit; }
-.menu-acoes button.perigo:hover:not(:disabled) { background: rgba(242,63,67,.15); }
+.menu-acoes button.perigo { color: var(--perigo-texto); border: 0; font-weight: inherit; }
+.menu-acoes button.perigo:hover:not(:disabled) { background: var(--perigo-tenue); }
 .menu-cargo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
 .menu-cargo select { padding: 4px 6px; font-size: 12px; }
 
@@ -803,7 +792,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 .partida {
   height: 100%; display: grid; place-items: center;
-  background: linear-gradient(160deg, #2b2d31, #1e1f22);
+  background: linear-gradient(160deg, var(--bg2), var(--bg0));
   -webkit-app-region: drag;
 }
 .partida-caixa { display: grid; gap: 10px; justify-items: center; text-align: center; width: 320px; }
@@ -922,7 +911,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .lista-salas li { display: flex; align-items: center; gap: 8px; }
 .lista-salas input { flex: 1; min-width: 0; }
 .lista-salas button {
-  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  background: var(--bg3); color: var(--text); border: none; border-radius: 4px;
   padding: 6px 10px; font-size: 12px; cursor: pointer;
 }
 .lista-salas button.danger { background: #6a2b2b; color: #f5c4c4; }
@@ -941,7 +930,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .bolinha-cargo { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .nome-cargo { font-weight: 600; color: var(--white); flex: 1; min-width: 0; }
 .lista-cargos button {
-  background: #383a40; color: #dbdee1; border: none; border-radius: 4px;
+  background: var(--bg3); color: var(--text); border: none; border-radius: 4px;
   padding: 4px 9px; font-size: 12px; cursor: pointer;
 }
 .lista-cargos button.danger { background: #6a2b2b; color: #f5c4c4; }
@@ -1088,7 +1077,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
   border-radius: 10px; background: var(--bg4); color: var(--text2);
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 .perfil-selo.berserk { background: rgba(192,132,252,.16); color: #d8b4fe; }
-.perfil-selo.ok { background: rgba(35,165,89,.16); color: #57d98a; }
+.perfil-selo.ok { background: var(--ok-tenue); color: var(--ok-texto); }
 /* As barras de rolagem são nossas.
    Sem isto o Windows desenha as dele — largas e brancas — no meio de um app escuro, e é
    a única coisa na tela que não é do app. No Mac elas são flutuantes e quase não
@@ -1300,7 +1289,7 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 /* O risco de onde a sala vai cair. Sem ele, solta-se no escuro. */
 .risco-de-solta {
   list-style: none; height: 2px; margin: 1px 6px; border-radius: 2px;
-  background: var(--accent); box-shadow: 0 0 0 1px rgba(88,101,242,.35);
+  background: var(--accent); box-shadow: 0 0 0 1px var(--acento-tenue-forte);
 }
 
 .menu-salas button {
@@ -1325,8 +1314,8 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    mensagem", e o `.menu-acoes` teve de aprender o mesmo. */
 .menu-do-servidor .convidar { color: var(--accent-claro); font-weight: 600; }
 .menu-do-servidor .convidar:hover { background: var(--accent-tenue); color: var(--accent-claro); }
-.menu-do-servidor .perigo { color: #fa777c; border: 0; border-radius: 4px; font-weight: inherit; }
-.menu-do-servidor .perigo:hover { background: rgba(242,63,67,.15); color: #fa777c; }
+.menu-do-servidor .perigo { color: var(--perigo-texto); border: 0; border-radius: 4px; font-weight: inherit; }
+.menu-do-servidor .perigo:hover { background: var(--perigo-tenue); color: var(--perigo-texto); }
 /* Armado, ele é o botão cheio: o segundo clique sai do servidor, e isso tem de parecer o
    que é. Mesma ideia do desistir do xadrez. */
 .menu-do-servidor .perigo.armado { background: var(--danger); color: #fff; }

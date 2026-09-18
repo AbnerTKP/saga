@@ -15,7 +15,16 @@
  */
 const DE_MIDIA = /\.(ogg|opus|mp3|wav|m4a|aac|flac|webm|mp4)$/i;
 
+/**
+ * Fonte também nunca: o CSP não tem `font-src`, então vale `default-src 'self'`, e uma fonte
+ * `data:` é recusada. A pecas.woff2 do xadrez tem 2.960 bytes e caía nos 4 KB — medido no
+ * Chrome com o CSP da tela: "Loading the font 'data:font/woff2…' violates … default-src
+ * 'self'". A Figtree tem 20 KB e sairia como arquivo de qualquer jeito, mas a regra é pelo
+ * tipo, pelo mesmo motivo dos sons.
+ */
+const DE_FONTE = /\.(woff2?|ttf|otf)$/i;
+
 /** `false` proíbe embutir; `undefined` deixa o Vite decidir pelo tamanho, como sempre. */
 export function podeEmbutir(caminho: string): false | undefined {
-  return DE_MIDIA.test(caminho) ? false : undefined;
+  return DE_MIDIA.test(caminho) || DE_FONTE.test(caminho) ? false : undefined;
 }

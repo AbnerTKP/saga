@@ -1,0 +1,238 @@
+/*
+ * tokens.css — os tokens da Saga. Carrega ANTES do styles.css (main.tsx).
+ *
+ * Este é o único arquivo do app com cor escrita à mão: o resto usa var(--…). O
+ * design.test.ts trava isso — arquivo .css novo não pode ter cor crua, e o styles.css (o
+ * CSS de antes, que ainda está sendo migrado) não pode ganhar nenhuma a mais.
+ *
+ * Duas camadas:
+ *   PRIMITIVOS  — a cor como ela é: a logo, a rampa de cinza frio, os tons de estado.
+ *   SEMÂNTICOS  — o papel: superfície, texto, borda, acento, estado. É o que se usa.
+ *
+ * A paleta continua saindo da logo, não do Discord — e também não do Trivo (fundo quase
+ * preto NEUTRO com azul #68a9ef é a cara dele). As superfícies são as do tema "Noite",
+ * escolhido pelo dono em 18/09/2026: um degrau abaixo das de antes, na mesma família fria.
+ * Contraste contado pela fórmula da WCAG 2.2 sobre a cor sólida, com a conta ao lado.
+ */
+
+/* A fonte vai no pacote, como a pecas.woff2: o CSP (default-src 'self', sem font-src)
+   recusa fonte de fora, e fonte nunca vira data: (embutir.ts). Figtree, variável de 300 a
+   900, SIL Open Font License 1.1 (fontes/figtree-OFL.txt), subconjunto latino — cobre o
+   português inteiro. É a mesma letra no Mac e no Windows; antes era SF lá e Segoe aqui, e
+   os pesos 650 e 750 caíam em outro no Windows. */
+@font-face {
+  font-family: 'Figtree';
+  src: url('./fontes/figtree.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+:root {
+  /* ===================================================================== */
+  /* PRIMITIVOS                                                            */
+  /* ===================================================================== */
+
+  /* A logo: azul-céu no alto do balão, azure no meio, marinho na ponta. */
+  --azul-ceu: #b7e3fc;
+  --azure: #4379cf;
+  --marinho: #17336d;
+
+  --azul-300: #6ba3f5;   /* texto e ícone sobre escuro (era --accent-claro e --falando) */
+  --azul-500: #3f7fe0;   /* anel, contorno, seleção, foco */
+  --azul-550: #3a75ce;   /* fundo de botão cheio: branco passa AA (4,55:1); o #3f7fe0 dava 3,94 */
+  --azul-600: #3268bb;   /* hover do cheio (branco 5,48:1) */
+
+  /* Cinza frio. */
+  --cinza-1000: #0f1115;
+  --cinza-950:  #14161b;
+  --cinza-925:  #181b21;
+  --cinza-900:  #1a1d24;
+  --cinza-875:  #1f232b;
+  --cinza-850:  #22262f;
+  --cinza-800:  #272c36;
+  --cinza-750:  #2c313d;
+  --cinza-700:  #313745;
+  --cinza-650:  #3b4252;  /* borda de cartão e de menu */
+  --cinza-600:  #4a5366;  /* borda forte, tracejado das ações da trilha */
+  --cinza-550:  #656e7f;  /* borda de campo */
+  --cinza-500:  #838b9b;  /* texto 3 — era #626a7a, que dava 2,90:1 e não passava em fundo nenhum */
+  --cinza-400:  #99a1b0;  /* texto 2 — era #8b93a3 */
+  --cinza-200:  #d3d9e3;  /* texto */
+  --cinza-50:   #f4f7fb;  /* texto forte */
+
+  --branco: #ffffff;
+  --preto: #000000;
+
+  --verde-500: #2ea36a;
+  --verde-300: #57d98a;
+  --ambar-500: #e0a233;
+  --vermelho-300: #ff8a90;
+  --vermelho-500: #e04852;
+  --vermelho-600: #c93b45;  /* fundo de botão de perigo cheio: branco 5,01:1 */
+  --vermelho-700: #b3343d;
+
+  /* Berserk: roxo e arco-íris. */
+  --roxo-300: #d8b4fe;
+  --roxo-500: #c084fc;
+  --roxo-600: #a855f7;
+  --rosa-500: #ec4899;
+
+  --preto-45: rgb(0 0 0 / .45);
+  --preto-55: rgb(0 0 0 / .55);
+  --preto-60: rgb(0 0 0 / .6);
+  --preto-85: rgb(0 0 0 / .85);
+  --branco-07: rgb(255 255 255 / .07);
+  --branco-14: rgb(255 255 255 / .14);
+  --azul-500-16: rgb(63 127 224 / .16);
+  --azul-500-28: rgb(63 127 224 / .28);
+  --verde-500-16: rgb(46 163 106 / .16);
+  --ambar-500-10: rgb(224 162 51 / .10);
+  --ambar-500-32: rgb(224 162 51 / .32);
+  --vermelho-500-14: rgb(224 72 82 / .14);
+  --vermelho-500-35: rgb(224 72 82 / .35);
+  --roxo-500-14: rgb(192 132 252 / .14);
+
+  /* ===================================================================== */
+  /* SEMÂNTICOS                                                            */
+  /* ===================================================================== */
+
+  /* Superfícies, do fundo para a frente — as do tema Noite. */
+  --superficie-0: var(--cinza-1000);  /* trilha, faixa, barra da conta, campos */
+  --superficie-1: var(--cinza-950);   /* barra lateral, pessoas, menu das configurações */
+  --superficie-2: var(--cinza-925);   /* palco, caixas, menus, conteúdo das configurações */
+  --superficie-3: var(--cinza-850);   /* hover padrão, botão secundário */
+  --superficie-4: var(--cinza-750);   /* hover do secundário, trilhos, contagem neutra */
+  --veu: var(--preto-60);
+  --veu-forte: var(--preto-85);
+
+  --borda-sutil: var(--cinza-875);    /* divisória entre superfícies vizinhas */
+  --borda: var(--cinza-650);
+  --borda-forte: var(--cinza-600);
+  --borda-campo: var(--cinza-550);
+
+  --texto-forte: var(--cinza-50);     /* nomes, títulos */
+  --texto: var(--cinza-200);          /* corpo */
+  --texto-2: var(--cinza-400);        /* secundário */
+  --texto-3: var(--cinza-500);        /* rótulo em versalete, legenda */
+  --sobre-acento: var(--branco);
+
+  --acento: var(--azul-500);
+  --acento-cheio: var(--azul-550);
+  --acento-cheio-hover: var(--azul-600);
+  --acento-texto: var(--azul-300);
+  --acento-tenue: var(--azul-500-16);
+  --acento-tenue-forte: var(--azul-500-28);
+  --falando: var(--azul-300);         /* falar é o azul da logo, não verde */
+  --link: var(--azul-300);            /* era #00a8fc, o azul de link do Discord */
+
+  /* Estados, com significado fixo: verde = deu certo / online; âmbar = impedimento ("não
+     foi você que quebrou"); vermelho = erro, desligar, ocupado. */
+  --ok: var(--verde-500);
+  --ok-texto: var(--verde-300);
+  --ok-tenue: var(--verde-500-16);
+  --aviso: var(--ambar-500);
+  --aviso-tenue: var(--ambar-500-10);
+  --aviso-borda: var(--ambar-500-32);
+  --perigo: var(--vermelho-500);
+  --perigo-texto: var(--vermelho-300);
+  --perigo-cheio: var(--vermelho-600);
+  --perigo-cheio-hover: var(--vermelho-700);
+  --perigo-tenue: var(--vermelho-500-14);
+  --perigo-borda: var(--vermelho-500-35);
+
+  --berserk: var(--roxo-500);
+  --berserk-claro: var(--roxo-300);
+  --berserk-tenue: var(--roxo-500-14);
+
+  /* ===================================================================== */
+  /* TIPOGRAFIA                                                            */
+  /* ===================================================================== */
+  --fonte-texto: 'Figtree', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --fonte-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --letra-selo: 10px;
+  --letra-rotulo: 11px;
+  --letra-legenda: 12px;
+  --letra-menu: 13px;
+  --letra-painel: 14px;
+  --letra-texto: 15px;
+  --letra-titulo: 17px;
+  --letra-destaque: 22px;
+  --letra-tela: 28px;
+
+  /* Hierarquia por PESO, não por tamanho. */
+  --peso-normal: 400;
+  --peso-medio: 500;
+  --peso-semi: 600;
+  --peso-forte: 700;
+  --peso-versalete: 800;
+
+  /* ===================================================================== */
+  /* ESPAÇO — a escada de antes (--e1..--e5) e os degraus que o uso pedia  */
+  /* ===================================================================== */
+  --e0: 2px;
+  --e1: 4px;
+  --e1m: 6px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e4m: 20px;
+  --e5: 24px;
+  --e6: 32px;
+  --e7: 48px;
+
+  /* ===================================================================== */
+  /* RAIOS E SOMBRAS                                                       */
+  /* ===================================================================== */
+  --raio-1: 4px;
+  --raio-2: 6px;
+  --raio-3: 8px;
+  --raio-4: 12px;
+  --raio-5: 16px;
+  --raio-cheio: 999px;
+  --raio-pessoa: 50%;  /* redondo é pessoa, quadrado é servidor */
+
+  --sombra-1: 0 1px 3px var(--preto-45);
+  --sombra-2: 0 8px 24px var(--preto-45);
+  --sombra-3: 0 16px 48px var(--preto-55);
+
+  /* ===================================================================== */
+  /* CAMADAS — a escada comentada em .modal-back, agora como variável.      */
+  /* Camada nova entra NA escada; o design.test.ts confere a ordem.        */
+  /* ===================================================================== */
+  --z-flutuante: 15;
+  --z-versao-nova: 20;
+  --z-painel: 25;
+  --z-ver-imagem: 30;
+  --z-menu: 35;
+  --z-avisos: 40;
+  --z-barra-da-janela: 45;
+  --z-marca-da-versao: 50;
+
+  /* ===================================================================== */
+  /* A PONTE: os nomes de antes, apontando para os tokens. O styles.css     */
+  /* inteiro usa estes; eles somem à medida que cada tela é migrada.        */
+  /* ===================================================================== */
+  --bg0: var(--superficie-0);
+  --bg1: var(--superficie-1);
+  --bg2: var(--superficie-2);
+  --bg3: var(--superficie-3);
+  --bg4: var(--superficie-4);
+  --line: var(--borda-sutil);
+  --text: var(--texto);
+  --text2: var(--texto-2);
+  --text3: var(--texto-3);
+  --white: var(--texto-forte);
+  --accent: var(--acento);
+  --accent-h: var(--acento-cheio-hover);
+  --accent-claro: var(--acento-texto);
+  --accent-tenue: var(--acento-tenue);
+  --warn: var(--aviso);
+  --danger: var(--perigo);
+
+  color-scheme: dark;   /* caixinha, select e rolagem nativos saem escuros */
+}

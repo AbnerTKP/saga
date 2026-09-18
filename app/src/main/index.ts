@@ -282,7 +282,7 @@ function createWindow() {
     height: 760,
     minWidth: 900,
     minHeight: 560,
-    backgroundColor: '#1e1f22',
+    backgroundColor: '#0f1115', // a superfície 0 do tema (tokens.css): o fundo antes do primeiro desenho
     title: 'Saga',
     // Nasce escondida. Quem clica no ícone espera que o app já venha atualizado — ver a
     // janela abrir e só depois anunciar que há atualização é a ordem errada.
