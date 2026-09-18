@@ -25,6 +25,7 @@ const FICAM: Record<string, string> = {
   setSeletorDoSistema: 'é do sistema operacional, não da conta',
   setAtualizacao: 'a atualização do app é da máquina',
   setPartidaResolvida: 'a consulta de versão já aconteceu, e não se repete por conta',
+  setPessoasNaCall: 'é preferência do computador (localStorage), como o volume',
 };
 
 /** O corpo de uma função `const nome = useCallback(() => { ... }, [])`. */

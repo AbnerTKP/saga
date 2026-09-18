@@ -59,6 +59,7 @@ import { RegistroDeErros } from './components/RegistroDeErros';
 import { Versao } from './components/Versao';
 import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
+import { Icon } from './components/Icon';
 import { podeConfigurar } from './configurar';
 import { CHAVE_DA_ULTIMA_SALA, comASala, salaGuardada } from './ultimaSala';
 import { NovoServidor } from './components/NovoServidor';
@@ -140,6 +141,12 @@ export function App() {
   // A sala que está sendo olhada. Pode ser de texto enquanto a voz continua noutra —
   // é assim que se lê um aviso sem sair da conversa.
   const [salaAbertaId, setSalaAbertaId] = useState<number | null>(null);
+  /**
+   * A lista de pessoas na call: escondida por padrão, e o botão no cabeçalho do palco a traz.
+   * A 1200 px ela comia o palco — a live ficava com uns 24% da janela (calculado). É do
+   * computador, como o volume: fica no localStorage.
+   */
+  const [pessoasNaCall, setPessoasNaCall] = useState(() => { try { return localStorage.getItem('cantinho.pessoasNaCall') === '1'; } catch { return false; } });
   /**
    * As mesas de xadrez do servidor aberto e os convites que chegaram para você. Vêm na mesma
    * busca de salas, como o "está digitando" — uma busca própria dobraria o trânsito para
@@ -815,6 +822,13 @@ export function App() {
   }, [pedido, notas]);
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
+  /** O palco está mostrando a call (e não um chat, um jogo ou as conversas). */
+  const palcoNaCall = !modoConversas && !jogoAberto && salaAberta?.tipo !== 'texto' && !!rm.salaDaVoz;
+  const semPessoas = modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || (palcoNaCall && !pessoasNaCall);
+  const alternarPessoasNaCall = useCallback(() => setPessoasNaCall((v) => {
+    try { localStorage.setItem('cantinho.pessoasNaCall', v ? '0' : '1'); } catch { /* vale até fechar */ }
+    return !v;
+  }), []);
 
   // O botão Relatar mora na faixa da janela, fora do App no Windows: ele não pergunta onde a
   // pessoa está — o App anota a cada troca, e o relato leva junto (ver relato.ts).
@@ -1363,7 +1377,7 @@ export function App() {
         servidor aberto para ter gente. */}
     {/* A corrida também tira a lista de pessoas: a pista precisa da largura, e foi a escolha do
         dono no desenho — o placar por cima da pista já diz quem está correndo. */}
-    <div className={`app ${modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' ? 'sem-pessoas' : ''}`}>
+    <div className={`app ${semPessoas ? 'sem-pessoas' : ''}`}>
       <Sidebar
         rooms={rooms}
         categorias={categorias}
@@ -1430,6 +1444,28 @@ export function App() {
         podeApagar={podeApagar}
         lives={lives}
         onAssistirLive={assistirLive}
+        botaoDePessoas={palcoNaCall ? (
+          <button className={`botao-do-palco ${pessoasNaCall ? 'on' : ''}`} onClick={alternarPessoasNaCall}
+            title={pessoasNaCall ? 'Esconder a lista de pessoas' : 'Mostrar a lista de pessoas'} aria-pressed={pessoasNaCall}>
+            <Icon name="pessoas" size={20} />
+          </button>
+        ) : undefined}
+        barraDaCall={(
+          <div className="barra-da-call-no-palco" role="toolbar" aria-label="Controles da call">
+            <button className={!rm.micOn ? 'off' : ''} disabled={rm.deafened} onClick={rm.toggleMic} title={rm.micOn ? 'Mutar microfone' : 'Desmutar microfone'}>
+              <Icon name={rm.micOn ? 'mic' : 'micOff'} />
+            </button>
+            <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title={rm.deafened ? 'Voltar a ouvir' : 'Ensurdecer'}>
+              <Icon name={rm.deafened ? 'headOff' : 'head'} />
+            </button>
+            <span className="divisor" />
+            <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
+            <button className={rm.screenOn ? 'on' : ''} onClick={compartilhar} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
+            <button onClick={() => setSoundboard(true)} title="Soundboard"><Icon name="speaker" /></button>
+            <span className="divisor" />
+            <button className="desligar" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
+          </div>
+        )}
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro.
         jogo={jogoAberto?.tipo === 'urna' ? (live) => (
@@ -1588,7 +1624,7 @@ export function App() {
       )}
       {/* A lista de pessoas é do SERVIDOR aberto. No modo conversas não há um: a coluna
           sai inteira, em vez de mostrar gente que não tem nada com o que está na tela. */}
-      {!modoConversas && jogoAberto?.tipo !== 'corrida' && jogoAberto?.tipo !== 'luta' && jogoAberto?.tipo !== 'urna' && (
+      {!semPessoas && (
       <ListaDeMembros
         membros={membrosDoServidor}
         cargos={cargos}

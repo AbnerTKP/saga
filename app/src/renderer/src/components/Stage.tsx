@@ -221,7 +221,14 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
+  /**
+   * Os controles da call NO PALCO, perto do que se vê (surgem com o mouse sobre ele). Antes
+   * moravam só no canto de baixo da coluna da esquerda, longe da call.
+   */
+  barraDaCall?: ReactNode;
+  /** Mostrar e esconder a lista de pessoas: na call ela sai da frente e a imagem cresce. */
+  botaoDePessoas?: ReactNode;
   /**
    * A conversa privada aberta. Ela toma o lugar da sala no palco: o chat é o MESMO — mesmo
    * anexo, mesmo GIF, mesmo apagar no botão direito —, e o que muda é o cabeçalho, que
@@ -424,6 +431,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           <>
             <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
             <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
+            {botaoDePessoas && <span className="ferramentas-do-palco">{botaoDePessoas}</span>}
           </>
         )}
       </header>
@@ -485,7 +493,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           />
         </div>
       ) : (
-      <div className="stage-body">
+      <div className="stage-body em-call">
+        {!idle && barraDaCall}
         <section className="videos">
           {idle && <div className="empty">Clique numa sala à esquerda para entrar na voz.</div>}
           {!idle && rm.tiles.length === 0 && rm.lives.length === 0 && (

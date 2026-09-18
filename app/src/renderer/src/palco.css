@@ -1,0 +1,40 @@
+/*
+ * O palco da call: os controles perto do que se vê, e a lista de pessoas fora da frente.
+ *
+ * Os controles moravam só no canto de baixo da coluna da esquerda — botões de 38 px longe da
+ * call. Aqui eles surgem com o mouse sobre o palco e somem quando ele sai, o mesmo jeito dos
+ * controles da live, que foi o que o dono escolheu ("o conteúdo ocupa o espaço, o controle
+ * aparece quando é procurado"). O painel da esquerda continua: a mão treinada não perde nada.
+ *
+ * Nada anima parado: é uma transição de opacidade, que só roda quando o mouse entra ou sai.
+ */
+.stage-body.em-call { position: relative; }
+.barra-da-call-no-palco {
+  position: absolute; left: 50%; bottom: var(--e5); transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; gap: var(--e1); padding: var(--e1m);
+  border-radius: var(--raio-4); background: var(--superficie-0); border: 1px solid var(--borda);
+  box-shadow: var(--sombra-2);
+  opacity: 0; pointer-events: none; transition: opacity .18s;
+  -webkit-app-region: no-drag;
+}
+.stage-body.em-call:hover .barra-da-call-no-palco, .barra-da-call-no-palco:focus-within { opacity: 1; pointer-events: auto; }
+.barra-da-call-no-palco button {
+  width: 44px; height: 40px; display: grid; place-items: center;
+  border-radius: var(--raio-3); color: var(--texto);
+}
+.barra-da-call-no-palco button:hover:not(:disabled) { background: var(--superficie-3); color: var(--texto-forte); }
+.barra-da-call-no-palco button:disabled { opacity: .45; }
+.barra-da-call-no-palco button.on { background: var(--acento-cheio); color: var(--sobre-acento); }
+.barra-da-call-no-palco button.off { color: var(--perigo); }
+.barra-da-call-no-palco button.desligar { background: var(--perigo-cheio); color: var(--sobre-acento); width: 52px; }
+.barra-da-call-no-palco button.desligar:hover { background: var(--perigo-cheio-hover); color: var(--sobre-acento); }
+.barra-da-call-no-palco .divisor { width: 1px; height: 24px; margin: 0 var(--e1); background: var(--borda); }
+
+/* O botão de pessoas, na ponta direita do cabeçalho do palco. */
+.ferramentas-do-palco { margin-left: auto; display: flex; align-items: center; gap: var(--e1); -webkit-app-region: no-drag; }
+.botao-do-palco {
+  width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--raio-3);
+  color: var(--texto-2);
+}
+.botao-do-palco:hover { background: var(--superficie-3); color: var(--texto-forte); }
+.botao-do-palco.on { background: var(--acento-tenue); color: var(--acento-texto); }
