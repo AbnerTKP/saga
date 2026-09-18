@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Categoria, Conversa, Membro, RoomInfo, Servidor } from '../api';
+import { urlDoArquivo, type Categoria, type Conversa, type Membro, type RoomInfo, type Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { contaDaIdentidade, identidadeDe } from '../pessoas';
 import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
@@ -11,6 +11,7 @@ import type { useRoom } from '../useRoom';
 import { Icon } from './Icon';
 import { CartaoDoMicrofone } from './AjustesDoMicrofone';
 import { Avatar } from './Avatar';
+import { FotoDoServidor } from './TrilhaDeServidores';
 import { Nome } from './Nome';
 import { Sinal } from './Sinal';
 import { CartaoDaLive } from './CartaoDaLive';
@@ -19,7 +20,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -62,6 +63,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   onPessoa: (identity: string, nome: string, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
   /** O menu do nome do servidor abre onde o cabeçalho termina, não onde o cursor caiu. */
   onMenuDoServidor: (em: { x: number; y: number }) => void;
+  /** A engrenagem do servidor. Ausente para quem não configura nada — aí ela não existe. */
+  onConfigurarServidor?: () => void;
   onSoundboard: () => void; onLogout: () => void;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   statusEscolhido: Status;
@@ -442,10 +445,23 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
             onMenuDoServidor({ x: r.left, y: r.bottom + 4 });
           }}
         >
-          <Avatar nome={servidor.nome} foto={servidor.foto} tamanho="big" />
+          {/* Quadrado, como na trilha: era o Avatar de PESSOA, redondo, e a mesma imagem saía
+              recortada de dois jeitos a um palmo de distância. */}
+          <span className="quadro-da-cabeca">
+            {urlDoArquivo(servidor.foto)
+              ? <FotoDoServidor url={urlDoArquivo(servidor.foto)!} />
+              : servidor.nome.slice(0, 2).toUpperCase()}
+          </span>
           <span className="nome-do-servidor">{servidor.nome}</span>
-          <span className="seta-do-servidor">▾</span>
+          <span className="seta-do-servidor"><Icon name="seta" size={16} /></span>
         </button>
+        {/* A engrenagem do servidor (P1 da reestruturação): a única engrenagem da tela era a
+            da conta, e é nela que o olho procura "configurações". */}
+        {onConfigurarServidor && (
+          <button className="engrenagem-do-servidor" title="Configurações do servidor" aria-label="Configurações do servidor" onClick={onConfigurarServidor}>
+            <Icon name="gear" size={18} />
+          </button>
+        )}
         {pollError && <span className="dot-warn" title={pollError} />}
       </div>
 

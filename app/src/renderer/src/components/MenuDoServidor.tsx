@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { useFecharComEsc } from '../useFechar';
 import { pode, type Membro } from '../api';
+import { podeConfigurar } from '../configurar';
 
 export type AcaoNoServidor =
   | { tipo: 'convidar' }
@@ -18,10 +19,14 @@ export type AcaoNoServidor =
  * querer fazer num servidor de amigos, e ficava enterrada dentro de um painel de
  * administração que nem todo mundo tinha motivo para abrir.
  *
- * Como no Discord: "Convidar gente" é o primeiro item e o único em cor de acento; o resto
- * é o que já existia, agora alcançável de um lugar só. O botão direito no quadrado do
- * servidor continua abrindo as configurações direto — quem já sabia o caminho não perdeu
- * um clique.
+ * É o MESMO menu pelo nome do servidor e pelo botão direito no quadrado da trilha. O
+ * botão direito abria as configurações direto, e a única pista disso era o balão do
+ * `title` — o dono não sabia que existia (18/09/2026). Hoje ele abre este menu, como em todo
+ * o resto do app (botão direito = as ações daquela coisa), com "Configurações do servidor"
+ * em PRIMEIRO, que foi a escolha dele. "Convidar gente" continua o único em cor de acento.
+ *
+ * Quem não configura nada não vê "Configurações do servidor": para ele o item abria uma
+ * lista de pessoas e um botão de sair — prometia uma coisa e entregava outra.
  */
 export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao, onClose }: {
   em: { x: number; y: number };
@@ -49,6 +54,7 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
   // servidor recusa com 409. A mesma regra do painel.
   const podeSair = !eu.cargo?.dono;
   const podeConvidar = pode(eu.cargo, 'convidar');
+  const configura = podeConfigurar(eu.cargo);
 
   const largura = 232;
   const x = Math.min(em.x, window.innerWidth - largura - 8);
@@ -61,26 +67,30 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
       className="menu-pessoa menu-salas menu-do-servidor"
       style={{ left: x, top: Math.max(8, em.y), width: largura }}
     >
-      {podeConvidar && (
-        <>
-          <button className="convidar" onClick={() => fazer({ tipo: 'convidar' })}>
-            <Icon name="convidar" size={15} /> Convidar gente
-          </button>
-          <div className="menu-risco" />
-        </>
+      {/* A cabeça de uma linha: o botão direito pode vir de um quadrado que não é o
+          servidor aberto, e o menu diz de qual é. */}
+      <div className="menu-titulo">{nomeDoServidor}</div>
+
+      {configura && (
+        <button className="configurar" onClick={() => fazer({ tipo: 'configurar' })}>
+          <Icon name="gear" size={15} /> Configurações do servidor
+        </button>
       )}
 
-      <button onClick={() => fazer({ tipo: 'configurar' })}>
-        <Icon name="gear" size={15} /> Configurações do servidor
-      </button>
+      {podeConvidar && (
+        <button className="convidar" onClick={() => fazer({ tipo: 'convidar' })}>
+          <Icon name="convidar" size={15} /> Convidar gente
+        </button>
+      )}
 
       {podeGerirSalas && (
         <>
+          <div className="menu-risco" />
           <button onClick={() => fazer({ tipo: 'criarSala', sala: 'voz' })}>
             <Icon name="speaker" size={15} /> Criar sala de voz
           </button>
           <button onClick={() => fazer({ tipo: 'criarSala', sala: 'texto' })}>
-            <Icon name="texto" size={15} /> Criar sala de chat
+            <Icon name="texto" size={15} /> Criar sala de texto
           </button>
         </>
       )}

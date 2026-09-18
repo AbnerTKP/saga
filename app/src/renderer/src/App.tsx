@@ -58,6 +58,7 @@ import { RegistroDeErros } from './components/RegistroDeErros';
 import { Versao } from './components/Versao';
 import { ListaDeMembros } from './components/ListaDeMembros';
 import { TrilhaDeServidores } from './components/TrilhaDeServidores';
+import { podeConfigurar } from './configurar';
 import { NovoServidor } from './components/NovoServidor';
 import { TelaInicial } from './components/TelaInicial';
 import { Administracao } from './components/Administracao';
@@ -1375,6 +1376,7 @@ export function App() {
         pessoas={vistosEm(conhecidos.current, servidor.id)}
         onPessoa={abrirMenu}
         onMenuDoServidor={(em) => setMenuDoServidor(em)}
+        onConfigurarServidor={podeConfigurar(eu.cargo) ? () => setPainel(true) : undefined}
         statusEscolhido={statusEscolhido}
         onStatus={escolherStatus}
         onSoundboard={() => setSoundboard(true)}
@@ -1585,9 +1587,10 @@ export function App() {
         onConversas={abrirConversas}
         // Clicar num servidor SAI do modo conversas: é ele que você está abrindo.
         onEscolher={(id) => { setModoConversas(false); if (id !== servidor.id) trocarDeServidor(id); }}
-        // Botão direito noutro servidor: troca primeiro e só então abre — o painel lê
-        // o servidor da sessão ao montar, e abrir antes mostraria o de onde você veio.
-        onAjustar={async (id) => { if (id !== servidor.id) await trocarDeServidor(id); setPainel(true); }}
+        // Botão direito noutro servidor: troca primeiro e só então abre o menu — ele lê
+        // o servidor da sessão ao abrir, e abrir antes mostraria o de onde você veio.
+        onAjustar={async (id, em) => { if (id !== servidor.id) await trocarDeServidor(id); setMenuDoServidor(em); }}
+        servidorDaVoz={rm.salaDaVoz?.servidorId ?? null}
         onConfigurar={() => setNovoServidor('entrar')}
         // Só o dono da Saga recebe a porta; para os outros ela não existe.
         onAdministracao={eu.donoDaSaga ? () => setAdministracao(true) : undefined}

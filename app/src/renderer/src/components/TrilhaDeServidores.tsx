@@ -3,19 +3,24 @@ import { useApontado, useImagemParada } from '../imagemParada';
 import { Icon } from './Icon';
 
 /**
- * A barra dos servidores. Fica à direita e é quadrada — de propósito diferente do
- * Discord, que põe redondo à esquerda.
+ * A barra dos servidores. É quadrada — "redondo é pessoa, quadrado é servidor" — e mora à
+ * ESQUERDA desde 18/09/2026. Ficou à direita da v0.15.0 até ali, "de propósito diferente
+ * do Discord"; na reestruturação o dono a trouxe para onde a mão procura: trocar de servidor
+ * era ir à borda direita e voltar à coluna de salas, ~1.050 px por troca, passando por cima
+ * da lista de pessoas. A identidade ficou no formato, na caixa das conversas e no risco.
  *
  * O primeiro botão não é um servidor: são as suas CONVERSAS, que não pertencem a
  * servidor nenhum. Ele fica separado por um risco justamente para dizer isso — daí para
  * baixo é "onde eu estou", e ali em cima é "com quem eu falo".
  */
-export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, onConfigurar, modoConversas, aviso, onConversas, onAdministracao }: {
+export function TrilhaDeServidores({ servidores, atual, servidorDaVoz, onEscolher, onAjustar, onConfigurar, modoConversas, aviso, onConversas, onAdministracao }: {
   servidores: Servidor[];
   atual: number;
+  /** Onde a SUA voz está — pode ser outro servidor que não o aberto ("olhar não é sair"). */
+  servidorDaVoz: number | null;
   onEscolher: (id: number) => void;
-  /** Botão direito no quadrado: as configurações DAQUELE servidor. */
-  onAjustar: (id: number) => void;
+  /** Botão direito no quadrado: o menu DAQUELE servidor, onde o mouse está. */
+  onAjustar: (id: number, em: { x: number; y: number }) => void;
   onConfigurar: () => void;
   /** A coluna da esquerda está mostrando as conversas: nenhum servidor está aberto. */
   modoConversas: boolean;
@@ -51,11 +56,15 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
           <button
             key={s.id}
             className={`quadro-servidor ${!modoConversas && s.id === atual ? 'atual' : ''}`}
-            title={`${s.nome} — botão direito para as configurações`}
+            title={`${s.nome} — botão direito para o menu e as configurações`}
             onClick={() => onEscolher(s.id)}
-            onContextMenu={(e) => { e.preventDefault(); onAjustar(s.id); }}
+            onContextMenu={(e) => { e.preventDefault(); onAjustar(s.id, { x: e.clientX, y: e.clientY }); }}
           >
             {foto ? <FotoDoServidor url={foto} /> : <span>{s.nome.slice(0, 2).toUpperCase()}</span>}
+            {/* Onde a sua voz está: o painel da call dizia em texto; a trilha não dizia nada. */}
+            {s.id === servidorDaVoz && (
+              <span className="quadro-voz" aria-label="Sua voz está aqui"><Icon name="speaker" size={10} /></span>
+            )}
           </button>
         );
       })}
@@ -78,8 +87,8 @@ export function TrilhaDeServidores({ servidores, atual, onEscolher, onAjustar, o
   );
 }
 
-/** A foto do servidor na trilha: GIF parado, animando com o mouse em cima (ver imagemParada.ts). */
-function FotoDoServidor({ url }: { url: string }) {
+/** A foto do servidor: GIF parado, animando com o mouse em cima (ver imagemParada.ts). */
+export function FotoDoServidor({ url }: { url: string }) {
   const [apontado, apontar] = useApontado();
   const src = useImagemParada(url, apontado);
   return <img ref={apontar} src={src ?? undefined} alt="" draggable={false} />;

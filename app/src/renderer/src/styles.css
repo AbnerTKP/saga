@@ -159,7 +159,20 @@ a, .link { color: var(--link); font-size: 12px; padding: 0; }
 }
 .cabeca-do-servidor:hover { background: var(--bg3); }
 .nome-do-servidor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seta-do-servidor { font-size: 11px; color: var(--text3); flex: none; }
+.seta-do-servidor { display: grid; color: var(--text2); flex: none; }
+/* A foto do servidor na cabeça: quadrada, como na trilha. Era o Avatar de pessoa, redondo. */
+.quadro-da-cabeca {
+  width: 34px; height: 34px; flex: none; border-radius: 8px; overflow: hidden;
+  display: grid; place-items: center; background: var(--bg3); color: var(--white);
+  font-size: 12px; font-weight: 700;
+}
+.quadro-da-cabeca img { width: 100%; height: 100%; object-fit: cover; }
+/* A engrenagem do servidor, ao lado do nome. Só existe para quem configura algo. */
+.engrenagem-do-servidor {
+  -webkit-app-region: no-drag; flex: none; width: 32px; height: 32px; border-radius: 8px;
+  display: grid; place-items: center; color: var(--text2);
+}
+.engrenagem-do-servidor:hover { background: var(--bg3); color: var(--white); }
 .cabeca-do-servidor:hover .seta-do-servidor { color: var(--text); }
 
 .dot-warn { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
@@ -947,7 +960,10 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 /* ---- lista de pessoas e trilha, à direita ---- */
 
 /* A trilha fica na ponta direita e é quadrada: a cara da Saga, não a do Discord. */
-.app { grid-template-columns: 240px 1fr 220px 60px; }
+/* A trilha mora à ESQUERDA (decisão do dono, 18/09/2026). Ela continua sendo o último
+   elemento no App; quem a põe na frente é o `order`, para a grade não depender da ordem do JSX. */
+.app { grid-template-columns: 60px 240px 1fr 220px; }
+.app > .trilha { order: -1; }
 
 .lista-membros { background: var(--bg1); display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); }
 .lista-membros-topo {
@@ -980,22 +996,35 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 
 .trilha {
   background: var(--bg0); display: flex; flex-direction: column; align-items: center;
-  gap: 8px; padding: 10px 0; overflow-y: auto; border-left: 1px solid var(--line);
+  gap: 8px; padding: 10px 0; overflow-y: auto; border-right: 1px solid var(--line);
 }
 .quadro-servidor {
-  width: 42px; height: 42px; flex: none; border-radius: 8px;
+  width: 42px; height: 42px; flex: none; border-radius: 8px; position: relative;
   background: var(--bg3); color: var(--white); font-weight: 700; font-size: 13px;
-  display: grid; place-items: center; overflow: hidden; transition: border-radius .15s;
+  display: grid; place-items: center; transition: border-radius .15s;
 }
-.quadro-servidor img { width: 100%; height: 100%; object-fit: cover; }
+.quadro-servidor img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .quadro-servidor:hover { border-radius: 12px; }
-.quadro-servidor.atual { box-shadow: 0 0 0 2px var(--accent); }
+/* "Você está aqui" na trilha é o MESMO risco à esquerda da sala onde a voz está — o anel
+   azul em volta do quadrado era outra linguagem para a mesma coisa. O risco encosta na
+   borda da trilha: (60 − 42) / 2 = 9 px para fora do quadrado. */
+.quadro-servidor.atual { border-radius: 12px; }
+.quadro-servidor.atual::before, .quadro-conversas.atual::before {
+  content: ''; position: absolute; left: -9px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 28px; border-radius: 0 var(--raio-1) var(--raio-1) 0; background: var(--acento-texto);
+}
+/* Onde a SUA voz está: um alto-falante no canto do quadrado daquele servidor. */
+.quadro-voz {
+  position: absolute; left: -4px; bottom: -4px; width: 18px; height: 18px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: var(--acento-cheio); color: var(--sobre-acento); border: 2px solid var(--bg0);
+}
 .quadro-servidor.acao { background: none; border: 1px dashed var(--bg4); color: var(--text3); font-size: 20px; }
 .quadro-servidor.acao:hover { border-color: var(--accent); color: var(--accent); }
 
 @media (max-width: 1100px) {
   /* Em janela estreita a lista de pessoas some antes da trilha: a trilha é navegação. */
-  .app { grid-template-columns: 240px 1fr 60px; }
+  .app { grid-template-columns: 60px 240px 1fr; }
   .lista-membros { display: none; }
 }
 
@@ -1312,6 +1341,9 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
    genérico é o botão de sair do servidor, com contorno — dentro de um menu essa borda vira
    um retângulo vermelho no meio da lista. Já aconteceu com o "Banir" e com o "Apagar
    mensagem", e o `.menu-acoes` teve de aprender o mesmo. */
+/* "Configurações do servidor" vem em primeiro e em peso de título: é a porta que o dono
+   procurava no botão direito do quadrado. */
+.menu-do-servidor .configurar { color: var(--white); font-weight: 600; }
 .menu-do-servidor .convidar { color: var(--accent-claro); font-weight: 600; }
 .menu-do-servidor .convidar:hover { background: var(--accent-tenue); color: var(--accent-claro); }
 .menu-do-servidor .perigo { color: var(--perigo-texto); border: 0; border-radius: 4px; font-weight: inherit; }
@@ -1627,7 +1659,7 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
    O modo conversas troca a COLUNA da esquerda e tira a lista de pessoas: quem está na
    tela não é um servidor, e a lista de gente de um servidor ali não teria a ver com
    nada. A trilha continua, porque é por ela que se volta. */
-.app.sem-pessoas { grid-template-columns: 240px 1fr 60px; }
+.app.sem-pessoas { grid-template-columns: 60px 240px 1fr; }
 
 /* O primeiro botão da trilha não é um servidor: são as suas conversas. Redondo seria
    "uma pessoa"; ele é a CAIXA de todas elas, então continua quadrado, e o risco logo
@@ -1637,7 +1669,7 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
   background: var(--bg3); color: var(--accent-claro); display: grid; place-items: center;
 }
 .quadro-conversas:hover { background: var(--bg4); }
-.quadro-conversas.atual { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-tenue); }
+.quadro-conversas.atual { background: var(--accent-tenue); }
 .quadro-conversas .marca-nova {
   position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; padding: 0 5px;
   display: grid; place-items: center; border-radius: 9px; background: var(--danger);
@@ -1739,7 +1771,7 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 .perfil-mandar.convite:hover:not(:disabled) { background: var(--bg4); }
 
 @media (max-width: 1100px) {
-  .app.sem-pessoas { grid-template-columns: 240px 1fr 60px; }
+  .app.sem-pessoas { grid-template-columns: 60px 240px 1fr; }
 }
 
 /* ---- seu microfone: supressão de ruído e sensibilidade ------------------------
