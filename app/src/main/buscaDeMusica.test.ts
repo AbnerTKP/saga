@@ -29,6 +29,7 @@ test('nome solto é busca, e texto com cara de opção não vira opção', () =>
   assert.equal(args.at(-2), '--', 'o alvo vem depois do fim das opções');
   assert.equal(args.at(-1), alvo);
   assert.ok(!args.includes('--no-part'), 'sem .part, a música já baixada volta com HTTP 416');
+  assert.ok(args.includes('before_dl:%()j'), 'os dados da música saem antes do download');
 });
 
 test('playlist, álbum e link desconhecido têm resposta que diz o que fazer', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarFilas, validarItem, MAXIMO_NA_FILA, FOLGA, VAZIA } from './musica.mjs';
+import { criarFilas, validarItem, MAXIMO_NA_FILA, FOLGA, VAZIA, AUSENTE } from './musica.mjs';
 import { ErroDeConta } from './contas.mjs';
 
 const TKP = { id: 1, nome: 'TKP' }, GUSTAVO = { id: 2, nome: 'Gustavo' }, TAVA = { id: 3, nome: 'Tava1' };
@@ -96,6 +96,9 @@ test('o anfitrião saiu da call: passa a quem ficou, e a música não recomeça'
   const comecou = filas.ver(GERAL).comecouEm;
   passar(60_000);
   assert.equal(filas.conferir(GERAL, [GUSTAVO.id, TAVA.id]), null);
+  assert.equal(filas.ver(GERAL).anfitriao, TKP.id, 'sumiu agora: ainda pode ser a internet piscando');
+  passar(AUSENTE);
+  filas.conferir(GERAL, [GUSTAVO.id, TAVA.id]);
   assert.equal(filas.ver(GERAL).anfitriao, GUSTAVO.id);
   assert.equal(filas.ver(GERAL).comecouEm, comecou, 'o novo anfitrião continua de onde estava');
 });
@@ -132,4 +135,15 @@ test('cada sala de voz tem a sua fila', () => {
   assert.throws(() => filas.parar(GERAL + 1), recusa(409));
   filas.parar(GERAL);
   assert.equal(filas.ver(GERAL), null);
+});
+
+test('o anfitrião que caiu e voltou dentro do prazo continua tocando', () => {
+  const { filas, passar } = montar();
+  filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });
+  filas.conferir(GERAL, [GUSTAVO.id]);
+  passar(AUSENTE - 1);
+  filas.conferir(GERAL, [TKP.id, GUSTAVO.id]);
+  passar(AUSENTE);
+  filas.conferir(GERAL, [GUSTAVO.id]);
+  assert.equal(filas.ver(GERAL).anfitriao, TKP.id, 'a contagem da ausência recomeça quando ele volta');
 });

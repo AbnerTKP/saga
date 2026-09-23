@@ -345,3 +345,26 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
   botão Pular, `/fila`, `/parar` (a faixa sai da call), a fila andando sozinha no fim da música,
   a mesma música duas vezes. **Não exercido**: Windows (o `yt-dlp_win.zip` e o `tar.exe` do
   sistema), o anfitrião passando para outra Saga de verdade, e ouvido humano na call.
+- **Primeira semana com o dono (23/09/2026): lento, "travando" e cartão repetido no chat.** Medido
+  no registro da Saga dele: 12 s para achar e baixar, e mais 9 s até tocar. O Mac dele estava
+  com o **Cloudflare WARP** ligado (interface `utun6`, saída 104.28.x): pedidos ao servidor e ao
+  GitHub falhando e voltando, e o SSH até a VPS fechado. O áudio sai do computador de quem pediu,
+  então uma internet assim trava a música para todo mundo — na bancada, pelo LiveKit local, os
+  20 s medidos chegaram com as 48 000 amostras de cada segundo, sem buraco. O que mudou do nosso
+  lado:
+  - **o servidor fica sabendo da música antes do download acabar** (`--print before_dl:%()j`):
+    dados em 5,1 s, arquivo em 7,2 s, pelo WARP. Quem toca espera o download que já está em
+    andamento (`baixando`, por id), sem baixar de novo;
+  - **a faixa entra na call enquanto o yt-dlp procura** (`quandoForTocar`), e sai em meio minuto
+    se a música for para outro anfitrião;
+  - **o anfitrião só perde a vez depois de 10 s fora da call** (`AUSENTE`): internet que pisca
+    reconecta em segundos, e trocar a cada piscada recomeçava a música noutro computador;
+  - **a partida não é a música andando**: o tocador pulava os primeiros segundos de toda música,
+    tratando a espera do download como posição. Só retoma do ponto a partir de 10 s;
+  - **o chat não repete mensagem**: a busca de 2 em 2 s que saía antes da resposta do `/tocar` e
+    voltava depois trazia de novo a mensagem já mostrada (`juntarMensagens`). Vale para qualquer
+    mensagem, e a internet lenta só tornava comum. O servidor tinha gravado UMA — a repetição era
+    só na tela.
+  Resultado na bancada: do comando ao som no ouvinte, 5,5 a 7,8 s (a busca pelo WARP varia de 2,9
+  a 4,4 s); no Mac do dono, antes, uns 21 s. O registro agora anota cada etapa (`achada em`,
+  `servidor respondeu em`, `ms depois de saber`), para a próxima reclamação ser medida, não chutada.

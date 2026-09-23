@@ -26,7 +26,14 @@ export function posicao(n: Noticia, agoraAqui: number): number {
   return Math.max(0, (n.agora - n.estado.comecouEm + (agoraAqui - n.recebidaEm)) / 1000);
 }
 
-/** Pular para o ponto só quando vale: no começo é ruído, e perto do fim não sobra nada. */
+/**
+ * Pular para o ponto só quando outra pessoa assumiu a música no meio. Poucos segundos são a
+ * PARTIDA — achar, baixar, entrar na call —, e não a música andando: pulá-los cortava o
+ * começo de toda música (medido em 23/09/2026: "tocando a partir de 2 s"). O anfitrião novo só
+ * existe depois de o antigo sumir por 10 s (`AUSENTE`, musica.mjs), então abaixo disso não há
+ * de onde continuar. Perto do fim também não: não sobra nada.
+ */
+export const RETOMA_A_PARTIR_DE = 10;
 export function pontoDeEntrada(segundos: number, duracao: number): number {
-  return segundos > 2 && segundos < duracao - 3 ? segundos : 0;
+  return segundos >= RETOMA_A_PARTIR_DE && segundos < duracao - 3 ? segundos : 0;
 }

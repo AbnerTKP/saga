@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { registrar } from './registro';
@@ -156,15 +156,62 @@ const arquivoDe = (id: string) => {
   try { return readdirSync(pastaDosAudios()).find((n) => n.startsWith(`${id}.`) && !/\.(part|ytdl)$/.test(n)) ?? null; } catch { return null; }
 };
 
-/** Roda o `yt-dlp` para achar e baixar. Falhou? Tenta de novo UMA vez com a versão mais nova. */
+/** Os downloads em andamento, por id: quem pede o mesmo áudio espera este, e não baixa de novo. */
+const baixando = new Map<string, Promise<void>>();
+
+/**
+ * Roda o `yt-dlp` e devolve os dados da música ASSIM QUE ele os imprime — antes de baixar —,
+ * com o fim do download numa promessa à parte. Medido em 23/09/2026 com o Mac do dono (atrás do
+ * Cloudflare WARP): dados em 5,1 s, arquivo pronto em 7,2 s. Esperar o arquivo para avisar o
+ * servidor era deixar a call esperando o download sem motivo.
+ */
+function iniciar(binario: string, alvo: string): Promise<{ dados: unknown; fim: Promise<void> }> {
+  return new Promise((resolve, reject) => {
+    const p = spawn(binario, argumentosParaBaixar(alvo, pastaDosAudios()), { windowsHide: true });
+    let saida = '', falha = '', respondeu = false;
+    let terminou!: () => void, falhou!: (e: Error) => void;
+    const fim = new Promise<void>((a, b) => { terminou = a; falhou = b; });
+    fim.catch(() => undefined);
+    const prazo = setTimeout(() => p.kill(), 180_000);
+    p.stdout.on('data', (d: Buffer) => {
+      saida += d.toString();
+      const quebra = saida.indexOf('\n');
+      if (respondeu || quebra < 0) return;
+      respondeu = true;
+      try { resolve({ dados: JSON.parse(saida.slice(0, quebra)), fim }); } catch (e) { reject(e as Error); }
+    });
+    p.stderr.on('data', (d: Buffer) => { falha += d.toString(); });
+    p.on('error', (e) => { if (!respondeu) { respondeu = true; reject(e); } falhou(e); });
+    p.on('close', (codigo) => {
+      clearTimeout(prazo);
+      if (codigo === 0) {
+        if (!respondeu) { respondeu = true; reject(new ErroDaMusica('Não achei nada com esse nome.')); }
+        terminou();
+        return;
+      }
+      const motivo = new Error(falha.split('\n').filter(Boolean).slice(-2).join(' | ') || `o yt-dlp saiu com ${codigo}`);
+      if (!respondeu) { respondeu = true; reject(motivo); }
+      falhou(motivo);
+    });
+  });
+}
+
+/**
+ * Acha a música e começa a baixar. Devolve os dados; o fim do download fica em `baixando`.
+ * Falhou? Tenta de novo UMA vez com a versão mais nova do yt-dlp.
+ */
 async function baixar(alvo: string): Promise<unknown> {
   mkdirSync(pastaDosAudios(), { recursive: true });
   const tentar = async (forcar: boolean) => {
     const { binario } = await programa({ forcar });
-    const saida = await rodar(binario, argumentosParaBaixar(alvo, pastaDosAudios()));
-    const linha = saida.trim().split('\n').filter(Boolean).at(-1);
-    if (!linha) throw new ErroDaMusica('Não achei nada com esse nome.');
-    return JSON.parse(linha) as unknown;
+    const { dados, fim } = await iniciar(binario, alvo);
+    const id = (dados as { id?: unknown })?.id;
+    if (typeof id === 'string') {
+      baixando.set(id, fim);
+      fim.catch((e) => registrar('erro', 'musica', `baixar ${id}: ${(e as Error).message}`))
+        .finally(() => { if (baixando.get(id) === fim) baixando.delete(id); });
+    }
+    return dados;
   };
   try { return await tentar(false); } catch (e) {
     if (e instanceof ErroDaMusica) throw e;
@@ -173,7 +220,7 @@ async function baixar(alvo: string): Promise<unknown> {
   }
 }
 
-/** Do texto do `/tocar` à música achada e já baixada. */
+/** Do texto do `/tocar` à música achada — o download segue por trás (ver `iniciar`). */
 async function achar(texto: string): Promise<MusicaAchada> {
   const pedido = lerPedido(texto);
   let spotify: { titulo: string; artista: string } | undefined;
@@ -209,8 +256,12 @@ export function registrarMusica() {
   /** Garante o áudio de uma música da fila — é o anfitrião adiantando a próxima. */
   ipcMain.handle('musica:preparar', async (_e, id: string) => {
     if (!ID.test(String(id))) return { ok: false, erro: 'id inválido' };
-    if (arquivoDe(id)) return { ok: true };
-    try { await baixar(`https://www.youtube.com/watch?v=${id}`); return { ok: true }; } catch (e) {
+    try {
+      // Já baixando (é o /tocar de agora, ou a próxima adiantada): espera esse, sem baixar de novo.
+      if (!baixando.has(id) && !arquivoDe(id)) await baixar(`https://www.youtube.com/watch?v=${id}`);
+      await baixando.get(id);
+      return arquivoDe(id) ? { ok: true } : { ok: false, erro: 'o áudio não ficou no disco' };
+    } catch (e) {
       registrar('erro', 'musica', `preparar ${id}: ${(e as Error).message}`);
       return { ok: false, erro: explicar(e) };
     }

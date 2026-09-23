@@ -131,7 +131,8 @@ export function argumentosParaBaixar(alvo: string, pasta: string): string[] {
   return [
     '--no-warnings', '--no-playlist', '--quiet',
     '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
-    '--print-json', '--no-simulate',
+    // Os dados da música saem ANTES do download (`before_dl`) — ver `iniciar`, em musica.ts.
+    '--print', 'before_dl:%()j', '--no-simulate',
     '-o', `${pasta}/%(id)s.%(ext)s`,
     '--', alvo,
   ];

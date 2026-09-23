@@ -6,6 +6,7 @@ import {
 import { vaiComoImagem } from './anexos';
 import { aoDespertar } from './despertar';
 import { mesmoSeIgual } from './igual';
+import { juntarMensagens } from './juntarMensagens';
 import { lerComando } from './comandos';
 import { executarComando, respostaLocal } from './musicaDoBot';
 
@@ -79,7 +80,7 @@ export function useChat(onde: Onde | null) {
         if (r.mensagens.length === 0) return;
         ultima.current = r.mensagens.at(-1)!.id;
         // A primeira busca traz o histórico; as seguintes, só o que chegou.
-        setMensagens((antigas) => [...antigas, ...r.mensagens].slice(-300));
+        setMensagens((antigas) => juntarMensagens(antigas, r.mensagens));
       } catch (e) {
         if (vivo) setErro((e as Error).message);
       }

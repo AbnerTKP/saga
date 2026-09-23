@@ -23,6 +23,8 @@ test('a posição conta com o relógio do servidor, mais o que passou aqui', () 
 
 test('só pula para o ponto quando vale a pena', () => {
   assert.equal(pontoDeEntrada(1, 213), 0);
+  assert.equal(pontoDeEntrada(2.3, 213), 0, 'a espera da partida não é a música andando');
+  assert.equal(pontoDeEntrada(9, 213), 0);
   assert.equal(pontoDeEntrada(62, 213), 62);
   assert.equal(pontoDeEntrada(211, 213), 0);
 });

@@ -27,6 +27,13 @@ export const FOLGA = 15_000;
  * (`lembrado`, em index.mjs), e um soluço dele apagaria a fila de quem está ouvindo.
  */
 export const VAZIA = 20_000;
+/**
+ * Quanto tempo o anfitrião precisa sumir da call para a música passar a outro. Não é na hora:
+ * internet ruim (o dono estava atrás do Cloudflare WARP em 23/09/2026) derruba e reconecta a
+ * call em segundos, e trocar de anfitrião a cada piscada recomeçava a música no computador de
+ * outra pessoa — que soa como a música travando.
+ */
+export const AUSENTE = 10_000;
 
 const ID_DO_YOUTUBE = /^[A-Za-z0-9_-]{11}$/;
 const ORIGENS = ['youtube', 'spotify', 'busca'];
@@ -132,7 +139,7 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
      * Conferida a cada busca de salas, com quem está na call agora (ids das contas).
      *
      * - ninguém na call por `VAZIA`: a fila some — tocar para sala vazia é gastar a banda de alguém;
-     * - o anfitrião saiu: passa a quem ficou, e a música continua de onde estava (o app novo
+     * - o anfitrião saiu (por `AUSENTE`): passa a quem ficou, e a música continua de onde estava (o app novo
      *   calcula pela hora em que ela começou);
      * - passou da hora e ninguém avisou: o app do anfitrião morreu no meio — anda sozinha.
      *
@@ -147,7 +154,11 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
         return null;
       }
       s.vaziaDesde = null;
-      if (!presentes.includes(s.anfitriao)) s.anfitriao = presentes[0];
+      if (presentes.includes(s.anfitriao)) s.ausenteDesde = null;
+      else {
+        s.ausenteDesde ??= relogio();
+        if (relogio() - s.ausenteDesde >= AUSENTE) { s.anfitriao = presentes[0]; s.ausenteDesde = null; }
+      }
       if (relogio() > s.comecouEm + s.itens[0].duracao * 1000 + FOLGA) return andar(salaVoz);
       return null;
     },

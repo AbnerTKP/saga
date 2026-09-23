@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioPresets, Track, type Room } from 'livekit-client';
 import { avisarQueAMusicaAcabou, type EstadoDaMusica, type ItemDaMusica } from './api';
-import { aoMudarAMusica, contarQueAMusicaMudou } from './musicaDoBot';
+import { aoMudarAMusica, contarQueAMusicaMudou, quandoForTocar } from './musicaDoBot';
 import { maisNova, posicao, pontoDeEntrada, type Noticia } from './tocador';
 import { NOME_DA_FAIXA_DE_MUSICA } from './useRoom';
 import { VOLUME } from './volume';
@@ -119,6 +119,16 @@ export function useMusica({ room, conectado, salaVozId, filasDaBusca, agoraDaBus
     }
   }, []);
 
+  // O /tocar começou a procurar: a faixa já entra na call enquanto isso. Se a música não vier
+  // para este app (foi para a fila de outro anfitrião), ela sai em meio minuto.
+  const conectadoRef = useRef(conectado);
+  conectadoRef.current = conectado;
+  useEffect(() => quandoForTocar(() => {
+    if (!conectadoRef.current) return;
+    garantirSaida().catch((e) => anotar('erro', 'musica', `adiantar a faixa: ${(e as Error).message}`));
+    setTimeout(() => { if (!tocando.current) void tirarDaCall(); }, 30_000);
+  }), [garantirSaida, tirarDaCall]);
+
   const noticiaDaMinhaSala = salaVozId !== null ? noticias.get(salaVozId) ?? null : null;
   const estado = noticiaDaMinhaSala?.estado ?? null;
   const souAnfitriao = conectado && !!estado && estado.anfitriao === room.localParticipant.identity;
@@ -134,6 +144,7 @@ export function useMusica({ room, conectado, salaVozId, filasDaBusca, agoraDaBus
     if (tocando.current?.uid === estado.tocando.uid) return;
 
     const minha = ++geracao.current;
+    const comecei = performance.now();
     const item = estado.tocando;
     const sala = salaVozId;
     const noticia = noticiaDaMinhaSala;
@@ -162,7 +173,7 @@ export function useMusica({ room, conectado, salaVozId, filasDaBusca, agoraDaBus
         // Anfitrião que assumiu no meio (o outro saiu da call) continua do ponto.
         audio.currentTime = pontoDeEntrada(posicao(noticia, Date.now()), item.duracao);
         await audio.play();
-        anotar('info', 'musica', `tocando ${item.id} a partir de ${Math.round(audio.currentTime)} s`);
+        anotar('info', 'musica', `tocando ${item.id} a partir de ${Math.round(audio.currentTime)} s — ${Math.round(performance.now() - comecei)} ms depois de saber`);
       } catch (e) {
         if (minha !== geracao.current) return;
         anotar('erro', 'musica', `tocar ${item.id}: ${(e as Error).message}`);

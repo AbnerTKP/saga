@@ -1,5 +1,6 @@
 import { comandoDeMusica, type EstadoDaMusica, type Mensagem } from './api';
 import type { NomeDoComando } from './comandos';
+import { anotar } from './registro';
 
 /**
  * O bot de música do lado da tela: executa o comando digitado no chat, e conta ao tocador
@@ -20,6 +21,17 @@ export function aoMudarAMusica(f: Ouvinte) {
 
 export function contarQueAMusicaMudou(salaVoz: number, estado: EstadoDaMusica | null, agora: number) {
   for (const f of ouvintes) f(salaVoz, estado, agora);
+}
+
+/**
+ * "Vou tocar": o `/tocar` começou a procurar. O tocador aproveita a espera para já pôr a faixa
+ * da música na call — a negociação com o LiveKit leva o seu tempo, e numa internet ruim leva
+ * mais. Se a música acabar indo para a fila de outro anfitrião, o tocador a tira de novo.
+ */
+const aoIrTocar = new Set<() => void>();
+export function quandoForTocar(f: () => void) {
+  aoIrTocar.add(f);
+  return () => { aoIrTocar.delete(f); };
 }
 
 /**
@@ -62,11 +74,18 @@ export async function executarComando(
   if (c.nome === 'tocar') {
     if (!window.desktop?.musica) throw new Error('Esta Saga é antiga para o bot de música. Atualize.');
     aoProcurar?.();
+    for (const f of aoIrTocar) f();
+    const inicio = performance.now();
     const achada = await window.desktop.musica.achar(c.arg);
     if (!achada.ok) throw new Error(achada.erro);
     musica = achada.musica;
+    // As marcas de tempo ficam no registro: é por elas que se sabe onde a espera foi parar
+    // no computador de quem reclamou, sem adivinhar (ver voz-e-live.md, o bot de música).
+    anotar('info', 'musica', `/tocar: achada em ${Math.round(performance.now() - inicio)} ms`);
   }
+  const antesDoServidor = performance.now();
   const r = await comandoDeMusica(sala, c.nome, musica);
+  anotar('info', 'musica', `/${c.nome}: servidor respondeu em ${Math.round(performance.now() - antesDoServidor)} ms`);
   if (r.sala) contarQueAMusicaMudou(r.sala.id, r.musica, r.agora ?? 0);
   return r.mensagem;
 }
