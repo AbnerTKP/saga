@@ -1,7 +1,7 @@
 {
   "name": "app",
   "productName": "Saga",
-  "version": "0.63.1",
+  "version": "0.64.0",
   "description": "Voz, vídeo e tela entre amigos",
   "private": true,
   "main": "./out/main/index.js",
