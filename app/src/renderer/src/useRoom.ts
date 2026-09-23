@@ -195,7 +195,16 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     setErrorCru(texto);
   }, []);
   const deafenedRef = useRef(false);
-  const micBeforeDeafen = useRef(true);
+  /**
+   * Se VOCÊ quer o microfone aberto — escolha sua, e não da sala. O microfone da call era a
+   * única memória disso, e ela morre a cada sala: trocar de sala, ou voltar depois de uma
+   * queda, religava o microfone de quem tinha se mutado — "eu muto e às vezes eles voltam a
+   * me ouvir" (o dono, 22/09/2026). Como no Discord, o mudo acompanha você. A surdez não
+   * mexe aqui: desligar o fone cala o microfone, e religá-lo devolve o que você tinha
+   * escolhido — inclusive quando ensurdeceu fora da call, que antes caía num "estava ligado"
+   * inventado.
+   */
+  const querFalar = useRef(true);
 
   // Soundboard. O som vai para a sala numa faixa própria, e não misturado ao microfone:
   // assim tocar não depende de estar com o microfone ligado, e mutar alguém não muta os
@@ -273,11 +282,17 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         const guardado = el.dataset.source === FONTE_DO_SOUNDBOARD
           ? volumeDoSoundboardRef.current
           : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
-        el.volume = VOLUME(guardado);
-        el.muted = mudo({ ehLive, identity }, {
+        const calado = mudo({ ehLive, identity }, {
           surdo: deafenedRef.current,
           liveNoPalco: assistindoRef.current,
         });
+        // Calado é `muted` E volume zero. O `muted` sozinho não segurava: o LiveKit o escreve
+        // por conta própria — o `room.startAudio()` põe `muted = false` em TODO elemento de
+        // áudio, e era assim que quem entrava numa sala de fone desligado ouvia quem já
+        // estava lá. Medido numa bancada com duas Saga de verdade (22/09/2026). No volume o
+        // LiveKit não mexe.
+        el.volume = calado ? 0 : VOLUME(guardado);
+        el.muted = calado;
       } catch (e) {
         anotar('erro', 'audio', e);
       }
@@ -533,6 +548,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
       tocarAviso('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
+      // O `startAudio` desmuta todo elemento de áudio — inclusive os que a surdez calou.
+      aplicarAudio();
       // Quem entra na sala já de fone desligado precisa aparecer assim desde o começo: o
       // anúncio nasce vazio a cada sala nova, e sem isto a marca só apareceria se a
       // pessoa mexesse no fone de novo.
@@ -540,7 +557,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       await conferirSaidaECamera();
       // `comMicrofone` só vem quando é uma VOLTA depois de queda: aí o microfone volta
       // como estava, e quem tinha se mutado não reaparece falando sem saber.
-      if (!deafenedRef.current && comMicrofone) {
+      if (!deafenedRef.current && comMicrofone && querFalar.current) {
         await conferirMicrofone();
         await room.localParticipant.setMicrophoneEnabled(true).catch(falhouOMicrofone);
       }
@@ -552,7 +569,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       setError(`Não conectou: ${(e as Error).message}`);
       throw e;
     }
-  }, [room, tocarAviso, anunciar, conferirMicrofone, conferirSaidaECamera, falhouOMicrofone]);
+  }, [room, tocarAviso, anunciar, aplicarAudio, conferirMicrofone, conferirSaidaECamera, falhouOMicrofone]);
 
   const leave = useCallback(async () => {
     desligueiDeProposito.current = true;
@@ -566,6 +583,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const toggleMic = useCallback(async () => {
     if (deafenedRef.current) return;
     const ligando = !lp().isMicrophoneEnabled;
+    querFalar.current = ligando;
     await lp().setMicrophoneEnabled(ligando).catch(falhouOMicrofone);
     // O som sai do que o microfone FICOU, e não do que foi pedido: falhar em adquirir o
     // dispositivo — headset ocupado, permissão negada — deixaria um "ligou" mentindo.
@@ -850,9 +868,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // `toggleMic` já usam: falhar o microfone avisa, não derruba.
       anunciar();
       if (next) {
-        micBeforeDeafen.current = lp().isMicrophoneEnabled;
         await lp().setMicrophoneEnabled(false).catch(falhouOMicrofone);
-      } else if (micBeforeDeafen.current) {
+      } else if (querFalar.current) {
         await lp().setMicrophoneEnabled(true).catch(falhouOMicrofone);
       }
     }

@@ -61,6 +61,14 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   dizer que o cartão rola; e a barra de rolagem dele entra na curva do canto de baixo,
   como a de todo contêiner arredondado que rola no app (o corpo dos painéis, a lista de
   cargos).
+- **Mutar e desligar o fone, numa call de verdade (22/09/2026).** Medido na bancada: o fone
+  segura ao entrar de fone desligado, e o microfone mutado fica mudo em todos os caminhos do
+  LiveKit. O que falta: trocar de sala mutado e de fone desligado com os amigos ouvindo. Se
+  ainda acontecer depois disso, é outra causa — anotar QUANDO aconteceu (trocou de sala? a
+  internet piscou? mexeu no fone Bluetooth?).
+- **Transmitir tela sem a permissão, com o app de verdade.** Medido com o servidor e um LiveKit
+  local: sem a permissão a tela é recusada e o soundboard toca; dar e tirar o cargo com a
+  pessoa na call libera e derruba na hora. Não visto: o botão apagado e o aviso no app.
 - Som, câmera, microfone e compartilhamento de tela em máquinas que não são este Mac.
 - **Se o modo de tela (`detail`) segura os quadros no conteúdo real dele.** O que está
   medido é o extremo: numa cena artificial de ruído fino em panorâmica, protegendo a

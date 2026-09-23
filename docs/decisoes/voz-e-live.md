@@ -211,6 +211,21 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
   de fone desligado. A marca conta quem não ouve; isso já foi decidido três linhas acima, e
   o microfone é consequência. O `catch` é o mesmo de `join` e `toggleMic`: falhar o
   microfone avisa, não derruba.
+- **Surdo é `muted` E volume zero, porque o LiveKit escreve o `muted` sozinho** (22/09/2026).
+  O dono: "muto meu fone e ouço alguém normal falar". O `room.startAudio()`, que o `join` chama
+  logo depois de conectar, põe `muted = false` em TODO elemento de áudio — e a Saga o chamava
+  sem reaplicar a surdez depois. Quem entrava ou trocava de sala de fone desligado (ou voltava
+  sozinho de uma queda) ouvia quem já estava lá. Medido numa bancada escondida (duas páginas
+  Electron com `livekit-client` num LiveKit local): `muted` true antes, false depois do
+  `startAudio`; o volume fica em 0. Hoje o `join` reaplica, e o volume zero segura o que vier
+  de novo. **Hipótese descartada pela bancada:** o `setMuted` que reprende o elemento quando o
+  outro desmuta também zera o `muted`, mas é só da faixa de VÍDEO — com áudio, o elemento
+  continuou mudo. No iOS o LiveKit chama `startAudio` também ao voltar a janela; aqui não.
+- **O mudo do microfone é da PESSOA, não da sala** (`querFalar`, 22/09/2026). O dono: "eu muto e
+  às vezes eles voltam a me ouvir". O `join` ligava o microfone a cada sala, então trocar de
+  sala desmutava quem tinha se mutado. O mudo do LiveKit em si foi medido e segura: com o
+  processador no caminho, mutado, a faixa reaberta, a troca de aparelho, a troca de supressão, a
+  reconexão rápida e a completa (`simulateScenario`) — −120 dB chegando ao robô em todas.
 - **Fone desligado tem marca própria, e ela entra NO LUGAR da do microfone.** Surdez é
   decisão local: não é faixa nenhuma, e o LiveKit não conta a ninguém. De fora só se via o
   microfone mudo — que é a consequência (desligar o fone muta o microfone junto) e diz a
