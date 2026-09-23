@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { urlDoArquivo, type Categoria, type Conversa, type Membro, type RoomInfo, type Servidor } from '../api';
+import { urlDoArquivo, type Cargo, type Categoria, type Conversa, type Membro, type RoomInfo, type Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { contaDaIdentidade, identidadeDe } from '../pessoas';
 import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
@@ -21,7 +21,17 @@ import { MOTIVO_SEM_TRANSMITIR } from '../transmitir';
 
 type RM = ReturnType<typeof useRoom>;
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos }: {
+/**
+ * Onde abrir um menu: no ponteiro — ou, sem ponteiro (teclado, clique sem coordenadas), junto
+ * do próprio elemento, e não no canto de cima da janela.
+ */
+function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
+  if (e.clientX || e.clientY) return { x: e.clientX, y: e.clientY };
+  const r = e.currentTarget.getBoundingClientRect();
+  return { x: r.left + 24, y: r.bottom };
+}
+
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -67,6 +77,14 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** A engrenagem do servidor. Ausente para quem não configura nada — aí ela não existe. */
   onConfigurarServidor?: () => void;
   onSoundboard: () => void; onLogout: () => void;
+  /**
+   * Arrastar alguém para outra sala de voz, como no Discord (23/09/2026). `podeMover` diz se
+   * esta pessoa pode ser arrastada por mim — a mim mesmo sempre posso (é só trocar de sala).
+   */
+  podeMover?: (p: { identity: string; usuarioId?: number; cargo?: Cargo | null }) => boolean;
+  onMover?: (p: { identity: string; usuarioId?: number; name: string }, sala: RoomInfo) => void;
+  /** O bot de música de uma sala, com o clique: o mesmo menu de uma pessoa. */
+  onBot?: (salaId: number, em: { x: number; y: number }) => void;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   statusEscolhido: Status;
   onStatus: (s: Status) => void;
@@ -92,6 +110,9 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   // desenhado como um risco entre duas linhas — sem ele, a pessoa solta no escuro.
   const [naMao, setNaMao] = useState<number | null>(null);
   const [alvo, setAlvo] = useState<Alvo | null>(null);
+  // A pessoa sendo arrastada para outra sala, e a sala que acenderia se ela fosse solta ali.
+  const [pessoaNaMao, setPessoaNaMao] = useState<{ identity: string; usuarioId?: number; name: string; sala: number } | null>(null);
+  const [salaDoSoltar, setSalaDoSoltar] = useState<number | null>(null);
   const [fechadas, setFechadas] = useState<Set<number>>(new Set());
   const [escolhendoStatus, setEscolhendoStatus] = useState(false);
   const [ajustandoMicrofone, setAjustandoMicrofone] = useState(false);
@@ -512,12 +533,30 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                   draggable={podeGerirSalas && !r.papel}
                   onDragStart={(e) => { setNaMao(r.id); e.dataTransfer.effectAllowed = 'move'; }}
                   onDragEnd={() => { setNaMao(null); setAlvo(null); }}
-                  onDragOver={(e) => mirar(e, g.categoria?.id ?? null, i)}
+                  onDragOver={(e) => {
+                    // Uma PESSOA sendo arrastada: só a sala de voz a recebe, e não a de onde ela veio.
+                    if (pessoaNaMao) {
+                      if (r.tipo !== 'voz' || r.id === pessoaNaMao.sala) return;
+                      e.preventDefault(); e.stopPropagation();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (salaDoSoltar !== r.id) setSalaDoSoltar(r.id);
+                      return;
+                    }
+                    mirar(e, g.categoria?.id ?? null, i);
+                  }}
+                  onDragLeave={(e) => { if (pessoaNaMao && !e.currentTarget.contains(e.relatedTarget as Node)) setSalaDoSoltar(null); }}
+                  onDrop={(e) => {
+                    if (!pessoaNaMao) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const quem = pessoaNaMao;
+                    setPessoaNaMao(null); setSalaDoSoltar(null);
+                    if (r.tipo === 'voz' && r.id !== quem.sala) onMover?.(quem, r);
+                  }}
                 >
                   {risco(g.categoria?.id ?? null, i)}
                   <div className="room-block">
                   <button
-                    className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''}`}
+                    className={`room ${live ? 'active' : ''} ${salaAbertaId === r.id ? 'aberta' : ''} ${r.naoLidas > 0 ? 'nova' : ''} ${salaDoSoltar === r.id ? 'solte-aqui-a-pessoa' : ''}`}
                     onClick={() => onAbrir(r)}
                     /* Sem parar aqui, o clique sobe até a lista e abre o menu DELA — o de
                        criar sala. Quem aponta para uma sala quer mexer naquela sala. */
@@ -545,7 +584,20 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                     {people.map((p) => (
                       <li
                         key={p.identity}
-                        className={`clicavel ${p.speaking ? 'speaking' : ''}`}
+                        className={`clicavel ${p.speaking ? 'speaking' : ''} ${pessoaNaMao?.identity === p.identity ? 'arrastada' : ''}`}
+                        // Arrastar para outra sala de voz — como no Discord. A linha da SALA também
+                        // é arrastável (reordenar salas): sem parar aqui, a sala sairia junto.
+                        // Conta e cargo saem do mapa de pessoas: na sala em que estou, a lista vem do
+                        // LiveKit, que não sabe nenhum dos dois.
+                        draggable={!!onMover && !!podeMover?.({ identity: p.identity, usuarioId: contaDaIdentidade(p.identity) ?? undefined, cargo: pessoas.get(p.identity)?.cargo })}
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          fecharCartao();
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', p.name);
+                          setPessoaNaMao({ identity: p.identity, usuarioId: contaDaIdentidade(p.identity) ?? undefined, name: p.name, sala: r.id });
+                        }}
+                        onDragEnd={(e) => { e.stopPropagation(); setPessoaNaMao(null); setSalaDoSoltar(null); }}
                         // Quem transmite já ganha o cartão da live ao apontar; o balão amarelo
                         // do navegador por cima dele diria outra coisa no mesmo lugar.
                         title={p.screen ? undefined : `${p.name} — clique para o perfil, botão direito para as opções`}
@@ -583,7 +635,13 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                     {/* O bot de música aparece como mais um na sala, embaixo de quem está nela:
                         é assim que se sabe, sem abrir o chat, que tem música ali e qual. */}
                     {r.musica && (
-                      <li className="linha-da-musica" title={`Tocando: ${r.musica.tocando.titulo} — pediu ${r.musica.tocando.pediu.nome}`}>
+                      <li
+                        className="linha-da-musica"
+                        title={`Tocando: ${r.musica.tocando.titulo} — pediu ${r.musica.tocando.pediu.nome}`}
+                        // Como uma pessoa: o clique (esquerdo ou direito) abre o menu dele.
+                        onClick={(e) => { e.stopPropagation(); onBot?.(r.id, pontoDoClique(e)); }}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onBot?.(r.id, pontoDoClique(e)); }}
+                      >
                         <span className="avatar avatar-do-bot"><Icon name="nota" size={13} /></span>
                         <span className="pname">
                           <span>Música</span>

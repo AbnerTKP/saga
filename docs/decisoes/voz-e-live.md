@@ -404,3 +404,32 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
     de 2 h limita a ~130 MB; servir por protocolo próprio é a saída); o anfitrião herdado pode
     ser alguém de app antigo, que não toca (aí a fila anda pelo tempo); e a trava de transmitir
     não segura um app modificado que declare a tela como câmera.
+
+## O bot como pessoa, e mover gente entre calls (23/09/2026)
+
+Pedido do dono: "que o bot tenha o mesmo comportamento de pessoa" e "mover pessoas entre as
+calls". Escolhas dele na prancheta (fileiras 4 e 5): o menu do bot igual ao de pessoa, e mover
+**só arrastando**, como no Discord — recusou o "Mover para" no menu, nas duas formas desenhadas.
+
+- **O bot na barra e no palco**: o clique (esquerdo ou direito) na linha "Música", ou no avatar
+  roxo do palco, abre o menu de pessoa dele (`MenuDoBot`): o volume (o mesmo da música, guardado
+  neste computador), "Pular esta música", a fila por dentro, e "Tirar da call" (parar e limpar a
+  fila). Tirar é de quem tem "Tocar música" — e então só na call em que está — ou de quem pode
+  tirar PESSOAS da call, de onde estiver: um moderador cala o bot sem mexer com música
+  (`POST /musica/acao`).
+- **Mover é permissão própria**, "Mover pessoas" (`moverPessoas`), nascida desligada, e é ação
+  sobre alguém: só alcança quem está abaixo. O destino tem de ser uma sala que a PESSOA MOVIDA
+  enxerga. Arrastar a si mesmo é só trocar de sala.
+- **Quem troca de sala é o app da pessoa**, pelo caminho de sempre (crachá novo, microfone como
+  estava), e ela vê "TKP moveu você para Jogos". O servidor avisa pela call — e **a mensagem pela
+  call não prova de onde veio**: medido na bancada, um "mover" forjado por uma participante comum
+  chegou SEM remetente, igual ao do servidor, e a Saga obedeceu (qualquer um da call moveria
+  qualquer um, o dono inclusive). Hoje pela call vai só `{tipo: 'confira'}`; a ordem fica no
+  servidor, por um minuto e uma vez só, e o app a busca com a própria sessão
+  (`POST /eu/movimento`). Medido depois: a forjada é ignorada, a de verdade move (a Saga da Bia foi
+  para a Jogos e mostrou o aviso). Um "confira" no meio da espera de outro vira uma pergunta a
+  mais, e não se perde.
+- **Arrastar pessoa não arrasta a sala**: a linha da sala também é arrastável (reordenar), e o
+  começo do arrastar da pessoa para a propagação. Só sala de voz, e não a de origem, acende.
+- **App antigo não obedece**: a v0.63.1 e anteriores não conhecem o "confira", e quem estiver
+  numa delas simplesmente não é movido.

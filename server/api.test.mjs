@@ -939,6 +939,48 @@ test('o bot de música não conta a ninguém que uma sala privada existe', async
   for (const s of [texto, voz]) await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: s.id } });
 });
 
+test('mover alguém de sala: permissão própria, só para baixo, e só para sala que a pessoa vê', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const alto = cargos.reduce((a, b) => (a.nivel >= b.nivel ? a : b));
+  const salas = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms;
+  const jogos = salas.find((r) => r.name === 'Jogos');
+  const porao = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Porão2', tipo: 'voz' } })).corpo.sala;
+  await chamar('POST', '/salas/editar', { sessao: dono.token, corpo: { id: porao.id, privada: true, cargos: [alto.id] } });
+
+  const semPermissao = await chamar('POST', '/moderar', { sessao: bruno.token, corpo: { acao: 'mover', alvo: dono.eu.id, sala: jogos.id } });
+  assert.equal(semPermissao.status, 403, 'membro sem a permissão moveu alguém');
+
+  const paraPrivada = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'mover', alvo: bruno.eu.id, sala: porao.id } });
+  assert.equal(paraPrivada.status, 403, 'moveu alguém para dentro de uma sala privada que ele não vê');
+
+  // O LiveKit daqui é uma porta morta: ninguém está em call, e a recusa diz isso.
+  const foraDaCall = await chamar('POST', '/moderar', { sessao: dono.token, corpo: { acao: 'mover', alvo: bruno.eu.id, sala: jogos.id } });
+  assert.equal(foraDaCall.status, 409);
+  assert.match(foraDaCall.corpo.error, /não está em nenhuma sala/);
+  // Sem ordem de verdade guardada, perguntar não move ninguém — é o que torna inofensivo um
+  // "confira" forjado pela call.
+  const nada = await chamar('POST', '/eu/movimento', { sessao: bruno.token });
+  assert.equal(nada.status, 200);
+  assert.equal(nada.corpo.movimento, null);
+  await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: porao.id } });
+});
+
+test('o menu do bot: tirar da call é de quem toca música ou de quem modera', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const geral = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms.find((r) => r.name === 'Geral');
+  const doBruno = await chamar('POST', '/musica/acao', { sessao: bruno.token, corpo: { sala: geral.id, acao: 'parar' } });
+  assert.equal(doBruno.status, 403);
+  assert.match(doBruno.corpo.error, /tirar o bot/);
+  // O dono modera: passa da permissão, e a recusa é por não haver música.
+  const doDono = await chamar('POST', '/musica/acao', { sessao: dono.token, corpo: { sala: geral.id, acao: 'parar' } });
+  assert.equal(doDono.status, 409);
+  assert.match(doDono.corpo.error, /Não tem nada tocando/);
+  assert.equal((await chamar('POST', '/musica/acao', { sessao: dono.token, corpo: { sala: geral.id, acao: 'inventada' } })).status, 400);
+});
+
 test('quem não vê a sala privada ainda consegue arrastar as que vê', async () => {
   // A ordem exige "todas as salas, uma vez cada" — e a tela de quem não vê a privada
   // manda a lista sem ela. Exigir a lista inteira tornaria a barra inarrastável.

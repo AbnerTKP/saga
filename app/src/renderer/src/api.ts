@@ -23,7 +23,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'transmitir' | 'tocarMusica';
+  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'transmitir' | 'tocarMusica' | 'moverPessoas';
 
 export type Cargo = {
   id: number;
@@ -59,7 +59,7 @@ export const podeMexerNosSons = (eu: Membro, cargos: Cargo[]) => {
 };
 
 /** Ações que recaem sobre alguém passam também pela hierarquia. */
-export const SOBRE_ALGUEM: Permissao[] = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo'];
+export const SOBRE_ALGUEM: Permissao[] = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo', 'moverPessoas'];
 
 export const podeSobre = (eu: Membro, p: Permissao, alvo: { id: number; cargo: Cargo | null }) =>
   pode(eu.cargo, p)
@@ -908,6 +908,16 @@ export const moderar = (
   extra?: { minutos?: number; cargo?: number; idExibido?: string },
 ) => pedir<{ alvo?: Membro; ok?: boolean }>('POST', '/moderar', { acao, alvo, ...extra });
 
+/**
+ * Move alguém para outra sala de voz — arrastando na barra, como no Discord. Quem troca de sala
+ * é o app da pessoa: o servidor manda a ordem pelo LiveKit (`OrdemDoServidor`, no useRoom).
+ */
+export const conferirMovimento = () =>
+  pedir<{ movimento: { sala: number; salaNome: string; servidorId: number; por: string } | null }>('POST', '/eu/movimento');
+
+export const moverPessoa = (alvo: number, sala: number) =>
+  pedir<{ ok: boolean }>('POST', '/moderar', { acao: 'mover', alvo, sala });
+
 // --- Giphy ------------------------------------------------------------------
 
 export type Gif = { id: string; titulo: string; previa: string | null; arquivo: string };
@@ -1143,3 +1153,7 @@ export const avisarQueAMusicaAcabou = (sala: number, uid: string, erro: boolean,
 /** A fila de uma sala de voz, direto — para quem está numa call de outro servidor que não o aberto. */
 export const lerMusica = (sala: number, servidor: number) =>
   pedir<{ musica: EstadoDaMusica | null; agora?: number }>('GET', `/musica?sala=${sala}`, undefined, servidor);
+
+/** O menu do bot, na barra: pular, ou tirá-lo da call (parar e limpar a fila). */
+export const acaoNoBot = (sala: number, acao: 'pular' | 'parar', uid?: string) =>
+  pedir<{ musica: EstadoDaMusica | null; agora?: number }>('POST', '/musica/acao', { sala, acao, uid });

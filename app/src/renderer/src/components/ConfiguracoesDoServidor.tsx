@@ -55,11 +55,12 @@ const DETALHE: Partial<Record<Permissao, string>> = {
   apagarMensagens: 'A própria mensagem qualquer um apaga.',
   transmitir: 'Sem ela, o botão de tela fica apagado. Tirar com a tela no ar derruba a transmissão.',
   tocarMusica: 'O bot de música: /tocar, /pular e /parar no chat. Ver a fila (/fila) é de todos.',
+  moverPessoas: 'Arrastar alguém de uma sala de voz para outra, na barra. Só quem está abaixo do seu cargo.',
 };
 const GRUPOS_DE_PERMISSAO: { titulo: string; permissoes: Permissao[] }[] = [
   { titulo: 'Moderação', permissoes: ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'apagarMensagens'] },
   { titulo: 'Pessoas e cargos', permissoes: ['definirCargo', 'gerirCargos', 'convidar'] },
-  { titulo: 'Na call', permissoes: ['transmitir', 'tocarMusica'] },
+  { titulo: 'Na call', permissoes: ['transmitir', 'tocarMusica', 'moverPessoas'] },
   { titulo: 'O servidor', permissoes: ['gerirServidor', 'gerirSalas', 'gerirSons'] },
 ];
 

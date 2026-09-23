@@ -2307,9 +2307,8 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 .bot-item-texto { display: flex; flex-direction: column; min-width: 0; }
 .bot-lista-vazia { padding: 6px 8px; font-size: 13px; color: var(--cinza-400); }
 
-/* Na barra, o bot é mais um na sala — mas não é pessoa: sem clique e sem menu. */
-.people li.linha-da-musica { cursor: default; align-items: center; }
-.people li.linha-da-musica:hover { background: none; }
+/* Na barra, o bot é mais um na sala — e, como uma pessoa, o clique abre o menu dele. */
+.people li.linha-da-musica { cursor: pointer; align-items: center; }
 .linha-da-musica .pname { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .linha-da-musica .pname > span:first-child { color: var(--text); }
 .linha-da-musica .tocando-agora { font-size: 12px; color: var(--verde-300); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2318,3 +2317,20 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
   padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--verde-500-16); color: var(--verde-300);
   font-size: 13px; font-weight: 600; }
 .faixa-musica > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* O bot no palco, entre as pessoas: um botão com a cara de avatar, sem moldura de botão. */
+.bot-no-palco { padding: 0; border: 0; background: none; border-radius: 50%; }
+.bot-no-palco:focus-visible { outline: 2px solid var(--azul-500); outline-offset: 3px; }
+
+/* O menu do bot: o de pessoa, com o que toca em verde e a fila por dentro. */
+.menu-do-bot .tocando-agora { color: var(--verde-300); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.fila-no-menu { list-style: none; margin: 2px 0 4px; padding: 0 8px; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.fila-no-menu li { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.fila-no-menu .fila-titulo { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erro-no-menu { color: var(--perigo-texto); padding: 6px 8px 0; }
+
+/* Arrastar alguém para outra sala, como no Discord: quem é arrastado esmaece na sala de onde
+   sai, e a sala onde cairia acende tracejada — o mesmo tracejado de "solte aqui" do chat. */
+.people li[draggable="true"] { cursor: grab; }
+.people li.arrastada { opacity: .35; }
+.room.solte-aqui-a-pessoa { outline: 2px dashed var(--azul-500); outline-offset: -2px; background: var(--azul-500-16); }

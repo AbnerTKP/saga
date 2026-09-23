@@ -11,8 +11,7 @@ import {
   abrirMesa, agirNaMesa, type ConviteDeJogo,
   abrirGrid, agirNoGrid, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
   agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
-  abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde,
-} from './api';
+  abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde, moverPessoa, acaoNoBot, podeSobre, conferirMovimento } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
 import { anotar } from './registro';
@@ -71,7 +70,8 @@ import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
 import { useMusica } from './useMusica';
-import { definirContextoDoBot } from './musicaDoBot';
+import { MenuDoBot } from './components/MenuDoBot';
+import { contarQueAMusicaMudou, definirContextoDoBot } from './musicaDoBot';
 import { derrubouASessao } from './resposta';
 import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
@@ -217,6 +217,8 @@ export function App() {
   const sessaoCaiuRef = useRef<() => void>(() => {});
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<(PessoaAberta & { em: { x: number; y: number } }) | null>(null);
+  /** O menu do bot de música aberto: de que sala de voz, e onde. */
+  const [menuDoBot, setMenuDoBot] = useState<{ salaId: number; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
   // A tela de partida só aparece na primeira consulta. Depois disso, versão nova chega
   // pelo aviso no canto, sem interromper quem está no meio de uma conversa.
@@ -237,7 +239,10 @@ export function App() {
     (nome: string) => notas.mostrar('info', `${nome} entrou na sala.`),
     [notas.mostrar],
   );
-  const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem);
+  // A ordem do servidor que chega pela call ("fulano moveu você") — quem a cumpre é
+  // `entrarNaVoz`, que nasce mais abaixo; a referência é preenchida lá.
+  const cumprirOrdem = useRef<() => void>(() => undefined);
+  const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem, () => cumprirOrdem.current());
 
   /**
    * A live por cima do jogo.
@@ -544,6 +549,7 @@ export function App() {
     setPicker(false);
     setNovoServidor(null);
     setMenu(null);
+    setMenuDoBot(null);
     setPerfilAberto(null);
     setMenuDaSala(null);
     setMenuDeSalas(null);
@@ -662,6 +668,34 @@ export function App() {
    */
   const entrarNaVozRef = useRef(entrarNaVoz);
   entrarNaVozRef.current = entrarNaVoz;
+
+  // Alguém com a permissão arrastou você para outra sala: entra nela pelo caminho de sempre
+  // (crachá novo, microfone como você o deixou) e conta quem moveu, para ninguém achar que
+  // a Saga trocou de sala sozinha.
+  // Uma pergunta por vez: um "confira" repetido (ou forjado, que custa só isto) não vira
+  // uma enxurrada de pedidos.
+  const conferindoMovimento = useRef(false);
+  const conferirDeNovo = useRef(false);
+  cumprirOrdem.current = () => {
+    // Um "confira" no meio da espera não se perde: vira uma pergunta a mais, no fim dela.
+    if (conferindoMovimento.current) { conferirDeNovo.current = true; return; }
+    conferindoMovimento.current = true;
+    conferirMovimento()
+      .then(async ({ movimento: o }) => {
+        if (!o) return;
+        const servidorNome = sessao?.servidores?.find((sv) => sv.id === o.servidorId)?.nome ?? '';
+        await entrarNaVozRef.current({ id: o.sala, nome: o.salaNome, servidorId: o.servidorId, servidorNome });
+        notas.mostrar('info', `${o.por} moveu você para ${o.salaNome}.`);
+      })
+      .catch((e) => notas.mostrarFalha(e))
+      .finally(() => {
+        setTimeout(() => {
+          conferindoMovimento.current = false;
+          if (conferirDeNovo.current) { conferirDeNovo.current = false; cumprirOrdem.current(); }
+        }, 1500);
+      });
+  };
+
   const avisarRef = useRef(notas.mostrar);
   avisarRef.current = notas.mostrar;
 
@@ -1479,6 +1513,18 @@ export function App() {
         pedidos={amigos.pedidos}
         onAbrirConversa={abrirConversaDaLista}
         onAbrirAmigos={() => { setConversaAberta(null); abrirConversas(); }}
+        // Arrastar alguém para outra sala. Arrastar a si mesmo é só trocar de sala; os outros,
+        // com a permissão e abaixo de mim — o servidor confere de novo.
+        podeMover={(p) => p.identity === identidadeDe(eu.id)
+          || (p.usuarioId !== undefined && podeSobre(eu, 'moverPessoas', { id: p.usuarioId, cargo: p.cargo ?? null }))}
+        onMover={(p, sala) => {
+          if (p.identity === identidadeDe(eu.id)) { void abrirSala(sala); return; }
+          if (p.usuarioId === undefined) return;
+          moverPessoa(p.usuarioId, sala.id)
+            .then(() => notas.mostrar('info', `${p.name} foi para ${sala.name}.`))
+            .catch((e) => notas.mostrarFalha(e));
+        }}
+        onBot={(salaId, em) => setMenuDoBot({ salaId, em })}
       />
       <Stage
         rm={rm}
@@ -1497,6 +1543,7 @@ export function App() {
         meuId={eu.id}
         podeApagar={podeApagar}
         estadoDaMusica={musica.estadoDaSala}
+        onBot={(salaId, em) => setMenuDoBot({ salaId, em })}
         lives={lives}
         onAssistirLive={assistirLive}
         botaoDePessoas={palcoNaCall ? (
@@ -1716,6 +1763,30 @@ export function App() {
         onAdministracao={eu.donoDaSaga ? () => setAdministracao(true) : undefined}
       />
 
+      {menuDoBot && (() => {
+        const estado = musica.estadoDaSala(menuDoBot.salaId);
+        if (!estado) return null;
+        const salaId = menuDoBot.salaId;
+        return (
+          <MenuDoBot
+            estado={estado}
+            em={menuDoBot.em}
+            volume={rm.volumeDaMusica}
+            onVolume={rm.definirVolumeDaMusica}
+            podePular={pode(eu.cargo, 'tocarMusica')}
+            podeTirar={pode(eu.cargo, 'tocarMusica') || pode(eu.cargo, 'desconectar')}
+            onPular={async () => {
+              const r = await acaoNoBot(salaId, 'pular', estado.tocando.uid);
+              contarQueAMusicaMudou(salaId, r.musica, r.agora ?? 0);
+            }}
+            onTirar={async () => {
+              const r = await acaoNoBot(salaId, 'parar');
+              contarQueAMusicaMudou(salaId, r.musica, r.agora ?? 0);
+            }}
+            onClose={() => setMenuDoBot(null)}
+          />
+        );
+      })()}
       {menu && (
         <MenuDaPessoa
           pessoa={menu.pessoa}

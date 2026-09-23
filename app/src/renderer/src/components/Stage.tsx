@@ -221,7 +221,7 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, estadoDaMusica, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, estadoDaMusica, onBot, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
   /**
    * Os controles da call NO PALCO, perto do que se vê (surgem com o mouse sobre ele). Antes
    * moravam só no canto de baixo da coluna da esquerda, longe da call.
@@ -268,6 +268,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   podeApagar?: (m: Mensagem) => boolean;
   /** A fila de agora de uma sala de voz, para o cartão do bot de música. */
   estadoDaMusica?: (salaVoz: number) => EstadoDaMusica | null | undefined;
+  /** O bot da call, com o clique: o mesmo menu de uma pessoa. */
+  onBot?: (salaId: number, em: { x: number; y: number }) => void;
   /** As telas no ar agora, em qualquer sala de voz do servidor — ver lives.ts. */
   lives: LiveNoChat[];
   /** Assistir a uma live a partir do chat, entrando na sala de voz dela se preciso. */
@@ -352,6 +354,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   };
 
   const idle = rm.status === 'idle';
+  const botNoPalco = rm.salaDaVoz ? estadoDaMusica?.(rm.salaDaVoz.id)?.tocando ?? null : null;
   // Quem está no palco é da CALL, e a call pode ser de outro servidor: trocar de servidor
   // não desliga a voz. O cartão dessas pessoas se pergunta ao servidor dela.
   const daCall = rm.salaDaVoz
@@ -517,6 +520,23 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
                       tamanho="huge" extra={rm.falando.has(p.identity) ? 'speaking' : ''} titulo={`${p.name} — clique para o perfil, botão direito para as opções`} />
                   </span>
                 ))}
+                {/* O bot de música é mais um na call: aparece aqui como as pessoas, e o clique
+                    abre o menu dele (volume, pular, tirar da call). */}
+                {botNoPalco && (
+                  <button
+                    type="button"
+                    className="clicavel bot-no-palco"
+                    title={`Música — tocando ${botNoPalco.titulo}. Clique para o volume e as opções.`}
+                    // Pelo teclado não há ponteiro: o menu abre junto do avatar.
+                    onClick={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      onBot?.(rm.salaDaVoz!.id, e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : { x: r.left, y: r.bottom });
+                    }}
+                    onContextMenu={(e) => { e.preventDefault(); onBot?.(rm.salaDaVoz!.id, { x: e.clientX, y: e.clientY }); }}
+                  >
+                    <span className="avatar huge avatar-do-bot"><Icon name="nota" size={48} /></span>
+                  </button>
+                )}
               </div>
               <div className="muted">Só voz por enquanto. Ligue a câmera ou compartilhe a tela.</div>
             </div>

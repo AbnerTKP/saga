@@ -61,6 +61,11 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   dizer que o cartão rola; e a barra de rolagem dele entra na curva do canto de baixo,
   como a de todo contêiner arredondado que rola no app (o corpo dos painéis, a lista de
   cargos).
+- **Mover alguém arrastando, e o menu do bot (23/09/2026).** Medido na bancada: a Saga de outra
+  pessoa troca de sala e mostra quem a moveu; uma ordem forjada por alguém da call é ignorada; o
+  menu do bot muda e guarda o volume e tira o bot da call. Falta: arrastar com o mouse de verdade
+  (na bancada os eventos de arrastar foram disparados por código), e ligar "Mover pessoas" nos
+  cargos que devem poder.
 - **O bot de música com os amigos (23/09/2026).** Medido na bancada muda: comandos, fila, cartão,
   a música chegando a um robô na call. Falta: ouvir de verdade (volume, qualidade, se corta),
   **o primeiro `/tocar` no Windows** (baixa o `yt-dlp_win.zip` e abre com o `tar.exe` do

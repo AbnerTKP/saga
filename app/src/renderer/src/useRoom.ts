@@ -175,7 +175,17 @@ const LIMITE_DE_CONEXAO = 20_000;
  * `aoChegarAlguem` é chamado quando alguém entra na sala em que você está — é dali que
  * sai o aviso na tela. Vem de fora porque quem desenha aviso é o App, não este gancho.
  */
-export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => void) {
+/**
+ * O "confira" que o servidor manda pela call quando há uma ordem para esta pessoa (hoje, "você
+ * foi movido"). NÃO se confia no que vem pela call: medido em 23/09/2026, uma mensagem forjada
+ * por alguém da call chegou sem remetente, igual à do servidor. Por isso ela é só o gatilho —
+ * o app pergunta ao servidor, com a própria sessão, e é a resposta de lá que vale.
+ */
+export type OrdemDoServidor = { tipo: 'mover'; sala: number; salaNome: string; servidorId: number; por: string };
+
+export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => void, aoReceberOrdem?: () => void) {
+  const aoReceberOrdemRef = useRef(aoReceberOrdem);
+  aoReceberOrdemRef.current = aoReceberOrdem;
   const roomRef = useRef<Room | null>(null);
   const [, bump] = useReducer((x: number) => x + 1, 0);
   /** Quem está falando agora, medido do som e não perguntado ao servidor — ver niveis.ts. */
@@ -554,6 +564,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       })
       .on(RoomEvent.LocalTrackUnpublished, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.ConnectionQualityChanged, bump)
+      // Só o gatilho: o que vale é o que o servidor responde (ver OrdemDoServidor).
+      .on(RoomEvent.DataReceived, (_dados: Uint8Array, _quem?: Participant, _tipo?: unknown, topico?: string) => {
+        if (topico === 'saga') aoReceberOrdemRef.current?.();
+      })
       // A permissão de transmitir mudou (o dono mexeu no cargo com a pessoa na call). Mora
       // AQUI, e não num efeito à parte: o `removeAllListeners` da volta deste efeito apagaria
       // o de fora calado — a regra dos eventos da sala, em som-e-microfone.md.

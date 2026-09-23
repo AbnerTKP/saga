@@ -32,6 +32,10 @@ export const PERMISSOES = {
   // O bot de música: pôr, pular e parar. Nasce desligada pelo mesmo motivo da de cima — é o
   // dono quem escolhe quem mexe no que a call inteira ouve.
   tocarMusica: 'Tocar música',
+  // Mover alguém de uma sala de voz para outra, arrastando na barra — como no Discord
+  // (23/09/2026). Nasce desligada, como as outras de hoje. É ação sobre alguém: só alcança
+  // quem está abaixo, a regra de toda moderação.
+  moverPessoas: 'Mover pessoas entre salas',
 };
 
 // `concederTurbo` viveu aqui e saiu: o Berserk é da conta, e vale na Saga inteira. Quem
@@ -42,7 +46,7 @@ export const PERMISSOES = {
 export const TODAS = Object.keys(PERMISSOES);
 
 /** Ações que recaem sobre outra pessoa. Só estas passam pela regra de hierarquia. */
-export const SOBRE_ALGUEM = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo'];
+export const SOBRE_ALGUEM = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo', 'moverPessoas'];
 
 /**
  * O que a pessoa pode publicar na call, no formato do crachá do LiveKit. `null` é sem

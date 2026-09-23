@@ -4,7 +4,7 @@
 // grupo virou só o convite, exigida uma vez, no cadastro. Sem isso não haveria como saber
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
-import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient, TrackSource, DataPacket_Kind } from 'livekit-server-sdk';
 import { SignJWT } from 'jose';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -139,6 +139,13 @@ const mesas = criarMesas();
 // As filas do bot de música, uma por sala de voz. Também na memória: REINICIAR O SERVIDOR
 // ZERA AS FILAS — ver musica.mjs.
 const filas = criarFilas();
+/**
+ * As mudanças de sala pedidas por quem tem "Mover pessoas", à espera de quem foi movido vir
+ * buscá-las (`POST /eu/movimento`). Uma por conta — a mais nova vale —, e só por um minuto:
+ * uma ordem velha levando alguém de sala horas depois seria pior que ela não chegar.
+ */
+const movimentos = new Map();
+const VALE_UM_MOVIMENTO = 60_000;
 // Os grids de Fórmula 1, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as corridas.
 // A corrida em si anda pelo LiveKit, não por aqui — ver corridas.mjs.
 const grids = criarGrids();
@@ -1646,6 +1653,50 @@ const ROTAS = {
     return { musica: verMusica(voz.id), agora: Date.now() };
   },
 
+  /**
+   * O bot como pessoa: pular e tirar da call pelo menu dele, na barra — sem sala de texto no
+   * meio. O bot conta no chat da fila o que foi feito, em nome de quem fez.
+   *
+   * Tirar o bot da call (parar e limpar a fila) é de quem tem "Tocar música" — e então só na
+   * call em que está, como o /parar — ou de quem pode tirar PESSOAS da call, de onde estiver:
+   * um moderador cala o bot mesmo sem mexer com música (decisão do dono, 23/09/2026). Pular
+   * é só de "Tocar música", e diz qual música quer pular, como o /pular.
+   */
+  'POST /musica/acao': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { sala: salaVoz, acao, uid } = await lerCorpo(req);
+    const voz = salasDoServidor(sid, eu).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
+    if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
+    if (!['pular', 'parar'].includes(acao)) throw new ErroDeConta('Essa ação não existe.', 400);
+    const musica = temPermissao(eu.cargo, 'tocarMusica');
+    const moderacao = acao === 'parar' && temPermissao(eu.cargo, 'desconectar');
+    if (!musica && !moderacao) {
+      throw new ErroDeConta(acao === 'parar' ? 'Seu cargo não pode tirar o bot da call.' : 'Seu cargo não pode pular música.', 403, 'musica');
+    }
+    if (!moderacao && (await salaDeVozDe(sid, eu.id)).id !== voz.id) {
+      throw new ErroDeConta('Só dá para mexer na música da call em que você está.', 409, 'musica');
+    }
+    const antes = filas.ver(voz.id);
+    if (!antes) throw new ErroDeConta('Não tem nada tocando.', 409, 'musica');
+    let bot, texto;
+    if (acao === 'pular') {
+      if (uid && uid !== antes.tocando.uid) throw new ErroDeConta('Essa música já tinha acabado — não pulei a seguinte.', 409, 'musica');
+      const { pulou, agora } = filas.pular(voz.id);
+      bot = agora
+        ? { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala: salaDoBot(voz) }
+        : { tipo: 'texto', cmd: 'pular', texto: `Pulei "${pulou.titulo}". A fila acabou.` };
+      texto = agora ? `♪ Tocando agora ${naSala(voz)}: ${linhaDaMusica(agora)}` : bot.texto;
+    } else {
+      filas.parar(voz.id);
+      bot = { tipo: 'texto', cmd: 'parar', texto: `${eu.nome} tirou o bot da call e limpou a fila.` };
+      texto = bot.texto;
+    }
+    falarDoBot(sid, eu, antes.salaDoChat, bot, texto);
+    return { musica: verMusica(voz.id), agora: Date.now() };
+  },
+
   /** O anfitrião avisa que o som começou, e em que ponto — ver `comecou`, em musica.mjs. */
   'POST /musica/comecou': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
@@ -1653,6 +1704,20 @@ const ROTAS = {
     const voz = salasDoServidor(sid, eu).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
     if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
     return { ok: filas.comecou(voz.id, String(uid ?? ''), eu.id, posicao) };
+  },
+
+  /**
+   * "Fui movido?" — o app pergunta quando recebe o "confira" pela call. Responde a ordem de
+   * mudança desta conta e a apaga: vale uma vez. Pela conta, e não pelo servidor aberto na
+   * tela, porque a call pode ser de outro servidor.
+   */
+  'POST /eu/movimento': async (req) => {
+    const usuario = exigirConta(req);
+    const m = movimentos.get(usuario.id);
+    movimentos.delete(usuario.id);
+    if (!m || Date.now() - m.em > VALE_UM_MOVIMENTO) return { movimento: null };
+    const { em: _em, ...movimento } = m;
+    return { movimento };
   },
 
   'POST /token': async (req) => {
@@ -1789,7 +1854,7 @@ const ROTAS = {
 
   'POST /moderar': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
-    const { acao, alvo, minutos, cargo, idExibido } = await lerCorpo(req);
+    const { acao, alvo, minutos, cargo, idExibido, sala } = await lerCorpo(req);
 
     switch (acao) {
       // Banir e dar castigo também tiram da call. Sem isso a pessoa continua conversando
@@ -1810,7 +1875,7 @@ const ROTAS = {
       case 'cargo': {
         const r = membros.definirCargo(db, sid, eu.id, alvo, cargo);
         // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
-    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
+        reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
         return { alvo: verMembro(r) };
       }
       case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };
@@ -1818,6 +1883,32 @@ const ROTAS = {
       case 'expulsar': {
         membros.expulsar(db, sid, eu.id, alvo);
         await tirarDaSala(sid, alvo);
+        return { ok: true };
+      }
+      /**
+       * Mover alguém para outra sala de voz, arrastando na barra. Quem troca de sala é o APP
+       * da pessoa: o servidor manda a ordem pelo LiveKit, só para ela, e o app entra na sala
+       * nova pelo caminho de sempre (crachá, microfone como estava). Mandada pelo servidor,
+       * a mensagem chega sem remetente — é assim que o app sabe que ninguém da call a forjou.
+       *
+       * O destino é uma sala que a PESSOA MOVIDA enxerga: mover alguém para dentro de uma
+       * sala privada que ela não vê seria abrir a porta que o cargo dela fecha.
+       */
+      case 'mover': {
+        const { alvo: movido } = membros.exigirPermissao(db, sid, eu.id, 'moverPessoas', alvo);
+        const destino = salasDoServidor(sid, movido).find((s) => s.id === Number(sala) && s.tipo === 'voz');
+        const vista = salasDoServidor(sid, eu).some((s) => s.id === Number(sala));
+        if (!destino || !vista) throw new ErroDeConta('Essa pessoa não pode entrar nessa sala.', 403);
+        const onde = await ondeEsta(sid, alvo);
+        if (!onde) throw new ErroDeConta('Essa pessoa não está em nenhuma sala.', 409);
+        if (onde.sala === salaNoLiveKit(destino)) return { ok: true };
+        // A ordem fica AQUI, e pela call vai só um "confira": quem recebe pergunta ao servidor,
+        // com a própria sessão, se há mesmo uma mudança para ele. A mensagem pela call não
+        // prova de onde veio — medido em 23/09/2026: um "mover" forjado por uma participante
+        // comum chegou sem remetente, igual ao do servidor, e a Saga obedeceu.
+        movimentos.set(Number(alvo), { sala: destino.id, salaNome: destino.nome, servidorId: sid, por: eu.nome, em: Date.now() });
+        await svc.sendData(onde.sala, new TextEncoder().encode(JSON.stringify({ tipo: 'confira' })), DataPacket_Kind.RELIABLE,
+          { destinationIdentities: [identidadeDe(alvo)], topic: 'saga' });
         return { ok: true };
       }
       case 'desconectar': {
