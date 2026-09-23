@@ -31,7 +31,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -85,6 +85,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   onMover?: (p: { identity: string; usuarioId?: number; name: string }, sala: RoomInfo) => void;
   /** O bot de música de uma sala, com o clique: o mesmo menu de uma pessoa. */
   onBot?: (salaId: number, em: { x: number; y: number }) => void;
+  /** Quem eu acabei de mover, a caminho da sala nova: aparece LÁ antes de a busca confirmar. */
+  aCaminho?: Map<string, { sala: number; nome: string }>;
   /** Dono da SAGA — não é o cargo mais alto de um servidor. Só ele vê o painel do app. */
   statusEscolhido: Status;
   onStatus: (s: Status) => void;
@@ -234,7 +236,24 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       ? <li className="risco-de-solta" aria-hidden /> : null;
 
   /** Quem aparece pendurado numa sala: a sua call sai do LiveKit; as outras, da busca. */
-  const quemEstaNa = (r: RoomInfo) => (rm.salaDaVoz?.id === r.id
+  const quemEstaNa = (r: RoomInfo) => {
+    const base = quemEstaNaSemOsMovidos(r);
+    if (!aCaminho?.size) return base;
+    // Quem eu movi sai das outras salas e aparece na de destino já, como "chegando".
+    const ficam = base.filter((p) => { const m = aCaminho.get(p.identity); return !m || m.sala === r.id; });
+    const chegando = [...aCaminho]
+      .filter(([identity, m]) => m.sala === r.id && !ficam.some((p) => p.identity === identity))
+      .map(([identity, m]) => ({
+        identity, name: m.nome,
+        foto: pessoas.get(identity)?.foto ?? null,
+        enquadramento: pessoas.get(identity)?.enquadramento,
+        turbo: pessoas.get(identity)?.turbo ?? false,
+        idExibido: pessoas.get(identity)?.idExibido ?? null,
+        speaking: false, muted: false, camera: false, screen: false, surdo: false, chegando: true,
+      }));
+    return [...ficam, ...chegando];
+  };
+  const quemEstaNaSemOsMovidos = (r: RoomInfo) => (rm.salaDaVoz?.id === r.id
     ? rm.participants.map((p) => ({
         identity: p.identity, name: p.name || p.identity,
         foto: pessoas.get(p.identity)?.foto ?? null,
@@ -584,7 +603,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                     {people.map((p) => (
                       <li
                         key={p.identity}
-                        className={`clicavel ${p.speaking ? 'speaking' : ''} ${pessoaNaMao?.identity === p.identity ? 'arrastada' : ''}`}
+                        className={`clicavel ${p.speaking ? 'speaking' : ''} ${pessoaNaMao?.identity === p.identity ? 'arrastada' : ''} ${'chegando' in p && p.chegando ? 'chegando' : ''}`}
                         // Arrastar para outra sala de voz — como no Discord. A linha da SALA também
                         // é arrastável (reordenar salas): sem parar aqui, a sala sairia junto.
                         // Conta e cargo saem do mapa de pessoas: na sala em que estou, a lista vem do

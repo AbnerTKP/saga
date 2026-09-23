@@ -2333,4 +2333,6 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
    sai, e a sala onde cairia acende tracejada — o mesmo tracejado de "solte aqui" do chat. */
 .people li[draggable="true"] { cursor: grab; }
 .people li.arrastada { opacity: .35; }
+/* Quem eu acabei de mover, antes de a busca confirmar: já na sala nova, um pouco apagado. */
+.people li.chegando { opacity: .6; }
 .room.solte-aqui-a-pessoa { outline: 2px dashed var(--azul-500); outline-offset: -2px; background: var(--azul-500-16); }

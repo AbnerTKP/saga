@@ -433,3 +433,21 @@ calls". Escolhas dele na prancheta (fileiras 4 e 5): o menu do bot igual ao de p
   começo do arrastar da pessoa para a propagação. Só sala de voz, e não a de origem, acende.
 - **App antigo não obedece**: a v0.63.1 e anteriores não conhecem o "confira", e quem estiver
   numa delas simplesmente não é movido.
+- **Quem move vê a pessoa na sala nova NA HORA** (`aCaminho`, no `App`). O dono, na v0.64.0:
+  "ele se vê na call que eu movi, porém ele some pra mim". Medido na bancada: a pessoa sumia da
+  sala de origem em 0,2 s e só aparecia na de destino em ~8 s. Eram duas demoras somadas:
+  - **A contagem do LiveKit atrasa**, e o servidor confiava nela. `listRooms` diz quantos há em
+    cada sala (`numParticipants`), e o servidor pulava as salas com 0 — mas o LiveKit atualiza
+    esse número de tempos em tempos: quem entrou numa sala vazia estava no `listParticipants`
+    em 1,2 s e a contagem ficou em 0 até 6,1 s. Não era só mover: QUALQUER pessoa entrando numa
+    sala vazia sumia da barra dos outros por esses segundos, e o bot respondia "entre numa sala
+    de voz" a quem tinha acabado de entrar numa. Hoje o servidor olha só se a sala EXISTE
+    (`nomesDasSalasVivas`); sala vazia some do LiveKit uns 20 s depois do último sair, então
+    perguntar a ela custa pouco. `api-livekit.test.mjs` sobe o servidor contra um LiveKit de
+    mentira com a contagem em 0 e gente dentro — com o código antigo, os dois testes falham.
+  - **A barra só pergunta de 4 em 4 s.** Depois de mover, ela pergunta de novo em 1,5, 3, 5 e 8 s,
+    e até lá mostra a pessoa na sala nova, um pouco apagada (`li.chegando`); sai do otimista
+    quando a busca a confirma lá, ou em 15 s.
+
+  Medido depois, com o arrasto para uma sala vazia: para quem moveu, a pessoa aparece na sala
+  nova em 30 ms e a busca confirma em 1,5 s; a Saga da pessoa movida entra em 0,7 s.

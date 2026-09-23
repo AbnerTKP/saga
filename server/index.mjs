@@ -530,6 +530,18 @@ function lembrado(caixa, buscar) {
 
 const salasVivas = () => lembrado(memoria.salas, () => svc.listRooms());
 
+/**
+ * O nome das salas que existem no LiveKit agora — SEM olhar a contagem (`numParticipants`).
+ * Medido em 23/09/2026: quem entra numa sala vazia aparece no `listParticipants` em 1,2 s, e a
+ * contagem do `listRooms` fica em 0 até 6,1 s; o LiveKit a atualiza de tempos em tempos, não a
+ * cada entrada. Filtrando por ela, quem entrava numa sala vazia sumia da barra dos outros por
+ * esses segundos a mais (o dono, ao mover alguém: "ele some pra mim, não vejo mais"), o bot
+ * respondia "entre numa sala de voz" a quem tinha acabado de entrar, e expulsar alguém de toda
+ * call deixava de fora a sala recém-ocupada. Sala vazia só existe por pouco tempo depois que o
+ * último sai, então perguntar a ela custa quase nada.
+ */
+const nomesDasSalasVivas = async () => new Set((await salasVivas()).map((r) => r.name));
+
 function genteDaSala(nome) {
   let caixa = memoria.gente.get(nome);
   if (!caixa) { caixa = { em: 0, valor: [], indo: null }; memoria.gente.set(nome, caixa); }
@@ -545,7 +557,8 @@ function esquecerSalas() {
 async function participantesDaSala(sid, sala, vivas) {
   const nome = salaNoLiveKit(sala);
   const r = (vivas ?? await salasVivas()).find((x) => x.name === nome);
-  if (!r || r.numParticipants === 0) return [];
+  // Pela existência, não pela contagem — ver `nomesDasSalasVivas`.
+  if (!r) return [];
   const ps = await genteDaSala(nome);
   return ps.map((p) => {
     const base = verParticipante(p);
@@ -593,9 +606,9 @@ async function tirarDaSala(sid, usuarioId) {
 async function tirarDeTodasAsCalls(usuarioId) {
   const alvo = identidadeDe(usuarioId);
   const vivas = await svc.listRooms().catch(() => []);
-  await Promise.all(vivas
-    .filter((r) => Number(r.numParticipants) > 0)
-    .map((r) => svc.removeParticipant(r.name, alvo).catch(() => {})));
+  // Todas as que existem, e não só as que a contagem dá como ocupadas: ela atrasa segundos
+  // (ver `nomesDasSalasVivas`), e quem acabou de entrar numa sala vazia ficaria lá.
+  await Promise.all(vivas.map((r) => svc.removeParticipant(r.name, alvo).catch(() => {})));
   esquecerSalas();
 }
 
@@ -627,9 +640,9 @@ const FONTE_NO_LIVEKIT = { camera: TrackSource.CAMERA, microphone: TrackSource.M
  * deixa o resto tocando.
  */
 async function reaplicarFontesDaCall(sid) {
-  // Só as salas com gente, e todas de uma vez: uma por uma, com o LiveKit lento, a edição do
+  // Só as salas que existem, e todas de uma vez: uma por uma, com o LiveKit lento, a edição do
   // cargo esperava segundos por sala para responder (achado na revisão de 23/09/2026).
-  const vivas = new Set((await salasVivas()).filter((r) => Number(r.numParticipants) > 0).map((r) => r.name));
+  const vivas = await nomesDasSalasVivas();
   const salas = salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz' && vivas.has(salaNoLiveKit(s)));
   await Promise.all(salas.map(async (sala) => {
     const nome = salaNoLiveKit(sala);
@@ -718,12 +731,12 @@ function verMusica(salaVoz) {
 
 /**
  * A sala de voz deste servidor em que a pessoa está, ou o erro que o bot responde. Pergunta só
- * às salas com gente, todas de uma vez: uma por uma, em fila, era a janela em que um /pular
+ * às salas que existem, todas de uma vez: uma por uma, em fila, era a janela em que um /pular
  * cruzava com o fim da música.
  */
 async function salaDeVozDe(sid, usuarioId) {
   const alvo = identidadeDe(usuarioId);
-  const vivas = new Set((await salasVivas()).filter((r) => Number(r.numParticipants) > 0).map((r) => r.name));
+  const vivas = await nomesDasSalasVivas();
   const comGente = salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz' && vivas.has(salaNoLiveKit(s)));
   const achadas = await Promise.all(comGente.map(async (s) =>
     ((await svc.listParticipants(salaNoLiveKit(s)).catch(() => [])).some((p) => p.identity === alvo) ? s : null)));

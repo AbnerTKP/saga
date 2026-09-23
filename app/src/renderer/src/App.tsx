@@ -217,6 +217,14 @@ export function App() {
   const sessaoCaiuRef = useRef<() => void>(() => {});
   const [seletorDoSistema, setSeletorDoSistema] = useState(false);
   const [menu, setMenu] = useState<(PessoaAberta & { em: { x: number; y: number } }) | null>(null);
+  /**
+   * Quem acabou de ser movido por mim, a caminho da sala nova. A barra o mostra LÁ na hora:
+   * antes, ele sumia da sala de onde saiu e só reaparecia na nova quando a busca de salas
+   * alcançava — uns 8 s medidos na bancada, e bem mais numa internet que falha (o dono:
+   * "ele some pra mim, não vejo mais"). Sai daqui quando a busca o confirma na sala nova,
+   * ou em 15 s.
+   */
+  const [aCaminho, setACaminho] = useState<Map<string, { sala: number; nome: string; ate: number }>>(new Map());
   /** O menu do bot de música aberto: de que sala de voz, e onde. */
   const [menuDoBot, setMenuDoBot] = useState<{ salaId: number; em: { x: number; y: number } } | null>(null);
   const [atualizacao, setAtualizacao] = useState<UpdateState>({ fase: 'procurando' });
@@ -280,6 +288,19 @@ export function App() {
   const salasDaqui = salasDoServidor?.servidorId === servidorAberto ? salasDoServidor : null;
   const rooms = salasDaqui?.rooms ?? SEM_SALAS;
   const categorias = salasDaqui?.categorias ?? SEM_CATEGORIAS;
+
+  // Quem estava a caminho sai do otimista quando a busca o confirma na sala nova, ou vence.
+  useEffect(() => {
+    if (aCaminho.size === 0) return;
+    const confirmar = () => setACaminho((m) => {
+      const fica = new Map([...m].filter(([identity, v]) => Date.now() < v.ate
+        && !rooms.some((r) => r.id === v.sala && r.participants.some((p) => p.identity === identity))));
+      return fica.size === m.size ? m : fica;
+    });
+    confirmar();
+    const id = setInterval(confirmar, 2000);
+    return () => clearInterval(id);
+  }, [rooms, aCaminho.size]);
 
   /**
    * O bot de música: as filas que vieram na busca de salas (servidor antigo não manda o campo,
@@ -550,6 +571,7 @@ export function App() {
     setNovoServidor(null);
     setMenu(null);
     setMenuDoBot(null);
+    setACaminho(new Map());
     setPerfilAberto(null);
     setMenuDaSala(null);
     setMenuDeSalas(null);
@@ -564,6 +586,9 @@ export function App() {
   // Sessão derrubada com o app aberto: volta para o login e SAI da call. Sem sair, a call
   // continuava rodando atrás da tela de login, sem botão nenhum para desligar.
   sessaoCaiuRef.current = () => { sairDaVozRef.current(); esquecerAConta(); };
+
+  /** A busca de salas, para chamar fora do relógio — depois de mover alguém, por exemplo. */
+  const buscarSalasJa = useRef<() => void>(() => undefined);
 
   // Quem está em cada sala
   useEffect(() => {
@@ -617,9 +642,10 @@ export function App() {
       }
     };
     tick();
+    buscarSalasJa.current = tick;
     const id = setInterval(tick, 4000);
     const pararDeDespertar = aoDespertar(tick);
-    return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
+    return () => { vivo = false; clearInterval(id); pararDeDespertar(); buscarSalasJa.current = () => undefined; };
   }, [sessao?.servidor?.id]);
 
   /**
@@ -1521,10 +1547,17 @@ export function App() {
           if (p.identity === identidadeDe(eu.id)) { void abrirSala(sala); return; }
           if (p.usuarioId === undefined) return;
           moverPessoa(p.usuarioId, sala.id)
-            .then(() => notas.mostrar('info', `${p.name} foi para ${sala.name}.`))
+            .then(() => {
+              notas.mostrar('info', `${p.name} foi para ${sala.name}.`);
+              setACaminho((m) => new Map(m).set(p.identity, { sala: sala.id, nome: p.name, ate: Date.now() + 15_000 }));
+              // A Saga da pessoa leva uns segundos para trocar de sala: pergunta algumas vezes,
+              // em vez de esperar a próxima volta de 4 s.
+              for (const ms of [1500, 3000, 5000, 8000]) setTimeout(() => buscarSalasJa.current(), ms);
+            })
             .catch((e) => notas.mostrarFalha(e));
         }}
         onBot={(salaId, em) => setMenuDoBot({ salaId, em })}
+        aCaminho={aCaminho}
       />
       <Stage
         rm={rm}

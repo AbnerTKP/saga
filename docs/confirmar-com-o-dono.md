@@ -65,7 +65,9 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   pessoa troca de sala e mostra quem a moveu; uma ordem forjada por alguém da call é ignorada; o
   menu do bot muda e guarda o volume e tira o bot da call. Falta: arrastar com o mouse de verdade
   (na bancada os eventos de arrastar foram disparados por código), e ligar "Mover pessoas" nos
-  cargos que devem poder.
+  cargos que devem poder. **A pessoa movida sumindo para quem moveu** foi consertada e medida
+  na bancada (aparece na sala nova em 30 ms, confirmada em 1,5 s); na produção, com a internet
+  do dono, não foi exercido.
 - **O bot de música com os amigos (23/09/2026).** Medido na bancada muda: comandos, fila, cartão,
   a música chegando a um robô na call. Falta: ouvir de verdade (volume, qualidade, se corta),
   **o primeiro `/tocar` no Windows** (baixa o `yt-dlp_win.zip` e abre com o `tar.exe` do

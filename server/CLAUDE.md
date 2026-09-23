@@ -399,6 +399,13 @@ O que vale para quem mexe em `server/`: regras que não são óbvias no código.
   Comparar `/health` com o ICMP é o que separa rede de aplicação: 29 ms de ICMP contra
   77 ms numa rota vazia quer dizer que o problema não é a rede — é o event loop. A VPS
   fica em Campinas e o ping é de 29 ms com 0% de perda; a rede nunca foi o problema.
+- **A contagem de gente do `listRooms` atrasa segundos — não decida nada por ela.** Quem
+  entra numa sala vazia está no `listParticipants` em ~1 s e o `numParticipants` fica em 0
+  até ~6 s (medido em 23/09/2026). O servidor pulava as salas com 0, e quem acabava de
+  entrar sumia da barra dos outros, não era achado pelo bot e escapava do "tirar de todas
+  as calls". Hoje vale a sala EXISTIR (`nomesDasSalasVivas`); `api-livekit.test.mjs` trava
+  isso contra um LiveKit de mentira. Só a administração ainda soma a contagem
+  (`emCallPorSalaDe`), porque ali é um número e alguns segundos não mudam nada.
 - **Um segundo de memória vale mais que qualquer micro-otimização aqui.** Oito pessoas
   pesquisando de 4 em 4 segundos pedem a MESMA lista. `lembrado()` guarda por 1 s e ainda
   junta as buscas simultâneas numa só (`indo`), senão duas chegando juntas disparariam
