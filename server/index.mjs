@@ -27,8 +27,9 @@ import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import { criarGrids } from './corridas.mjs';
 import { criarArenas } from './lutas.mjs';
+import { criarFilas } from './musica.mjs';
 import * as servidoresM from './servidores.mjs';
-import { verParticipante, salaNoLiveKit, emCallPorSalaDe } from './participantes.mjs';
+import { verParticipante, salaNoLiveKit, salaDoLiveKit, emCallPorSalaDe } from './participantes.mjs';
 import * as tabelaDeServidores from './repositorios/servidores.mjs';
 import * as tabelaDeUsuarios from './repositorios/usuarios.mjs';
 import * as tabelaDeMembros from './repositorios/membros.mjs';
@@ -135,6 +136,9 @@ const digitando = criarRegistroDeDigitacao();
 // As mesas de xadrez, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
 // Publicar o servidor com alguém jogando apaga a partida dele — ver jogos.mjs.
 const mesas = criarMesas();
+// As filas do bot de música, uma por sala de voz. Também na memória: REINICIAR O SERVIDOR
+// ZERA AS FILAS — ver musica.mjs.
+const filas = criarFilas();
 // Os grids de Fórmula 1, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as corridas.
 // A corrida em si anda pelo LiveKit, não por aqui — ver corridas.mjs.
 const grids = criarGrids();
@@ -628,6 +632,61 @@ async function reaplicarFontesDaCall(sid) {
   }
 }
 
+// --- o bot de música ----------------------------------------------------------------
+//
+// A fila é do `musica.mjs`; aqui mora o que precisa de banco e de LiveKit: em que call a
+// pessoa está, e o bot falando no chat.
+
+const linhaDaMusica = (i) => `${i.autor ? `${i.autor} — ` : ''}${i.titulo}`;
+
+/** O bot no chat. Falhar aqui (a sala sumiu, quem pediu saiu do servidor) não desfaz o comando. */
+function falarDoBot(sid, quem, salaDoChat, bot, texto) {
+  try { return mensagens.enviarDoBot(db, sid, quem, salaDoChat, { texto, bot }); }
+  catch (e) { console.error('[musica] o bot não conseguiu falar:', e.message); return null; }
+}
+
+/** A fila andou sozinha (acabou, ou passou da hora): o chat fica sabendo o que começou. */
+function anunciarQueComecou(sid, salaVoz, item) {
+  const fila = filas.ver(salaVoz.id);
+  const quem = membros.buscarMembro(db, sid, item.pediu.id);
+  if (!fila || !quem) return;
+  falarDoBot(sid, quem, fila.salaDoChat,
+    { tipo: 'tocando', item, sala: { id: salaVoz.id, nome: salaVoz.nome } },
+    `♪ Tocando agora na ${salaVoz.nome}: ${linhaDaMusica(item)}`);
+}
+
+/**
+ * A música de uma sala de voz, como o app a lê na busca de salas — e é aqui que a fila é
+ * conferida (anfitrião que saiu, música que passou da hora, sala vazia): sem relógio de
+ * fundo, é a busca de 4 em 4 s de quem tem a Saga aberta que a faz andar.
+ */
+function musicaDaSala(sid, sala) {
+  const presentes = sala.participants.map((p) => p.usuarioId).filter(Boolean);
+  const comecou = filas.conferir(sala.id, presentes);
+  if (comecou) anunciarQueComecou(sid, { id: sala.id, nome: sala.name }, comecou);
+  return verMusica(sala.id);
+}
+
+/** A fila como o app a lê. Sem conferir nada: quem confere é a busca de salas, com a lista real. */
+function verMusica(salaVoz) {
+  const f = filas.ver(salaVoz);
+  if (!f) return null;
+  return {
+    tocando: f.tocando, fila: f.fila, comecouEm: f.comecouEm, agora: f.agora,
+    // A identidade do LiveKit, que é o que o app compara com a dele.
+    anfitriao: identidadeDe(f.anfitriao),
+  };
+}
+
+/** A sala de voz deste servidor em que a pessoa está, ou o erro que o bot responde. */
+async function salaDeVozDe(sid, usuarioId) {
+  const onde = await ondeEsta(sid, usuarioId);
+  const id = onde ? salaDoLiveKit(onde.sala) : null;
+  const sala = id && salasM.listarSalas(db, sid).find((s) => s.id === id);
+  if (!sala) throw new ErroDeConta('Entre numa sala de voz primeiro: eu toco na call em que você está.', 409, 'musica');
+  return sala;
+}
+
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
 async function ondeEsta(sid, usuarioId) {
   const alvo = identidadeDe(usuarioId);
@@ -902,7 +961,7 @@ const ROTAS = {
     // não depende da outra.
     const vivas = await salasVivas();
     const acessos = salasM.acessosDoServidor(db, sid);
-    const salas = await Promise.all(salasDoServidor(sid, eu).map(async (s) => ({
+    const salas = (await Promise.all(salasDoServidor(sid, eu).map(async (s) => ({
       id: s.id,
       name: s.nome,
       tipo: s.tipo,
@@ -918,7 +977,7 @@ const ROTAS = {
       naoLidas: s.tipo === 'texto'
         ? mensagens.contarNaoLidas(db, s.id, lidas.get(s.id) ?? 0, eu.id)
         : 0,
-    })));
+    })))).map((s) => (s.tipo === 'voz' ? { ...s, musica: musicaDaSala(sid, s) } : s));
     // As gavetas vão junto: a barra lateral desenha as duas coisas na mesma passada, e
     // uma segunda busca só para elas piscaria a lista a cada atualização.
     //
@@ -1445,6 +1504,78 @@ const ROTAS = {
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
     at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: lutador });
     return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
+  },
+
+  /**
+   * Os comandos do bot de música, digitados numa sala de texto: `/tocar`, `/pular`, `/parar`
+   * e `/fila`. O bot age na call em que QUEM DIGITOU está, e responde na sala de texto.
+   *
+   * `/tocar` chega com a música já achada: quem acha é o app de quem pediu (o YouTube barra a
+   * VPS — ver musica.mjs), e o servidor só confere e enfileira.
+   */
+  'POST /musica': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { sala: salaDoChat, comando, musica } = await lerCorpo(req);
+    const chat = salasM.listarSalas(db, sid).find((s) => s.id === Number(salaDoChat) && s.tipo === 'texto');
+    if (!chat) throw new ErroDeConta('Os comandos do bot são numa sala de texto.', 400);
+    if (!['tocar', 'pular', 'parar', 'fila'].includes(comando)) throw new ErroDeConta('Esse comando não existe.', 400);
+    // Ver a fila não mexe no que ninguém ouve: é de qualquer um.
+    if (comando !== 'fila' && !temPermissao(eu.cargo, 'tocarMusica')) {
+      throw new ErroDeConta('Seu cargo não pode pôr música. Peça ao dono do servidor a permissão "Tocar música".', 403, 'musica');
+    }
+    const voz = await salaDeVozDe(sid, eu.id);
+    const sala = { id: voz.id, nome: voz.nome };
+    const pediu = { id: eu.id, nome: eu.nome };
+    let bot, texto;
+
+    if (comando === 'tocar') {
+      const { item, posicao } = filas.tocar(voz.id, musica, { pediu, salaDoChat: chat.id });
+      bot = posicao === 0
+        ? { tipo: 'tocando', cmd: 'tocar', item, sala }
+        : { tipo: 'na-fila', cmd: 'tocar', item, posicao, sala };
+      texto = posicao === 0
+        ? `♪ Tocando agora na ${voz.nome}: ${linhaDaMusica(item)}`
+        : `♪ Na fila da ${voz.nome} (${posicao}ª): ${linhaDaMusica(item)}`;
+    } else if (comando === 'pular') {
+      const { pulou, agora } = filas.pular(voz.id);
+      bot = agora
+        ? { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala }
+        : { tipo: 'texto', cmd: 'pular', texto: `Pulei "${pulou.titulo}". A fila acabou.` };
+      texto = agora ? `♪ Tocando agora na ${voz.nome}: ${linhaDaMusica(agora)}` : bot.texto;
+    } else if (comando === 'parar') {
+      filas.parar(voz.id);
+      bot = { tipo: 'texto', cmd: 'parar', texto: 'Parei a música e limpei a fila.' };
+      texto = bot.texto;
+    } else {
+      const f = filas.ver(voz.id);
+      if (!f) throw new ErroDeConta('Não tem nada tocando.', 409, 'musica');
+      bot = { tipo: 'fila', cmd: 'fila', tocando: f.tocando, fila: f.fila, tocouSegundos: Math.round((f.agora - f.comecouEm) / 1000), sala };
+      texto = `♪ Fila da ${voz.nome}: ${[f.tocando, ...f.fila].map(linhaDaMusica).join(' · ')}`;
+    }
+    const mensagem = mensagens.enviarDoBot(db, sid, eu, chat.id, { texto, bot });
+    return { mensagem, musica: verMusica(voz.id), sala };
+  },
+
+  /**
+   * O anfitrião avisa que a música acabou — ou que não conseguiu tocá-la (`erro`), e aí o bot
+   * conta no chat que pulou. A resposta já traz a seguinte, para ele emendar sem esperar a
+   * próxima busca de salas.
+   */
+  'POST /musica/acabou': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { sala: salaVoz, uid, erro } = await lerCorpo(req);
+    const voz = salasM.listarSalas(db, sid).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
+    if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
+    const antes = filas.ver(voz.id);
+    const r = filas.acabou(voz.id, String(uid ?? ''), eu.id);
+    if (r.andou && erro && antes) {
+      falarDoBot(sid, eu, antes.salaDoChat, { tipo: 'texto', texto: `Não consegui tocar "${antes.tocando.titulo}" — pulei.` },
+        `Não consegui tocar "${antes.tocando.titulo}" — pulei.`);
+    }
+    if (r.andou && r.agora) anunciarQueComecou(sid, voz, r.agora);
+    return { musica: verMusica(voz.id) };
   },
 
   'POST /token': async (req) => {

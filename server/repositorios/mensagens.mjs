@@ -13,7 +13,7 @@
  */
 
 const SELECT = `
-  SELECT m.id, m.texto, m.imagem, m.arquivo, m.arquivo_nome, m.arquivo_bytes, m.criado_em, m.usuario_id,
+  SELECT m.id, m.texto, m.imagem, m.arquivo, m.arquivo_nome, m.arquivo_bytes, m.bot, m.criado_em, m.usuario_id,
          COALESCE(NULLIF(mem.nome_exibido, ''), u.apelido) AS nome,
          u.foto, u.enquadramento, u.turbo, mem.id_exibido
     FROM mensagens m
@@ -34,12 +34,13 @@ export const ultimas = (db, servidorId, salaId, quantas) =>
  * Uma mensagem mora numa SALA ou numa CONVERSA, nunca nas duas e nunca em nenhuma — quem
  * garante isso é o `CHECK` do esquema, e não a boa vontade de quem chama.
  */
-export function inserir(db, { salaId = null, conversaId = null, usuarioId, texto, imagem, arquivo, criadoEm }) {
+export function inserir(db, { salaId = null, conversaId = null, usuarioId, texto, imagem, arquivo, bot = null, criadoEm }) {
   const info = db.prepare(
-    `INSERT INTO mensagens (sala_id, conversa_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, criado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(salaId, conversaId, usuarioId, texto, imagem,
-        arquivo?.nomeNoDisco ?? null, arquivo?.nome ?? null, arquivo?.bytes ?? null, criadoEm);
+    `INSERT INTO mensagens (sala_id, conversa_id, usuario_id, texto, imagem, arquivo, arquivo_nome, arquivo_bytes, bot, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(salaId, conversaId, usuarioId, texto, imagem ?? null,
+        arquivo?.nomeNoDisco ?? null, arquivo?.nome ?? null, arquivo?.bytes ?? null,
+        bot ? JSON.stringify(bot) : null, criadoEm);
   return Number(info.lastInsertRowid);
 }
 
@@ -65,7 +66,7 @@ export const buscar = (db, id) =>
 /** Tira o conteúdo e anota quando e por quem. A linha fica, vazia — ver o cabeçalho. */
 export const apagar = (db, id, { porQuem, quando }) =>
   db.prepare(`UPDATE mensagens
-                 SET texto = '', imagem = NULL, arquivo = NULL, arquivo_nome = NULL, arquivo_bytes = NULL,
+                 SET texto = '', imagem = NULL, arquivo = NULL, arquivo_nome = NULL, arquivo_bytes = NULL, bot = NULL,
                      apagada_em = ?, apagada_por = ?
                WHERE id = ? AND apagada_em IS NULL`)
     .run(quando, porQuem, Number(id));

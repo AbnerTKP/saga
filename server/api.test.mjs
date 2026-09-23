@@ -300,6 +300,32 @@ test('transmitir tela é do cargo: o crachá de quem não pode leva a lista sem 
   assert.equal(doBruno.video.canUpdateOwnMetadata, true);
 });
 
+test('o bot de música: permissão de cargo, só em sala de texto, e só para quem está numa call', async () => {
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const chat = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'musica-teste', tipo: 'texto' } })).corpo.sala;
+  const tocar = { comando: 'tocar', musica: { id: 'dQw4w9WgXcQ', titulo: 'Never Gonna Give You Up', duracao: 213, origem: 'youtube' } };
+
+  const semCargo = await chamar('POST', '/musica', { sessao: bruno.token, corpo: { sala: chat.id, ...tocar } });
+  assert.equal(semCargo.status, 403, 'membro sem a permissão pôs música');
+  assert.equal(semCargo.corpo.tipo, 'musica', 'a recusa do bot tem de ser reconhecível pelo app');
+
+  // A fila é de qualquer um ver — mas fora da call não há fila de onde.
+  const fila = await chamar('POST', '/musica', { sessao: bruno.token, corpo: { sala: chat.id, comando: 'fila' } });
+  assert.equal(fila.status, 409);
+
+  // O LiveKit daqui é uma porta morta: ninguém está em call, e o bot diz o que fazer.
+  const foraDaCall = await chamar('POST', '/musica', { sessao: dono.token, corpo: { sala: chat.id, ...tocar } });
+  assert.equal(foraDaCall.status, 409);
+  assert.match(foraDaCall.corpo.error, /Entre numa sala de voz/);
+
+  const geral = (await chamar('GET', '/rooms', { sessao: dono.token })).corpo.rooms.find((r) => r.name === 'Geral');
+  const naVoz = await chamar('POST', '/musica', { sessao: dono.token, corpo: { sala: geral.id, ...tocar } });
+  assert.equal(naVoz.status, 400, 'comando numa sala de voz');
+  assert.equal(geral.musica, null, 'sala de voz sem fila diz null, e não some');
+  await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: chat.id } });
+});
+
 test('membro não modera; o dono modera', async () => {
   const dono = await sessaoDe('abner');
   const bruno = await sessaoDe('bruno');

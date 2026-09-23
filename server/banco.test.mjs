@@ -68,6 +68,7 @@ const IMPRESSOES = [
   '9a26490a93b0',  // 54 urna_votos: o total de cada escolha, sem quem votou
   'ebc5a9ec323b',  // 55 urna_eleitores: quantas vezes cada pessoa votou, sem em quem
   '515a01a2c443',  // 56 enquadramento da foto e da capa do servidor
+  '93906f078740',  // 57 mensagens.bot: o cartão do bot de música
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);

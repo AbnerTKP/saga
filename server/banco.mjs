@@ -379,6 +379,12 @@ export const MIGRACOES = [
   // cortada pelo meio no quadrado da trilha, e o dono não tinha como escolher o que aparece
   // (18/09/2026). 18/09/2026: a produção na 55; esta é a 56.
   `ALTER TABLE servidores ADD COLUMN enquadramento TEXT`,
+
+  // O cartão do bot de música: o que tocou, a fila, quem pulou (musica.mjs). JSON, porque cada
+  // resposta do bot tem uma forma, e uma coluna por forma seria migração a cada comando novo.
+  // `texto` continua preenchido com a mesma notícia em uma linha — é o que o app de antes
+  // desta versão mostra. 22/09/2026: a produção na 56; esta é a 57.
+  `ALTER TABLE mensagens ADD COLUMN bot TEXT`,
 ];
 
 export function abrirBanco(caminho) {

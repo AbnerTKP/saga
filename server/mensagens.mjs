@@ -35,6 +35,8 @@ export const verMensagem = (m, semAutor = 'alguém') => ({
   // O que vai para a tela é o nome que a pessoa escolheu; `arquivo` é o do disco, que
   // é o hash e não diz nada a ninguém.
   arquivo: m.arquivo ? { url: m.arquivo, nome: m.arquivo_nome ?? 'arquivo', bytes: m.arquivo_bytes ?? 0 } : null,
+  // A resposta do bot de música, quando é uma — ver `enviarDoBot`.
+  bot: lerBot(m.bot),
   criadoEm: m.criado_em,
   autorId: m.usuario_id,
   nome: m.nome ?? semAutor,
@@ -43,6 +45,11 @@ export const verMensagem = (m, semAutor = 'alguém') => ({
   turbo: !!m.turbo,
   idExibido: m.id_exibido ?? null,
 });
+
+function lerBot(texto) {
+  if (!texto) return null;
+  try { return JSON.parse(texto); } catch { return null; }
+}
 
 /** Da mais antiga para a mais nova, que é a ordem em que se lê. */
 export function listarMensagens(db, servidorId, quem, salaId, { depoisDe } = {}) {
@@ -78,6 +85,22 @@ export function enviarMensagem(db, servidorId, quem, salaId, texto, imagem = nul
     salaId: sala.id, usuarioId: quem.id, texto: limpo, imagem, arquivo, criadoEm: Date.now(),
   });
 
+  const [nova] = listarMensagens(db, servidorId, quem, sala.id, { depoisDe: id - 1 });
+  return nova;
+}
+
+/**
+ * O bot de música falando no chat. A mensagem é de QUEM usou o comando — é ela que apaga, e
+ * é no nome dela que a tela escreve "TKP usou /tocar" —, com o cartão em `bot`. `texto` leva
+ * a mesma notícia numa linha, e é só para o app de antes desta versão: ele não conhece o
+ * cartão e mostraria uma mensagem vazia.
+ */
+export function enviarDoBot(db, servidorId, quem, salaId, { texto, bot }) {
+  const sala = salaVisivel(db, servidorId, quem, salaId);
+  if (!sala) throw new ErroDeConta('Essa sala não existe.', 404);
+  const id = tabela.inserir(db, {
+    salaId: sala.id, usuarioId: quem.id, texto: String(texto).slice(0, TAMANHO_MAXIMO), bot, criadoEm: Date.now(),
+  });
   const [nova] = listarMensagens(db, servidorId, quem, sala.id, { depoisDe: id - 1 });
   return nova;
 }

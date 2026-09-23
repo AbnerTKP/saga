@@ -29,6 +29,9 @@ export const PERMISSOES = {
   // Nasce desligada em todo cargo, inclusive nos que já existiam: foi o pedido do dono
   // (22/09/2026) — "só quem eu autorizar transmite". Ligar em cargo antigo é trabalho dele.
   transmitir: 'Transmitir a tela',
+  // O bot de música: pôr, pular e parar. Nasce desligada pelo mesmo motivo da de cima — é o
+  // dono quem escolhe quem mexe no que a call inteira ouve.
+  tocarMusica: 'Tocar música',
 };
 
 // `concederTurbo` viveu aqui e saiu: o Berserk é da conta, e vale na Saga inteira. Quem
