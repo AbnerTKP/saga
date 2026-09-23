@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { urlDoArquivo, type Digitando, type Mensagem } from '../api';
+import { urlDoArquivo, type Digitando, type EstadoDaMusica, type Mensagem } from '../api';
 import { useImagemParada, useJanelaEmFoco } from '../imagemParada';
 import { Icon } from './Icon';
 import { partirEmLinks } from '../links';
@@ -13,6 +13,8 @@ import { ehContinuacao } from '../agrupamento';
 import { fraseDeQuemDigita } from '../digitando';
 import type { LiveNoChat } from '../lives';
 import { arquivoColado, vaiComoImagem } from '../anexos';
+import { comandosParaOMenu } from '../comandos';
+import { RespostaDoBot } from './RespostaDoBot';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -134,7 +136,7 @@ function LinhaDaLive({ live, naMinhaSala, assistindo, onAssistir }: {
 export function Chat({
   mensagens, digitando, erro, onEnviar, onEnviarGif, onEnviarArquivo, onDigitar, onVerImagem,
   sala, meuId, onPessoa, lives = [], assistindo, onAssistir, salaDaVozId, podeApagar, onApagar,
-  chave, emConversa = false, bloqueio = null,
+  chave, emConversa = false, bloqueio = null, estadoDaMusica,
 }: {
   /**
    * O LUGAR, para os efeitos que precisam saber que ele trocou (o cursor no campo, o menu
@@ -173,8 +175,19 @@ export function Chat({
   onAssistir?: (live: LiveNoChat) => void;
   /** Em que sala de voz você está, para a linha da live saber se é a mesma. */
   salaDaVozId?: number | null;
+  /**
+   * A fila de agora de uma sala de voz — é o que o cartão do bot lê para não dizer "tocando"
+   * sobre uma música que já passou. undefined quando não se sabe. Sem isto (a conversa
+   * privada), o bot nem aparece.
+   */
+  estadoDaMusica?: (salaVoz: number) => EstadoDaMusica | null | undefined;
 }) {
   const [texto, setTexto] = useState('');
+  // O menu dos comandos do bot, enquanto se digita "/nome". Só onde o bot atende.
+  const menuDeComandos = estadoDaMusica ? comandosParaOMenu(texto) : [];
+  const [escolhido, setEscolhido] = useState(0);
+  useEffect(() => { setEscolhido(0); }, [menuDeComandos.length]);
+  const completar = (nome: string) => { setTexto(`/${nome} `); campo.current?.focus(); };
   const [gifAberto, setGifAberto] = useState(false);
   /**
    * O arquivo escolhido espera aqui até a pessoa confirmar.
@@ -278,6 +291,13 @@ export function Chat({
     setErroDoAnexo(null);
   };
 
+  // O cartão mais recente de cada música do bot — ver `principal` em RespostaDoBot.
+  const ultimoCartao = new Map<string, number>();
+  for (const m of mensagens) {
+    const b = m.bot;
+    if (b && (b.tipo === 'tocando' || b.tipo === 'na-fila')) ultimoCartao.set(b.item.uid, m.id);
+  }
+
   const ehImagem = !!anexo && vaiComoImagem(anexo);
   const frase = fraseDeQuemDigita(digitando.map((q) => q.nome));
 
@@ -341,7 +361,9 @@ export function Chat({
                 <div className="msg-lado">
                   {seguida
                     ? <span className="msg-hora-margem">{hora(m.criadoEm)}</span>
-                    : (
+                    : m.bot ? (
+                      <span className="quem-falou"><span className="avatar big avatar-do-bot"><Icon name="nota" size={22} /></span></span>
+                    ) : (
                       <button className="quem-falou" title={`${m.nome} — clique para o perfil`}
                         onClick={abrirPerfil} onContextMenu={abrirAcoes}>
                         <Avatar nome={m.nome} foto={m.foto} enquadramento={m.enquadramento?.foto} tamanho="big" />
@@ -349,6 +371,30 @@ export function Chat({
                     )}
                 </div>
                 <div className="msg-corpo">
+                  {m.bot ? (
+                    <>
+                      {/* A mensagem é de quem usou o comando: é o nome dela que diz de onde veio. */}
+                      {m.bot.cmd && (
+                        <div className="bot-comando">
+                          <button className="msg-nome" onClick={abrirPerfil} onContextMenu={abrirAcoes}>{m.nome}</button>
+                          {' '}usou <b>/{m.bot.cmd}</b>
+                        </div>
+                      )}
+                      <div className="msg-topo">
+                        <span className="nome-do-bot">Música</span>
+                        <span className="selo-bot">BOT</span>
+                        <span className="time">{hora(m.criadoEm)}</span>
+                      </div>
+                      <RespostaDoBot
+                        bot={m.bot}
+                        estadoDaSala={(id) => estadoDaMusica?.(id)}
+                        soParaVoce={m.soParaVoce}
+                        principal={!(m.bot.tipo === 'tocando' || m.bot.tipo === 'na-fila') || ultimoCartao.get(m.bot.item.uid) === m.id}
+                        onComando={(t) => { grudado.current = true; void onEnviar(t); }}
+                        onApagarLocal={() => onApagar?.(m.id)}
+                      />
+                    </>
+                  ) : <>
                   {!seguida && (
                     <div className="msg-topo">
                       <button className="msg-nome" title={`${m.nome} — clique para o perfil`}
@@ -369,6 +415,7 @@ export function Chat({
                     </button>
                   )}
                   {m.arquivo && <Anexo arquivo={m.arquivo} />}
+                  </>}
                 </div>
               </div>
             </div>
@@ -428,6 +475,26 @@ export function Chat({
           não um retângulo dentro dela. Antes eram quatro coisas soltas na mesma linha e
           nada dizia que formavam um lugar de escrever. */}
       <form className="chat-input" onSubmit={enviar}>
+        {menuDeComandos.length > 0 && (
+          <div className="menu-de-comandos" role="listbox" aria-label="Comandos do bot de música">
+            <div className="menu-de-comandos-cab"><span className="avatar avatar-do-bot"><Icon name="nota" size={11} /></span> Música</div>
+            {menuDeComandos.map((c, i) => (
+              <button
+                key={c.nome}
+                type="button"
+                role="option"
+                aria-selected={i === escolhido}
+                className={i === escolhido ? 'escolhido' : ''}
+                onMouseEnter={() => setEscolhido(i)}
+                onClick={() => completar(c.nome)}
+              >
+                <span className="cmd-nome">/{c.nome}</span>
+                {c.argumento && <span className="cmd-arg">{c.argumento}</span>}
+                <span className="cmd-desc">{c.descricao}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {/* O input fica escondido e o botão é que aparece: o seletor de arquivo do
             navegador não combina com nada em volta, e não dá para estilizá-lo. */}
         <input
@@ -466,6 +533,21 @@ export function Chat({
           disabled={travado || progresso !== null}
           maxLength={2000}
           onPaste={colar}
+          onKeyDown={(e) => {
+            if (menuDeComandos.length === 0) return;
+            const c = menuDeComandos[Math.min(escolhido, menuDeComandos.length - 1)];
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const passo = e.key === 'ArrowDown' ? 1 : -1;
+              setEscolhido((i) => (i + passo + menuDeComandos.length) % menuDeComandos.length);
+            } else if (e.key === 'Tab' || (e.key === 'Enter' && texto !== `/${c.nome}`)) {
+              // Enter no nome já inteiro (/pular) manda; no pedaço (/pu), completa.
+              e.preventDefault();
+              completar(c.nome);
+            } else if (e.key === 'Escape') {
+              setTexto('');
+            }
+          }}
         />
         {/* `rotulo-gif`, e não `gif`: `gif` já era a classe do QUADRADINHO da busca, com
             fundo preto e proporção 1:1 — e ela caiu inteira neste botão, que virou uma

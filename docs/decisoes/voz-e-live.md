@@ -294,3 +294,54 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
 - **Contexto de áudio suspenso lê zero em tudo**, e não lança nada: seria o anel nunca
   acendendo, para ninguém, sem pista. Entrar na call é sempre um clique, então o
   `resume()` passa — mas ele precisa estar lá.
+
+## O bot de música (23/09/2026)
+
+Pedido do dono: colar um link do YouTube ou do Spotify e tocar na call, como os bots do
+Discord — chamado por comando no chat (`/tocar`, `/pular`, `/parar`, `/fila`). Desenho
+escolhido na prancheta: opção A, o cartão com capa e botões.
+
+- **A música NÃO sai do servidor, e isso foi medido antes de desenhar.** `yt-dlp` na VPS pegou
+  1 vídeo de 5: do segundo em diante, "Sign in to confirm you're not a bot" (IP de
+  datacenter). Numa internet de casa, 4 de 4. Contornar isso na VPS pediria logar uma conta
+  Google lá, que o YouTube costuma banir. Então quem toca é o APP do **anfitrião** — quem pediu
+  a primeira música; se ele sai da call, o servidor passa a quem ficou, e a música continua do
+  ponto (pela hora em que começou, no relógio do servidor). A faixa vai como `unknown`, nome
+  `musica`: o crachá sem a permissão de transmitir continua deixando passar, e quem ouve tem
+  volume próprio para ela (Configurações › Voz e vídeo › Bot de música), separado de voz e de
+  soundboard.
+- **O servidor só guarda a fila** (`musica.mjs`, na memória: reiniciar zera). Ela é conferida
+  na busca de salas, sem relógio de fundo: anfitrião que saiu é trocado, música que passou da
+  hora anda sozinha (o app do anfitrião morreu no meio), e sala vazia perde a fila — **depois
+  de 20 s vazia**, porque o LiveKit que não responde devolve a lista vazia sem erro, e um
+  soluço dele apagaria a fila de quem está ouvindo.
+- **O `yt-dlp` não vai no instalador.** Ele é baixado na primeira música para a pasta da Saga e
+  trocado quando sai versão nova (conferido a cada 3 dias, e na hora quando ele falha). O
+  YouTube quebra o `yt-dlp` mais ou menos por mês; embutido, cada quebra pediria mandar 93 MB a
+  todo mundo. **Vai a versão em pasta** (`yt-dlp_macos.zip`), não a de arquivo único: medido
+  num Mac, a de arquivo único se desempacota numa pasta nova a cada execução e o macOS a
+  inspeciona toda vez — 10 s só para `--version`, a 11% de CPU. A em pasta paga isso uma vez
+  e depois parte em 0,26 s. Achar e baixar numa ida só: 3,6 s. Primeira música de um
+  computador novo (baixar o programa incluído): ~20 s.
+- **A última versão sai do redirecionamento de `releases/latest`, não da API do GitHub.** A API
+  tem cota de 60 por hora por IP e respondeu 403 no meio de um teste — cinco amigos atrás do
+  mesmo roteador poderiam cair nisso no primeiro `/tocar`.
+- **Sem `--no-part`.** Com ele, a música pedida pela segunda vez falhava com HTTP 416: sem o
+  `.part`, o arquivo pronto parece um download pela metade, e o YouTube recusa "do fim em
+  diante". Achado na bancada, pedindo a mesma música duas vezes.
+- **Spotify não entrega áudio**: o link vira "artista título" e a busca é no YouTube, como nos
+  bots do Discord. A página do Spotify pedida com cabeçalho de navegador volta vazia (é o app
+  web); com o de um programa, traz `og:title` e `og:description`.
+- **O cartão diz o que a música é AGORA** (`cartaoDoBot.ts`): tocando (com botões), na fila (em
+  que posição) ou já tocou — e só o cartão mais recente de cada música fica grande com botões;
+  os anteriores encolhem. Duas cópias de "tocando agora" com os mesmos botões era ruído.
+- **As notícias da fila chegam por dois caminhos e se cruzam** (`tocador.ts`): a busca que saiu
+  antes do "acabou" do anfitrião chega depois dele, dizendo que a música velha ainda toca.
+  Cada resposta traz a hora do servidor, e a mais velha é descartada — fora do estado das
+  salas, para não redesenhar a tela de 4 em 4 s.
+- **Medido na bancada escondida e muda** (Saga de verdade com o processo principal do build,
+  servidor e LiveKit locais, um robô `rtc-node` na call medindo a faixa `musica`): `/tocar` por
+  link, por nome e por link do Spotify; a música chegando ao robô entre −18 e −40 dB; fila,
+  botão Pular, `/fila`, `/parar` (a faixa sai da call), a fila andando sozinha no fim da música,
+  a mesma música duas vezes. **Não exercido**: Windows (o `yt-dlp_win.zip` e o `tar.exe` do
+  sistema), o anfitrião passando para outra Saga de verdade, e ouvido humano na call.

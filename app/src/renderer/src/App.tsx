@@ -70,6 +70,8 @@ import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
+import { useMusica } from './useMusica';
+import { definirContextoDoBot } from './musicaDoBot';
 import { derrubouASessao } from './resposta';
 import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
@@ -116,6 +118,8 @@ export function App() {
    * com o nome dele no alto. Com ela, lista de outro servidor não vale aqui: é como se
    * ainda não tivesse chegado. As que valem são tiradas logo depois do `useRoom`.
    */
+  /** A hora do servidor na última busca de salas — o bot de música compara notícias por ela. */
+  const agoraDasSalas = useRef(0);
   const [salasDoServidor, setSalasDoServidor] = useState<{ servidorId: number; rooms: RoomInfo[]; categorias: Categoria[] } | null>(null);
   const [menuDeSalas, setMenuDeSalas] = useState<{ em: { x: number; y: number }; categoria: Categoria | null } | null>(null);
   const [menuDaSala, setMenuDaSala] = useState<{ sala: RoomInfo; em: { x: number; y: number } } | null>(null);
@@ -271,6 +275,36 @@ export function App() {
   const salasDaqui = salasDoServidor?.servidorId === servidorAberto ? salasDoServidor : null;
   const rooms = salasDaqui?.rooms ?? SEM_SALAS;
   const categorias = salasDaqui?.categorias ?? SEM_CATEGORIAS;
+
+  /**
+   * O bot de música: as filas que vieram na busca de salas (servidor antigo não manda o campo,
+   * e aí a sala nem entra no mapa) e o tocador, que toca no app de quem for o anfitrião.
+   */
+  const filasDaBusca = useMemo(
+    () => new Map(rooms.filter((r) => r.tipo === 'voz' && r.musica !== undefined).map((r) => [r.id, r.musica ?? null] as const)),
+    [rooms],
+  );
+  const musica = useMusica({
+    room: rm.room,
+    conectado: rm.status === 'connected',
+    salaVozId: rm.salaDaVoz?.id ?? null,
+    filasDaBusca,
+    agoraDaBusca: agoraDasSalas.current,
+    volume: rm.volumeDaMusica,
+    surdo: rm.deafened,
+  });
+  // O que a tela sabe sem perguntar ao servidor — ver `executarComando`. Em referência, para o
+  // "estou na call?" ser o de agora e não o de quando o efeito rodou.
+  const statusDaVoz = useRef(rm.status);
+  statusDaVoz.current = rm.status;
+  const euNoBot = sessao?.eu;
+  useEffect(() => {
+    definirContextoDoBot(euNoBot ? {
+      eu: { id: euNoBot.id, nome: euNoBot.nome },
+      naCall: () => statusDaVoz.current === 'connected',
+      podeTocar: () => pode(euNoBot.cargo, 'tocarMusica'),
+    } : null);
+  }, [euNoBot]);
   const dadosDaqui = dadosDoServidor?.servidorId === servidorAberto ? dadosDoServidor : null;
   const cargos = dadosDaqui?.cargos ?? SEM_CARGOS;
   const membrosDoServidor = dadosDaqui?.membros ?? SEM_MEMBROS;
@@ -529,6 +563,8 @@ export function App() {
         if (lista.servidorId && lista.servidorId !== servidorId) { perdeuOServidorRef.current(servidorId); return; }
         // Só troca o que mudou: a resposta chega igual quase sempre, e objeto novo redesenha o
         // app inteiro para mostrar a mesma tela (ver igual.ts).
+        // A hora do servidor fica FORA do estado: muda a cada volta, e redesenharia tudo.
+        agoraDasSalas.current = lista.agora ?? 0;
         setSalasDoServidor((a) => mesmoSeIgual(a, { servidorId, rooms: lista.rooms, categorias: lista.categorias }));
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
@@ -1319,6 +1355,8 @@ export function App() {
             donoDaSaga={!!sessao.eu.donoDaSaga}
             volumeDoSoundboard={rm.volumeDoSoundboard}
             onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
+            volumeDaMusica={rm.volumeDaMusica}
+            onVolumeDaMusica={rm.definirVolumeDaMusica}
             onEu={atualizarEu}
             email={sessao}
             onEmail={atualizarEmail}
@@ -1446,6 +1484,7 @@ export function App() {
         chat={chat}
         meuId={eu.id}
         podeApagar={podeApagar}
+        estadoDaMusica={musica.estadoDaSala}
         lives={lives}
         onAssistirLive={assistirLive}
         botaoDePessoas={palcoNaCall ? (
@@ -1577,6 +1616,8 @@ export function App() {
           donoDaSaga={!!eu.donoDaSaga}
           volumeDoSoundboard={rm.volumeDoSoundboard}
           onVolumeDoSoundboard={rm.definirVolumeDoSoundboard}
+            volumeDaMusica={rm.volumeDaMusica}
+            onVolumeDaMusica={rm.definirVolumeDaMusica}
           onEu={atualizarEu}
           email={sessao}
           onEmail={atualizarEmail}

@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
+import { registrarMusica } from './musica';
 import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu } from './inicio';
 import {
   ATALHO_PADRAO, atalhoAceito, encaixarNaTela, gravar as gravarOverlay, ler as lerOverlay,
@@ -453,6 +454,9 @@ app.whenReady().then(async () => {
    * não se vê teclado nem mouse fora do app, então a página acharia que você está ali
    * enquanto você foi almoçar. Com a tela bloqueada, o sistema já conta como ociosidade.
    */
+  // O bot de música: achar e baixar mora aqui (o yt-dlp é um programa) — ver musica.ts.
+  registrarMusica();
+
   ipcMain.handle('presenca:ociosidade', () => {
     try { return powerMonitor.getSystemIdleTime(); } catch { return 0; }
   });

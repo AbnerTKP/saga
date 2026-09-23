@@ -8,7 +8,7 @@ import { Chat } from './Chat';
 import { FaixaDoPalco } from './FaixaDoPalco';
 import { ControleDeVolume } from './ControleDeVolume';
 import { QuadroFlutuante } from './QuadroFlutuante';
-import type { ConversaAberta, Digitando, Mensagem, RoomInfo } from '../api';
+import type { ConversaAberta, Digitando, EstadoDaMusica, Mensagem, RoomInfo } from '../api';
 import type { LiveNoChat } from '../lives';
 import { identidadeDe } from '../pessoas';
 import type { PessoaNaCall } from './MenuDaPessoa';
@@ -221,7 +221,7 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, estadoDaMusica, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
   /**
    * Os controles da call NO PALCO, perto do que se vê (surgem com o mouse sobre ele). Antes
    * moravam só no canto de baixo da coluna da esquerda, longe da call.
@@ -266,6 +266,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   meuId: number;
   /** Se quem lê pode apagar esta mensagem — ver apagar.ts. */
   podeApagar?: (m: Mensagem) => boolean;
+  /** A fila de agora de uma sala de voz, para o cartão do bot de música. */
+  estadoDaMusica?: (salaVoz: number) => EstadoDaMusica | null | undefined;
   /** As telas no ar agora, em qualquer sala de voz do servidor — ver lives.ts. */
   lives: LiveNoChat[];
   /** Assistir a uma live a partir do chat, entrando na sala de voz dela se preciso. */
@@ -447,6 +449,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           transmitindo={rm.lives.length}
           assistindoNome={nomeDaLiveNoPalco}
           servidorAberto={servidorId}
+          musica={estadoDaMusica?.(rm.salaDaVoz.id)?.tocando ?? null}
           onAbrir={onVoltarAVoz}
         />
       )}
@@ -490,6 +493,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
             assistindo={rm.assistindo}
             onAssistir={conversa ? undefined : onAssistirLive}
             salaDaVozId={rm.salaDaVoz?.id ?? null}
+            // O bot de música atende nas salas de texto do servidor; na conversa privada, não.
+            estadoDaMusica={conversa ? undefined : estadoDaMusica}
           />
         </div>
       ) : (

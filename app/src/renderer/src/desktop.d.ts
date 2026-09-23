@@ -18,6 +18,14 @@ export type UpdateState = {
   mensagem?: string;
 };
 
+export type MusicaAchada = {
+  id: string;
+  titulo: string;
+  autor: string;
+  duracao: number;
+  origem: 'youtube' | 'spotify' | 'busca';
+};
+
 declare global {
   interface Window {
     desktop: {
@@ -30,6 +38,12 @@ declare global {
       usaSeletorDoSistema: () => Promise<boolean>;
       openScreenSettings: () => Promise<void>;
       version: () => Promise<string>;
+      /** O bot de música: achar (e baixar) pelo yt-dlp, e ler o áudio. Ver main/musica.ts. */
+      musica: {
+        achar: (texto: string) => Promise<{ ok: true; musica: MusicaAchada } | { ok: false; erro: string }>;
+        preparar: (id: string) => Promise<{ ok: boolean; erro?: string }>;
+        ler: (id: string) => Promise<{ bytes: Uint8Array; tipo: string } | null>;
+      };
       /** Os botões da barra da janela, que no Windows é desenhada pelo app. */
       janela: {
         minimizar: () => Promise<void>;

@@ -15,13 +15,16 @@ import { mudouDeDia } from './dias.ts';
 /** Depois disto a pessoa voltou depois de um tempo, e isso é outra fala. */
 export const JUNTAS_ATE = 5 * 60_000;
 
-type Falada = { autorId: number | null; criadoEm: number };
+type Falada = { autorId: number | null; criadoEm: number; bot?: unknown };
 
 export function ehContinuacao(anterior: Falada | null | undefined, atual: Falada): boolean {
   if (!anterior) return false;
   // Sem autor não há de quem continuar: é a Saga falando na sala de notas, e cada versão
   // publicada é um recado inteiro, com o cabeçalho dela.
   if (anterior.autorId == null || atual.autorId == null) return false;
+  // A resposta do bot é do bot, mesmo com a mensagem sendo de quem usou o comando: ela leva
+  // o próprio cabeçalho, e o que a pessoa escreve depois também.
+  if (anterior.bot || atual.bot) return false;
   if (anterior.autorId !== atual.autorId) return false;
   // Virou o dia: por mais perto que estejam no relógio (23:59 e 00:01), o separador entra
   // no meio e a mensagem de baixo precisa do próprio cabeçalho.

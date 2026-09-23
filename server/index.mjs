@@ -637,7 +637,9 @@ async function reaplicarFontesDaCall(sid) {
 // A fila é do `musica.mjs`; aqui mora o que precisa de banco e de LiveKit: em que call a
 // pessoa está, e o bot falando no chat.
 
-const linhaDaMusica = (i) => `${i.autor ? `${i.autor} — ` : ''}${i.titulo}`;
+// Sem repetir o artista que o título do vídeo já traz — o mesmo `nomeDaMusica` do app.
+const linhaDaMusica = (i) =>
+  (!i.autor || i.titulo.toLowerCase().includes(i.autor.toLowerCase()) ? i.titulo : `${i.autor} — ${i.titulo}`);
 
 /** O bot no chat. Falhar aqui (a sala sumiu, quem pediu saiu do servidor) não desfaz o comando. */
 function falarDoBot(sid, quem, salaDoChat, bot, texto) {
@@ -671,8 +673,10 @@ function musicaDaSala(sid, sala) {
 function verMusica(salaVoz) {
   const f = filas.ver(salaVoz);
   if (!f) return null;
+  // Sem a hora de agora dentro: ela vai uma vez, ao lado, na resposta. Dentro, a fila mudaria a
+  // cada busca mesmo parada, e o app redesenharia a tela inteira de 4 em 4 s por nada.
   return {
-    tocando: f.tocando, fila: f.fila, comecouEm: f.comecouEm, agora: f.agora,
+    tocando: f.tocando, fila: f.fila, comecouEm: f.comecouEm,
     // A identidade do LiveKit, que é o que o app compara com a dele.
     anfitriao: identidadeDe(f.anfitriao),
   };
@@ -1000,6 +1004,9 @@ const ROTAS = {
     const daAmizade = amigos.listar(db, eu);
     return {
       servidorId: sid,
+      // A hora daqui: é por ela que o app sabe se a fila que chegou é mais nova que a que ele
+      // já tem — uma busca que saiu antes do "acabou" do anfitrião chega depois dele.
+      agora: Date.now(),
       rooms: salas,
       categorias: categoriasM.listarCategorias(db, sid),
       jogos: mesas.resumo(naMesa(sid, eu), foraDaqui(eu)),
@@ -1555,7 +1562,7 @@ const ROTAS = {
       texto = `♪ Fila da ${voz.nome}: ${[f.tocando, ...f.fila].map(linhaDaMusica).join(' · ')}`;
     }
     const mensagem = mensagens.enviarDoBot(db, sid, eu, chat.id, { texto, bot });
-    return { mensagem, musica: verMusica(voz.id), sala };
+    return { mensagem, musica: verMusica(voz.id), sala, agora: Date.now() };
   },
 
   /**
@@ -1575,7 +1582,7 @@ const ROTAS = {
         `Não consegui tocar "${antes.tocando.titulo}" — pulei.`);
     }
     if (r.andou && r.agora) anunciarQueComecou(sid, voz, r.agora);
-    return { musica: verMusica(voz.id) };
+    return { musica: verMusica(voz.id), agora: Date.now() };
   },
 
   'POST /token': async (req) => {

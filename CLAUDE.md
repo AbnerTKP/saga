@@ -161,7 +161,7 @@ errado":
 | Servidor: cargos, permissões, contas e recuperação de senha, salas, arquivos, amizade, desempenho, notas, relatos, administração | `server/CLAUDE.md` | sim, ao abrir arquivo de `server/` |
 | Electron: janela, arranque, uma Saga por computador, captura de tela e som do sistema, assinatura no Mac, barra do Windows, overlay, CSP | `app/src/main/CLAUDE.md` | sim, ao abrir arquivo de `app/src/main/` |
 | O Dragão Quadrado | `app/src/renderer/src/dragao/CLAUDE.md` | sim, ao abrir arquivo de `dragao/` |
-| Voz, call, live, palco, quadro flutuante, quem está falando (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`) | `docs/decisoes/voz-e-live.md` | não — leia |
+| Voz, call, live, palco, quadro flutuante, quem está falando, bot de música (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`, `useMusica`, `musica.mjs`, `main/musica.ts`) | `docs/decisoes/voz-e-live.md` | não — leia |
 | Microfone, supressão de ruído, soundboard, sons de aviso (`useMicrofone`, `sensibilidade`, `embutir`, `sons/`) | `docs/decisoes/som-e-microfone.md` | não — leia |
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
 | Xadrez, Fórmula 1, Urna e o menu de jogos, app e servidor (`xadrez`, `corrida`, `pista`, `motor`, `urna/`, `jogos.mjs`, `corridas.mjs`, `urnas.mjs`) | `docs/decisoes/jogos.md` | não — leia |

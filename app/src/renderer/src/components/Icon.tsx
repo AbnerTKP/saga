@@ -73,6 +73,12 @@ const paths: Record<string, string> = {
   maisSimples: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
   // Triângulo para baixo: abre um menu. Era o glifo ▾ de 11 px, que mal se via.
   seta: 'M7 9.5l5 5 5-5z',
+  // O bot de música: a nota é ele (avatar, linha na barra, selo); os outros são os botões do cartão.
+  nota: 'M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z',
+  tocar: 'M8 5v14l11-7z',
+  pular: 'M6 18l8.5-6L6 6v12zm9-12v12h2V6h-2z',
+  parar: 'M6 6h12v12H6z',
+  fila: 'M3 6h13v2H3zm0 5h13v2H3zm0 5h9v2H3zm15-5v6.2a2.5 2.5 0 1 0 2 2.45V13h2v-2h-4z',
   grade: 'M5 3h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm10 0h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM5 13h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2zm10 0h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z',
 };
 

@@ -137,6 +137,22 @@ function guardarVolumeDoSoundboard(v: number) {
 }
 
 /**
+ * O volume do bot de música, de quem OUVE — como o do soundboard, e pelo mesmo motivo: música
+ * não é voz, e abaixá-la não pode abaixar quem fala junto. Nasce na metade, e não em 100%: o
+ * áudio do YouTube vem masterizado bem mais alto que uma voz de microfone.
+ */
+const CHAVE_VOLUME_DA_MUSICA = 'cantinho.volumeMusica';
+export function lerVolumeDaMusica(): number {
+  try {
+    const guardado = localStorage.getItem(CHAVE_VOLUME_DA_MUSICA);
+    return guardado === null ? 0.5 : volumeGuardado(guardado);
+  } catch { return 0.5; }
+}
+
+/** O nome com que o tocador publica a música (`useMusica`). É por ele que ela tem volume próprio. */
+export const NOME_DA_FAIXA_DE_MUSICA = 'musica';
+
+/**
  * O volume de cada pessoa e o de cada live, deste computador, como o do soundboard. Viviam só na
  * memória: fechar a Saga devolvia todo mundo a 100% (ver `volumesGuardados`).
  */
@@ -230,6 +246,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    */
   const [volumeDoSoundboard, setVolumeDoSoundboardState] = useState(lerVolumeDoSoundboard);
   const volumeDoSoundboardRef = useRef(volumeDoSoundboard);
+  const [volumeDaMusica, setVolumeDaMusicaState] = useState(lerVolumeDaMusica);
+  const volumeDaMusicaRef = useRef(volumeDaMusica);
   const ganhoDoSoundboard = useRef<GainNode | null>(null);
 
   // Volume por pessoa. Aplicado nos elementos de áudio que nós mesmos criamos, e não pelo
@@ -279,9 +297,12 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         const ehLive = el.dataset.source === Track.Source.ScreenShareAudio;
         // O soundboard tem volume próprio, e global: não é a voz da pessoa, e abaixar o
         // efeito não pode abaixar quem está falando junto dele.
-        const guardado = el.dataset.source === FONTE_DO_SOUNDBOARD
-          ? volumeDoSoundboardRef.current
-          : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
+        // A música do bot também é publicada como `unknown`: quem separa as duas é o nome.
+        const guardado = el.dataset.nome === NOME_DA_FAIXA_DE_MUSICA
+          ? volumeDaMusicaRef.current
+          : el.dataset.source === FONTE_DO_SOUNDBOARD
+            ? volumeDoSoundboardRef.current
+            : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
         const calado = mudo({ ehLive, identity }, {
           surdo: deafenedRef.current,
           liveNoPalco: assistindoRef.current,
@@ -422,6 +443,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         const el = track.attach() as HTMLMediaElement;
         el.dataset.identity = participante.identity;
         el.dataset.source = track.source;
+        el.dataset.nome = pub.trackName;
         // A faixa é quem identifica o elemento na hora de tirá-lo; ver onUnsubscribed.
         el.dataset.sid = track.sid ?? '';
         getAudioRoot().appendChild(el);
@@ -1011,6 +1033,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     aplicarAudio();
   }, [aplicarAudio]);
 
+  const definirVolumeDaMusica = useCallback((valor: number) => {
+    const v = VOLUME(valor);
+    volumeDaMusicaRef.current = v;
+    setVolumeDaMusicaState(v);
+    try { localStorage.setItem(CHAVE_VOLUME_DA_MUSICA, String(v)); } catch { /* sem storage, vale até fechar */ }
+    aplicarAudio();
+  }, [aplicarAudio]);
+
   const volumeDaTelaDe = useCallback((identity: string) => volumesDaTela.current.get(identity) ?? 1, []);
 
   const definirVolumeDaTela = useCallback((identity: string, valor: number) => {
@@ -1184,6 +1214,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     podeTransmitir: podeTransmitir(room.localParticipant.permissions?.canPublishSources),
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
     tocarSom, pararSom, somTocando, volumeDoSoundboard, definirVolumeDoSoundboard,
+    volumeDaMusica, definirVolumeDaMusica,
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),
     lives, assistir, assistindo, espectadores, caiuDaCall,
     volumeDaTelaDe, definirVolumeDaTela,

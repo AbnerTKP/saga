@@ -6,6 +6,8 @@ import {
 import { vaiComoImagem } from './anexos';
 import { aoDespertar } from './despertar';
 import { mesmoSeIgual } from './igual';
+import { lerComando } from './comandos';
+import { executarComando, respostaLocal } from './musicaDoBot';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
 // e para cinco amigos, dois segundos passam por instantâneo.
@@ -119,18 +121,48 @@ export function useChat(onde: Onde | null) {
   // Mandou: o servidor já tira a frase, e o relógio zera para a próxima tecla avisar logo.
   const mandou = useCallback(() => { ultimoAviso.current = 0; }, []);
 
+  /** Mostra uma resposta do bot que só quem pediu vê; `tirar` a apaga. */
+  const mostrarLocal = useCallback((m: Mensagem) => setMensagens((antigas) => [...antigas, m]), []);
+  const tirarLocal = useCallback((id: number) => setMensagens((antigas) => antigas.filter((m) => m.id !== id)), []);
+
+  /**
+   * Um comando do bot de música. Não vira mensagem com a barra: o que aparece é a resposta
+   * do bot — e, no erro, uma que só você vê, como no Discord.
+   */
+  const comando = useCallback(async (c: NonNullable<ReturnType<typeof lerComando>>) => {
+    const aqui = lugar.current;
+    if (!aqui) return;
+    if (!('sala' in aqui)) {
+      mostrarLocal(respostaLocal('O bot de música só atende nas salas de texto de um servidor.', c.nome));
+      return;
+    }
+    const procurando = respostaLocal(`Procurando "${c.arg || '…'}"…`, c.nome);
+    try {
+      const m = await executarComando(aqui.sala, c, () => mostrarLocal(procurando));
+      tirarLocal(procurando.id);
+      // A busca pode levar segundos: quem trocou de sala nesse meio-tempo não recebe a resposta na sala errada.
+      if (chaveDoLugar(lugar.current) === chaveDoLugar(aqui)) mostrarJa(m);
+      mandou();
+    } catch (e) {
+      tirarLocal(procurando.id);
+      mostrarLocal(respostaLocal((e as Error).message, c.nome));
+    }
+  }, [chave, mostrarJa, mandou, mostrarLocal, tirarLocal]);
+
   const enviar = useCallback(async (texto: string) => {
     const aqui = lugar.current;
     if (!aqui) return;
     const limpo = texto.trim();
     if (!limpo) return;
+    const c = lerComando(limpo);
+    if (c) { await comando(c); return; }
     try {
       mostrarJa(await enviarMensagem(aqui, limpo));
       mandou();
     } catch (e) {
       setErro((e as Error).message);
     }
-  }, [chave, mostrarJa, mandou]);
+  }, [chave, mostrarJa, mandou, comando]);
 
   const enviarGif = useCallback(async (url: string) => {
     const aqui = lugar.current;
@@ -171,9 +203,11 @@ export function useChat(onde: Onde | null) {
    * erro sobe para quem clicou — é ao lado da mensagem que ele precisa aparecer.
    */
   const apagar = useCallback(async (id: number) => {
+    // A resposta que só você vê nunca foi ao servidor: apagar é só tirar da tela.
+    if (id < 0) { tirarLocal(id); return; }
     await apagarMensagem(id);
     setMensagens((antigas) => antigas.filter((m) => m.id !== id));
-  }, []);
+  }, [tirarLocal]);
 
-  return { mensagens, digitando, erro, enviar, enviarGif, enviarArquivo, contarQueDigito, apagar };
+  return { mensagens, digitando, erro, enviar, comando, enviarGif, enviarArquivo, contarQueDigito, apagar };
 }

@@ -2246,3 +2246,75 @@ button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
 .convite-em-pixel-botao:focus-visible { width: auto; height: auto; clip: auto; margin: 0; left: 8px; bottom: 8px; padding: 4px 8px;
   background: var(--bg1); color: var(--white); border-radius: 6px; outline: 2px solid var(--accent); }
 @media (prefers-reduced-motion: reduce) { .convite-em-pixel { animation: none; } }
+
+/* ---- Bot de música ----
+   O desenho é a opção A que o dono escolheu na prancheta (22/09/2026): o bot fala no chat com
+   um cartão de capa e botões, aparece como mais um na sala de voz e num selo na faixa do chat.
+   Roxo é a cor dele — nenhuma pessoa tem avatar roxo, então o bot não se confunde com ninguém. */
+.avatar-do-bot { background: var(--roxo-600); color: var(--branco); }
+.chat-input { position: relative; }
+
+.menu-de-comandos { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 5;
+  display: flex; flex-direction: column; padding: 6px; background: var(--cinza-900);
+  border: 1px solid var(--cinza-650); border-radius: 12px; box-shadow: 0 12px 32px var(--preto-55); }
+.menu-de-comandos-cab { display: flex; align-items: center; gap: 8px; padding: 6px 10px 8px;
+  font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--cinza-500); }
+.menu-de-comandos-cab .avatar { width: 18px; height: 18px; }
+.chat-input .menu-de-comandos button { width: auto; height: auto; display: flex; align-items: center; gap: 12px;
+  padding: 9px 10px; border-radius: 8px; color: var(--text); text-align: left; }
+.chat-input .menu-de-comandos button.escolhido,
+.chat-input .menu-de-comandos button:hover:not(:disabled) { background: var(--azul-500-16); color: var(--text); }
+.menu-de-comandos .cmd-nome { font-weight: 700; color: var(--cinza-50); min-width: 64px; }
+.menu-de-comandos .cmd-arg { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--cinza-400);
+  background: var(--cinza-800); padding: 2px 6px; border-radius: 5px; }
+.menu-de-comandos .cmd-desc { margin-left: auto; font-size: 13px; color: var(--cinza-400); }
+
+.bot-comando { font-size: 13px; color: var(--cinza-400); margin-bottom: 2px; }
+.bot-comando .msg-nome, .bot-comando b { color: var(--azul-300); font-weight: 600; font-size: 13px; }
+.nome-do-bot { font-weight: 700; color: var(--cinza-50); }
+.selo-bot { font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 1px 5px; border-radius: 4px;
+  background: var(--azul-550); color: var(--branco); align-self: center; }
+.bot-so-voce { margin-top: 4px; font-size: 12px; color: var(--cinza-400); }
+.bot-so-voce button { color: var(--cinza-400); text-decoration: underline; font-size: 12px; padding: 0; }
+.bot-so-voce button:hover { color: var(--text); }
+.bot-pulou { font-size: 13px; color: var(--cinza-400); margin-top: 2px; }
+
+.bot-cartao { margin-top: 6px; display: flex; gap: 14px; max-width: 520px; padding: 12px;
+  background: var(--cinza-875); border: 1px solid var(--cinza-700); border-radius: 10px; }
+.bot-cartao img { width: 132px; height: 74px; object-fit: cover; border-radius: 6px; flex: none; background: var(--cinza-800); }
+.bot-cartao.passou { opacity: .7; }
+.bot-cartao.passou img { width: 88px; height: 50px; }
+.bot-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.bot-rotulo { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--cinza-500); }
+.bot-rotulo.tocando { color: var(--verde-300); }
+.bot-rotulo.na-fila { color: var(--azul-300); }
+.bot-titulo { font-weight: 700; color: var(--cinza-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-sub { font-size: 13px; color: var(--cinza-400); }
+.bot-sub b { color: var(--cinza-200); font-weight: 600; }
+.bot-botoes { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.bot-botoes button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border-radius: 8px; background: var(--cinza-800); color: var(--cinza-200); font-size: 13px; font-weight: 600; }
+.bot-botoes button:hover { background: var(--cinza-700); color: var(--cinza-50); }
+
+.bot-lista { margin-top: 6px; max-width: 520px; padding: 6px; background: var(--cinza-875);
+  border: 1px solid var(--cinza-700); border-radius: 10px; }
+.bot-item { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 8px; }
+.bot-item.agora { background: var(--verde-500-16); }
+.bot-item img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; flex: none; background: var(--cinza-800); }
+.bot-item .bot-n { width: 18px; text-align: right; font-weight: 700; color: var(--cinza-500); flex: none; display: grid; justify-content: end; }
+.bot-item.agora .bot-n { color: var(--verde-300); }
+.bot-item-texto { display: flex; flex-direction: column; min-width: 0; }
+.bot-lista-vazia { padding: 6px 8px; font-size: 13px; color: var(--cinza-400); }
+
+/* Na barra, o bot é mais um na sala — mas não é pessoa: sem clique e sem menu. */
+.people li.linha-da-musica { cursor: default; align-items: center; }
+.people li.linha-da-musica:hover { background: none; }
+.linha-da-musica .pname { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.linha-da-musica .pname > span:first-child { color: var(--text); }
+.linha-da-musica .tocando-agora { font-size: 12px; color: var(--verde-300); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.faixa-musica { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 340px; flex: 0 1 auto;
+  padding: 3px 10px 3px 8px; border-radius: 999px; background: var(--verde-500-16); color: var(--verde-300);
+  font-size: 13px; font-weight: 600; }
+.faixa-musica > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

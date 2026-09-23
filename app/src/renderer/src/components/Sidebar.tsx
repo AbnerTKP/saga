@@ -580,6 +580,17 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                         </span>
                       </li>
                     ))}
+                    {/* O bot de música aparece como mais um na sala, embaixo de quem está nela:
+                        é assim que se sabe, sem abrir o chat, que tem música ali e qual. */}
+                    {r.musica && (
+                      <li className="linha-da-musica" title={`Tocando: ${r.musica.tocando.titulo} — pediu ${r.musica.tocando.pediu.nome}`}>
+                        <span className="avatar avatar-do-bot"><Icon name="nota" size={13} /></span>
+                        <span className="pname">
+                          <span>Música</span>
+                          <span className="tocando-agora">{r.musica.tocando.titulo}</span>
+                        </span>
+                      </li>
+                    )}
                   </ul>
                   </div>
                 </li>

@@ -39,3 +39,11 @@ test('quem não tem autor não continua nem é continuado', () => {
   assert.equal(ehContinuacao(nota, { autorId: 1, criadoEm: em(22, 1) }), false);
   assert.equal(ehContinuacao({ autorId: 1, criadoEm: em(22, 0) }, nota), false);
 });
+
+test('a resposta do bot nunca continua a fala de alguém, nem é continuada', () => {
+  const t = Date.now();
+  const falou = { autorId: 1, criadoEm: t };
+  const bot = { autorId: 1, criadoEm: t + 1000, bot: { tipo: 'texto' } };
+  assert.equal(ehContinuacao(falou, bot), false);
+  assert.equal(ehContinuacao(bot, { autorId: 1, criadoEm: t + 2000 }), false);
+});

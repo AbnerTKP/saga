@@ -2,6 +2,7 @@ import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import type { SalaDaVoz } from '../useRoom';
+import { nomeDaMusica } from '../cartaoDoBot';
 
 /** Quantos rostos cabem antes de virar "+N". Acima disso a faixa deixa de caber. */
 const ROSTOS = 4;
@@ -17,7 +18,7 @@ const ROSTOS = 4;
  * Só aparece quando a voz está NOUTRA sala: olhando a própria sala de voz, o palco já
  * está na tela e a faixa seria uma segunda cópia do que se está vendo.
  */
-export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, assistindoNome, servidorAberto, onAbrir }: {
+export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, assistindoNome, servidorAberto, musica, onAbrir }: {
   sala: SalaDaVoz;
   /** Quem está na call agora, pelo LiveKit — inclusive você. */
   participantes: { identity: string; nome: string }[];
@@ -28,6 +29,8 @@ export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, assis
   assistindoNome?: string | null;
   /** O servidor que está sendo lido: se for outro, o nome do servidor da voz entra junto. */
   servidorAberto: number;
+  /** O que o bot de música está tocando nessa sala, se estiver. */
+  musica?: { titulo: string; autor: string } | null;
   onAbrir?: () => void;
 }) {
   const cabem = participantes.slice(0, ROSTOS);
@@ -48,6 +51,13 @@ export function FaixaDoPalco({ sala, participantes, pessoas, transmitindo, assis
         ))}
         {sobra > 0 && <span className="faixa-mais">+{sobra}</span>}
       </span>
+
+      {musica && (
+        <span className="faixa-musica" title={`Tocando: ${nomeDaMusica(musica)}`}>
+          <Icon name="nota" size={13} />
+          <span>{nomeDaMusica(musica)}</span>
+        </span>
+      )}
 
       {assistindoNome ? (
         <span className="faixa-live">

@@ -23,7 +23,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'transmitir';
+  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'transmitir' | 'tocarMusica';
 
 export type Cargo = {
   id: number;
@@ -127,6 +127,8 @@ export type RoomInfo = {
   naoLidas: number;
   /** A gaveta em que a sala está, ou null quando está solta no topo. */
   categoriaId: number | null;
+  /** O bot de música desta sala de voz, ou null. Servidor antigo não manda. */
+  musica?: EstadoDaMusica | null;
 };
 export type Sala = {
   id: number; nome: string; tipo: TipoDeSala; ordem: number; categoriaId: number | null;
@@ -435,6 +437,10 @@ export type Mensagem = {
   /** O que vale agora: 'online' | 'ausente' | 'ocupado' | 'offline'. */
   status?: string;
   idExibido: string | null;
+  /** A resposta do bot de música, quando é uma. A mensagem é de quem usou o comando. */
+  bot?: MensagemDoBot | null;
+  /** Resposta do bot que só quem pediu vê — um erro, ou o "procurando…". Não vai ao servidor. */
+  soParaVoce?: boolean;
 };
 
 /** Quem está escrevendo agora numa sala, fora você. */
@@ -569,6 +575,8 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
   // dizer coisas que mudam devagar. Servidor antigo não manda nenhum dos dois.
   pedir<{
     servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
+    /** A hora do servidor na resposta. Servidor antigo não manda. */
+    agora?: number;
     corridas?: CorridasNoServidor;
     lutas?: LutasNoServidor;
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
@@ -1084,3 +1092,39 @@ export const desfazerAmizade = (alvo: number) =>
 /** Abre a conversa com um amigo — ou devolve a que já existe. */
 export const abrirConversa = async (alvo: number) =>
   (await pedir<{ conversa: ConversaAberta }>('POST', '/conversas/abrir', { alvo })).conversa;
+
+// --- bot de música -----------------------------------------------------------
+
+export type ItemDaMusica = {
+  uid: string; id: string; titulo: string; autor: string; duracao: number; capa: string;
+  origem: 'youtube' | 'spotify' | 'busca';
+  pediu: { id: number; nome: string };
+};
+
+/** A fila de uma sala de voz. `anfitriao` é a identidade do LiveKit de quem está tocando. */
+export type EstadoDaMusica = {
+  tocando: ItemDaMusica; fila: ItemDaMusica[];
+  /** Hora do SERVIDOR em que a que toca começou. A hora dele agora vem ao lado, na resposta. */
+  comecouEm: number;
+  anfitriao: string;
+};
+
+type SalaDoBot = { id: number; nome: string };
+export type MensagemDoBot =
+  | { tipo: 'tocando'; cmd?: string; item: ItemDaMusica; sala: SalaDoBot; pulou?: string }
+  | { tipo: 'na-fila'; cmd?: string; item: ItemDaMusica; posicao: number; sala: SalaDoBot }
+  | { tipo: 'fila'; cmd?: string; tocando: ItemDaMusica; fila: ItemDaMusica[]; tocouSegundos: number; sala: SalaDoBot }
+  | { tipo: 'texto'; cmd?: string; texto: string };
+
+export type NomeDoComandoDeMusica = 'tocar' | 'pular' | 'parar' | 'fila';
+
+/** Um comando do bot, digitado numa sala de texto. O `/tocar` chega com a música já achada. */
+export const comandoDeMusica = (
+  sala: number,
+  comando: NomeDoComandoDeMusica,
+  musica?: { id: string; titulo: string; autor: string; duracao: number; origem: string },
+) => pedir<{ mensagem: Mensagem; musica: EstadoDaMusica | null; sala?: SalaDoBot; agora?: number }>('POST', '/musica', { sala, comando, musica });
+
+/** O anfitrião avisa que a música acabou — ou que não conseguiu tocá-la. Volta a seguinte. */
+export const avisarQueAMusicaAcabou = (sala: number, uid: string, erro = false) =>
+  pedir<{ musica: EstadoDaMusica | null; agora?: number }>('POST', '/musica/acabou', { sala, uid, erro });

@@ -61,6 +61,13 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   dizer que o cartão rola; e a barra de rolagem dele entra na curva do canto de baixo,
   como a de todo contêiner arredondado que rola no app (o corpo dos painéis, a lista de
   cargos).
+- **O bot de música com os amigos (23/09/2026).** Medido na bancada muda: comandos, fila, cartão,
+  a música chegando a um robô na call. Falta: ouvir de verdade (volume, qualidade, se corta),
+  **o primeiro `/tocar` no Windows** (baixa o `yt-dlp_win.zip` e abre com o `tar.exe` do
+  sistema — nada disso rodou num Windows), e quem pediu sair da call com a música tocando (a
+  música tem de seguir no app de outra pessoa, do mesmo ponto). **Depois de atualizar, ligue
+  "Tocar música" nos cargos** (Configurações do servidor › Cargos › Na call): nasce desligada
+  para todo cargo, como a de transmitir.
 - **Mutar e desligar o fone, numa call de verdade (22/09/2026).** Medido na bancada: o fone
   segura ao entrar de fone desligado, e o microfone mutado fica mudo em todos os caminhos do
   LiveKit. O que falta: trocar de sala mutado e de fone desligado com os amigos ouvindo. Se

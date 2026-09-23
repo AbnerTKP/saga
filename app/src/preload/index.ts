@@ -29,6 +29,16 @@ const desktop = {
   updateAtual: (): Promise<unknown> => ipcRenderer.invoke('update:atual'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
+  /**
+   * O bot de música: quem pede acha (e já baixa) pelo `yt-dlp`, e quem toca lê o áudio daqui.
+   * Ver `main/musica.ts`.
+   */
+  musica: {
+    achar: (texto: string): Promise<{ ok: true; musica: { id: string; titulo: string; autor: string; duracao: number; origem: 'youtube' | 'spotify' | 'busca' } } | { ok: false; erro: string }> =>
+      ipcRenderer.invoke('musica:achar', texto),
+    preparar: (id: string): Promise<{ ok: boolean; erro?: string }> => ipcRenderer.invoke('musica:preparar', id),
+    ler: (id: string): Promise<{ bytes: Uint8Array; tipo: string } | null> => ipcRenderer.invoke('musica:ler', id),
+  },
   /** Salva um anexo do chat com o diálogo do sistema. Nada é aberto nem executado. */
   salvarArquivo: (url: string, nome: string): Promise<{ ok: boolean; caminho?: string; erro?: string }> =>
     ipcRenderer.invoke('arquivo:salvar', url, nome),

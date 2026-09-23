@@ -236,7 +236,7 @@ function BlocoDoEmail({ estado, onEmail }: { estado: EstadoDoEmail; onEmail: (e:
  * A lógica de cada bloco veio de lá sem mudar (PainelDaConta, até a v0.61).
  */
 export function ConfiguracoesDaConta({
-  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, onEu, onRegistro, onAdministracao, onSair, onClose,
+  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, volumeDaMusica, onVolumeDaMusica, onEu, onRegistro, onAdministracao, onSair, onClose,
   email, onEmail, inicial,
 }: {
   eu: Membro;
@@ -255,6 +255,8 @@ export function ConfiguracoesDaConta({
   souBerserk: boolean;
   donoDaSaga: boolean;
   volumeDoSoundboard: number;
+  volumeDaMusica: number;
+  onVolumeDaMusica: (v: number) => void;
   onVolumeDoSoundboard: (v: number) => void;
   onEu: (m: Membro) => void;
   onRegistro: () => void;
@@ -292,7 +294,7 @@ export function ConfiguracoesDaConta({
         onIr={(id) => { if (id === 'perfil' || id === 'conta' || id === 'voz' || id === 'atalhos' || id === 'inicio') setPagina(id); }} onClose={onClose}>
         {pagina === 'perfil' && <PaginaPerfil eu={eu} servidorNome={servidorNome} onEu={onEu} />}
         {pagina === 'conta' && <PaginaConta eu={eu} email={email} onEmail={onEmail} />}
-        {pagina === 'voz' && <PaginaVoz room={room} microfone={microfone} souBerserk={souBerserk} donoDaSaga={donoDaSaga} volumeDoSoundboard={volumeDoSoundboard} onVolumeDoSoundboard={onVolumeDoSoundboard} />}
+        {pagina === 'voz' && <PaginaVoz room={room} microfone={microfone} souBerserk={souBerserk} donoDaSaga={donoDaSaga} volumeDoSoundboard={volumeDoSoundboard} onVolumeDoSoundboard={onVolumeDoSoundboard} volumeDaMusica={volumeDaMusica} onVolumeDaMusica={onVolumeDaMusica} />}
         {pagina === 'atalhos' && <PaginaAtalhos />}
         {pagina === 'inicio' && <PaginaInicio />}
       </Configuracoes>
@@ -417,9 +419,10 @@ function PaginaConta({ eu, email, onEmail }: { eu: Membro; email: EstadoDoEmail;
   );
 }
 
-function PaginaVoz({ room, microfone, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard }: {
+function PaginaVoz({ room, microfone, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, volumeDaMusica, onVolumeDaMusica }: {
   room: Room; microfone: MicrofoneDaCall; souBerserk: boolean; donoDaSaga: boolean;
   volumeDoSoundboard: number; onVolumeDoSoundboard: (v: number) => void;
+  volumeDaMusica: number; onVolumeDaMusica: (v: number) => void;
 }) {
   const [qualidade, setQualidade] = useState<Qualidade>(() => qualidadeValida(lerQualidadeGuardada(), souBerserk));
   const permitidas = qualidadesDe(souBerserk);
@@ -522,6 +525,13 @@ function PaginaVoz({ room, microfone, souBerserk, donoDaSaga, volumeDoSoundboard
           </Linha>
         </Secao>
       )}
+      <Secao titulo="Bot de música">
+        <Linha rotulo={`Volume da música · ${Math.round(volumeDaMusica * 100)}%`}
+          explica="Vale para a música que você OUVE na call, e já na hora. Não muda o volume dela para os outros." empilhada>
+          <input type="range" min={0} max={100} value={Math.round(volumeDaMusica * 100)} aria-label="Volume da música"
+            onChange={(e) => onVolumeDaMusica(Number(e.target.value) / 100)} style={{ width: '100%' }} />
+        </Linha>
+      </Secao>
       <div className="cfg-ponte">
         <Icon name="info" size={16} />
         <span>O volume de cada pessoa fica nela mesma: clique ou botão direito sobre o nome.</span>
