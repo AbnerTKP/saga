@@ -249,6 +249,9 @@ a, .link { color: var(--link); font-size: 12px; padding: 0; }
 .voice-actions button:hover { background: var(--bg4); }
 .voice-actions button.on { background: var(--accent); color: #fff; }
 .voice-actions button.danger { background: var(--danger); color: #fff; }
+/* Sem a permissão de transmitir: apagado, mas clicável — o clique diz o porquê. */
+.voice-actions button[aria-disabled="true"] { opacity: .45; cursor: default; }
+.voice-actions button[aria-disabled="true"]:hover { background: var(--bg3); }
 
 .user-panel { position: relative; background: var(--bg0); border-top: 1px solid var(--line);
   display: flex; align-items: center; gap: 9px; padding: 8px var(--e2); min-height: 58px; }

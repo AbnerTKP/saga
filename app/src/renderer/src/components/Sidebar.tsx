@@ -17,6 +17,7 @@ import { Sinal } from './Sinal';
 import { CartaoDaLive } from './CartaoDaLive';
 import { MenuDeJogos } from './MenuDeJogos';
 import type { PessoaNaCall } from './MenuDaPessoa';
+import { MOTIVO_SEM_TRANSMITIR } from '../transmitir';
 
 type RM = ReturnType<typeof useRoom>;
 
@@ -272,7 +273,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       </button>
       <div className="voice-actions">
         <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
-        <button className={rm.screenOn ? 'on' : ''} onClick={onShare} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
+        <button className={rm.screenOn ? 'on' : ''} onClick={onShare} aria-disabled={!rm.podeTransmitir || undefined}
+          title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>
         <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
         {/* Os jogos moram aqui porque é daqui que se chama gente: o lobby chama
             primeiro quem está na call. */}

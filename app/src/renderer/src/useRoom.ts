@@ -10,6 +10,7 @@ import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
+import { podeTransmitir } from './transmitir';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
 import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, trocarAparelho } from './aparelhos';
@@ -817,6 +818,21 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     bump();
   }, [room, pararMedicoes]);
 
+  // O dono tirou a permissão com a tela no ar: o LiveKit já derrubou a transmissão, mas a
+  // captura continua ligada aqui (e o aviso de gravação do sistema também) até alguém
+  // desligá-la. Ganhar a permissão só redesenha o botão.
+  useEffect(() => {
+    const aoMudar = () => {
+      bump();
+      const lp = room.localParticipant;
+      if (podeTransmitir(lp.permissions?.canPublishSources) || !lp.isScreenShareEnabled) return;
+      void stopScreen().catch(() => undefined);
+      avisar('aviso', 'Seu cargo deixou de poder transmitir a tela.');
+    };
+    room.on(RoomEvent.ParticipantPermissionsChanged, aoMudar);
+    return () => { room.off(RoomEvent.ParticipantPermissionsChanged, aoMudar); };
+  }, [room, stopScreen, avisar]);
+
   const toggleDeafen = useCallback(async () => {
     const next = !deafenedRef.current;
     deafenedRef.current = next;
@@ -1148,6 +1164,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
+    podeTransmitir: podeTransmitir(room.localParticipant.permissions?.canPublishSources),
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
     tocarSom, pararSom, somTocando, volumeDoSoundboard, definirVolumeDoSoundboard,
     sonsRestantes: souBerserk ? null : Math.max(0, LIMITE_SEM_BERSERK - sonsTocados.current),

@@ -24,6 +24,8 @@
 }
 .barra-da-call-no-palco button:hover:not(:disabled) { background: var(--superficie-3); color: var(--texto-forte); }
 .barra-da-call-no-palco button:disabled { opacity: .45; }
+.barra-da-call-no-palco button[aria-disabled="true"] { opacity: .45; cursor: default; }
+.barra-da-call-no-palco button[aria-disabled="true"]:hover { background: none; color: inherit; }
 .barra-da-call-no-palco button.on { background: var(--acento-cheio); color: var(--sobre-acento); }
 .barra-da-call-no-palco button.off { color: var(--perigo); }
 .barra-da-call-no-palco button.desligar { background: var(--perigo-cheio); color: var(--sobre-acento); width: 52px; }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TODAS, SOBRE_ALGUEM, limparPermissoes, temPermissao, podeAgir, podeDarCargo, podeMexerNoCargo,
-  podeApagarMensagem,
+  podeApagarMensagem, fontesDaCall,
 } from './permissoes.mjs';
 
 const cargo = (nivel, permissoes = [], dono = false) => ({ nivel, permissoes, dono });
@@ -133,4 +133,12 @@ test('toda recusa vem com motivo escrito', () => {
     assert.equal(r.pode, false, acao);
     assert.ok(r.motivo?.length > 0, `${acao} negou sem motivo`);
   }
+});
+
+test('sem a permissão de transmitir, a call aceita câmera, microfone e soundboard — e não a tela', () => {
+  // `unknown` é o soundboard: fora da lista, ele calaria junto com a tela.
+  assert.deepEqual(fontesDaCall(MOD.cargo), ['camera', 'microphone', 'unknown']);
+  assert.deepEqual(fontesDaCall(null), ['camera', 'microphone', 'unknown']);
+  assert.equal(fontesDaCall(cargo(10, ['transmitir'])), null);
+  assert.equal(fontesDaCall(DONO.cargo), null, 'o dono transmite sem precisar ligar nada');
 });

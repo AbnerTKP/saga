@@ -75,6 +75,7 @@ import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
 import { mesmoSeIgual } from './igual';
 import type { UpdateState } from './desktop';
+import { MOTIVO_SEM_TRANSMITIR } from './transmitir';
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
 const ULTIMO_APELIDO = 'cantinho.apelido';
@@ -716,6 +717,9 @@ export function App() {
   // significaria escolher duas vezes. Quem decide qual é qual é o processo principal.
   const compartilhar = useCallback(async () => {
     if (rm.screenOn) return rm.stopScreen();
+    // Apagado não é `disabled`: botão desabilitado engole o clique, e quem clicou ficaria
+    // sem saber por que nada aconteceu.
+    if (!rm.podeTransmitir) return rm.avisar('aviso', `${MOTIVO_SEM_TRANSMITIR}. Peça ao dono do servidor.`);
     if (!seletorDoSistema) return setPicker(true);
     try { await rm.startScreen(null, true); } catch (e) { notas.mostrarFalha(e, 'Tela'); }
   }, [rm, seletorDoSistema, notas]);
@@ -1460,7 +1464,8 @@ export function App() {
             </button>
             <span className="divisor" />
             <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
-            <button className={rm.screenOn ? 'on' : ''} onClick={compartilhar} title={rm.screenOn ? 'Parar de compartilhar' : 'Compartilhar tela'}><Icon name="screen" /></button>
+            <button className={rm.screenOn ? 'on' : ''} onClick={compartilhar} aria-disabled={!rm.podeTransmitir || undefined}
+              title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>
             <button onClick={() => setSoundboard(true)} title="Soundboard"><Icon name="speaker" /></button>
             <span className="divisor" />
             <button className="desligar" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>

@@ -4,7 +4,8 @@
 // grupo virou só o convite, exigida uma vez, no cadastro. Sem isso não haveria como saber
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk';
+import { SignJWT } from 'jose';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
@@ -37,7 +38,7 @@ import {
   esquecerCodigoDeSenha,
 } from './contas.mjs';
 import * as email from './email.mjs';
-import { temPermissao, PERMISSOES } from './permissoes.mjs';
+import { temPermissao, PERMISSOES, fontesDaCall } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
 
@@ -583,6 +584,48 @@ async function tirarDeTodasAsCalls(usuarioId) {
     .filter((r) => Number(r.numParticipants) > 0)
     .map((r) => svc.removeParticipant(r.name, alvo).catch(() => {})));
   esquecerSalas();
+}
+
+/**
+ * O crachá da call. É assinado aqui, e não pelo `AccessToken` do SDK, por um motivo só: o
+ * SDK se recusa a escrever `unknown` na lista de fontes, e é como o soundboard publica — sem
+ * ele, quem não transmite tela ficaria também sem soundboard (ver `fontesDaCall`). O resto
+ * é o mesmo JWT que o SDK monta: HS256, emissor = chave, assunto = identidade.
+ */
+function crachaDaCall({ identity, name, sala, fontes }) {
+  const video = {
+    room: sala, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true,
+    canPublishData: true, canUpdateOwnMetadata: true,
+    ...(fontes ? { canPublishSources: fontes } : {}),
+  };
+  return new SignJWT({ video, name })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(KEY).setSubject(identity)
+    .setNotBefore(new Date()).setExpirationTime('12h')
+    .sign(new TextEncoder().encode(SECRET));
+}
+
+const FONTE_NO_LIVEKIT = { camera: TrackSource.CAMERA, microphone: TrackSource.MICROPHONE, unknown: TrackSource.UNKNOWN };
+
+/**
+ * Leva a quem JÁ está na call o que o cargo dele permite publicar agora. O crachá só vale
+ * na entrada: sem isto, ganhar a permissão de transmitir pediria sair e voltar, e perdê-la
+ * não tiraria do ar a tela de ninguém. O LiveKit derruba sozinho a tela de quem perdeu, e
+ * deixa o resto tocando.
+ */
+async function reaplicarFontesDaCall(sid) {
+  for (const sala of salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz')) {
+    const nome = salaNoLiveKit(sala);
+    for (const p of await svc.listParticipants(nome).catch(() => [])) {
+      const membro = membros.buscarMembro(db, sid, idDaIdentidade(p.identity));
+      if (!membro) continue;
+      const querido = (fontesDaCall(membro.cargo) ?? []).map((f) => FONTE_NO_LIVEKIT[f]).sort();
+      const atual = [...(p.permission?.canPublishSources ?? [])].sort();
+      if (querido.join() === atual.join()) continue;
+      await svc.updateParticipant(nome, p.identity, { permission: { ...p.permission, canPublishSources: querido } })
+        .catch((e) => console.error('[call] não deu para atualizar as fontes de', p.identity, e.message));
+    }
+  }
 }
 
 /** Encontra em que sala a pessoa está agora, para poder mutá-la ou desconectá-la. */
@@ -1414,13 +1457,12 @@ const ROTAS = {
     if (!sala) throw new ErroDeConta('Essa sala não existe, ou é de texto.', 400);
 
     const nome = salaNoLiveKit(sala);
-    const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '12h' });
     // `canUpdateOwnMetadata` é o que deixa o app CONTAR à sala qual transmissão ele está
     // assistindo (o atributo `assistindo`, em espectadores.ts). Sem isso quem transmite não
     // teria como saber quem está vendo: o LiveKit não conta a ninguém quem se inscreveu na
     // faixa dele. É permissão de mexer nos PRÓPRIOS atributos, não nos de outra pessoa.
-    at.addGrant({ room: nome, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true });
-    return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
+    const token = await crachaDaCall({ identity: identidadeDe(eu.id), name: eu.nome, sala: nome, fontes: fontesDaCall(eu.cargo) });
+    return { url: PUBLIC_URL, token, identity: identidadeDe(eu.id) };
   },
 
   'POST /eu/foto':   (req) => trocarImagem(req, 'usuario', 'foto'),
@@ -1490,13 +1532,17 @@ const ROTAS = {
   'POST /cargos/editar': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const c = await lerCorpo(req);
-    return { cargo: cargosM.editarCargo(db, sid, eu, c.id, c) };
+    const cargo = cargosM.editarCargo(db, sid, eu, c.id, c);
+    await reaplicarFontesDaCall(sid);
+    return { cargo };
   },
 
   'POST /cargos/apagar': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
-    return cargosM.apagarCargo(db, sid, eu, id);
+    const r = cargosM.apagarCargo(db, sid, eu, id);
+    await reaplicarFontesDaCall(sid);
+    return r;
   },
 
   'GET /giphy': async (req) => {
@@ -1551,7 +1597,11 @@ const ROTAS = {
       }
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
-      case 'cargo':      return { alvo: verMembro(membros.definirCargo(db, sid, eu.id, alvo, cargo)) };
+      case 'cargo': {
+        const r = membros.definirCargo(db, sid, eu.id, alvo, cargo);
+        await reaplicarFontesDaCall(sid);
+        return { alvo: verMembro(r) };
+      }
       case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };
 
       case 'expulsar': {

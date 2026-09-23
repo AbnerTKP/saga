@@ -26,6 +26,9 @@ export const PERMISSOES = {
   convidar: 'Convidar gente para o servidor',
   definirId: 'Definir o identificador de alguém',
   apagarMensagens: 'Apagar mensagens dos outros',
+  // Nasce desligada em todo cargo, inclusive nos que já existiam: foi o pedido do dono
+  // (22/09/2026) — "só quem eu autorizar transmite". Ligar em cargo antigo é trabalho dele.
+  transmitir: 'Transmitir a tela',
 };
 
 // `concederTurbo` viveu aqui e saiu: o Berserk é da conta, e vale na Saga inteira. Quem
@@ -37,6 +40,19 @@ export const TODAS = Object.keys(PERMISSOES);
 
 /** Ações que recaem sobre outra pessoa. Só estas passam pela regra de hierarquia. */
 export const SOBRE_ALGUEM = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo'];
+
+/**
+ * O que a pessoa pode publicar na call, no formato do crachá do LiveKit. `null` é sem
+ * lista, e sem lista o LiveKit aceita tudo.
+ *
+ * A trava é no LiveKit, e não no botão: botão apagado não segura um app velho nem um
+ * mexido. E a lista precisa levar `unknown`, que é como o soundboard publica — com ela
+ * ligada, só passa o que está escrito, e sem `unknown` o soundboard cala. Medido num
+ * LiveKit de verdade em 22/09/2026, junto com a outra metade: tirar a permissão com a tela
+ * no ar derruba a tela na hora e deixa o soundboard tocando.
+ */
+export const fontesDaCall = (cargo) =>
+  temPermissao(cargo, 'transmitir') ? null : ['camera', 'microphone', 'unknown'];
 
 export const ehPermissaoConhecida = (p) => TODAS.includes(p);
 
