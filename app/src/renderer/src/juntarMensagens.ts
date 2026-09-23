@@ -13,5 +13,9 @@ export function juntarMensagens<M extends { id: number }>(antigas: M[], novas: M
   const ja = new Set(antigas.map((m) => m.id));
   const deVerdade = novas.filter((m) => !ja.has(m.id));
   if (deVerdade.length === 0) return antigas;
-  return [...antigas, ...deVerdade].slice(-limite);
+  // As respostas locais do bot (id negativo, "só você vê") ficam no fim, onde nasceram; as do
+  // servidor, pela ordem do id — a do envio pode ter entrado antes da de um amigo com id menor.
+  const doServidor = [...antigas.filter((m) => m.id > 0), ...deVerdade.filter((m) => m.id > 0)].sort((a, b) => a.id - b.id);
+  const locais = [...antigas.filter((m) => m.id < 0), ...deVerdade.filter((m) => m.id < 0)];
+  return [...doServidor, ...locais].slice(-limite);
 }

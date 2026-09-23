@@ -17,10 +17,18 @@ import { ErroDeConta } from './contas.mjs';
 
 /** Uma fila de cinco amigos não passa disso; mais é alguém colando uma playlist à mão. */
 export const MAXIMO_NA_FILA = 50;
-/** Três horas: disco inteiro cabe, live que não acaba não. */
-export const DURACAO_MAXIMA = 3 * 60 * 60;
-/** Folga para o anfitrião avisar que acabou antes de a fila andar sozinha. */
-export const FOLGA = 15_000;
+/**
+ * Duas horas: disco e mix longo cabem, live que não acaba não. O mesmo teto do app
+ * (buscaDeMusica.ts): acima disso o áudio passa de 130 MB, e atravessa inteiro para a tela.
+ */
+export const DURACAO_MAXIMA = 2 * 60 * 60;
+/**
+ * Folga para o anfitrião avisar que acabou antes de a fila andar sozinha. Larga de propósito:
+ * `comecouEm` é a hora do COMANDO, e o som começa depois do download — numa internet lenta
+ * (medido: 9 s no Mac do dono, atrás do WARP), 15 s cortavam o fim da música. Ela só vale
+ * quando o app de quem toca morreu, e aí 60 s de silêncio custam menos que cortar toda música.
+ */
+export const FOLGA = 60_000;
 /**
  * Quanto tempo a sala precisa ficar vazia para a fila sumir. Não é na hora porque "vazia" às
  * vezes é mentira: quando o LiveKit não responde, a lista de gente volta vazia, sem erro
@@ -49,7 +57,7 @@ export function validarItem(bruto) {
   if (!titulo) throw new ErroDeConta('Não reconheci essa música.', 400);
   const duracao = Math.round(Number(bruto?.duracao));
   if (!(duracao > 0)) throw new ErroDeConta('Ao vivo não dá: a música precisa ter fim.', 400);
-  if (duracao > DURACAO_MAXIMA) throw new ErroDeConta('Passa de 3 horas. Escolha algo mais curto.', 400);
+  if (duracao > DURACAO_MAXIMA) throw new ErroDeConta('Passa de 2 horas. Escolha algo mais curto.', 400);
   return {
     id,
     titulo,
@@ -121,6 +129,21 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
     parar(salaVoz) {
       if (!salas.has(salaVoz)) throw new ErroDeConta('Não tem nada tocando.', 409);
       salas.delete(salaVoz);
+    },
+
+    /**
+     * O anfitrião avisa que o som COMEÇOU, e em que ponto. `comecouEm` nasce na hora do comando
+     * (ou da troca de música), mas o som só sai depois do download — e o fim da música, contado
+     * dali, chegava antes da hora numa internet lenta (achado na revisão de 23/09/2026: com 20 s
+     * de download e 15 s de folga, a fila andava com 5 s de música por tocar). Daqui em diante
+     * o relógio da música é o do som de verdade. Vale uma vez por música e por anfitrião.
+     */
+    comecou(salaVoz, uid, quem, posicao) {
+      const s = salas.get(salaVoz);
+      if (!s || s.itens[0]?.uid !== uid || s.anfitriao !== quem) return false;
+      const p = Math.min(Math.max(Number(posicao) || 0, 0), s.itens[0].duracao);
+      s.comecouEm = relogio() - p * 1000;
+      return true;
     },
 
     /**

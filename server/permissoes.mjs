@@ -48,8 +48,12 @@ export const SOBRE_ALGUEM = ['mutar', 'desconectar', 'timeout', 'expulsar', 'ban
  * O que a pessoa pode publicar na call, no formato do crachá do LiveKit. `null` é sem
  * lista, e sem lista o LiveKit aceita tudo.
  *
- * A trava é no LiveKit, e não no botão: botão apagado não segura um app velho nem um
- * mexido. E a lista precisa levar `unknown`, que é como o soundboard publica — com ela
+ * A trava é no LiveKit, e não no botão: botão apagado não segura um app de versão antiga,
+ * que nem sabe da permissão. O que ela NÃO segura é um app modificado de propósito: o
+ * LiveKit confere a FONTE que o cliente declara, e quem mexer no app pode publicar a tela
+ * dizendo que é câmera (visto na revisão de 23/09/2026 — não há como conferir o conteúdo da
+ * faixa). Para cinco amigos, a trava é contra o engano, não contra o ataque. E a lista
+ * precisa levar `unknown`, que é como o soundboard publica — com ela
  * ligada, só passa o que está escrito, e sem `unknown` o soundboard cala. Medido num
  * LiveKit de verdade em 22/09/2026, junto com a outra metade: tirar a permissão com a tela
  * no ar derruba a tela na hora e deixa o soundboard tocando.

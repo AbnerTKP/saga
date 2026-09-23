@@ -25,6 +25,13 @@ export type MusicaAchada = {
 
 export class ErroDaMusica extends Error {}
 
+/**
+ * Duas horas: cabe disco e mix longo. Acima disso o arquivo passa de 130 MB, e ele atravessa
+ * inteiro para a tela (`musica:ler`) — com a cópia do Blob, o dobro disso de memória. O
+ * servidor tem o mesmo teto (`DURACAO_MAXIMA`, musica.mjs).
+ */
+export const DURACAO_MAXIMA = 2 * 60 * 60;
+
 const ID = /^[A-Za-z0-9_-]{11}$/;
 
 /** Link do YouTube em qualquer das formas que se cola; `null` se não for um. */
@@ -106,6 +113,7 @@ export function lerRespostaDoYtDlp(json: unknown, origem: Origem): MusicaAchada 
   }
   const duracao = Number(v.duration);
   if (!(duracao > 0)) throw new ErroDaMusica('Não sei quanto essa dura, e sem isso não dá para pôr na fila.');
+  if (duracao > DURACAO_MAXIMA) throw new ErroDaMusica('Passa de 2 horas. Escolha algo mais curto.');
   const autor = String(v.artist ?? v.uploader ?? v.channel ?? '').replace(/ - Topic$/, '').trim();
   return {
     id: v.id,
@@ -129,7 +137,9 @@ export function lerRespostaDoYtDlp(json: unknown, origem: Origem): MusicaAchada 
  */
 export function argumentosParaBaixar(alvo: string, pasta: string): string[] {
   return [
-    '--no-warnings', '--no-playlist', '--quiet',
+    // `--ignore-config`: a configuração pessoal do yt-dlp de quem tiver uma (um `-x`, um
+    // `--download-archive`) mudaria o que a Saga recebe — visto na revisão de 23/09/2026.
+    '--ignore-config', '--no-warnings', '--no-playlist', '--quiet',
     '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
     // Os dados da música saem ANTES do download (`before_dl`) — ver `iniciar`, em musica.ts.
     '--print', 'before_dl:%()j', '--no-simulate',

@@ -513,9 +513,11 @@ function lembrado(caixa, buscar) {
   const agora = Date.now();
   if (agora - caixa.em < LEMBRAR) return Promise.resolve(caixa.valor);
   if (caixa.indo) return caixa.indo;
+  // Falhou: fica o último valor que se conseguiu, marcado — "vazio" seria mentira, e o bot de
+  // música apagaria a fila de quem ouve por um soluço do LiveKit (musicaDaSala).
   caixa.indo = buscar()
-    .catch(() => [])
-    .then((v) => { caixa.valor = v; caixa.em = Date.now(); caixa.indo = null; return v; });
+    .then((v) => { caixa.valor = v; caixa.falhou = false; return v; }, () => { caixa.falhou = true; return caixa.valor; })
+    .then((v) => { caixa.em = Date.now(); caixa.indo = null; return v; });
   return caixa.indo;
 }
 
@@ -618,7 +620,11 @@ const FONTE_NO_LIVEKIT = { camera: TrackSource.CAMERA, microphone: TrackSource.M
  * deixa o resto tocando.
  */
 async function reaplicarFontesDaCall(sid) {
-  for (const sala of salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz')) {
+  // Só as salas com gente, e todas de uma vez: uma por uma, com o LiveKit lento, a edição do
+  // cargo esperava segundos por sala para responder (achado na revisão de 23/09/2026).
+  const vivas = new Set((await salasVivas()).filter((r) => Number(r.numParticipants) > 0).map((r) => r.name));
+  const salas = salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz' && vivas.has(salaNoLiveKit(s)));
+  await Promise.all(salas.map(async (sala) => {
     const nome = salaNoLiveKit(sala);
     for (const p of await svc.listParticipants(nome).catch(() => [])) {
       const membro = membros.buscarMembro(db, sid, idDaIdentidade(p.identity));
@@ -629,7 +635,7 @@ async function reaplicarFontesDaCall(sid) {
       await svc.updateParticipant(nome, p.identity, { permission: { ...p.permission, canPublishSources: querido } })
         .catch((e) => console.error('[call] não deu para atualizar as fontes de', p.identity, e.message));
     }
-  }
+  }));
 }
 
 // --- o bot de música ----------------------------------------------------------------
@@ -647,26 +653,47 @@ function falarDoBot(sid, quem, salaDoChat, bot, texto) {
   catch (e) { console.error('[musica] o bot não conseguiu falar:', e.message); return null; }
 }
 
-/** A fila andou sozinha (acabou, ou passou da hora): o chat fica sabendo o que começou. */
-function anunciarQueComecou(sid, salaVoz, item) {
-  const fila = filas.ver(salaVoz.id);
+/**
+ * Como o bot se refere à sala de voz. Sala PRIVADA não tem o nome escrito: o bot fala num chat
+ * que mais gente lê, e sala privada é invisível para quem não a vê — nem o nome pode aparecer
+ * (achado na revisão de 23/09/2026). Aí é só "a call".
+ */
+const salaDoBot = (voz) => ({ id: voz.id, nome: voz.privada ? null : voz.nome });
+const naSala = (voz) => (voz.privada ? 'na call' : `na ${voz.nome}`);
+
+/**
+ * A fila andou sozinha (acabou, ou passou da hora): o chat fica sabendo o que começou. Em nome
+ * de quem pediu — e não de quem foi banido ou está de castigo, que não fala mais ali.
+ */
+function anunciarQueComecou(sid, voz, item) {
+  const fila = filas.ver(voz.id);
   const quem = membros.buscarMembro(db, sid, item.pediu.id);
-  if (!fila || !quem) return;
+  if (!fila || !quem || membros.impedimento(quem)) return;
   falarDoBot(sid, quem, fila.salaDoChat,
-    { tipo: 'tocando', item, sala: { id: salaVoz.id, nome: salaVoz.nome } },
-    `♪ Tocando agora na ${salaVoz.nome}: ${linhaDaMusica(item)}`);
+    { tipo: 'tocando', item, sala: salaDoBot(voz) },
+    `♪ Tocando agora ${naSala(voz)}: ${linhaDaMusica(item)}`);
 }
 
 /**
- * A música de uma sala de voz, como o app a lê na busca de salas — e é aqui que a fila é
- * conferida (anfitrião que saiu, música que passou da hora, sala vazia): sem relógio de
- * fundo, é a busca de 4 em 4 s de quem tem a Saga aberta que a faz andar.
+ * A música de uma sala de voz, como o app a lê — e é aqui que a fila é conferida (anfitrião que
+ * saiu, música que passou da hora, sala vazia): sem relógio de fundo, é a busca de quem tem a
+ * Saga aberta que a faz andar.
+ *
+ * Duas precauções. Com o LiveKit sem responder, a lista de gente é a última que se conseguiu, e
+ * a conferência espera — "ninguém na call" ali seria mentira, e apagaria a fila de quem ouve
+ * (achado na revisão). E quem pode herdar a música, se o anfitrião sair, é primeiro quem tem
+ * "Tocar música": o anfitrião avisa o fim de cada uma, e isso é mexer na fila.
  */
-function musicaDaSala(sid, sala) {
-  const presentes = sala.participants.map((p) => p.usuarioId).filter(Boolean);
-  const comecou = filas.conferir(sala.id, presentes);
-  if (comecou) anunciarQueComecou(sid, { id: sala.id, nome: sala.name }, comecou);
-  return verMusica(sala.id);
+function musicaDaSala(sid, voz) {
+  if (!memoria.salas.falhou) {
+    const presentes = voz.participants
+      .filter((p) => p.usuarioId)
+      .sort((a, b) => Number(temPermissao(b.cargo, 'tocarMusica')) - Number(temPermissao(a.cargo, 'tocarMusica')))
+      .map((p) => p.usuarioId);
+    const comecou = filas.conferir(voz.id, presentes);
+    if (comecou) anunciarQueComecou(sid, voz, comecou);
+  }
+  return verMusica(voz.id);
 }
 
 /** A fila como o app a lê. Sem conferir nada: quem confere é a busca de salas, com a lista real. */
@@ -682,11 +709,18 @@ function verMusica(salaVoz) {
   };
 }
 
-/** A sala de voz deste servidor em que a pessoa está, ou o erro que o bot responde. */
+/**
+ * A sala de voz deste servidor em que a pessoa está, ou o erro que o bot responde. Pergunta só
+ * às salas com gente, todas de uma vez: uma por uma, em fila, era a janela em que um /pular
+ * cruzava com o fim da música.
+ */
 async function salaDeVozDe(sid, usuarioId) {
-  const onde = await ondeEsta(sid, usuarioId);
-  const id = onde ? salaDoLiveKit(onde.sala) : null;
-  const sala = id && salasM.listarSalas(db, sid).find((s) => s.id === id);
+  const alvo = identidadeDe(usuarioId);
+  const vivas = new Set((await salasVivas()).filter((r) => Number(r.numParticipants) > 0).map((r) => r.name));
+  const comGente = salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz' && vivas.has(salaNoLiveKit(s)));
+  const achadas = await Promise.all(comGente.map(async (s) =>
+    ((await svc.listParticipants(salaNoLiveKit(s)).catch(() => [])).some((p) => p.identity === alvo) ? s : null)));
+  const sala = achadas.find(Boolean);
   if (!sala) throw new ErroDeConta('Entre numa sala de voz primeiro: eu toco na call em que você está.', 409, 'musica');
   return sala;
 }
@@ -981,7 +1015,7 @@ const ROTAS = {
       naoLidas: s.tipo === 'texto'
         ? mensagens.contarNaoLidas(db, s.id, lidas.get(s.id) ?? 0, eu.id)
         : 0,
-    })))).map((s) => (s.tipo === 'voz' ? { ...s, musica: musicaDaSala(sid, s) } : s));
+    })))).map((s) => (s.tipo === 'voz' ? { ...s, musica: musicaDaSala(sid, { ...s, nome: s.name }) } : s));
     // As gavetas vão junto: a barra lateral desenha as duas coisas na mesma passada, e
     // uma segunda busca só para elas piscaria a lista a cada atualização.
     //
@@ -1524,33 +1558,42 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
-    const { sala: salaDoChat, comando, musica } = await lerCorpo(req);
-    const chat = salasM.listarSalas(db, sid).find((s) => s.id === Number(salaDoChat) && s.tipo === 'texto');
-    if (!chat) throw new ErroDeConta('Os comandos do bot são numa sala de texto.', 400);
+    const { sala: salaDoChat, comando, musica, uid } = await lerCorpo(req);
+    // A sala é uma das que a pessoa VÊ: a privada que ela não vê responde como a que não existe,
+    // igual a todo o resto — e isso vem ANTES de qualquer outra resposta, senão "esse comando
+    // não existe" já contava que a sala estava lá (achado na revisão). A de notas é da Saga.
+    const vista = salasDoServidor(sid, eu).find((s) => s.id === Number(salaDoChat));
+    if (!vista) throw new ErroDeConta('Essa sala não existe.', 404);
+    if (vista.tipo !== 'texto' || vista.papel === 'notas') throw new ErroDeConta('Os comandos do bot são numa sala de texto.', 400);
     if (!['tocar', 'pular', 'parar', 'fila'].includes(comando)) throw new ErroDeConta('Esse comando não existe.', 400);
     // Ver a fila não mexe no que ninguém ouve: é de qualquer um.
     if (comando !== 'fila' && !temPermissao(eu.cargo, 'tocarMusica')) {
       throw new ErroDeConta('Seu cargo não pode pôr música. Peça ao dono do servidor a permissão "Tocar música".', 403, 'musica');
     }
     const voz = await salaDeVozDe(sid, eu.id);
-    const sala = { id: voz.id, nome: voz.nome };
+    const sala = salaDoBot(voz);
+    const na = naSala(voz);
     const pediu = { id: eu.id, nome: eu.nome };
     let bot, texto;
 
     if (comando === 'tocar') {
-      const { item, posicao } = filas.tocar(voz.id, musica, { pediu, salaDoChat: chat.id });
+      const { item, posicao } = filas.tocar(voz.id, musica, { pediu, salaDoChat: vista.id });
       bot = posicao === 0
         ? { tipo: 'tocando', cmd: 'tocar', item, sala }
         : { tipo: 'na-fila', cmd: 'tocar', item, posicao, sala };
       texto = posicao === 0
-        ? `♪ Tocando agora na ${voz.nome}: ${linhaDaMusica(item)}`
-        : `♪ Na fila da ${voz.nome} (${posicao}ª): ${linhaDaMusica(item)}`;
+        ? `♪ Tocando agora ${na}: ${linhaDaMusica(item)}`
+        : `♪ Na fila ${na} (${posicao}ª): ${linhaDaMusica(item)}`;
     } else if (comando === 'pular') {
+      // O app diz QUAL música a pessoa quer pular. Sem isto, um /pular que cruzasse com o fim da
+      // música pulava a seguinte, que ninguém pediu para pular (achado na revisão).
+      const agoraToca = filas.ver(voz.id)?.tocando.uid;
+      if (uid && agoraToca && uid !== agoraToca) throw new ErroDeConta('Essa música já tinha acabado — não pulei a seguinte.', 409, 'musica');
       const { pulou, agora } = filas.pular(voz.id);
       bot = agora
         ? { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala }
         : { tipo: 'texto', cmd: 'pular', texto: `Pulei "${pulou.titulo}". A fila acabou.` };
-      texto = agora ? `♪ Tocando agora na ${voz.nome}: ${linhaDaMusica(agora)}` : bot.texto;
+      texto = agora ? `♪ Tocando agora ${na}: ${linhaDaMusica(agora)}` : bot.texto;
     } else if (comando === 'parar') {
       filas.parar(voz.id);
       bot = { tipo: 'texto', cmd: 'parar', texto: 'Parei a música e limpei a fila.' };
@@ -1558,11 +1601,27 @@ const ROTAS = {
     } else {
       const f = filas.ver(voz.id);
       if (!f) throw new ErroDeConta('Não tem nada tocando.', 409, 'musica');
-      bot = { tipo: 'fila', cmd: 'fila', tocando: f.tocando, fila: f.fila, tocouSegundos: Math.round((f.agora - f.comecouEm) / 1000), sala };
-      texto = `♪ Fila da ${voz.nome}: ${[f.tocando, ...f.fila].map(linhaDaMusica).join(' · ')}`;
+      // O cartão guarda até 20: a fila inteira (50) em cada /fila incharia o chat à toa.
+      bot = { tipo: 'fila', cmd: 'fila', tocando: f.tocando, fila: f.fila.slice(0, 20), mais: Math.max(0, f.fila.length - 20), tocouSegundos: Math.round((f.agora - f.comecouEm) / 1000), sala };
+      texto = `♪ Fila ${voz.privada ? 'da call' : `da ${voz.nome}`}: ${[f.tocando, ...f.fila.slice(0, 20)].map(linhaDaMusica).join(' · ')}`;
     }
-    const mensagem = mensagens.enviarDoBot(db, sid, eu, chat.id, { texto, bot });
-    return { mensagem, musica: verMusica(voz.id), sala, agora: Date.now() };
+    const mensagem = mensagens.enviarDoBot(db, sid, eu, vista.id, { texto, bot });
+    return { mensagem, musica: verMusica(voz.id), sala: { id: voz.id }, agora: Date.now() };
+  },
+
+  /**
+   * A fila de UMA sala de voz, conferida na hora. É para quem está na call de um servidor e
+   * olhando outro: a busca de salas é do servidor aberto na tela, e sem isto quem toca não
+   * ficava sabendo do /pular — e, se ninguém estivesse com aquele servidor aberto, a fila nem
+   * era conferida (anfitrião que saiu, música que passou da hora).
+   */
+  'GET /musica': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const id = Number(new URL(req.url, 'http://x').searchParams.get('sala'));
+    const voz = salasDoServidor(sid, eu).find((s) => s.id === id && s.tipo === 'voz');
+    if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
+    const participants = await participantesDaSala(sid, voz, await salasVivas());
+    return { musica: musicaDaSala(sid, { ...voz, participants }), agora: Date.now() };
   },
 
   /**
@@ -1573,7 +1632,9 @@ const ROTAS = {
   'POST /musica/acabou': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const { sala: salaVoz, uid, erro } = await lerCorpo(req);
-    const voz = salasM.listarSalas(db, sid).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
+    // Só entre as salas que a pessoa vê: com todas, qualquer membro descobria as salas privadas
+    // e lia a fila delas — quem pediu, e quem estava lá dentro (achado na revisão).
+    const voz = salasDoServidor(sid, eu).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
     if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
     const antes = filas.ver(voz.id);
     const r = filas.acabou(voz.id, String(uid ?? ''), eu.id);
@@ -1583,6 +1644,15 @@ const ROTAS = {
     }
     if (r.andou && r.agora) anunciarQueComecou(sid, voz, r.agora);
     return { musica: verMusica(voz.id), agora: Date.now() };
+  },
+
+  /** O anfitrião avisa que o som começou, e em que ponto — ver `comecou`, em musica.mjs. */
+  'POST /musica/comecou': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const { sala: salaVoz, uid, posicao } = await lerCorpo(req);
+    const voz = salasDoServidor(sid, eu).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
+    if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
+    return { ok: filas.comecou(voz.id, String(uid ?? ''), eu.id, posicao) };
   },
 
   'POST /token': async (req) => {
@@ -1671,7 +1741,8 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const c = await lerCorpo(req);
     const cargo = cargosM.editarCargo(db, sid, eu, c.id, c);
-    await reaplicarFontesDaCall(sid);
+    // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
+    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
     return { cargo };
   },
 
@@ -1679,7 +1750,8 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
     const r = cargosM.apagarCargo(db, sid, eu, id);
-    await reaplicarFontesDaCall(sid);
+    // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
+    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
     return r;
   },
 
@@ -1737,7 +1809,8 @@ const ROTAS = {
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
       case 'cargo': {
         const r = membros.definirCargo(db, sid, eu.id, alvo, cargo);
-        await reaplicarFontesDaCall(sid);
+        // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
+    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
         return { alvo: verMembro(r) };
       }
       case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };

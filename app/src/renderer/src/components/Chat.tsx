@@ -540,8 +540,9 @@ export function Chat({
               e.preventDefault();
               const passo = e.key === 'ArrowDown' ? 1 : -1;
               setEscolhido((i) => (i + passo + menuDeComandos.length) % menuDeComandos.length);
-            } else if (e.key === 'Tab' || (e.key === 'Enter' && texto !== `/${c.nome}`)) {
-              // Enter no nome já inteiro (/pular) manda; no pedaço (/pu), completa.
+            } else if (e.key === 'Tab' || (e.key === 'Enter' && (texto !== `/${c.nome}` || c.argumento))) {
+              // Enter no nome já inteiro de um comando sem argumento (/pular) manda; no pedaço
+              // (/pu), ou num que pede o que tocar (/tocar), completa e espera o resto.
               e.preventDefault();
               completar(c.nome);
             } else if (e.key === 'Escape') {

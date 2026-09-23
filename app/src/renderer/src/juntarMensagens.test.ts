@@ -21,3 +21,12 @@ test('continua com o teto de mensagens na tela', () => {
   assert.equal(juntarMensagens(muitas, [m(300)]).length, 300);
   assert.equal(juntarMensagens(muitas, [m(300)])[0].id, 1);
 });
+
+test('a mensagem de um amigo com id menor entra no lugar dela, e não depois da sua', () => {
+  // Você enviou a 12 (mostrada na hora); a do amigo, 11, foi gravada logo antes e chega na busca.
+  assert.deepEqual(juntarMensagens([m(10), m(12)], [m(11), m(12)]).map((x) => x.id), [10, 11, 12]);
+});
+
+test('as respostas locais do bot (id negativo) ficam no fim', () => {
+  assert.deepEqual(juntarMensagens([m(10), m(-1)], [m(11)]).map((x) => x.id), [10, 11, -1]);
+});

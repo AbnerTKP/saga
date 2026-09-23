@@ -41,13 +41,15 @@ export function RespostaDoBot({ bot, estadoDaSala, soParaVoce, principal = true,
         <LinhaDaFila item={bot.tocando} marca="agora" detalhe={`${duracao(passou)} de ${duracao(bot.tocando.duracao)}`} />
         {bot.fila.map((f, i) => <LinhaDaFila key={f.uid} item={f} marca={String(i + 1)} detalhe={duracao(f.duracao)} />)}
         {bot.fila.length === 0 && <div className="bot-lista-vazia">Depois desta, nada. Ponha mais com /tocar.</div>}
+        {!!bot.mais && <div className="bot-lista-vazia">E mais {bot.mais} depois dessas.</div>}
       </div>
     );
   }
 
   const nasceu = bot.tipo === 'tocando' ? { tipo: 'tocando' as const } : { tipo: 'na-fila' as const, posicao: bot.posicao };
   const s = situacaoDoCartao(bot.item, nasceu, estadoDaSala(bot.sala.id));
-  const rotulo = s.tipo === 'tocando' ? `Tocando agora na ${bot.sala.nome}`
+  // Sala privada vem sem nome (o servidor não o escreve num chat que mais gente lê).
+  const rotulo = s.tipo === 'tocando' ? (bot.sala.nome ? `Tocando agora na ${bot.sala.nome}` : 'Tocando agora')
     : s.tipo === 'na-fila' ? (s.posicao === 1 ? 'Na fila — é a próxima' : `Na fila — ${s.posicao}ª`)
     : 'Tocou';
   return (

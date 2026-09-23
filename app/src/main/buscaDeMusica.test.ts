@@ -30,6 +30,7 @@ test('nome solto é busca, e texto com cara de opção não vira opção', () =>
   assert.equal(args.at(-1), alvo);
   assert.ok(!args.includes('--no-part'), 'sem .part, a música já baixada volta com HTTP 416');
   assert.ok(args.includes('before_dl:%()j'), 'os dados da música saem antes do download');
+  assert.ok(args.includes('--ignore-config'), 'a configuração pessoal do yt-dlp não entra');
 });
 
 test('playlist, álbum e link desconhecido têm resposta que diz o que fazer', () => {
@@ -64,4 +65,7 @@ test('ao vivo e sem duração não entram', () => {
   assert.throws(() => lerRespostaDoYtDlp({ id: 'abcdefghijk', title: 'x', is_live: true, duration: 0 }, 'youtube'), /Ao vivo/);
   assert.throws(() => lerRespostaDoYtDlp({ id: 'abcdefghijk', title: 'x' }, 'youtube'), /quanto essa dura/);
   assert.throws(() => lerRespostaDoYtDlp({ _type: 'playlist', entries: [] }, 'busca'), /Não achei/);
+  // Medido: a busca "1 hour mix" trouxe um de 6 h (22 258 s, 399 MB).
+  assert.throws(() => lerRespostaDoYtDlp({ id: 'abcdefghijk', title: 'mix', duration: 22258 }, 'busca'), /2 horas/);
+  assert.equal(lerRespostaDoYtDlp({ id: 'abcdefghijk', title: 'mix', duration: 7200 }, 'busca').duracao, 7200);
 });

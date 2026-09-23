@@ -28,7 +28,7 @@ test('a capa sai do id, e não do que o app mandou', () => {
 
 test('música sem fim ou comprida demais não entra', () => {
   assert.throws(() => validarItem(musica('dQw4w9WgXcQ', 0)), recusa(400, /Ao vivo/));
-  assert.throws(() => validarItem(musica('dQw4w9WgXcQ', 4 * 3600)), recusa(400, /3 horas/));
+  assert.throws(() => validarItem(musica('dQw4w9WgXcQ', 2 * 3600 + 1)), recusa(400, /2 horas/));
   assert.throws(() => validarItem(musica('../../etc')), recusa(400));
 });
 
@@ -146,4 +146,25 @@ test('o anfitrião que caiu e voltou dentro do prazo continua tocando', () => {
   passar(AUSENTE);
   filas.conferir(GERAL, [GUSTAVO.id]);
   assert.equal(filas.ver(GERAL).anfitriao, TKP.id, 'a contagem da ausência recomeça quando ele volta');
+});
+
+test('o relógio da música é o do som: o aviso de começo corrige a espera do download', () => {
+  const { filas, passar, agora } = montar();
+  filas.tocar(GERAL, musica('dQw4w9WgXcQ', 200), { pediu: TKP, salaDoChat: CHAT });
+  passar(20_000);   // o download levou 20 s
+  assert.equal(filas.comecou(GERAL, 'u1', TKP.id, 0), true);
+  assert.equal(filas.ver(GERAL).comecouEm, agora());
+  passar(200_000 + FOLGA - 1);
+  assert.equal(filas.conferir(GERAL, [TKP.id]), null, 'a música ainda está tocando');
+});
+
+test('só o anfitrião avisa que começou, e só da música que toca; o ponto entra na conta', () => {
+  const { filas, agora } = montar();
+  filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });
+  assert.equal(filas.comecou(GERAL, 'u1', GUSTAVO.id, 0), false);
+  assert.equal(filas.comecou(GERAL, 'outra', TKP.id, 0), false);
+  assert.equal(filas.comecou(GERAL, 'u1', TKP.id, 42), true);
+  assert.equal(filas.ver(GERAL).comecouEm, agora() - 42_000, 'quem assumiu no meio continua do ponto');
+  filas.comecou(GERAL, 'u1', TKP.id, 99999);
+  assert.equal(filas.ver(GERAL).comecouEm, agora() - 213_000, 'o ponto não passa do fim');
 });

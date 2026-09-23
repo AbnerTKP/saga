@@ -323,6 +323,13 @@ test('o bot de música: permissão de cargo, só em sala de texto, e só para qu
   const naVoz = await chamar('POST', '/musica', { sessao: dono.token, corpo: { sala: geral.id, ...tocar } });
   assert.equal(naVoz.status, 400, 'comando numa sala de voz');
   assert.equal(geral.musica, null, 'sala de voz sem fila diz null, e não some');
+  // A pergunta direta, de quem está numa call de outro servidor que não o aberto.
+  const direta = await chamar('GET', `/musica?sala=${geral.id}`, { sessao: bruno.token });
+  assert.equal(direta.status, 200);
+  assert.equal(direta.corpo.musica, null);
+  assert.ok(direta.corpo.agora > 0, 'a hora do servidor vai junto');
+  assert.equal((await chamar('GET', `/musica?sala=${chat.id}`, { sessao: bruno.token })).status, 404, 'sala de texto não tem fila');
+  assert.equal((await chamar('GET', '/musica?sala=999999', { sessao: bruno.token })).status, 404);
   await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: chat.id } });
 });
 
@@ -903,6 +910,33 @@ test('a voz de uma sala privada não emite passe para quem não a vê', async ()
   const dele = await chamar('POST', '/token', { sessao: bruno.token, corpo: { sala: voz.id } });
   assert.equal(dele.status, 400, 'saiu passe de voz para sala que ele não vê');
   assert.equal((await chamar('POST', '/token', { sessao: dono.token, corpo: { sala: voz.id } })).status, 200);
+});
+
+test('o bot de música não conta a ninguém que uma sala privada existe', async () => {
+  // Achado na revisão de 23/09/2026: as rotas do bot procuravam a sala entre TODAS, e a
+  // resposta diferente ("esse comando não existe" contra 404) dizia que a sala estava lá.
+  const dono = await sessaoDe('abner');
+  const bruno = await sessaoDe('bruno');
+  const cargos = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.cargos;
+  const alto = cargos.reduce((a, b) => (a.nivel >= b.nivel ? a : b));
+  const texto = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Cofre', tipo: 'texto' } })).corpo.sala;
+  const voz = (await chamar('POST', '/salas/criar', { sessao: dono.token, corpo: { nome: 'Porão', tipo: 'voz' } })).corpo.sala;
+  for (const s of [texto, voz]) await chamar('POST', '/salas/editar', { sessao: dono.token, corpo: { id: s.id, privada: true, cargos: [alto.id] } });
+  const inexistente = 999999;
+
+  for (const [rota, corpo] of [
+    ['/musica', (id) => ({ sala: id, comando: 'inventado' })],
+    ['/musica/acabou', (id) => ({ sala: id, uid: 'x' })],
+    ['/musica/comecou', (id) => ({ sala: id, uid: 'x', posicao: 0 })],
+  ]) {
+    const privada = await chamar('POST', rota, { sessao: bruno.token, corpo: corpo(rota === '/musica' ? texto.id : voz.id) });
+    const nenhuma = await chamar('POST', rota, { sessao: bruno.token, corpo: corpo(inexistente) });
+    assert.equal(privada.status, 404, `${rota} respondeu ${privada.status} para a sala privada`);
+    assert.deepEqual(privada.corpo, nenhuma.corpo, `${rota}: a privada responde diferente da que não existe`);
+  }
+  const lida = await chamar('GET', `/musica?sala=${voz.id}`, { sessao: bruno.token });
+  assert.equal(lida.status, 404, 'a fila da sala privada vazou');
+  for (const s of [texto, voz]) await chamar('POST', '/salas/apagar', { sessao: dono.token, corpo: { id: s.id } });
 });
 
 test('quem não vê a sala privada ainda consegue arrastar as que vê', async () => {

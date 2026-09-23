@@ -1109,11 +1109,12 @@ export type EstadoDaMusica = {
   anfitriao: string;
 };
 
-type SalaDoBot = { id: number; nome: string };
+/** `nome` null: sala privada — o bot não escreve o nome dela num chat que mais gente lê. */
+type SalaDoBot = { id: number; nome: string | null };
 export type MensagemDoBot =
   | { tipo: 'tocando'; cmd?: string; item: ItemDaMusica; sala: SalaDoBot; pulou?: string }
   | { tipo: 'na-fila'; cmd?: string; item: ItemDaMusica; posicao: number; sala: SalaDoBot }
-  | { tipo: 'fila'; cmd?: string; tocando: ItemDaMusica; fila: ItemDaMusica[]; tocouSegundos: number; sala: SalaDoBot }
+  | { tipo: 'fila'; cmd?: string; tocando: ItemDaMusica; fila: ItemDaMusica[]; mais?: number; tocouSegundos: number; sala: SalaDoBot }
   | { tipo: 'texto'; cmd?: string; texto: string };
 
 export type NomeDoComandoDeMusica = 'tocar' | 'pular' | 'parar' | 'fila';
@@ -1123,8 +1124,22 @@ export const comandoDeMusica = (
   sala: number,
   comando: NomeDoComandoDeMusica,
   musica?: { id: string; titulo: string; autor: string; duracao: number; origem: string },
-) => pedir<{ mensagem: Mensagem; musica: EstadoDaMusica | null; sala?: SalaDoBot; agora?: number }>('POST', '/musica', { sala, comando, musica });
+  /** No /pular: a música que a pessoa via tocando. O servidor só pula se ainda for ela. */
+  uid?: string,
+) => pedir<{ mensagem: Mensagem; musica: EstadoDaMusica | null; sala?: { id: number }; agora?: number }>('POST', '/musica', { sala, comando, musica, uid });
 
-/** O anfitrião avisa que a música acabou — ou que não conseguiu tocá-la. Volta a seguinte. */
-export const avisarQueAMusicaAcabou = (sala: number, uid: string, erro = false) =>
-  pedir<{ musica: EstadoDaMusica | null; agora?: number }>('POST', '/musica/acabou', { sala, uid, erro });
+/** O anfitrião avisa que o som começou, e em que ponto: o relógio da música passa a ser o dele. */
+export const avisarQueAMusicaComecou = (sala: number, uid: string, posicao: number, servidor: number) =>
+  pedir<{ ok: boolean }>('POST', '/musica/comecou', { sala, uid, posicao }, servidor);
+
+/**
+ * O anfitrião avisa que a música acabou — ou que não conseguiu tocá-la. Volta a seguinte.
+ * `servidor` é o da CALL, que pode não ser o aberto na tela: com o cabeçalho de outro, o
+ * servidor respondia "essa sala não existe" e a fila não andava.
+ */
+export const avisarQueAMusicaAcabou = (sala: number, uid: string, erro: boolean, servidor: number) =>
+  pedir<{ musica: EstadoDaMusica | null; agora?: number }>('POST', '/musica/acabou', { sala, uid, erro }, servidor);
+
+/** A fila de uma sala de voz, direto — para quem está numa call de outro servidor que não o aberto. */
+export const lerMusica = (sala: number, servidor: number) =>
+  pedir<{ musica: EstadoDaMusica | null; agora?: number }>('GET', `/musica?sala=${sala}`, undefined, servidor);

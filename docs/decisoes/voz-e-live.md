@@ -368,3 +368,39 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
   Resultado na bancada: do comando ao som no ouvinte, 5,5 a 7,8 s (a busca pelo WARP varia de 2,9
   a 4,4 s); no Mac do dono, antes, uns 21 s. O registro agora anota cada etapa (`achada em`,
   `servidor respondeu em`, `ms depois de saber`), para a próxima reclamação ser medida, não chutada.
+- **A revisão antes da v0.63.1 (23/09/2026).** Dois revisores independentes leram tudo desde a
+  v0.62.0 (servidor e app), e a bancada mediu o que eles apontaram. O que não é óbvio:
+  - **Sala privada**: as rotas do bot procuravam a sala entre TODAS, e a resposta diferente
+    contava que uma sala privada existia — e o "acabou" devolvia a fila dela, com quem estava lá
+    dentro. Hoje as quatro rotas (`/musica`, `/musica/acabou`, `/musica/comecou`, `GET /musica`)
+    respondem para a privada exatamente como para a inexistente (`api.test.mjs` trava), e o bot
+    não escreve o nome de sala de voz privada no chat: diz "na call".
+  - **A faixa encerrada pela sala** (o maior): ao sair da sala, o LiveKit ENCERRA as faixas
+    locais, e publicar de novo uma faixa encerrada não dá erro — só silêncio para os outros,
+    com quem toca ouvindo normal. A música (e o soundboard, desde antes do bot) reaproveitava a
+    faixa morta. Medido depois do conserto: música e soundboard chegando depois de trocar de
+    sala. O defeito antigo do soundboard NÃO foi reproduzido antes do conserto — é leitura do
+    código, a mesma do da música, que foi.
+  - **O prazo de um `/tocar` velho tirava a faixa da call** enquanto a música nova carregava:
+    reproduzido na bancada (música tocando para ninguém), consertado, e três rodadas seguidas
+    passaram.
+  - **Reconexão**: "reconectando" conta como estar na call, e a faixa não é publicada de novo
+    se o LiveKit já a republicou. Medido matando o LiveKit (`kill -9`; o `pkill` comum ele
+    espera os participantes saírem e nada cai): volta UMA faixa, com som, em 10 s.
+  - **O relógio da música é o do som**: o anfitrião avisa `comecou` com o ponto, e o fim é
+    contado dali (a folga de 60 s fica só para o app morto). Quem pediu toca do começo; quem
+    caiu e voltou continua do ponto.
+  - **O `/pular` diz qual música quer pular**, e o servidor recusa se já for outra — corrida
+    reproduzida por simulação na revisão.
+  - **Quem cai da call voltava sempre mutado** (defeito antigo): o registro da queda lia o
+    microfone depois de o LiveKit já tê-lo tirado. Hoje volta pela escolha (`querFalar`).
+  - **Mensagem de amigo podia nunca aparecer** (defeito antigo): mostrar a SUA mensagem na hora
+    avançava o marcador da busca para depois dela.
+  - Processo principal: o zip do yt-dlp é conferido contra o `SHA2-256SUMS` da própria versão;
+    a versão é validada antes de virar pasta; `--ignore-config`; um download por id; versões
+    velhas apagadas só na abertura; prazo em todo pedido à internet; áudios limpos de hora em
+    hora; o yt-dlp morre junto com a Saga.
+  - **Ficou para depois, de propósito**: o áudio atravessa inteiro para a tela por IPC (o teto
+    de 2 h limita a ~130 MB; servir por protocolo próprio é a saída); o anfitrião herdado pode
+    ser alguém de app antigo, que não toca (aí a fila anda pelo tempo); e a trava de transmitir
+    não segura um app modificado que declare a tela como câmera.

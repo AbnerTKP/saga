@@ -221,6 +221,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    * inventado.
    */
   const querFalar = useRef(true);
+  /** Ver o efeito principal: é ele quem ouve a mudança de permissão, e chama isto. */
+  const aoMudarPermissao = useRef<() => void>(() => undefined);
 
   // Soundboard. O som vai para a sala numa faixa própria, e não misturado ao microfone:
   // assim tocar não depende de estar com o microfone ligado, e mutar alguém não muta os
@@ -474,7 +476,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
        * já é "a tentativa dele desistiu", e não o primeiro soluço da rede.
        */
       if (!desligueiDeProposito.current && salaDaVozRef.current && deveVoltarParaACall(motivo)) {
-        setCaiuDaCall({ sala: salaDaVozRef.current, comMicrofone: room.localParticipant.isMicrophoneEnabled });
+        // Pela escolha da pessoa, e não pelo microfone da sala: quando este evento chega, o
+        // LiveKit já tirou as faixas, e `isMicrophoneEnabled` dava sempre falso — quem caía
+        // voltava mutado, contra o "volta como estava" (achado na revisão de 23/09/2026).
+        setCaiuDaCall({ sala: salaDaVozRef.current, comMicrofone: querFalar.current });
       }
       desligueiDeProposito.current = false;
       // A publicação morre junto com a sala; a próxima entrada publica de novo.
@@ -486,6 +491,11 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       medicoes.current.forEach(clearTimeout);
       medicoes.current = [];
       faixaDoSom.current = null;
+      // A sala ENCERRA as faixas locais ao sair — a do soundboard também. O destino velho
+      // devolveria a mesma faixa morta, e publicá-la de novo não dá erro nenhum: os sons só
+      // chegavam mudos aos outros depois da primeira troca de sala (achado na revisão de
+      // 23/09/2026). O próximo som faz um destino novo.
+      destinoDoSom.current = null;
       getAudioRoot().innerHTML = '';
       setStatus('idle');
       setSalaDaVoz(null);
@@ -544,6 +554,13 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       })
       .on(RoomEvent.LocalTrackUnpublished, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.ConnectionQualityChanged, bump)
+      // A permissão de transmitir mudou (o dono mexeu no cargo com a pessoa na call). Mora
+      // AQUI, e não num efeito à parte: o `removeAllListeners` da volta deste efeito apagaria
+      // o de fora calado — a regra dos eventos da sala, em som-e-microfone.md.
+      .on(RoomEvent.ParticipantPermissionsChanged, (_antes: unknown, quem: Participant) => {
+        bump();
+        if (quem === room.localParticipant) aoMudarPermissao.current();
+      })
       .on(RoomEvent.MediaDevicesError, (e: Error) => { anotar('erro', 'aparelhos', e); onError(e); });
 
     return () => {
@@ -860,18 +877,16 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
 
   // O dono tirou a permissão com a tela no ar: o LiveKit já derrubou a transmissão, mas a
   // captura continua ligada aqui (e o aviso de gravação do sistema também) até alguém
-  // desligá-la. Ganhar a permissão só redesenha o botão.
-  useEffect(() => {
-    const aoMudar = () => {
-      bump();
-      const lp = room.localParticipant;
-      if (podeTransmitir(lp.permissions?.canPublishSources) || !lp.isScreenShareEnabled) return;
-      void stopScreen().catch(() => undefined);
-      avisar('aviso', 'Seu cargo deixou de poder transmitir a tela.');
-    };
-    room.on(RoomEvent.ParticipantPermissionsChanged, aoMudar);
-    return () => { room.off(RoomEvent.ParticipantPermissionsChanged, aoMudar); };
-  }, [room, stopScreen, avisar]);
+  // desligá-la. Ganhar a permissão só redesenha o botão. Quem chama é o efeito principal.
+  aoMudarPermissao.current = () => {
+    const lp = room.localParticipant;
+    if (podeTransmitir(lp.permissions?.canPublishSources)) return;
+    // O LiveKit pode ter tirado a publicação antes deste aviso: a mixagem que é nossa conta.
+    const transmitia = lp.isScreenShareEnabled || !!faixaDeMixagem.current;
+    if (!transmitia) return;
+    void stopScreen().catch(() => undefined);
+    avisar('aviso', 'Seu cargo deixou de poder transmitir a tela.');
+  };
 
   const toggleDeafen = useCallback(async () => {
     const next = !deafenedRef.current;

@@ -39,7 +39,13 @@ export function quandoForTocar(f: () => void) {
  * permissão — sai na hora, e não depois de o yt-dlp passar segundos procurando uma música
  * que não vai tocar. O servidor confere de novo: isto é conforto, não trava.
  */
-type Contexto = { eu: { id: number; nome: string }; naCall: () => boolean; podeTocar: () => boolean };
+type Contexto = {
+  eu: { id: number; nome: string };
+  naCall: () => boolean;
+  podeTocar: () => boolean;
+  /** A música que esta tela vê tocando na minha call — o /pular diz qual quer pular. */
+  tocandoAgora: () => string | null;
+};
 let contexto: Contexto | null = null;
 export const definirContextoDoBot = (c: Contexto | null) => { contexto = c; };
 
@@ -84,7 +90,7 @@ export async function executarComando(
     anotar('info', 'musica', `/tocar: achada em ${Math.round(performance.now() - inicio)} ms`);
   }
   const antesDoServidor = performance.now();
-  const r = await comandoDeMusica(sala, c.nome, musica);
+  const r = await comandoDeMusica(sala, c.nome, musica, c.nome === 'pular' ? contexto?.tocandoAgora() ?? undefined : undefined);
   anotar('info', 'musica', `/${c.nome}: servidor respondeu em ${Math.round(performance.now() - antesDoServidor)} ms`);
   if (r.sala) contarQueAMusicaMudou(r.sala.id, r.musica, r.agora ?? 0);
   return r.mensagem;

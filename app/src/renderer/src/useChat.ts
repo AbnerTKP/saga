@@ -95,9 +95,13 @@ export function useChat(onde: Onde | null) {
   }, [chave]);
 
   // Quem acabou de escrever não pode esperar a próxima busca para se ver na tela.
+  //
+  // O marcador `ultima` NÃO anda aqui. Andava, e a mensagem de um amigo gravada entre a última
+  // busca e o seu envio (id menor que o da sua) nunca aparecia: a busca seguinte já perguntava
+  // "depois da sua" (achado na revisão de 23/09/2026). A busca traz a sua de novo, e
+  // `juntarMensagens` não a repete.
   const mostrarJa = useCallback((m: Mensagem) => {
-    ultima.current = Math.max(ultima.current, m.id);
-    setMensagens((antigas) => (antigas.some((x) => x.id === m.id) ? antigas : [...antigas, m]));
+    setMensagens((antigas) => juntarMensagens(antigas, [m]));
     setErro(null);
   }, []);
 
@@ -146,7 +150,9 @@ export function useChat(onde: Onde | null) {
       mandou();
     } catch (e) {
       tirarLocal(procurando.id);
-      mostrarLocal(respostaLocal((e as Error).message, c.nome));
+      // O erro é da sala onde o comando foi dado: quem trocou de sala enquanto esperava não o
+      // recebe no meio de outra conversa.
+      if (chaveDoLugar(lugar.current) === chaveDoLugar(aqui)) mostrarLocal(respostaLocal((e as Error).message, c.nome));
     }
   }, [chave, mostrarJa, mandou, mostrarLocal, tirarLocal]);
 

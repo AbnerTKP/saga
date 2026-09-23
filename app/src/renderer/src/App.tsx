@@ -286,8 +286,12 @@ export function App() {
   );
   const musica = useMusica({
     room: rm.room,
-    conectado: rm.status === 'connected',
+    // Reconectando ainda é estar na call: o LiveKit republica a faixa da música sozinho, e
+    // parar o som numa piscada da internet recomeçava tudo (achado na revisão).
+    conectado: rm.status === 'connected' || rm.status === 'reconnecting',
+    euId: sessao?.eu?.id ?? null,
     salaVozId: rm.salaDaVoz?.id ?? null,
+    servidorDaVoz: rm.salaDaVoz?.servidorId ?? null,
     filasDaBusca,
     agoraDaBusca: agoraDasSalas.current,
     volume: rm.volumeDaMusica,
@@ -297,12 +301,20 @@ export function App() {
   // "estou na call?" ser o de agora e não o de quando o efeito rodou.
   const statusDaVoz = useRef(rm.status);
   statusDaVoz.current = rm.status;
+  const salaDaVozDoBot = useRef<number | null>(null);
+  salaDaVozDoBot.current = rm.salaDaVoz?.id ?? null;
+  const estadoDaSalaDoBot = useRef(musica.estadoDaSala);
+  estadoDaSalaDoBot.current = musica.estadoDaSala;
   const euNoBot = sessao?.eu;
   useEffect(() => {
     definirContextoDoBot(euNoBot ? {
       eu: { id: euNoBot.id, nome: euNoBot.nome },
       naCall: () => statusDaVoz.current === 'connected',
       podeTocar: () => pode(euNoBot.cargo, 'tocarMusica'),
+      tocandoAgora: () => {
+        const voz = salaDaVozDoBot.current;
+        return voz === null ? null : estadoDaSalaDoBot.current(voz)?.tocando.uid ?? null;
+      },
     } : null);
   }, [euNoBot]);
   const dadosDaqui = dadosDoServidor?.servidorId === servidorAberto ? dadosDoServidor : null;
