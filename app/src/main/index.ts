@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor, dialog, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, session, desktopCapturer, systemPreferences, shell, powerMonitor, dialog, globalShortcut, screen, net } from 'electron';
 import { join, dirname } from 'node:path';
 import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
@@ -468,18 +468,26 @@ app.whenReady().then(async () => {
    * `showSaveFilePicker` não têm para onde escrever, e a alternativa seria abrir o
    * arquivo no navegador — que é justamente o que não se quer com arquivo que veio de
    * fora. Aqui a pessoa escolhe onde põe, e nada é aberto nem executado.
+   *
+   * Baixa pelo `net.fetch`, a rede do Chromium, e não pelo `fetch` do Node. Em 25/09/2026 o
+   * salvar falhou quatro vezes seguidas no Mac do dono com "fetch failed", enquanto o chat,
+   * que é da tela e usa a rede do Chromium, seguia chegando. São duas pilhas de rede: a do
+   * Node não segue proxy nem VPN do sistema. Reproduzir aqui não deu — os dois caminhos
+   * funcionaram depois —, então o que decide é baixar pelo MESMO caminho do resto do app,
+   * e deixar a causa no registro se falhar de novo.
    */
   ipcMain.handle('arquivo:salvar', async (_e, url: string, nome: string) => {
     const janela = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
     const escolha = await dialog.showSaveDialog(janela, { defaultPath: nome });
     if (escolha.canceled || !escolha.filePath) return { ok: false };
     try {
-      const r = await fetch(url);
+      const r = await net.fetch(url);
       if (!r.ok) throw new Error(`o servidor respondeu ${r.status}`);
       writeFileSync(escolha.filePath, Buffer.from(await r.arrayBuffer()));
       return { ok: true, caminho: escolha.filePath };
     } catch (e) {
-      registrar('erro', 'arquivo', `salvar "${nome}": ${(e as Error).message}`);
+      const causa = (e as Error & { cause?: { code?: string; message?: string } }).cause;
+      registrar('erro', 'arquivo', `salvar "${nome}" (${url}): ${(e as Error).message}${causa ? ` — ${causa.code ?? causa.message}` : ''}`);
       return { ok: false, erro: (e as Error).message };
     }
   });
