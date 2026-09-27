@@ -1502,6 +1502,61 @@ test('xadrez pela rede: abrir, chamar, o convite no /rooms, aceitar, jogar, assi
   assert.deepEqual((await naMesa(juninho.token, { id, acao: 'fechar' })).corpo, { ok: true });
 });
 
+// --- Catan --------------------------------------------------------------------
+
+test('Catan pela rede: abrir, chamar dois, o convite no /rooms, começar, jogar e a mão escondida', async () => {
+  const tkp = (await cadastrar('catan_tkp')).corpo;
+  const tava = (await cadastrar('catan_tava')).corpo;
+  const gus = (await cadastrar('catan_gus')).corpo;
+  const casa = tkp.servidor.id;
+  const naMesa = (sessao, corpo) => chamar('POST', '/catan/mesa', { sessao, servidor: casa, corpo });
+  const ler = async (sessao, id) => (await chamar('GET', `/catan/mesa?id=${id}`, { sessao, servidor: casa })).corpo.mesa;
+
+  const aberta = await chamar('POST', '/catan/abrir', { sessao: tkp.token, servidor: casa, corpo: {} });
+  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
+  const { id } = aberta.corpo.mesa;
+  assert.equal(aberta.corpo.mesa.eu, 'anfitriao');
+
+  for (const alvo of [tava, gus]) assert.equal((await naMesa(tkp.token, { id, acao: 'chamar', alvo: alvo.eu.id })).status, 200);
+  const convites = (await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa })).corpo.catan.convites;
+  assert.deepEqual(convites.map((c) => ({ mesa: c.mesa, de: c.de.id, sentados: c.sentados.map((p) => p.id) })), [{ mesa: id, de: tkp.eu.id, sentados: [tkp.eu.id] }]);
+
+  for (const quem of [tava, gus]) assert.equal((await naMesa(quem.token, { id, acao: 'aceitar' })).status, 200);
+  const comecou = await naMesa(tkp.token, { id, acao: 'comecar' });
+  assert.equal(comecou.status, 200, JSON.stringify(comecou.corpo));
+  assert.equal(comecou.corpo.mesa.estado, 'jogando');
+
+  // Quem tem a vez põe a primeira aldeia; quem não tem ouve o motivo.
+  const ordem = comecou.corpo.mesa.jogadores.map((p) => p.id);
+  const sessaoDe = { [tkp.eu.id]: tkp.token, [tava.eu.id]: tava.token, [gus.eu.id]: gus.token };
+  const primeiro = sessaoDe[ordem[0]];
+  const segundo = sessaoDe[ordem[1]];
+  const dele = await ler(primeiro, id);
+  assert.equal(dele.partida.eu, 0);
+  assert.equal(dele.partida.pode.aldeias.length, 54);
+  const fora = await naMesa(segundo, { id, acao: 'jogar', jogada: { tipo: 'aldeia', v: dele.partida.pode.aldeias[0] } });
+  assert.equal(fora.status, 409);
+  assert.match(fora.corpo.error, /vez/);
+  const pos = await naMesa(primeiro, { id, acao: 'jogar', jogada: { tipo: 'aldeia', v: dele.partida.pode.aldeias[0] } });
+  assert.equal(pos.status, 200, JSON.stringify(pos.corpo));
+
+  // A mão dos outros não sai do servidor, e o resumo diz de quem é a vez.
+  const doSegundo = await ler(segundo, id);
+  assert.equal(doSegundo.partida.jogadores[0].mao, undefined);
+  assert.deepEqual(doSegundo.partida.pode, {});
+  const resumo = (await chamar('GET', '/rooms', { sessao: gus.token, servidor: casa })).corpo.catan.mesas.find((m) => m.id === id);
+  assert.equal(resumo.vez, ordem[0]);
+  assert.deepEqual(new Set(resumo.jogadores), new Set(ordem));
+
+  // Noutro servidor o número não abre a mesa.
+  const outro = (await chamar('POST', '/servidores/criar', { sessao: gus.token, corpo: { nome: 'Ilha de Catan' } })).corpo.servidor;
+  assert.equal((await chamar('GET', `/catan/mesa?id=${id}`, { sessao: gus.token, servidor: outro.id })).status, 404);
+
+  for (const t of [tkp.token, tava.token]) await naMesa(t, { id, acao: 'desistir' });
+  assert.equal((await ler(gus.token, id)).estado, 'fim');
+  assert.equal((await naMesa(gus.token, { id, acao: 'fechar' })).status, 200);
+});
+
 test('xadrez: só se chama quem é do servidor e não foi banido, e sem sessão nada', async () => {
   const dono = await sessaoDe('abner');
   const quem = (await cadastrar('xadrez_quem')).corpo;

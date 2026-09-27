@@ -31,7 +31,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -67,6 +67,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   onCorrida: () => void;
   textoDaLuta: string;
   onLuta: () => void;
+  textoDoCatan: string;
+  onCatan: () => void;
   onUrna: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
@@ -398,6 +400,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       minha={minhaPartida}
       corrida={textoDaCorrida}
       luta={textoDaLuta}
+      catan={textoDoCatan}
+      onCatan={onCatan}
       onXadrez={onXadrez}
       onCorrida={onCorrida}
       onLuta={onLuta}

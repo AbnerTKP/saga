@@ -6,6 +6,7 @@ import './tokens.css';
 import './styles.css';
 import './configuracoes.css';
 import './palco.css';
+import './catan.css';
 import { capturarErrosGlobais } from './registro';
 
 capturarErrosGlobais();

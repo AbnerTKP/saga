@@ -3,6 +3,7 @@ import { useFecharComEsc } from '../useFechar';
 import { apuracaoDaUrna } from '../api';
 import { Peca } from './Tabuleiro';
 import { QuadroNaTela } from './TelaDaLuta';
+import { CapaDoCatan } from './CapaDoCatan';
 import { retratoPronto } from '../dragao/desenho';
 import { criarQuadro } from '../dragao/quadro';
 import { desenharCapa } from '../urna/cabine';
@@ -14,7 +15,7 @@ import interlagos from '../pistas/miniaturas/interlagos.webp';
  * embaixo o que acontece ali; com uma partida, grid ou arena de pé, a frase fica azul e a capa ganha
  * o ponto, e clicar leva de volta a ela em vez de abrir outra.
  */
-export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onLuta, onUrna, onClose }: {
+export function MenuDeJogos({ em, minha, corrida, luta, catan, onXadrez, onCorrida, onLuta, onCatan, onUrna, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
   minha: 'lobby' | 'jogando' | 'fim' | null;
@@ -22,9 +23,12 @@ export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onL
   corrida: string;
   /** O mesmo para o Dragão Quadrado: abrir uma arena, voltar à sua, ou assistir. */
   luta: string;
+  /** O mesmo para o Catan: abrir uma mesa, voltar à sua, ou assistir. */
+  catan: string;
   onXadrez: () => void;
   onCorrida: () => void;
   onLuta: () => void;
+  onCatan: () => void;
   onUrna: () => void;
   onClose: () => void;
 }) {
@@ -63,6 +67,7 @@ export function MenuDeJogos({ em, minha, corrida, luta, onXadrez, onCorrida, onL
       nome: 'Dragão Quadrado', sub: luta, fundo: '#6fa8dc', abrir: onLuta,
       capa: <QuadroNaTela chave="icone" className="capa-de-luta" quadro={() => retratoPronto('goiaba')} />,
     },
+    { nome: 'Catan', sub: catan, fundo: '#2a6aa3', abrir: onCatan, capa: <CapaDoCatan className="capa-do-catan" /> },
     {
       nome: 'Urna', sub: votos === null ? 'votar para presidente' : `${votos} ${votos === 1 ? 'voto' : 'votos'} na Saga`,
       fundo: '#2e6fb0', abrir: onUrna,

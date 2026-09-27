@@ -9,7 +9,7 @@ import {
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type EstadoDoEmail, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
-  abrirGrid, agirNoGrid, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
+  abrirGrid, agirNoGrid, abrirCatan, agirNaMesaDoCatan, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
   agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde, moverPessoa, acaoNoBot, podeSobre, conferirMovimento } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
@@ -20,6 +20,9 @@ import { TelaDoXadrez } from './components/TelaDoXadrez';
 import { ConviteDeXadrez } from './components/ConviteDeXadrez';
 import { FaixaDaPartida } from './components/FaixaDaPartida';
 import { TelaDaCorrida } from './components/TelaDaCorrida';
+import { TelaDoCatan } from './components/TelaDoCatan';
+import { ConviteDeCatan } from './components/ConviteDeCatan';
+import { minhaMesaDoCatan, oQueTocarNoCatan, type ConviteDeCatan as ConviteParaOCatan, type ResumoDaMesaDoCatan } from './catan';
 import { ConviteDeCorrida } from './components/ConviteDeCorrida';
 import { TelaDaLuta } from './components/TelaDaLuta';
 import { TelaDaUrna } from './components/TelaDaUrna';
@@ -91,6 +94,7 @@ const SEM_MEMBROS: Membro[] = [];
 const SEM_MESAS: ResumoDaMesa[] = [];
 const SEM_GRIDS: ResumoDoGrid[] = [];
 const SEM_ARENAS: ResumoDaArena[] = [];
+const SEM_MESAS_DO_CATAN: ResumoDaMesaDoCatan[] = [];
 
 /** Uma pessoa aberta num cartão ou num menu, com o servidor de que se está falando dela. */
 type PessoaAberta = { pessoa: PessoaNaCall; servidorId: number; servidorNome: string };
@@ -167,6 +171,10 @@ export function App() {
   /** As arenas do Dragão Quadrado e os convites para lutar, pela mesma carona e com a mesma etiqueta. */
   const [lutas, setLutas] = useState<{ servidorId: number; arenas: ResumoDaArena[]; convites: ConviteParaLutar[] } | null>(null);
   const [conviteDeLutaRespondido, setConviteDeLutaRespondido] = useState<number | null>(null);
+  /** As mesas do Catan e os convites para sentar, pela mesma carona e com a mesma etiqueta. */
+  const [catan, setCatan] = useState<{ servidorId: number; mesas: ResumoDaMesaDoCatan[]; convites: ConviteParaOCatan[] } | null>(null);
+  const [conviteDeCatanRespondido, setConviteDeCatanRespondido] = useState<number | null>(null);
+  const [respondendoCatan, setRespondendoCatan] = useState(false);
   /**
    * O jogo aberta na tela — a partida de xadrez ou o grid da corrida —, com o servidor DELE: é
    * a ele que a tela do jogo pergunta. Um só por vez, porque os dois tomam o palco inteiro.
@@ -177,6 +185,7 @@ export function App() {
     // sem arena é o título do Dragão Quadrado, que oferece abrir uma ou entrar na de alguém
     | { tipo: 'luta'; arenaId: number | null; servidorId: number }
     | { tipo: 'urna'; servidorId: number }
+    | { tipo: 'catan'; mesaId: number; servidorId: number }
     | null
   >(null);
   const [conviteDeCorridaRespondido, setConviteDeCorridaRespondido] = useState<number | null>(null);
@@ -553,6 +562,9 @@ export function App() {
     setConviteDeCorridaRespondido(null);
     setLutas(null);
     setConviteDeLutaRespondido(null);
+    setCatan(null);
+    setConviteDeCatanRespondido(null);
+    setRespondendoCatan(false);
     setJogoAberto(null);
     setModoConversas(false);
     setConversaAberta(null);
@@ -616,6 +628,8 @@ export function App() {
         setCorridas((a) => mesmoSeIgual(a, { servidorId, grids: lista.corridas?.grids ?? [], convites: lista.corridas?.convites ?? [] }));
         // As arenas do Dragão Quadrado, idem. Servidor antigo não manda: não há luta.
         setLutas((a) => mesmoSeIgual(a, { servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] }));
+        // As mesas do Catan, idem. Servidor antigo não manda: não há Catan.
+        setCatan((a) => mesmoSeIgual(a, { servidorId, mesas: lista.catan?.mesas ?? [], convites: lista.catan?.convites ?? [] }));
         // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
         // elas são da conta. Servidor antigo não manda o campo — aí não há conversa
         // nenhuma na tela e nada quebra, como o "está digitando".
@@ -936,7 +950,7 @@ export function App() {
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   /** O palco está mostrando a call (e não um chat, um jogo ou as conversas). */
   const palcoNaCall = !modoConversas && !jogoAberto && salaAberta?.tipo !== 'texto' && !!rm.salaDaVoz;
-  const semPessoas = modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || (palcoNaCall && !pessoasNaCall);
+  const semPessoas = modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
   const alternarPessoasNaCall = useCallback(() => setPessoasNaCall((v) => {
     try { localStorage.setItem('cantinho.pessoasNaCall', v ? '0' : '1'); } catch { /* vale até fechar */ }
     return !v;
@@ -1295,6 +1309,72 @@ export function App() {
     tocarAviso('convite', rm.deafened);
   }, [conviteDeLuta?.arena, rm.deafened, tocarAviso]);
 
+  /**
+   * O Catan visto da busca de salas, no molde do xadrez: "a sua mesa" é a partida em que você
+   * joga, ou a mesa esperando com você sentado, ou a que acabou. Sem uma sua, o menu leva à
+   * partida que estiver andando no servidor — para assistir —, ou abre uma mesa nova.
+   */
+  const catanDaqui = catan?.servidorId === servidorAberto ? catan : null;
+  const mesasDoCatan = catanDaqui?.mesas ?? SEM_MESAS_DO_CATAN;
+  const minhaMesaCatan = euIdAgora === null ? null : minhaMesaDoCatan(mesasDoCatan, euIdAgora);
+  const partidaDeCatanAndando = mesasDoCatan.find((m) => m.estado === 'jogando') ?? null;
+  const conviteDeCatan = catan?.convites.find((c) => c.mesa !== conviteDeCatanRespondido) ?? null;
+  const textoDoCatan = minhaMesaCatan
+    ? (minhaMesaCatan.estado === 'jogando' ? 'voltar à sua partida' : minhaMesaCatan.estado === 'lobby' ? 'voltar à sua mesa' : 'ver o fim da partida')
+    : partidaDeCatanAndando ? `assistir ${nomeDoJogador(partidaDeCatanAndando.anfitriao)} e cia.` : 'abrir uma mesa';
+
+  const abrirCatanDoMenu = useCallback(async () => {
+    const servidorId = sessao?.servidor?.id;
+    if (!servidorId) return;
+    const ir = minhaMesaCatan ?? partidaDeCatanAndando;
+    if (ir) { setJogoAberto({ tipo: 'catan', mesaId: ir.id, servidorId }); return; }
+    try {
+      const mesa = await abrirCatan(servidorId);
+      setJogoAberto({ tipo: 'catan', mesaId: mesa.id, servidorId });
+    } catch (e) { notas.mostrarFalha(e, 'Catan'); }
+  }, [sessao?.servidor?.id, minhaMesaCatan, partidaDeCatanAndando, notas]);
+
+  const responderConviteDeCatan = useCallback(async (c: ConviteParaOCatan, sentar: boolean) => {
+    const servidorId = c.servidor ?? catan?.servidorId;
+    if (!servidorId) return;
+    setRespondendoCatan(true);
+    try {
+      await agirNaMesaDoCatan(c.mesa, { acao: sentar ? 'aceitar' : 'recusar' }, servidorId);
+      setConviteDeCatanRespondido(c.mesa);
+      if (sentar) {
+        await irAoServidorDoJogo(servidorId);
+        setJogoAberto({ tipo: 'catan', mesaId: c.mesa, servidorId });
+      }
+    } catch (e) {
+      // Cancelado, mesa cheia ou você entrou noutra partida: o convite sai da tela do mesmo jeito.
+      setConviteDeCatanRespondido(c.mesa);
+      notas.mostrarFalha(e, 'Catan');
+    } finally {
+      setRespondendoCatan(false);
+    }
+  }, [catan?.servidorId, notas, irAoServidorDoJogo]);
+
+  const conviteDeCatanTocado = useRef<number | null>(null);
+  useEffect(() => {
+    if (!conviteDeCatan) { conviteDeCatanTocado.current = null; return; }
+    if (conviteDeCatanTocado.current === conviteDeCatan.mesa) return;
+    conviteDeCatanTocado.current = conviteDeCatan.mesa;
+    tocarAviso('convite', rm.deafened);
+  }, [conviteDeCatan?.mesa, rm.deafened, tocarAviso]);
+
+  /**
+   * A vez que chega (ou o descarte que um 7 te pede) e o fim tocam com a partida fora da tela,
+   * como o lance do xadrez. Com ela na tela também: o Catan é longo, e quem esperava a vez pode
+   * estar olhando outra janela. A regra de o quê tocar é pura e testada (`oQueTocarNoCatan`).
+   */
+  const catanAnterior = useRef<ResumoDaMesaDoCatan | null>(null);
+  useEffect(() => {
+    if (euIdAgora === null) return;
+    const aviso = oQueTocarNoCatan(catanAnterior.current, minhaMesaCatan, euIdAgora);
+    catanAnterior.current = minhaMesaCatan;
+    if (aviso) tocarAviso(aviso === 'vez' ? 'lance' : 'fimDaPartida', rm.deafened);
+  }, [minhaMesaCatan, euIdAgora, rm.deafened, tocarAviso]);
+
   // Os sons da corrida saem pela mesma regra dos avisos — o mesmo som não empilha —, e o fone
   // desligado cala todos.
   const tocarNaCorrida = useCallback((qual: Aviso) => { tocarAviso(qual, rm.deafened); }, [tocarAviso, rm.deafened]);
@@ -1517,6 +1597,8 @@ export function App() {
         onCorrida={abrirCorrida}
         textoDaLuta={textoDaLuta}
         onLuta={abrirLuta}
+        textoDoCatan={textoDoCatan}
+        onCatan={abrirCatanDoMenu}
         onUrna={abrirUrna}
         // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
         // aqui" sobre um lugar que não é o que se está vendo.
@@ -1604,7 +1686,20 @@ export function App() {
         )}
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro.
-        jogo={jogoAberto?.tipo === 'urna' ? (live) => (
+        jogo={jogoAberto?.tipo === 'catan' ? (live) => (
+          <TelaDoCatan
+            key={`catan-${jogoAberto.mesaId}`}
+            mesaId={jogoAberto.mesaId}
+            servidorId={jogoAberto.servidorId}
+            euId={eu.id}
+            membros={membrosDoServidor}
+            naCall={naMinhaCall}
+            surdo={rm.deafened}
+            live={live}
+            onFechar={() => setJogoAberto(null)}
+            onAviso={notas.mostrar}
+          />
+        ) : jogoAberto?.tipo === 'urna' ? (live) => (
           <TelaDaUrna
             key={`urna-${jogoAberto.servidorId}`}
             servidorId={jogoAberto.servidorId}
@@ -1656,7 +1751,16 @@ export function App() {
             onAviso={notas.mostrar}
           />
         ) : undefined}
-        faixaDaPartida={minhaArena && !jogoAberto ? (
+        faixaDaPartida={minhaMesaCatan && minhaMesaCatan.estado !== 'fim' && !jogoAberto ? (
+          <FaixaDaPartida
+            jogo="Catan"
+            estado={minhaMesaCatan.estado}
+            titulo={minhaMesaCatan.estado === 'lobby' ? `mesa de ${nomeDoJogador(minhaMesaCatan.anfitriao)}` : `${minhaMesaCatan.jogadores.length} jogando`}
+            minhaVez={minhaMesaCatan.vez === eu.id || minhaMesaCatan.devem.includes(eu.id)}
+            outroNome={minhaMesaCatan.vez !== null ? nomeDoJogador(minhaMesaCatan.vez) : null}
+            onVoltar={() => setJogoAberto({ tipo: 'catan', mesaId: minhaMesaCatan.id, servidorId: servidor.id })}
+          />
+        ) : minhaArena && !jogoAberto ? (
           <FaixaDaPartida
             jogo="Dragão Quadrado"
             estado={minhaArena.estado === 'arena' ? 'lobby' : minhaArena.estado === 'lutando' ? 'jogando' : 'fim'}
@@ -1916,8 +2020,17 @@ export function App() {
         avisos={notas.avisos}
         // O convite para jogar fica na mesma pilha, num cartão grande (a opção C do dono), e não
         // some sozinho: quem chamou está esperando a resposta.
-        extra={(convite || conviteDeCorrida || conviteDeLuta) && (
+        extra={(convite || conviteDeCorrida || conviteDeLuta || conviteDeCatan) && (
           <>
+            {conviteDeCatan && (
+              <ConviteDeCatan
+                convite={conviteDeCatan}
+                servidorAberto={servidorAberto}
+                ocupado={respondendoCatan}
+                onSentar={() => responderConviteDeCatan(conviteDeCatan, true)}
+                onRecusar={() => responderConviteDeCatan(conviteDeCatan, false)}
+              />
+            )}
             {conviteDeLuta && (
               <ConviteDeLuta
                 convite={conviteDeLuta}

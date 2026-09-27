@@ -2,6 +2,16 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **O Catan (27/09/2026), jogado de verdade por duas a quatro pessoas.** O que está medido: as regras
+  (`catan.test.mjs`, com 40 partidas inteiras de robôs), as mesas (`catans.test.mjs`), a costura
+  pela rede (`api.test.mjs`) e as telas no RENDERER, num Chrome headless e mudo contra servidor local
+  — colocação, dados, troca, 7, lobby, fim, menu e convite (ver `docs/decisoes/jogos.md`). **Não foi
+  exercido**: a Saga no Electron com o Catan aberto pelo menu; o convite chegando a outra pessoa pela
+  busca de salas; a faixa da partida no alto do chat; o aviso de "sua vez" tocando com a tela fechada;
+  o SOM dos dados (se ficou bom é de ouvido); o Windows. **O servidor tem de subir junto**: sem ele,
+  a capa aparece no menu e abrir a mesa deve dar erro de rota inexistente — dedução do código, não
+  medido.
+
 - **A reestruturação da interface (18/09/2026): trilha à esquerda, configurações em páginas,
   tema Noite, Figtree, foto do servidor enquadrável, barra da call no palco.** O que está medido:
   typecheck, os testes (os novos: `design.test.ts`, `configurar.test.ts`,

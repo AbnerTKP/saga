@@ -1,4 +1,4 @@
-# Xadrez, Fórmula 1 e Urna
+# Xadrez, Fórmula 1, Urna e Catan
 
 App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/CLAUDE.md`.
 
@@ -210,3 +210,66 @@ coluna seria migração sem ganho), e a leitura soma; o freio de 3 s e o "você 
   cabine, voto, FIM, apuração, votar de novo e fechar, por teclado e clique. Parada: seção 0 quadro/s e
   0,3% de CPU; urna com o cursor piscando, 2 quadros/s e 0,5%. **Não foi ouvido** nenhum som (a bancada é
   muda) nem visto no Windows.
+
+## O Catan (27/09/2026)
+
+Pedido do dono: "faça o gameboard Catan para o Saga, poder jogar multiplayer, analise o game e traga
+pra cá, com os dados e tudo". Antes do código, a prancheta (claude.ai/artifact/AmMrgETf88y4h215ACtUEB)
+com a análise do jogo e as telas feitas com o CSS de verdade. Ele escolheu: **a disposição A** (a da
+casa, como o xadrez: tabuleiro e mão à esquerda, coluna dos jogadores, custos e "Acontecendo" à
+direita — e não a B, com os jogadores nos cantos como no colonist.io), **de 2 a 4 jogadores agora, 5–6
+depois**, **tabuleiro sempre sorteado** e **arte ilustrada** — com "porém melhore as ilustrações", que
+trouxe o volume nos terrenos, os pinheiros, as ovelhas, o trigo, o barro, os picos com neve, o píer e
+o barco dos portos, e as cartas mostrando o RECURSO em vez do terreno.
+
+- **A regra mora no servidor, como a do xadrez** (`catan.mjs`, o motor; `catans.mjs`, as mesas). O
+  servidor rola os dados, embaralha as 25 cartas de desenvolvimento e sorteia o roubo — ninguém rola
+  na própria máquina. Cada leitura (`vista`) já traz o que QUEM PERGUNTA pode fazer agora: os
+  cruzamentos onde cabe aldeia, as arestas de estrada, as aldeias que viram cidade, os terrenos do
+  ladrão com quem dá para roubar em cada um, as cartas jogáveis, a taxa do banco. A tela desenha só
+  isso. A mão e as cartas de desenvolvimento dos outros chegam só como QUANTIDADE; a carta roubada só
+  aparece para os dois envolvidos; a carta comprada, só para quem comprou. No fim, tudo aparece.
+- **As peças se chamam pela posição.** O cruzamento é "x,y" numa grade inteira (meias-larguras e
+  meios-raios de hexágono) e a aresta é o par dos dois cruzamentos. O app desenha qualquer peça
+  sabendo só o nome dela — não há tabela de posições viajando, nem uma segunda geometria no app que
+  pudesse discordar da do servidor. `catan.test.ts` confere que os seis cantos de um hexágono caem a
+  1 do centro.
+- **As regras do jogo base, inteiras**: colocação em ida e volta com a segunda aldeia rendendo;
+  produção com o banco que falta não pagando ninguém daquele recurso (e pagando o que houver se só
+  um pediu); 7 com descarte de metade para quem tem mais de 7, ladrão e roubo sorteado; regra da
+  distância; estrada que não passa pela aldeia de outro; maior estrada (5+, cortável por aldeia no
+  meio — e empatados os de cima depois do corte, ninguém fica com ela); maior exército (3+);
+  desenvolvimento que não vale no turno em que foi comprado, um por turno, cavaleiro antes de rolar;
+  monopólio, ano de fartura, duas estradas; portos 3:1 e 2:1; troca com os jogadores (oferta a todos,
+  aceite, contraproposta, e quem está na vez fecha com quem quiser); vitória com 10 NA PRÓPRIA VEZ,
+  contando as cartas de ponto escondidas.
+- **Partidas inteiras de robôs são o teste que segura isso** (`catan.test.mjs`): 40 partidas de 2 a
+  4 jogadores, cada robô sorteando uma ação qualquer do que a `vista` oferece. A cada passo: nada do
+  que a tela oferece é recusado, as cartas se conservam (banco + mãos = 19 de cada), e ninguém fica
+  com 10 pontos na própria vez sem a partida acabar. Foi essa última conferência, escrita junto com o
+  teste da vitória, que achou o defeito de construir aldeia não conferir a vitória.
+- **Sem relógio** (decisão do dono): à mesa entre amigos ninguém cronometra a vez. O preço é alguém
+  que fecha a Saga segurar todo mundo; por isso **quem não aparece há 10 minutos sai da partida
+  sozinho** — nem na mesa, nem na busca de salas, que roda enquanto a Saga está aberta. Quem só foi
+  ler o chat continua aparecendo. Quem sai deixa as peças (que continuam cortando estradas) e devolve
+  as cartas ao banco; sobrando um, ele vence.
+- **A mesa vive na MEMÓRIA do servidor, como as do xadrez**: publicar o servidor com gente jogando
+  encerra a partida. Uma partida de Catan dura uma hora; se isso incomodar, é guardar no banco.
+- **Anda por HTTP, perguntando de 800 em 800 ms**, como o xadrez: é jogo de turno, poucas ações por
+  minuto — não precisa do canal de dados do LiveKit que a Fórmula 1 usa.
+- **O tabuleiro é desenhado por código, em texto SVG** (`desenhoDoCatan.ts`): o fundo (mar, portos,
+  terrenos) é montado uma vez por partida e as peças uma vez por mudança; os alvos de clique ficam
+  numa camada de JSX por cima. O que há dentro de cada terreno sai de um sorteio com semente pela
+  POSIÇÃO, então é o mesmo desenho em todo computador e não muda a cada leitura. As cores do jogo
+  moram ali, não no CSS: as da casa servem para o app, não para um jogo (a lição da primeira F1).
+- **Os dados rolam por 900 ms na tela de todo mundo, a cada rolagem** — inclusive a dos outros —, os
+  terrenos que renderam acendem, e o som é sintetizado na hora (`somDosDados.ts`, como o motor da F1):
+  doze estalos filtrados, cada vez mais espaçados, e as duas batidas do fim. Fone desligado cala.
+- **O que está de fora desta versão**: 5–6 jogadores (o dono escolheu depois); o controle ao lado do
+  nome de quem joga (só o xadrez tem; a F1 e o Dragão também não); o tabuleiro fixo do manual.
+- **Medido** no renderer de verdade, num Chrome headless e mudo contra servidor local, com partidas
+  semeadas por robôs pela rede: a colocação clicando no cruzamento e na aresta, rolar e acender os
+  terrenos, a troca com o banco (as taxas dos portos certas) e entre dois jogadores (oferta, aceite,
+  recusa, fechar), o descarte do 7, o lobby, o fim com o placar e o gráfico dos dados, o menu de jogos
+  e o cartão de convite. **Não foi exercido**: o app no Electron, o convite chegando pela busca de
+  salas numa Saga de verdade, a faixa da partida, o som dos dados (a bancada é muda), o Windows.

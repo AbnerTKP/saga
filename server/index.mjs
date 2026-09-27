@@ -25,6 +25,7 @@ import * as urnas from './urnas.mjs';
 import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
+import { criarMesasDoCatan } from './catans.mjs';
 import { criarGrids } from './corridas.mjs';
 import { criarArenas } from './lutas.mjs';
 import { criarFilas } from './musica.mjs';
@@ -136,6 +137,8 @@ const digitando = criarRegistroDeDigitacao();
 // As mesas de xadrez, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
 // Publicar o servidor com alguém jogando apaga a partida dele — ver jogos.mjs.
 const mesas = criarMesas();
+// As mesas do Catan, pelo mesmo motivo e com o mesmo preço — ver catans.mjs.
+const mesasDoCatan = criarMesasDoCatan();
 // As filas do bot de música, uma por sala de voz. Também na memória: REINICIAR O SERVIDOR
 // ZERA AS FILAS — ver musica.mjs.
 const filas = criarFilas();
@@ -1069,6 +1072,8 @@ const ROTAS = {
       corridas: grids.resumo(naMesa(sid, eu), foraDaqui(eu)),
       // As arenas do Dragão Quadrado, pela mesma carona e pelo mesmo motivo.
       lutas: arenas.resumo(naArena(req, sid, eu), foraDaqui(eu)),
+      // As mesas do Catan, idem — e a vez vai junto, para tocar o aviso a quem saiu da tela.
+      catan: mesasDoCatan.resumo(naMesa(sid, eu), foraDaqui(eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
@@ -1481,6 +1486,26 @@ const ROTAS = {
   'POST /jogos/mesa': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return mesas.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // --- Catan ------------------------------------------------------------------
+  // Como o xadrez: a mesa é do servidor do pedido, e quem rola os dados, embaralha as cartas e
+  // valida cada jogada é o servidor — ver catan.mjs.
+  'POST /catan/abrir': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return { mesa: mesasDoCatan.abrir(naMesa(sid, eu)) };
+  },
+
+  'GET /catan/mesa': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const id = new URL(req.url, 'http://x').searchParams.get('id');
+    return { mesa: mesasDoCatan.ver(naMesa(sid, eu), id) };
+  },
+
+  // Devolve `{ mesa }` depois de qualquer ação — e `{ ok: true }` quando a ação foi fechar a mesa.
+  'POST /catan/mesa': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return mesasDoCatan.agir(naMesa(sid, eu), await lerCorpo(req));
   },
 
   // --- relatos -----------------------------------------------------------------

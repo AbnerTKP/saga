@@ -6,6 +6,7 @@
 // Em desenvolvimento aponta para a máquina local, senão testar qualquer mudança
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
 import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
+import type { AcaoNaMesaDoCatan, CatanNoServidor, MesaDoCatan } from './catan';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { ResumoDaMesa } from './jogos';
@@ -579,6 +580,7 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
     agora?: number;
     corridas?: CorridasNoServidor;
     lutas?: LutasNoServidor;
+    catan?: CatanNoServidor;
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
   }>('GET', `/rooms${comParametros({ lidas, lidasConversas: lidasDeConversa })}`, undefined, servidorId);
 
@@ -723,6 +725,19 @@ export const agirNoGrid = async (id: number, a: AcaoNoGrid, servidorId: number) 
 /** O passe da sala da corrida no LiveKit: só dados, e publicar só se você está sentado. */
 export const pedirTokenDaCorrida = (id: number, servidorId: number) =>
   pedir<{ url: string; token: string; identity: string }>('POST', '/corridas/token', { id }, servidorId);
+
+// --- Catan ----------------------------------------------------------------------
+// Como o xadrez: a mesa é do servidor, e a regra também — ver `catan.ts`.
+
+export const abrirCatan = async (servidorId: number) =>
+  (await pedir<{ mesa: MesaDoCatan }>('POST', '/catan/abrir', {}, servidorId)).mesa;
+
+export const verMesaDoCatan = async (id: number, servidorId: number) =>
+  (await pedir<{ mesa: MesaDoCatan }>('GET', `/catan/mesa?id=${id}`, undefined, servidorId)).mesa;
+
+/** Fechar não devolve mesa nenhuma: ela deixou de existir. */
+export const agirNaMesaDoCatan = async (id: number, a: AcaoNaMesaDoCatan, servidorId: number) =>
+  (await pedir<{ mesa?: MesaDoCatan; ok?: true }>('POST', '/catan/mesa', { id, ...a }, servidorId)).mesa ?? null;
 
 // --- Dragão Quadrado ------------------------------------------------------------
 

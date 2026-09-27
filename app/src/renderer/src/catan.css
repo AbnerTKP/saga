@@ -1,0 +1,172 @@
+/*
+ * O Catan (TelaDoCatan.tsx). A disposição é a A que o dono escolheu em 27/09/2026: tabuleiro e
+ * mão à esquerda, coluna à direita, como o xadrez. As cores do JOGO (terrenos, cartas, peças)
+ * moram no desenho (desenhoDoCatan.ts), não aqui: as da casa servem para o app, não para um
+ * jogo — foi a lição da primeira Fórmula 1. Aqui só há tokens.
+ */
+
+.tela-do-catan { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.catan-area { flex: 1; min-height: 0; display: flex; padding: var(--e3) var(--e4); }
+
+/* --- a mesa esperando ------------------------------------------------------ */
+.catan-lobby { flex: 1; display: flex; gap: var(--e4); min-height: 0; }
+.catan-lobby-mesa {
+  flex: 1; display: flex; flex-direction: column; gap: var(--e3); padding: var(--e6);
+  background: var(--superficie-0); border-radius: var(--raio-4); align-items: center; justify-content: center; text-align: center;
+}
+.catan-lobby-titulo { font-size: var(--letra-destaque); font-weight: var(--peso-forte); color: var(--texto-forte); }
+.catan-lugares { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: var(--e2); margin: var(--e3) 0; }
+.catan-lugar {
+  display: flex; align-items: center; gap: var(--e2); padding: var(--e2) var(--e3); min-height: 48px;
+  border: 1px dashed var(--borda); border-radius: var(--raio-3); text-align: left;
+}
+.catan-lugar.ocupado { border-style: solid; background: var(--superficie-1); }
+.catan-lugar-nome { flex: 1; font-weight: var(--peso-semi); color: var(--texto-forte); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catan-lugar-nota, .catan-lugar-vazio { font-size: var(--letra-legenda); color: var(--texto-3); }
+.catan-lugar-vazio { flex: 1; text-align: center; }
+.catan-lobby-botoes { display: flex; gap: var(--e2); align-items: center; }
+.catan-lobby-chamar { width: 280px; }
+
+/* --- a partida --------------------------------------------------------------- */
+.catan-partida { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: var(--e4); min-height: 0; }
+.catan-esquerda { display: flex; flex-direction: column; gap: var(--e2); min-width: 0; min-height: 0; }
+.catan-tabuleiro-caixa {
+  position: relative; flex: 1; min-height: 0; background: var(--superficie-0); border-radius: var(--raio-4);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.catan-tabuleiro { width: 100%; height: 100%; display: block; }
+.catan-tabuleiro.ocupado { cursor: progress; }
+
+/* O que dá para clicar: só o que a regra oferece, e aceso ao passar o mouse. Sem pulso: nada
+   anima para sempre com a Saga parada (animacoes.test.ts), e a vez pode ficar esperando. */
+.catan-alvo-largo { fill: transparent; stroke: transparent; stroke-width: 26; cursor: pointer; }
+.catan-alvo-traco { stroke-width: 9; stroke-linecap: round; stroke-dasharray: 4 7; opacity: .75; pointer-events: none; }
+.catan-alvo-aresta:hover .catan-alvo-traco { stroke-dasharray: none; opacity: 1; stroke-width: 11; }
+.catan-alvo-ponto { stroke: var(--branco); stroke-width: 3; stroke-dasharray: 5 4; opacity: .8; pointer-events: none; }
+.catan-alvo-cruzamento:hover .catan-alvo-ponto { stroke-dasharray: none; opacity: 1; }
+.catan-alvo-terreno { fill: transparent; stroke: var(--branco); stroke-width: 3; stroke-dasharray: 8 8; opacity: .55; cursor: pointer; }
+.catan-alvo-terreno:hover { fill: var(--acento-tenue-forte); opacity: 1; stroke-dasharray: none; }
+
+.catan-dados { position: absolute; right: var(--e4); bottom: var(--e4); display: flex; align-items: center; gap: var(--e2); pointer-events: none; }
+.catan-dado { width: 48px; height: 48px; transition: transform .08s linear; }
+.catan-dados.rolando .catan-dado { width: 56px; height: 56px; }
+.catan-soma { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); min-width: 36px; }
+.catan-dados.sete .catan-soma { color: var(--perigo-texto); }
+
+.catan-dica {
+  position: absolute; top: var(--e3); left: 50%; transform: translateX(-50%);
+  padding: var(--e1m) var(--e4); border-radius: var(--raio-cheio); background: var(--veu-forte); border: 1px solid var(--borda);
+  font-size: var(--letra-menu); font-weight: var(--peso-semi); color: var(--texto-forte); white-space: nowrap;
+}
+
+.catan-veu { position: absolute; inset: 0; background: var(--veu); }
+.catan-janela {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 32px));
+  max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: var(--e3); padding: var(--e4);
+  background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--raio-4); box-shadow: var(--sombra-3);
+}
+.catan-oferta, .catan-respostas { top: auto; bottom: var(--e4); transform: translateX(-50%); }
+.catan-janela-cabeca { display: flex; align-items: center; gap: var(--e2); }
+.catan-janela-titulo { font-size: var(--letra-titulo); font-weight: var(--peso-forte); color: var(--texto-forte); }
+.catan-abas { margin-left: auto; display: flex; gap: var(--e1); }
+.catan-janela-pe { display: flex; align-items: center; justify-content: flex-end; gap: var(--e2); }
+.catan-janela-pe > .muted:first-child { margin-right: auto; }
+.catan-vitimas { display: flex; flex-direction: column; gap: var(--e1m); }
+.catan-vitimas .secundario { display: flex; align-items: center; gap: var(--e2); }
+.catan-bolinha { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px var(--preto-45); }
+
+.catan-escolher { display: flex; gap: var(--e3); flex-wrap: wrap; margin-top: var(--e1m); }
+.catan-escolher-item { display: flex; flex-direction: column; align-items: center; gap: var(--e1); }
+.catan-escolher-item.botao { background: none; padding: var(--e1); border-radius: var(--raio-3); border: 2px solid transparent; }
+.catan-escolher-item.botao:hover:not(:disabled) { background: var(--superficie-3); }
+.catan-escolher-item.botao.escolhido { border-color: var(--acento); background: var(--acento-tenue); }
+.catan-escolher-item.botao:disabled { opacity: .35; }
+.catan-contador { display: flex; align-items: center; gap: var(--e1); }
+.catan-contador b { min-width: 16px; text-align: center; color: var(--texto-3); font-weight: var(--peso-versalete); }
+.catan-contador b.marcado { color: var(--texto-forte); }
+.catan-mais-menos { width: 22px; height: 22px; border-radius: var(--raio-2); background: var(--superficie-3); color: var(--texto-forte); padding: 0; font-weight: var(--peso-forte); }
+.catan-mais-menos:disabled { opacity: .35; }
+.catan-taxa { font-size: var(--letra-legenda); color: var(--texto-2); }
+.catan-resposta { display: flex; align-items: center; gap: var(--e2); font-size: var(--letra-painel); }
+.catan-aceita { color: var(--ok-texto); }
+
+/* --- a mão ---------------------------------------------------------------------- */
+.catan-mao {
+  display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3);
+  background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3);
+}
+.catan-cartas { display: flex; gap: var(--e1m); flex-wrap: wrap; }
+.catan-acoes { margin-left: auto; display: flex; gap: var(--e1m); flex-wrap: wrap; justify-content: flex-end; max-width: 380px; }
+.catan-acoes .secundario, .catan-acoes .primary { padding: 7px 12px; font-size: var(--letra-menu); }
+.catan-acoes .secundario.ativo { background: var(--acento-tenue-forte); color: var(--acento-texto); }
+.catan-acoes button:disabled { opacity: .4; }
+
+.catan-carta {
+  position: relative; width: 46px; height: 62px; border-radius: var(--raio-3); flex: none; overflow: hidden;
+  border: 2px solid var(--azul-ceu); box-shadow: var(--sombra-1); box-sizing: border-box; padding: 0;
+}
+.catan-carta svg { position: absolute; inset: 8px 3px 14px; width: calc(100% - 6px); height: calc(100% - 22px); }
+.catan-carta.pequena { width: 26px; height: 34px; border-width: 1px; border-radius: var(--raio-1); }
+.catan-carta.pequena svg { inset: 3px 1px 5px; width: calc(100% - 2px); height: calc(100% - 8px); }
+.catan-carta.zerada { opacity: .35; }
+.catan-carta-n {
+  position: absolute; right: 2px; bottom: 2px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 9px; background: var(--veu-forte); color: var(--branco); font-size: 11px; line-height: 18px;
+  font-weight: var(--peso-versalete); text-align: center;
+}
+.catan-carta.desenvolvimento {
+  background: var(--berserk-tenue); border-color: var(--berserk-claro); color: var(--berserk-claro);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+}
+.catan-carta.desenvolvimento.jogavel { cursor: pointer; box-shadow: 0 0 0 2px var(--berserk); }
+.catan-carta.desenvolvimento.jogavel:hover { background: var(--berserk); color: var(--branco); }
+.catan-carta-nome { font-size: 9px; line-height: 1.1; font-weight: var(--peso-versalete); padding: 2px; }
+.catan-carta-nova { position: absolute; top: 2px; left: 0; right: 0; font-size: 8px; color: var(--texto-2); text-transform: uppercase; }
+
+/* --- a coluna -------------------------------------------------------------------- */
+.catan-coluna { display: flex; flex-direction: column; gap: var(--e3); min-height: 0; }
+.catan-caixa { background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3); }
+.catan-jogadores { overflow: hidden; }
+.catan-jogador { display: grid; grid-template-columns: 40px 1fr auto; gap: 2px var(--e2); align-items: center; padding: var(--e2) var(--e3); }
+.catan-jogador + .catan-jogador { border-top: 1px solid var(--borda-sutil); }
+.catan-jogador.vez { background: var(--acento-tenue); box-shadow: inset 3px 0 0 var(--acento); }
+.catan-jogador.fora { opacity: .5; }
+.catan-anel { grid-row: span 2; width: 36px; height: 36px; border-radius: 50%; border: 3px solid; display: grid; place-items: center; overflow: hidden; }
+.catan-anel > * { width: 30px; height: 30px; }
+.catan-jogador-nome { display: flex; align-items: center; gap: var(--e1m); min-width: 0; font-weight: var(--peso-forte); color: var(--texto-forte); font-size: var(--letra-painel); }
+.catan-voce { font-weight: var(--peso-medio); color: var(--texto-3); font-size: var(--letra-legenda); }
+.catan-selo {
+  font-size: 9px; font-weight: var(--peso-versalete); letter-spacing: .04em; padding: 1px 4px; border-radius: var(--raio-1);
+  background: var(--aviso-tenue); color: var(--aviso); border: 1px solid var(--aviso-borda);
+}
+.catan-pontos { grid-row: span 2; text-align: right; font-size: 20px; font-weight: var(--peso-versalete); color: var(--texto-forte); line-height: 1; }
+.catan-pontos small { display: block; font-size: 10px; color: var(--texto-3); font-weight: var(--peso-forte); letter-spacing: .04em; text-transform: uppercase; }
+.catan-jogador-detalhe { display: flex; flex-wrap: wrap; gap: 2px var(--e2); font-size: var(--letra-legenda); color: var(--texto-2); }
+.catan-deve { color: var(--aviso); }
+
+.catan-custos { padding: var(--e2) var(--e3); display: flex; flex-direction: column; gap: var(--e1m); }
+.catan-custo { display: flex; align-items: center; gap: var(--e2); font-size: var(--letra-legenda); color: var(--texto); }
+.catan-custo > span:first-child { width: 104px; }
+.catan-custo-cartas { display: flex; gap: 3px; }
+.catan-custo .catan-carta.pequena { width: 18px; height: 24px; }
+
+.catan-acontecendo { flex: 1; min-height: 80px; padding: var(--e2) var(--e3); display: flex; flex-direction: column; gap: var(--e1m); }
+.catan-historico { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--e1); font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.4; }
+.catan-evento.rolou, .catan-evento.venceu, .catan-evento.maiorEstrada, .catan-evento.maiorExercito { color: var(--texto-forte); font-weight: var(--peso-semi); }
+
+/* --- o fim ------------------------------------------------------------------------ */
+.catan-fim { width: min(460px, calc(100% - 32px)); }
+.catan-fim-titulo { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); text-align: center; }
+.catan-placar { display: flex; flex-direction: column; gap: var(--e1); }
+.catan-placar-linha { display: flex; align-items: center; gap: var(--e2); padding: var(--e1m) var(--e2); border-radius: var(--raio-2); }
+.catan-placar-linha.venceu { background: var(--ok-tenue); }
+.catan-histograma { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: var(--e1); height: 96px; margin-top: var(--e2); }
+.catan-barra { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; font-size: 11px; color: var(--texto-2); height: 100%; }
+.catan-barra i { width: 100%; background: var(--acento); border-radius: var(--raio-1) var(--raio-1) 0 0; min-height: 2px; }
+.catan-barra i.sete { background: var(--perigo); }
+.catan-barra-n { color: var(--texto-3); }
+
+/* --- a capa (menu de jogos e convite) ---------------------------------------------- */
+.capa-do-catan { width: 76px; height: 76px; }
+.cartao-de-convite-capa > .capa-do-catan { display: block; width: 100%; height: 100%; padding: var(--e2) 0; box-sizing: border-box; background: var(--marinho); }
