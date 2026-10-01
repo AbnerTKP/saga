@@ -203,6 +203,27 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   **Numa call de verdade, por cima de um jogo de verdade, não foi exercido.**
 - **Segredos são removidos antes de gravar no registro de erros** — é um arquivo feito
   para circular no grupo.
+- **A Microsoft Store é um SEGUNDO canal no Windows, não o substituto do .exe.** Existe
+  para tirar o "Windows protegeu o seu PC" de quem instala pela primeira vez: certificado
+  auto-assinado não muda o SmartScreen, e desde 2024 nem certificado pago tira o aviso na
+  hora — ele espera reputação, que um grupo de cinco não junta. Na Store quem assina o
+  pacote é a Microsoft, depois da revisão. O nome na Store é **"Saga Chat"** ("Saga" já
+  era de outro app), da conta `TKPNerelle`, Store ID `9NTFHT718FJT`; a identidade do
+  pacote está em `electron-builder.yml › appx` e tem de bater letra por letra com o
+  Partner Center. O que muda dentro do pacote, por `process.windowsStore`:
+  - **A atualização é da Store.** O `update.ts` não consulta o GitHub: o instalador de lá,
+    por cima de um pacote da Store, seria uma segunda Saga ao lado, não uma versão nova.
+  - **"Abrir junto com o Windows" fica indisponível.** O caminho de hoje grava no registro,
+    e num pacote a escrita no registro do usuário fica isolada dentro dele: o Windows não a
+    veria e a leitura de volta poderia dizer "ligado". O jeito da Store é a tarefa de
+    arranque declarada no pacote (`addAutoLaunchExtension`), que abre SEM o `--ao-iniciar`
+    — a janela viria na cara —, e não foi exercida num Windows.
+  - Quem monta é o `loja.yml` (só Windows tem `makeappx`), e o envio é à mão no Partner
+    Center. **No Mac, `electron-builder --win appx` tenta LIGAR O PARALLELS** desta
+    máquina para montar lá dentro — e liga os serviços dele mesmo com a licença vencida.
+    Não rode aqui; se escapar, `"Parallels Service" stop` desliga o que o `pkill` não alcança.
+  **Nada disso foi exercido num Windows ainda**: microfone, câmera, captura de tela com som
+  e o overlay dentro do pacote dependem de alguém instalar pela Store e conferir.
 
 ## A limitação que caiu sem ser atacada
 

@@ -50,5 +50,30 @@ nsis:
   perMachine: false
   createDesktopShortcut: true
 
+# Pacote da Microsoft Store. NÃO entra no `win.target`: o .exe do GitHub continua sendo o
+# canal de sempre (e o dos consertos urgentes, que na Store esperam a revisão). Quem o
+# monta é o `dist:loja`, só no Windows — o makeappx não existe no Mac.
+#
+# Os três valores de identidade são os que o Partner Center mostra em "Identidade do
+# produto" para o "Saga Chat" (Store ID 9NTFHT718FJT). Têm de bater letra por letra, senão
+# a Store recusa o envio. "Saga" sozinho já era de outro app na Store.
+#
+# Vai sem assinatura de propósito: quem assina o pacote é a própria Microsoft, depois da
+# revisão — e é essa assinatura que tira o "Windows protegeu o seu PC".
+appx:
+  identityName: TKPNerelle.SagaChat
+  publisher: CN=8DD5962A-BA4B-4003-84A9-4DC9548B9E21
+  publisherDisplayName: TKPNerelle
+  displayName: Saga Chat
+  applicationId: Saga
+  # A ficha da loja só pode ser escrita nos idiomas que o pacote declara.
+  languages: [pt-BR]
+  backgroundColor: transparent
+  # Microfone e câmera precisam estar declarados no pacote para o Windows deixar a Saga
+  # pedi-los; o runFullTrust é obrigatório em app Electron.
+  capabilities: [runFullTrust, internetClient, microphone, webcam]
+  # Sem a tarefa de arranque: ver "Abrir junto com o Windows" em src/main/CLAUDE.md.
+  addAutoLaunchExtension: false
+
 toolsets:
   nsis: "1.2.1"

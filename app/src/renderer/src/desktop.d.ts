@@ -6,8 +6,9 @@ export type SourceInfo = {
   icon: string | null;
 };
 
-/** Se a Saga abre junto com o sistema. Fora do app instalado, `disponivel` é falso. */
-export type AberturaComOSistema = { disponivel: boolean; ligado: boolean };
+/** Se a Saga abre junto com o sistema. Fora do app instalado e no pacote da Microsoft
+ *  Store (`loja`), `disponivel` é falso. */
+export type AberturaComOSistema = { disponivel: boolean; loja: boolean; ligado: boolean };
 
 /** Espelha o UpdateState do processo principal (src/main/update.ts). */
 export type UpdateState = {

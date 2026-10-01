@@ -75,8 +75,10 @@ export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () 
     if (/^https:\/\//.test(url)) shell.openExternal(url);
   });
 
-  // Em desenvolvimento não há o que atualizar: abre na hora.
-  if (!app.isPackaged || REPO.startsWith('SEU_')) {
+  // Em desenvolvimento não há o que atualizar: abre na hora. Na Microsoft Store quem
+  // atualiza é a Store — e o instalador do GitHub, por cima de um pacote dela, seria uma
+  // segunda Saga instalada ao lado, não uma versão nova desta.
+  if (!app.isPackaged || process.windowsStore || REPO.startsWith('SEU_')) {
     enviar({ fase: 'nenhuma' });
     return;
   }

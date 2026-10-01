@@ -31,9 +31,24 @@ export function abriuComOSistema(argv: string[], porLogin = false): boolean {
  * - `win32`: foi o que se pediu. No Mac a chave existe no painel, começando desligada.
  * - `jaDecidiu`: sem essa marca, quem desligasse veria a Saga voltar sozinha na abertura
  *   seguinte — ajuste que não obedece é pior que ajuste nenhum.
+ * - `loja`: no pacote da Microsoft Store a chave fica indisponível — ver `podeAbrirComOSistema`.
  */
-export function deveLigarSozinho(o: { plataforma: string; empacotado: boolean; jaDecidiu: boolean }): boolean {
-  return o.empacotado && o.plataforma === 'win32' && !o.jaDecidiu;
+export function deveLigarSozinho(o: { plataforma: string; empacotado: boolean; jaDecidiu: boolean; loja: boolean }): boolean {
+  return podeAbrirComOSistema(o) && o.plataforma === 'win32' && !o.jaDecidiu;
+}
+
+/**
+ * Se a chave existe neste app.
+ *
+ * - Em desenvolvimento, não: o executável é o Electron.
+ * - No pacote da Microsoft Store, também não. O caminho de hoje grava a entrada de arranque
+ *   no registro, e num pacote da Store a escrita no registro do usuário fica isolada dentro
+ *   do pacote: o Windows não a vê, e a leitura de volta, feita de dentro do mesmo pacote,
+ *   pode dizer "ligado" — a chave mentiria. O jeito da Store é a tarefa de arranque
+ *   declarada no pacote, que abre sem o `--ao-iniciar`, e não foi exercido num Windows.
+ */
+export function podeAbrirComOSistema(o: { empacotado: boolean; loja: boolean }): boolean {
+  return o.empacotado && !o.loja;
 }
 
 // Em texto e com data, na pasta de dados do app: quem abrir entende sem ferramenta nenhuma.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu } from './inicio.ts';
+import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu, podeAbrirComOSistema } from './inicio.ts';
 
 const pastaDeTeste = () => mkdtempSync(join(tmpdir(), 'saga-inicio-'));
 
@@ -18,15 +18,22 @@ test('no Mac não há argumento: quem responde é o login', () => {
 });
 
 test('liga sozinho no Windows instalado, uma vez só', () => {
-  const base = { plataforma: 'win32', empacotado: true, jaDecidiu: false };
+  const base = { plataforma: 'win32', empacotado: true, jaDecidiu: false, loja: false };
   assert.equal(deveLigarSozinho(base), true);
   assert.equal(deveLigarSozinho({ ...base, jaDecidiu: true }), false, 'já decidiu: não mexe mais');
 });
 
 test('não liga sozinho em desenvolvimento nem fora do Windows', () => {
-  assert.equal(deveLigarSozinho({ plataforma: 'win32', empacotado: false, jaDecidiu: false }), false);
-  assert.equal(deveLigarSozinho({ plataforma: 'darwin', empacotado: true, jaDecidiu: false }), false);
-  assert.equal(deveLigarSozinho({ plataforma: 'linux', empacotado: true, jaDecidiu: false }), false);
+  assert.equal(deveLigarSozinho({ plataforma: 'win32', empacotado: false, jaDecidiu: false, loja: false }), false);
+  assert.equal(deveLigarSozinho({ plataforma: 'darwin', empacotado: true, jaDecidiu: false, loja: false }), false);
+  assert.equal(deveLigarSozinho({ plataforma: 'linux', empacotado: true, jaDecidiu: false, loja: false }), false);
+});
+
+test('no pacote da Microsoft Store a chave não existe, e nada se liga sozinho', () => {
+  assert.equal(podeAbrirComOSistema({ empacotado: true, loja: true }), false);
+  assert.equal(podeAbrirComOSistema({ empacotado: true, loja: false }), true);
+  assert.equal(podeAbrirComOSistema({ empacotado: false, loja: false }), false, 'desenvolvimento');
+  assert.equal(deveLigarSozinho({ plataforma: 'win32', empacotado: true, jaDecidiu: false, loja: true }), false);
 });
 
 test('a decisão fica anotada, e anotada só se pergunta uma vez', () => {
@@ -35,7 +42,7 @@ test('a decisão fica anotada, e anotada só se pergunta uma vez', () => {
     assert.equal(jaDecidiu(pasta), false);
     assert.equal(anotarDecisao(pasta, true), true);
     assert.equal(jaDecidiu(pasta), true);
-    assert.equal(deveLigarSozinho({ plataforma: 'win32', empacotado: true, jaDecidiu: jaDecidiu(pasta) }), false);
+    assert.equal(deveLigarSozinho({ plataforma: 'win32', empacotado: true, jaDecidiu: jaDecidiu(pasta), loja: false }), false);
   } finally {
     rmSync(pasta, { recursive: true, force: true });
   }

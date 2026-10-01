@@ -4,7 +4,7 @@ import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 import { registrarMusica } from './musica';
-import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu } from './inicio';
+import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu, podeAbrirComOSistema } from './inicio';
 import {
   ATALHO_PADRAO, atalhoAceito, encaixarNaTela, gravar as gravarOverlay, ler as lerOverlay,
   type Retangulo,
@@ -148,7 +148,7 @@ function definirAberturaComOSistema(ligado: boolean): boolean {
 function ligarNaPrimeiraVez() {
   try {
     const pasta = app.getPath('userData');
-    if (!deveLigarSozinho({ plataforma: process.platform, empacotado: app.isPackaged, jaDecidiu: jaDecidiu(pasta) })) return;
+    if (!deveLigarSozinho({ plataforma: process.platform, empacotado: app.isPackaged, jaDecidiu: jaDecidiu(pasta), loja: !!process.windowsStore })) return;
     // Anotar primeiro: só se liga o que se consegue lembrar de ter ligado.
     if (!anotarDecisao(pasta, true)) return;
     definirAberturaComOSistema(true);
@@ -599,18 +599,22 @@ app.whenReady().then(async () => {
   ipcMain.handle('janela:fechar', (e) => janelaDe(e)?.close());
   ipcMain.handle('janela:estaMaximizada', (e) => janelaDe(e)?.isMaximized() ?? false);
 
-  // Abrir junto com o sistema. `disponivel` é falso em desenvolvimento: ali o executável é
-  // o Electron, e o que se gravaria no arranque não é a Saga de ninguém.
+  // Abrir junto com o sistema. `disponivel` é falso em desenvolvimento — ali o executável é
+  // o Electron, e o que se gravaria no arranque não é a Saga de ninguém — e no pacote da
+  // Microsoft Store (ver `podeAbrirComOSistema`).
+  const loja = !!process.windowsStore;
+  const disponivel = podeAbrirComOSistema({ empacotado: app.isPackaged, loja });
   ipcMain.handle('inicio:estado', () => ({
-    disponivel: app.isPackaged,
-    ligado: app.isPackaged && abreComOSistema(),
+    disponivel,
+    loja,
+    ligado: disponivel && abreComOSistema(),
   }));
 
   ipcMain.handle('inicio:definir', (_e, ligado: boolean) => {
-    if (!app.isPackaged) return { disponivel: false, ligado: false };
+    if (!disponivel) return { disponivel: false, loja, ligado: false };
     const ficou = definirAberturaComOSistema(!!ligado);
     anotarDecisao(app.getPath('userData'), ficou);
-    return { disponivel: true, ligado: ficou };
+    return { disponivel: true, loja, ligado: ficou };
   });
 
   ligarNaPrimeiraVez();

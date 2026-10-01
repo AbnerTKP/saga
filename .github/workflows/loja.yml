@@ -1,0 +1,39 @@
+# Monta o pacote da Microsoft Store (.appx) do "Saga Chat" e o deixa como artefato desta
+# execução. NÃO envia nada à Store: o envio é feito no Partner Center, à mão, por quem tem a
+# conta — e cada envio passa pela revisão da Microsoft, que leva até uns três dias úteis.
+#
+# Existe porque o makeappx só roda no Windows: no Mac não há como montar o pacote. O .exe
+# do GitHub continua sendo o canal de sempre; este é um segundo canal, para quem chega
+# agora não ver o "Windows protegeu o seu PC" (quem assina o pacote é a Microsoft).
+#
+# Roda dentro do release (uma vez por versão) e à mão, pelo "Run workflow" desta tela. Falhar
+# aqui não segura o Release: o .exe e o .dmg são montados num job à parte.
+name: loja
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appx:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter app dist:loja
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      # O artefato de um repositório público pode ser baixado por qualquer pessoa logada no
+      # GitHub. Tudo bem: é o mesmo app do .exe público, e sem segredo nenhum dentro.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saga-chat-appx
+          path: app/dist/*.appx
+          if-no-files-found: error
+          retention-days: 30

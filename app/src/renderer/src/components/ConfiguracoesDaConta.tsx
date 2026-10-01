@@ -573,7 +573,9 @@ function PaginaInicio() {
         <Linha rotulo={`Abrir a Saga junto com ${sistema.nome}`}
           explica={<>Aberta pelo sistema, ela vem encolhida{sistema.encolhida} — você já entra online para o pessoal sem uma janela na cara.
             {resposta === 'erro' && ' Não deu para saber como está agora.'}
-            {abertura && !abertura.disponivel && ' Só vale no app instalado.'}</>}
+            {abertura && !abertura.disponivel && (abertura.loja
+              ? ' Na versão da Microsoft Store ainda não dá.'
+              : ' Só vale no app instalado.')}</>}
           travada={!abertura?.disponivel}>
           <input
             type="checkbox" role="switch" className="cfg-chave" aria-label={`Abrir a Saga junto com ${sistema.nome}`}

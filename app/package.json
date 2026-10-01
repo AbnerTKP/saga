@@ -11,6 +11,7 @@
     "build": "electron-vite build",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
+    "dist:loja": "electron-vite build && electron-builder --win appx --publish never",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
   },
