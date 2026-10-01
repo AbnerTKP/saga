@@ -26,6 +26,16 @@ import {
  * uma música leva 3,6 s.
  */
 
+/**
+ * Desligado em 01/10/2026, a pedido do dono, em TODAS as versões — não só na da Microsoft
+ * Store, onde baixar e executar um programa que não veio no pacote é motivo de recusa. Fica
+ * desligado até haver um jeito seguro. Desligado, nada aqui baixa nem executa o `yt-dlp`:
+ * achar e preparar respondem o aviso, e ler não devolve nada. O código fica para religar.
+ * O par desta chave na tela é `BOT_DE_MUSICA_LIGADO`, em `comandos.ts`.
+ */
+const LIGADO = false;
+const DESLIGADO = 'O bot de música está desligado por enquanto.';
+
 const ASSET: Record<string, string | undefined> = {
   darwin: 'yt-dlp_macos.zip',
   win32: process.arch === 'arm64' ? 'yt-dlp_win_arm64.zip' : process.arch === 'ia32' ? 'yt-dlp_win_x86.zip' : 'yt-dlp_win.zip',
@@ -321,6 +331,7 @@ export function registrarMusica() {
   app.on('before-quit', () => { for (const p of rodando) p.kill(); });
 
   ipcMain.handle('musica:achar', async (_e, texto: string) => {
+    if (!LIGADO) return { ok: false, erro: DESLIGADO };
     try { return { ok: true, musica: await achar(String(texto ?? '')) }; } catch (e) {
       if (!(e instanceof ErroDaMusica)) registrar('erro', 'musica', `achar: ${(e as Error).message}`);
       return { ok: false, erro: explicar(e) };
@@ -329,6 +340,7 @@ export function registrarMusica() {
 
   /** Garante o áudio de uma música da fila — é o anfitrião adiantando a próxima. */
   ipcMain.handle('musica:preparar', async (_e, id: string) => {
+    if (!LIGADO) return { ok: false, erro: DESLIGADO };
     if (!ID.test(String(id))) return { ok: false, erro: 'id inválido' };
     try {
       // Já baixando (é o /tocar de agora, ou a próxima adiantada): espera esse, sem baixar de novo.
@@ -352,6 +364,7 @@ export function registrarMusica() {
 
   /** Os bytes do áudio, para a tela tocar num blob — ver `useMusica`. */
   ipcMain.handle('musica:ler', (_e, id: string) => {
+    if (!LIGADO) return null;
     if (!ID.test(String(id))) return null;
     const nome = arquivoDe(id);
     if (!nome) return null;

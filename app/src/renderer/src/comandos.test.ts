@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lerComando, comandosParaOMenu } from './comandos.ts';
+import { lerComando, comandosParaOMenu, BOT_DE_MUSICA_LIGADO } from './comandos.ts';
 
 test('comando conhecido vira comando, com o resto como argumento', () => {
   assert.deepEqual(lerComando('/tocar https://youtu.be/dQw4w9WgXcQ'), { nome: 'tocar', arg: 'https://youtu.be/dQw4w9WgXcQ' });
@@ -16,8 +16,13 @@ test('barra que não é comando continua sendo mensagem', () => {
 });
 
 test('o menu filtra pelo começo e some quando chega o argumento', () => {
-  assert.equal(comandosParaOMenu('/').length, 4);
-  assert.deepEqual(comandosParaOMenu('/p').map((c) => c.nome), ['pular', 'parar']);
-  assert.deepEqual(comandosParaOMenu('/tocar ').map((c) => c.nome), []);
-  assert.deepEqual(comandosParaOMenu('oi').map((c) => c.nome), []);
+  assert.equal(comandosParaOMenu('/', true).length, 4);
+  assert.deepEqual(comandosParaOMenu('/p', true).map((c) => c.nome), ['pular', 'parar']);
+  assert.deepEqual(comandosParaOMenu('/tocar ', true).map((c) => c.nome), []);
+  assert.deepEqual(comandosParaOMenu('oi', true).map((c) => c.nome), []);
+});
+
+test('com o bot desligado, o menu não aparece', () => {
+  assert.deepEqual(comandosParaOMenu('/', false), []);
+  assert.deepEqual(comandosParaOMenu('/', BOT_DE_MUSICA_LIGADO), [], 'desligado desde 01/10/2026, até haver um jeito seguro');
 });

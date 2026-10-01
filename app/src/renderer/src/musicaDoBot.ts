@@ -1,5 +1,5 @@
 import { comandoDeMusica, type EstadoDaMusica, type Mensagem } from './api';
-import type { NomeDoComando } from './comandos';
+import { BOT_DE_MUSICA_LIGADO, type NomeDoComando } from './comandos';
 import { anotar } from './registro';
 
 /**
@@ -73,6 +73,8 @@ export async function executarComando(
   c: { nome: NomeDoComando; arg: string },
   aoProcurar?: () => void,
 ): Promise<Mensagem> {
+  // Antes de "fora da call" e de "sem permissão": desligado é a resposta para todo mundo.
+  if (c.nome === 'tocar' && !BOT_DE_MUSICA_LIGADO) throw new Error('O bot de música está desligado por enquanto.');
   if (contexto && !contexto.naCall()) throw new Error(FORA_DA_CALL);
   if (contexto && c.nome !== 'fila' && !contexto.podeTocar()) throw new Error(SEM_PERMISSAO);
 

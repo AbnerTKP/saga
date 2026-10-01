@@ -297,6 +297,14 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
 
 ## O bot de música (23/09/2026)
 
+> **Desligado desde 01/10/2026, em todas as versões, a pedido do dono — até haver um jeito
+> seguro.** O motivo imediato foi a Microsoft Store (baixar e executar um programa que não
+> veio no pacote é motivo de recusa), mas o dono quis fora "de tudo". O código ficou: duas
+> chaves, `LIGADO` em `main/musica.ts` (quem deixa de baixar e executar o `yt-dlp`) e
+> `BOT_DE_MUSICA_LIGADO` em `comandos.ts` (o menu some e o `/tocar` responde "desligado" só
+> para quem digitou). Pular, parar e fila continuam, para parar música posta por uma Saga
+> antiga. O `yt-dlp` já baixado na pasta da Saga de quem usou fica lá, sem ser executado.
+
 Pedido do dono: colar um link do YouTube ou do Spotify e tocar na call, como os bots do
 Discord — chamado por comando no chat (`/tocar`, `/pular`, `/parar`, `/fila`). Desenho
 escolhido na prancheta: opção A, o cartão com capa e botões.
