@@ -1,0 +1,30 @@
+# HTTPS da Saga, direto no IP — sem domínio. Usado pelo docker-compose.ip.yml.
+#
+# A Let's Encrypt emite certificado para endereço IP desde 15/01/2026, mas só no perfil
+# `shortlived`: vale ~6 dias, e o Caddy renova sozinho bem antes. Sem o `issuer acme` aqui, o
+# Caddy usaria para um IP a autoridade INTERNA dele, que nenhum computador reconhece.
+#
+# Por que existe: até a v0.65 a senha e as mensagens viajavam em HTTP puro (a :3001). A Store
+# exige criptografia (política 10.5.4), e mais que isso, senha aberta na rede é senha de
+# qualquer um no caminho. As portas antigas (:3001 e o LiveKit na :7880) continuam abertas
+# para o app velho até todo mundo atualizar — ver CLAUDE.md da raiz.
+76.13.225.79 {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+
+	# O LiveKit (sinalização da call, por WebSocket) mora em /rtc; o resto é o servidor da Saga.
+	# Nenhuma rota da Saga começa com /rtc.
+	@livekit path /rtc /rtc/*
+	reverse_proxy @livekit 127.0.0.1:7880
+	reverse_proxy 127.0.0.1:3001 {
+		# O Node fecha a conexão parada aos 60 s (`keepAliveTimeout`, ver server/CLAUDE.md), e
+		# o Caddy guardaria a dele por 2 min: reaproveitando uma que o Node acabou de fechar,
+		# um POST cairia no meio. Soltando antes, quem fecha é sempre o Caddy.
+		transport http {
+			keepalive 30s
+		}
+	}
+}

@@ -124,6 +124,16 @@ const KEY = process.env.LIVEKIT_API_KEY;
 const SECRET = process.env.LIVEKIT_API_SECRET;
 const HOST = process.env.LIVEKIT_HOST ?? 'http://localhost:7880';
 const PUBLIC_URL = process.env.LIVEKIT_PUBLIC_URL ?? 'ws://localhost:7880';
+/**
+ * O LiveKit pelo caminho cifrado (`wss://`, pelo Caddy na 443). Vai só para quem CHEGOU pelo
+ * HTTPS — o Caddy marca o pedido com `X-Forwarded-Proto: https` —, e o app antigo, que ainda
+ * fala com a :3001 em HTTP puro, continua recebendo o endereço de sempre. Assim a troca não
+ * depende de todo mundo atualizar no mesmo dia: cada app pega o caminho por onde chegou.
+ * Forjar o cabeçalho direto na :3001 só devolveria o endereço cifrado, que é o melhor dos dois.
+ */
+const PUBLIC_URL_TLS = process.env.LIVEKIT_PUBLIC_URL_TLS ?? '';
+const urlDoLiveKit = (cabecalhos, comum = PUBLIC_URL, cifrado = PUBLIC_URL_TLS) =>
+  cifrado && String(cabecalhos['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https' ? cifrado : comum;
 
 if (!KEY || !SECRET) {
   console.error('Defina LIVEKIT_API_KEY e LIVEKIT_API_SECRET');
@@ -1557,7 +1567,7 @@ const ROTAS = {
     const { sala, piloto } = grids.salaDaCorrida(naMesa(sid, eu), id);
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
     at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: piloto });
-    return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
+    return { url: urlDoLiveKit(req.headers), token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
   // --- Dragão Quadrado ---------------------------------------------------------
@@ -1589,7 +1599,7 @@ const ROTAS = {
     const { sala, lutador } = arenas.salaDaLuta(naMesa(sid, eu), id);
     const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
     at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: lutador });
-    return { url: PUBLIC_URL, token: await at.toJwt(), identity: identidadeDe(eu.id) };
+    return { url: urlDoLiveKit(req.headers), token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
   /**
@@ -1773,7 +1783,7 @@ const ROTAS = {
     // teria como saber quem está vendo: o LiveKit não conta a ninguém quem se inscreveu na
     // faixa dele. É permissão de mexer nos PRÓPRIOS atributos, não nos de outra pessoa.
     const token = await crachaDaCall({ identity: identidadeDe(eu.id), name: eu.nome, sala: nome, fontes: fontesDaCall(eu.cargo) });
-    return { url: PUBLIC_URL, token, identity: identidadeDe(eu.id) };
+    return { url: urlDoLiveKit(req.headers), token, identity: identidadeDe(eu.id) };
   },
 
   'POST /eu/foto':   (req) => trocarImagem(req, 'usuario', 'foto'),

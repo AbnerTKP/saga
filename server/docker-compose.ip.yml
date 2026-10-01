@@ -33,3 +33,21 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  # HTTPS na 443, com certificado da Let's Encrypt para o próprio IP — ver Caddyfile.ip. Na
+  # frente dos dois de cima: /rtc vai para o LiveKit, o resto para a Saga. As portas antigas
+  # (:3001 e :7880) continuam para o app até a v0.65, que fala HTTP puro.
+  caddy:
+    image: caddy:2.11.4
+    restart: unless-stopped
+    # Proxy pequeno; o teto é o mesmo motivo dos outros (a VPS de um núcleo que já travou).
+    mem_limit: 128m
+    network_mode: host
+    volumes:
+      - ./Caddyfile.ip:/etc/caddy/Caddyfile:ro
+      # O certificado e a conta da Let's Encrypt. Sem guardar, cada reinício pediria um
+      # certificado novo — e a Let's Encrypt limita quantos o mesmo IP pode pedir.
+      - ./caddy-dados:/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

@@ -45,6 +45,7 @@ before(async () => {
       LIVEKIT_API_SECRET: 'secret-de-teste-bem-longo',
       LIVEKIT_HOST: `http://127.0.0.1:${livekit.address().port}`,
       LIVEKIT_PUBLIC_URL: 'ws://exemplo:7880',
+      LIVEKIT_PUBLIC_URL_TLS: 'wss://exemplo',
       SEM_NOTAS: '1',
     },
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -63,10 +64,10 @@ after(() => {
   rmSync(pasta, { recursive: true, force: true });
 });
 
-const chamar = async (metodo, rota, { corpo, sessao } = {}) => {
+const chamar = async (metodo, rota, { corpo, sessao, cabecalhos } = {}) => {
   const r = await fetch(base + rota, {
     method: metodo,
-    headers: { 'content-type': 'application/json', ...(sessao ? { 'x-sessao': sessao } : {}) },
+    headers: { 'content-type': 'application/json', ...(sessao ? { 'x-sessao': sessao } : {}), ...cabecalhos },
     body: corpo ? JSON.stringify(corpo) : undefined,
   });
   return { status: r.status, corpo: await r.json().catch(() => ({})) };
@@ -108,4 +109,15 @@ test('o bot acha a call de quem acabou de entrar numa sala vazia', async () => {
   });
   // Achando a call, a fila vazia responde isto; sem achar, "Entre numa sala de voz primeiro".
   assert.match(r.corpo.error ?? '', /Não tem nada tocando/, `o bot não achou a call: ${JSON.stringify(r.corpo)}`);
+});
+
+test('quem chega pelo HTTPS recebe o LiveKit cifrado; o app antigo, o endereço de sempre', async () => {
+  const eu = await entrarComoDono();
+  const sala = (await chamar('GET', '/rooms', { sessao: eu.token })).corpo.rooms.find((r) => r.name === 'Geral');
+  const pedir = (cabecalhos) => chamar('POST', '/token', { sessao: eu.token, corpo: { sala: sala.id }, cabecalhos });
+  // O Caddy, na 443, marca o pedido assim antes de passar para a :3001.
+  assert.equal((await pedir({ 'x-forwarded-proto': 'https' })).corpo.url, 'wss://exemplo');
+  // O app até a v0.65 fala com a :3001 direto: nada muda para ele.
+  assert.equal((await pedir({})).corpo.url, 'ws://exemplo:7880');
+  assert.equal((await pedir({ 'x-forwarded-proto': 'http' })).corpo.url, 'ws://exemplo:7880');
 });

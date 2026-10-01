@@ -14,3 +14,6 @@ docker-compose*.yml
 publicar.sh
 instalar.sh
 Caddyfile.template
+Caddyfile.ip
+# O certificado do HTTPS (ver Caddyfile.ip): é do Caddy, não do servidor da Saga.
+caddy-dados
