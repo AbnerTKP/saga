@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacidade da Saga</title>
+<meta name="description" content="O que a Saga (na Microsoft Store, Saga Chat) guarda, onde, e como pedir para apagar.">
+<link rel="icon" href="favicon.png" type="image/png">
+<meta name="theme-color" content="#141517">
+<style>
+  /* Os mesmos tons da página de download (index.html): é a mesma Saga. */
+  :root {
+    --fundo: #141517; --carta: #1e1f22; --linha: #2b2d31;
+    --texto: #dbdee1; --suave: #949ba4; --fraco: #6d6f78; --claro: #f2f3f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--texto);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: #7d90ff; }
+  main { width: min(720px, 100% - 48px); margin: 0 auto; padding: 64px 0 96px; }
+  @media (max-width: 640px) { main { width: calc(100% - 32px); padding-top: 40px; } }
+  .marca { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; text-decoration: none; color: var(--claro); }
+  .marca img { width: 40px; height: 40px; }
+  .marca b { font-weight: 650; }
+  h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; letter-spacing: -.025em; color: var(--claro); }
+  .data { margin: 0 0 40px; color: var(--fraco); font-size: 14px; }
+  h2 { margin: 44px 0 10px; font-size: 19px; letter-spacing: -.01em; color: var(--claro); }
+  p, li { color: var(--texto); }
+  ul { padding-left: 20px; }
+  li { margin: 6px 0; }
+  li b, p b { color: var(--claro); font-weight: 620; }
+  .quadro { margin-top: 12px; padding: 16px 18px; border: 1px solid var(--linha); border-radius: 12px; background: var(--carta); }
+  .quadro p { margin: 0; color: var(--suave); }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--linha); font-size: 14px; color: var(--fraco); }
+</style>
+</head>
+<body>
+<main>
+  <a class="marca" href="./"><img src="favicon.png" alt=""><b>Saga</b></a>
+
+  <h1>Privacidade</h1>
+  <p class="data">Atualizada em 1º de outubro de 2026. Vale para o app Saga, inclusive a versão da Microsoft Store, chamada <b>Saga Chat</b>.</p>
+
+  <p>A Saga é um app de voz, vídeo e chat feito por um grupo de amigos, para um grupo de amigos. Não tem anúncio, não vende dado de ninguém e não usa ferramenta de rastreamento ou de estatística.</p>
+
+  <h2>O que fica guardado no servidor da Saga</h2>
+  <ul>
+    <li><b>Sua conta:</b> apelido e senha. Da senha, guardamos só um resumo criptográfico (hash), nunca a senha em si. Se você puser, também a foto e o banner do perfil, o status e quando você foi visto pela última vez.</li>
+    <li><b>O que você manda:</b> mensagens, imagens, arquivos e GIFs, nas salas de texto e nas conversas privadas, e os sons que você subir para o soundboard.</li>
+    <li><b>Os servidores de que você participa:</b> cargo, nome exibido, identificador e, se acontecer, castigo ou banimento.</li>
+    <li><b>Amizades:</b> quem é seu amigo e os pedidos de amizade.</li>
+    <li><b>Jogos:</b> o que é preciso para a partida acontecer. Na Urna, o voto é secreto: fica guardado o total de cada opção e quantas vezes cada pessoa votou, nunca em quem ela votou.</li>
+    <li><b>Relatos:</b> quando você usa o botão Relatar, vai o texto que você escreveu, a versão do app, o sistema e a tela em que você estava. O registro de erros do seu computador só vai se você marcar para anexá-lo.</li>
+  </ul>
+  <p>A Saga não pede o seu e-mail.</p>
+
+  <h2>Voz, vídeo e tela</h2>
+  <p>Passam ao vivo pelo servidor de mídia da própria Saga, só para quem está na mesma sala, e <b>não são gravados</b>.</p>
+
+  <h2>O que fica só no seu computador</h2>
+  <p>O app guarda na pasta dele a sua sessão (para não pedir a senha toda vez), as suas preferências e um registro de erros. Senhas e chaves são tiradas do registro antes de ele ser escrito. Ele só sai do seu computador se você o anexar a um relato.</p>
+
+  <h2>Com quem a Saga fala além do próprio servidor</h2>
+  <ul>
+    <li><b>Giphy</b>, quando você procura um GIF: a busca é feita pelo servidor da Saga, que manda ao Giphy só o termo pesquisado. As prévias dos resultados vêm direto do Giphy, que por isso vê o endereço de internet do seu computador, mas nada da sua conta. O GIF que você escolhe é baixado pelo servidor da Saga e fica guardado lá.</li>
+    <li><b>GitHub</b>, onde o app é publicado: a versão baixada do site consulta o GitHub para saber se há atualização. A versão da Microsoft Store é atualizada pela própria Store.</li>
+  </ul>
+
+  <h2>Onde fica e por quanto tempo</h2>
+  <p>Num servidor contratado pela Saga na Hostinger. O que é seu fica guardado enquanto a sua conta existir. Quando uma mensagem é apagada, ela some da conversa para todo mundo e o texto dela é apagado do servidor: fica só a marca de que ali houve uma mensagem.</p>
+
+  <h2>Apagar a sua conta</h2>
+  <div class="quadro">
+    <p>Peça ao dono da Saga, o <b>TKP</b>, dentro do app, ou abra um pedido em <a href="https://github.com/AbnerTKP/saga/issues">github.com/AbnerTKP/saga/issues</a>. A conta é apagada à mão, com a foto, o banner, as amizades e os vínculos com os servidores. As mensagens que você mandou ficam nas conversas sem o seu nome, a não ser que você peça para apagá-las também.</p>
+  </div>
+
+  <h2>Menores de idade</h2>
+  <p>A Saga não é feita para menores de 13 anos.</p>
+
+  <h2>Mudanças</h2>
+  <p>Quando algo aqui mudar, esta página muda junto, com a data no alto.</p>
+
+  <footer>Dúvidas: <a href="https://github.com/AbnerTKP/saga/issues">github.com/AbnerTKP/saga/issues</a> · <a href="./">Baixar a Saga</a></footer>
+</main>
+</body>
+</html>
