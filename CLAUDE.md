@@ -44,6 +44,7 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
 | E-mail (Resend) | `RESEND_KEY` + `EMAIL_DE` no `.env` da VPS; vazios, a Saga não pede e-mail a ninguém. **Desligado desde que nasceu (17/09/2026): a conta do Resend não tem domínio verificado** e, assim, só entrega no e-mail do dono — ligar antes disso trava o grupo inteiro fora. Ver `server/CLAUDE.md`, "O e-mail da conta" |
 | Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
+| HTTPS | `https://76.13.225.79` desde 01/10/2026: Caddy na 443 (`server/Caddyfile.ip`), certificado da Let's Encrypt **para o próprio IP**, sem domínio — perfil `shortlived`, ~6 dias, o Caddy renova sozinho e guarda em `/root/server/caddy-dados`. `/rtc` vai para o LiveKit (`wss://`), o resto para a :3001. **A :3001 e a :7880 continuam abertas para o app até a v0.65**, que fala HTTP puro; fechar no `ufw` só quando ninguém mais estiver nela |
 
 **Publicar servidor: `cd server && ./publicar.sh`** — nunca o `scp` na mão. Cada trava
 lá dentro é um erro que já aconteceu, e o comentário ao lado diz qual: teste falhando,
@@ -81,6 +82,11 @@ publica só o servidor, e à mão continua valendo. Três coisas não óbvias:
 
 O script roda igual no Mac e no Linux do CI porque a lista de md5 deste lado usa `md5sum`
 quando existe e `md5 -q` quando não — sempre só o hash, montada como a de lá.
+
+**O `publicar.sh` não leva o compose nem o `Caddyfile.ip`** — leva só o código. Infraestrutura
+nova (um serviço no compose, uma variável no `.env`) vai à mão, e do jeito que foi o HTTPS em
+01/10/2026: cópia de `.env` e compose em `/root/backup-…` antes, `scp` só dos dois arquivos, md5
+dos dois lados, e `docker compose up -d <serviço>` só do serviço novo — nunca `up -d` geral.
 
 **Nunca mande `livekit.yaml` daqui.** O de produção tem a chave de verdade e mora só na
 VPS; o do repositório é modelo e chama-se `livekit.exemplo.yaml` justamente porque um

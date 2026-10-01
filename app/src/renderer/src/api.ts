@@ -15,7 +15,10 @@ import type { IdDoCenario, IdDoLutador } from './dragao/tipos';
 import { PROTOCOLO_DA_LUTA } from './dragao/protocolo';
 import type { CorpoDoRelato } from './relato';
 
-export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : '76.13.225.79:3001';
+// Em produção, pelo HTTPS (o Caddy na 443, ver server/Caddyfile.ip): até a v0.65 era a :3001 em
+// HTTP puro, com a senha e as mensagens abertas na rede. A :3001 fica de pé para quem ainda não
+// atualizou, e o servidor entrega o LiveKit cifrado (`wss://`) a quem chega por aqui.
+export const SERVIDOR = import.meta.env.DEV ? 'localhost:3001' : 'https://76.13.225.79';
 
 const BASE = /^https?:\/\//i.test(SERVIDOR)
   ? SERVIDOR.replace(/\/+$/, '')
