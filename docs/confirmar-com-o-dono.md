@@ -2,6 +2,14 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **O relógio do Catan, os avisos e as cartas grandes (04/10/2026).** O que está medido: as regras do
+  relógio (`catan.test.mjs`, inclusive 30 partidas de robôs que às vezes dormem e deixam o relógio
+  jogar), as funções da tela (`catan.test.ts`) e a tela inteira no RENDERER pelo passo `19-catan` do
+  `ferramentas/fotografar`. **Não foi exercido**: NENHUM dos nove sons foi ouvido — timbre e volume
+  são de ouvido; o tique dos últimos 5 s; a Saga no Electron; o Windows; duas pessoas de verdade
+  vendo o aviso da vez ao mesmo tempo. **Servidor e app sobem juntos**: app antigo com servidor novo
+  deve jogar sem ver o relógio, com a vez estourando do mesmo jeito — dedução do código, não medido.
+
 - **O Catan (27/09/2026), jogado de verdade por duas a quatro pessoas.** O que está medido: as regras
   (`catan.test.mjs`, com 40 partidas inteiras de robôs), as mesas (`catans.test.mjs`), a costura
   pela rede (`api.test.mjs`) e as telas no RENDERER, num Chrome headless e mudo contra servidor local

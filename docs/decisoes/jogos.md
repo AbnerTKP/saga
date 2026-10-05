@@ -248,11 +248,63 @@ o barco dos portos, e as cartas mostrando o RECURSO em vez do terreno.
   que a tela oferece é recusado, as cartas se conservam (banco + mãos = 19 de cada), e ninguém fica
   com 10 pontos na própria vez sem a partida acabar. Foi essa última conferência, escrita junto com o
   teste da vitória, que achou o defeito de construir aldeia não conferir a vitória.
-- **Sem relógio** (decisão do dono): à mesa entre amigos ninguém cronometra a vez. O preço é alguém
-  que fecha a Saga segurar todo mundo; por isso **quem não aparece há 10 minutos sai da partida
-  sozinho** — nem na mesa, nem na busca de salas, que roda enquanto a Saga está aberta. Quem só foi
-  ler o chat continua aparecendo. Quem sai deixa as peças (que continuam cortando estradas) e devolve
-  as cartas ao banco; sobrando um, ele vence.
+- **Sem relógio, até 04/10/2026** (decisão do dono, depois desfeita por ele mesmo): à mesa entre
+  amigos ninguém cronometra a vez. O preço é alguém que fecha a Saga segurar todo mundo; por isso
+  **quem não aparece há 10 minutos sai da partida sozinho** — nem na mesa, nem na busca de salas, que
+  roda enquanto a Saga está aberta. Quem só foi ler o chat continua aparecendo. Quem sai deixa as
+  peças (que continuam cortando estradas) e devolve as cartas ao banco; sobrando um, ele vence. Os
+  10 minutos continuam valendo com o relógio.
+
+### O relógio, os avisos e as cartas (04/10/2026)
+
+Pedido do dono, jogando: tempo na vez e na troca, "mais evidente quando for minha rodada" e "que eu
+vou mexer os dados", som na passagem da vez, na troca e em cada jogada, e "design mais evidente das
+cartas, mais foco". Na prancheta (claude.ai/artifact/AmMrgETf88y4h215ACtUEB, página "Relógio, avisos
+e cartas") havia A ou B para a vez e C ou D para as cartas; **o dono deixou a escolha comigo** e saiu
+A e C. Depois pediu o aviso no meio — "mostrando, não falando".
+
+- **O tempo da vez é de 30 s ou 1 min, escolhido por quem abriu a mesa** (`acao: 'tempo'`), e vale no
+  "jogar de novo". **Estourou, o jogo joga por você** e a partida nunca fica parada: na colocação,
+  aldeia e estrada num lugar sorteado; antes de rolar, rola; no ladrão, terreno e vítima sorteados;
+  e passa a vez. No 7, quem deve cartas tem o mesmo tempo para devolver, e o relógio de quem rolou
+  fica PARADO enquanto isso. Se o 7 saiu do próprio relógio (quem rolou já estava fora do tempo), o
+  ladrão vai na hora e a vez passa. Cada coisa do relógio entra no "Acontecendo".
+- **O prazo é um instante do relógio do servidor, vencido pela leitura seguinte** — o mesmo do
+  xadrez, sem `setTimeout` no servidor. Toda tela pergunta de 800 em 800 ms e a busca de salas também
+  vence a vez, então quem saiu da tela do jogo não segura a partida. Prazos vencidos andam em
+  cascata, cada um no instante em que venceu. Jogada que chega depois do prazo é recusada: a leitura
+  antes dela já jogou a vez vencida.
+- **A troca tem 15 s fixos**: quem não respondeu conta como recusa; se ninguém quis, ela fecha
+  sozinha ("ninguém quis"); se alguém aceitou, quem ofereceu ainda fecha dentro do tempo da vez dele.
+  Com a vez de 30 s, uma troca come metade dela — foi dito ao dono antes.
+- **A faixa da vez fica ACIMA do tabuleiro, e não por cima.** Na primeira prancheta ela ficava
+  sobre o tabuleiro e tapava os portos da fileira de cima. Diz de quem é a vez, o que falta fazer e o
+  tempo (vermelho nos últimos 5 s, quando tiquetaqueia), com uma barra da cor de quem joga; na sua
+  vez ela acende. Na sua vez de rolar, os dados viram um botão grande no canto deles, e **a barra de
+  espaço rola** — nunca dentro de campo de texto nem sobre um botão, que o espaço já apertaria.
+- **O aviso "Sua vez!" / "Vez de Tava1" aparece no meio do tabuleiro a cada vez que começa**, inclusive
+  no começo da partida (quem pôs a última aldeia rola primeiro, e a vez não muda de mão). Fica 1,6 s
+  e não pega clique: a jogada de quem já está jogando não espera aviso.
+- **As barras de tempo andam aos saltos, quatro por segundo, SEM transição.** Com `transition: width
+  .25s`, cada salto virava uma animação emendada na seguinte: a janela se redesenhando a partida
+  inteira, o que o `animacoes.test.ts` existe para impedir — e o teste não pegava, porque não era
+  `infinite`. Quem pegou foi a ferramenta de fotos, que nunca achava a tela parada.
+- **As cartas da mão têm o dobro do tamanho, com o nome e a quantidade, e a que chega sobe com "+1
+  lã" por 2,5 s.** Pesou o relato do dono, "com casa no 4 e no 3 em 30 minutos não ganhei 1 carta
+  direito": a produção foi conferida (300 partidas de robôs, 445 mil rolagens, zero diferenças contra
+  uma conta independente pela geometria do desenho) e o dado também (1 milhão de rolagens). O 3 e o 4
+  somados rendem o mesmo que UM terreno de 6 ou 8, e a carta chegava sem ninguém ver — agora se vê.
+- **Os sons são sintetizados (`somDoCatan.ts`) e saem da DIFERENÇA entre leituras**
+  (`oQueTocarNaPartida`, puro e testado): a vez que muda (a sua, mais alto), o tique dos últimos 5 s,
+  a troca que chega para você, estrada, aldeia, cidade e carta comprada de QUALQUER um, e as cartas
+  que renderam para você. Na primeira leitura, nada — abrir a tela não é acontecer. Com a tela do
+  jogo aberta, o aviso de vez da busca de salas (`App.tsx`) não toca, para não sair dobrado.
+- **Medido** no renderer de verdade pelo passo `19-catan` do `ferramentas/fotografar` (contra
+  servidor local, com robôs nos outros lugares): o tempo escolhido pela tela, o aviso, o botão e a
+  barra de espaço, o "+1", a troca vencendo sozinha, o relógio vermelho e a vez estourando (numa
+  rodada, o dado do relógio deu 7 e o ladrão foi sozinho). **Não foi exercido**: o DESCARTE vencendo
+  na tela (só nos testes do servidor); nenhum som foi ouvido; o Electron; o Windows.
+
 - **A mesa vive na MEMÓRIA do servidor, como as do xadrez**: publicar o servidor com gente jogando
   encerra a partida. Uma partida de Catan dura uma hora; se isso incomodar, é guardar no banco.
 - **Anda por HTTP, perguntando de 800 em 800 ms**, como o xadrez: é jogo de turno, poucas ações por

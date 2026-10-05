@@ -1364,16 +1364,19 @@ export function App() {
 
   /**
    * A vez que chega (ou o descarte que um 7 te pede) e o fim tocam com a partida fora da tela,
-   * como o lance do xadrez. Com ela na tela também: o Catan é longo, e quem esperava a vez pode
-   * estar olhando outra janela. A regra de o quê tocar é pura e testada (`oQueTocarNoCatan`).
+   * como o lance do xadrez. A regra de o quê tocar é pura e testada (`oQueTocarNoCatan`). Com a
+   * partida NA tela, a vez é da tela (`oQueTocarNaPartida`, com o som próprio de "sua vez", desde
+   * 04/10/2026): tocar aqui também daria dois sons para a mesma vez.
    */
   const catanAnterior = useRef<ResumoDaMesaDoCatan | null>(null);
+  const catanNaTela = jogoAberto?.tipo === 'catan' ? jogoAberto.mesaId : null;
   useEffect(() => {
     if (euIdAgora === null) return;
     const aviso = oQueTocarNoCatan(catanAnterior.current, minhaMesaCatan, euIdAgora);
     catanAnterior.current = minhaMesaCatan;
+    if (aviso === 'vez' && catanNaTela !== null && catanNaTela === minhaMesaCatan?.id) return;
     if (aviso) tocarAviso(aviso === 'vez' ? 'lance' : 'fimDaPartida', rm.deafened);
-  }, [minhaMesaCatan, euIdAgora, rm.deafened, tocarAviso]);
+  }, [minhaMesaCatan, euIdAgora, catanNaTela, rm.deafened, tocarAviso]);
 
   // Os sons da corrida saem pela mesma regra dos avisos — o mesmo som não empilha —, e o fone
   // desligado cala todos.

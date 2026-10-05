@@ -261,7 +261,7 @@ para o arquivo da área, não para cá — aqui só entra o que vale em qualquer
 ## Testes
 
 ```bash
-pnpm test        # servidor (585) + app (490), segundos, sem nada externo
+pnpm test        # servidor (598) + app (501), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

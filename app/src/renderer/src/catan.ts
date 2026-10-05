@@ -34,6 +34,15 @@ export const CUSTOS: Record<'estrada' | 'aldeia' | 'cidade' | 'desenvolvimento',
   desenvolvimento: ['la', 'trigo', 'minerio'],
 };
 
+/** O tempo de cada vez: quem abre a mesa escolhe, antes de começar. */
+export type SegundosDaVez = 30 | 60;
+export const TEMPOS_DA_VEZ: { segundos: SegundosDaVez; rotulo: string }[] = [
+  { segundos: 30, rotulo: '30 segundos' },
+  { segundos: 60, rotulo: '1 minuto' },
+];
+/** Quanto a troca fica aberta para resposta — fixo no servidor. */
+export const PRAZO_DA_TROCA = 15_000;
+
 export type PessoaNoCatan = { id: number; nome: string; foto: string | null; idExibido: string | null };
 
 export type Pode = {
@@ -70,6 +79,10 @@ export type Evento =
   | { t: 'trocou'; j: number; com: number; deu: Monte; recebeu: Monte; rodada: number }
   | { t: 'maiorEstrada' | 'maiorExercito'; j: number | null; de: number | null; rodada: number }
   | { t: 'saiu'; j: number; rodada: number }
+  /** O relógio jogou por `j`: a `fase` é onde a vez (ou o descarte) estava quando o tempo acabou. */
+  | { t: 'tempo'; j: number; fase: Exclude<Fase, 'fim'>; rodada: number }
+  /** Os 15 s da troca de `j` passaram sem ninguém aceitar nem propor outra: ela fechou. */
+  | { t: 'ofertaVenceu'; j: number; rodada: number }
   | { t: 'venceu'; j: number; porAbandono?: true; rodada: number };
 
 export type JogadorNaPartida = {
@@ -111,6 +124,23 @@ export type Partida = {
     da: Monte; quer: Monte;
     respostas: Record<string, 'aceita' | 'recusa' | 'contra'>;
     contras: Record<string, { da: Monte; quer: Monte }>;
+    /** Falso depois dos 15 s: ninguém mais responde, e quem ofereceu ainda fecha com quem aceitou. */
+    aberta: boolean;
+    /** Instante (relógio do servidor) em que acabam os 15 s; null em partida sem relógio. */
+    prazo: number | null;
+  } | null;
+  /**
+   * O relógio da vez. Os prazos são INSTANTES do relógio do servidor, comparáveis com o `agora`
+   * da mesa — nunca com o relógio deste computador (ver `tempoRestante`).
+   */
+  relogio: {
+    segundos: SegundosDaVez;
+    /** Quando acaba a vez de `vez`; null durante o descarte do 7 e no fim. */
+    prazo: number | null;
+    /** Quando acaba o descarte do 7, para todos que devem; só na fase 'descartar'. */
+    descarte: number | null;
+    /** O que sobrava da vez de quem rolou o 7, parado enquanto os outros descartam. */
+    pausa: number | null;
   } | null;
   historico: Evento[];
   vencedor: number | null;
@@ -134,6 +164,8 @@ export type MesaDoCatan = {
   plateia: PessoaNoCatan[];
   eu: 'anfitriao' | 'sentado' | 'chamado' | 'jogador' | 'plateia';
   agora: number;
+  /** O tempo de cada vez, escolhido por quem abriu a mesa. */
+  segundos: SegundosDaVez;
 };
 
 export type ResumoDaMesaDoCatan = {
@@ -167,7 +199,8 @@ export type Jogada =
 export type AcaoNaMesaDoCatan =
   | { acao: 'chamar' | 'cancelarConvite' | 'tirar'; alvo: number }
   | { acao: 'aceitar' | 'recusar' | 'levantar' | 'comecar' | 'desistir' | 'jogarDeNovo' | 'fechar' }
-  | { acao: 'jogar'; jogada: Jogada };
+  | { acao: 'jogar'; jogada: Jogada }
+  | { acao: 'tempo'; segundos: SegundosDaVez };
 
 // --- geometria ----------------------------------------------------------------
 // Os nomes das peças SÃO posições (ver `server/catan.mjs`): o cruzamento "x,y" está em x meias-
@@ -255,6 +288,20 @@ export function textoDoEvento(e: Evento, nome: (j: number) => string, eu: number
     case 'maiorExercito':
       return e.j === null ? null : `${Q(e.j)} ${e.de === null ? 'formou' : 'tomou'} o maior exército.`;
     case 'saiu': return `${Q(e.j)} saiu da partida.`;
+    case 'tempo': {
+      // O que vem depois (rolou, produziu, a aldeia…) entra no registro como jogada comum; aqui só
+      // o que o relógio fez de diferente.
+      const fez: Record<Exclude<Fase, 'fim'>, string> = {
+        inicio: 'o jogo pôs a peça num lugar sorteado',
+        rolar: 'o jogo rolou os dados',
+        acoes: 'a vez passou',
+        ladrao: 'o jogo moveu o ladrão',
+        estradas: 'as estradas de graça pararam ali',
+        descartar: 'o jogo devolveu as cartas',
+      };
+      return `${Q(e.j)} ficou sem tempo, e ${fez[e.fase] ?? 'a vez passou'}.`;
+    }
+    case 'ofertaVenceu': return `${e.j === eu ? 'Sua troca' : `A troca de ${nome(e.j)}`} fechou: ninguém quis.`;
     case 'venceu': return e.porAbandono ? `${Q(e.j)} venceu: os outros saíram.` : `${Q(e.j)} venceu a partida!`;
   }
   return null;
@@ -305,4 +352,179 @@ export function minhaMesaDoCatan(mesas: ResumoDaMesaDoCatan[], euId: number): Re
     ?? mesas.find((m) => m.estado === 'lobby' && estou(m))
     ?? mesas.find((m) => m.estado === 'fim' && estou(m))
     ?? null;
+}
+
+// --- o relógio --------------------------------------------------------------------
+
+/**
+ * Quanto falta para `prazo`, em ms. O prazo é um instante do relógio do SERVIDOR; a mesa traz o
+ * `agora` dele em cada resposta, e entre uma resposta e a seguinte a tela desconta o que passou
+ * aqui (`passou`) — o mesmo do xadrez, senão a contagem andaria aos saltos, de busca em busca. O
+ * relógio deste computador nunca é comparado com o do servidor: os dois podem estar minutos
+ * desencontrados.
+ */
+export function tempoRestante(prazo: number | null | undefined, agoraDoServidor: number, passou: number): number | null {
+  if (prazo === null || prazo === undefined) return null;
+  return Math.max(0, prazo - agoraDoServidor - Math.max(0, passou));
+}
+
+/** Os segundos que a tela mostra: com 14,2 s faltando, "15" — e o 0 só quando acabou mesmo. */
+export const segundosQueFaltam = (ms: number) => Math.ceil(Math.max(0, ms) / 1000);
+
+/** Os últimos segundos da sua vez tiquetaqueiam: estes. */
+export const TIQUE_A_PARTIR_DE = 5;
+
+/**
+ * Se a contagem acabou de virar um dos últimos segundos (5, 4, 3, 2, 1) — então tiquetaqueia.
+ * A primeira leitura (`antes` null) não tique: abrir a tela com 3 s faltando não é o 3 chegando.
+ */
+export function deveTicar(antes: number | null, agora: number | null): boolean {
+  if (antes === null || agora === null) return false;
+  const s = segundosQueFaltam(agora);
+  return s < segundosQueFaltam(antes) && s >= 1 && s <= TIQUE_A_PARTIR_DE;
+}
+
+/**
+ * O prazo que corre contra VOCÊ agora: o do descarte, se o 7 te pediu cartas; senão o da vez, se
+ * ela é sua. De quem só assiste, ou fora da vez, nenhum.
+ */
+export function meuPrazo(p: Partida): number | null {
+  const eu = p.eu;
+  if (eu === null || !p.relogio || p.fase === 'fim' || p.jogadores[eu]?.fora) return null;
+  if (p.fase === 'descartar') return p.jogadores[eu].descartar > 0 ? p.relogio.descarte : null;
+  return p.vez === eu ? p.relogio.prazo : null;
+}
+
+// --- a vez na tela ------------------------------------------------------------------
+
+/** "Juninho", "Juninho e Gustavo", "Tava1, Juninho e Gustavo". */
+const juntar = (nomes: string[]) => (nomes.length <= 1 ? nomes[0] ?? '' : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`);
+
+export type FaixaDaVez = {
+  /** De quem é a faixa: a cor, a foto e a barra são desta pessoa. */
+  j: number;
+  titulo: string;
+  detalhe: string;
+  /** É com você agora: a faixa acende. */
+  minha: boolean;
+  /** O prazo que a faixa conta (relógio do servidor); sem relógio, nenhum. */
+  prazo: number | null;
+};
+
+/**
+ * A faixa acima do tabuleiro (a opção A, 04/10/2026): de quem é a vez, o que falta fazer, e o
+ * relógio que corre. No 7, o relógio que corre é o do descarte, e "com você" é dever cartas —
+ * não a vez de quem rolou. Na partida acabada, faixa nenhuma.
+ */
+export function faixaDaVez(p: Partida, nome: (j: number) => string): FaixaDaVez | null {
+  if (p.fase === 'fim') return null;
+  const eu = p.eu;
+  if (p.fase === 'descartar') {
+    const devo = eu !== null ? p.jogadores[eu].descartar : 0;
+    const devendo = p.jogadores.map((j, k) => (j.descartar > 0 && k !== eu ? nome(k) : null)).filter((x): x is string => !!x);
+    return {
+      j: p.vez,
+      titulo: devo > 0 ? `Saiu 7: devolva ${devo} ${devo === 1 ? 'carta' : 'cartas'}` : 'Saiu 7',
+      detalhe: devo > 0 ? 'Escolha as cartas que voltam ao banco' : `Esperando ${juntar(devendo)} devolver cartas`,
+      minha: devo > 0,
+      prazo: p.relogio?.descarte ?? null,
+    };
+  }
+  const minha = eu !== null && p.vez === eu;
+  const n = p.estradasGratis;
+  const detalhe: Record<Exclude<Fase, 'fim' | 'descartar'>, [string, string]> = {
+    inicio: p.inicio?.falta === 'estrada' ? ['Ponha a estrada, saindo da aldeia', 'Pondo a estrada'] : ['Clique num cruzamento para pôr a aldeia', 'Pondo uma aldeia'],
+    rolar: ['Role os dados para começar', 'Vai rolar os dados'],
+    acoes: ['Troque, construa ou passe a vez', 'Construindo e trocando'],
+    ladrao: ['Mova o ladrão', 'Movendo o ladrão'],
+    estradas: [`Ponha ${n} ${n === 1 ? 'estrada' : 'estradas'} de graça`, 'Pondo estradas de graça'],
+  };
+  return {
+    j: p.vez,
+    titulo: minha ? 'Sua vez' : `Vez de ${nome(p.vez)}`,
+    detalhe: detalhe[p.fase][minha ? 0 : 1],
+    minha,
+    prazo: p.relogio?.prazo ?? null,
+  };
+}
+
+/**
+ * O aviso no meio do tabuleiro: de quem é a vez que ACABOU de começar. A vez que muda de mão, e
+ * também o fim da colocação — quem pôs a última aldeia é quem rola primeiro, e sem isto a
+ * partida começaria sem aviso. Na primeira leitura, nenhum: abrir a tela não é a vez começar.
+ */
+export function vezQueComecou(antes: Partida | null, agora: Partida): number | null {
+  if (!antes || agora.fase === 'fim') return null;
+  const comecou = antes.fase === 'inicio' && agora.fase !== 'inicio';
+  return agora.vez !== antes.vez || comecou ? agora.vez : null;
+}
+
+/**
+ * As cartas que chegaram à sua mão entre duas leituras — o "+1 lã" das cartas grandes. Só o que
+ * subiu: na troca, o que saiu não aparece, e o que entrou sim. Na primeira leitura, nada.
+ */
+export function cartasQueChegaram(antes: Monte | null | undefined, agora: Monte | null | undefined): Partial<Monte> {
+  if (!antes || !agora) return {};
+  const chegou: Partial<Monte> = {};
+  for (const r of RECURSOS) if (agora[r] > antes[r]) chegou[r] = agora[r] - antes[r];
+  return chegou;
+}
+
+// --- os sons ------------------------------------------------------------------------
+
+export type SomDoCatan = 'suaVez' | 'vezDeOutro' | 'tique' | 'troca' | 'estrada' | 'aldeia' | 'cidade' | 'carta' | 'ganhou';
+
+/**
+ * Os eventos que chegaram desde a leitura anterior. O registro não tem número de evento, e o do
+ * servidor guarda só os últimos 200 — então o que é novo se acha pelo ENCAIXE: os três últimos
+ * de antes, na mesma ordem, dentro do de agora; o que vem depois deles é novo. Três, e não um,
+ * porque dois eventos iguais seguidos existem (duas estradas da carta de estradas). Sem encaixe
+ * nenhum, nada é novo: uma salva de sons de um registro que não se reconhece é pior que silêncio.
+ */
+export function eventosNovos(antes: Evento[], agora: Evento[]): Evento[] {
+  if (antes.length === 0) return agora;
+  const k = Math.min(3, antes.length);
+  const cauda = antes.slice(-k).map((e) => JSON.stringify(e));
+  for (let i = agora.length - 1; i >= k - 1; i--) {
+    let encaixa = true;
+    for (let d = 0; d < k && encaixa; d++) encaixa = JSON.stringify(agora[i - d]) === cauda[k - 1 - d];
+    if (encaixa) return agora.slice(i + 1);
+  }
+  return [];
+}
+
+/** Na ordem em que tocam, quando várias coisas chegam na mesma leitura. */
+const ORDEM_DOS_SONS: SomDoCatan[] = ['suaVez', 'troca', 'ganhou', 'cidade', 'aldeia', 'estrada', 'carta', 'vezDeOutro'];
+
+/**
+ * O que tocar entre duas leituras da partida, na tela dela. A vez que muda (a sua, mais alto; a
+ * dos outros, um toque baixo), o 7 que te pede cartas, a oferta de troca que chega para você, as
+ * construções e as cartas compradas de QUALQUER um — dá para ouvir alguém construindo olhando o
+ * chat — e as cartas que renderam para você. Na primeira leitura, nada: abrir a tela não é
+ * acontecer. Cada som uma vez só, por mais que a leitura traga três estradas.
+ */
+export function oQueTocarNaPartida(antes: Partida | null, agora: Partida): SomDoCatan[] {
+  if (!antes) return [];
+  const sons = new Set<SomDoCatan>();
+  const eu = agora.eu;
+  const jogo = eu !== null && !agora.jogadores[eu]?.fora;
+  if (agora.fase !== 'fim') {
+    if (agora.vez !== antes.vez) sons.add(jogo && agora.vez === eu ? 'suaVez' : 'vezDeOutro');
+    if (jogo && agora.jogadores[eu].descartar > 0 && !(antes.jogadores[eu]?.descartar > 0)) sons.add('suaVez');
+    const o = agora.oferta;
+    if (jogo && o?.aberta && agora.vez !== eu) {
+      const a = antes.oferta;
+      const mesma = !!a?.aberta && (o.prazo !== null
+        ? a.prazo === o.prazo
+        : JSON.stringify([a.da, a.quer]) === JSON.stringify([o.da, o.quer]));
+      if (!mesma) sons.add('troca');
+    }
+  }
+  for (const e of eventosNovos(antes.historico, agora.historico)) {
+    if (e.t === 'estrada' || e.t === 'aldeia' || e.t === 'cidade') sons.add(e.t);
+    else if (e.t === 'comprou') sons.add('carta');
+    else if (jogo && e.t === 'produziu' && somaDoMonte(e.ganhos[String(eu)]) > 0) sons.add('ganhou');
+    else if (jogo && e.t === 'recebeu' && e.j === eu && somaDoMonte(e.recursos) > 0) sons.add('ganhou');
+  }
+  return ORDEM_DOS_SONS.filter((s) => sons.has(s));
 }

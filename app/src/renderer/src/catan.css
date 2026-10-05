@@ -27,6 +27,21 @@
 .catan-lobby-botoes { display: flex; gap: var(--e2); align-items: center; }
 .catan-lobby-chamar { width: 280px; }
 
+/* O tempo de cada vez (04/10/2026): só quem abriu escolhe. Quem está sentado vê a escolha acesa,
+   sem o apagado do botão desabilitado — senão pareceria que não há nada escolhido. */
+.catan-tempo { display: flex; flex-direction: column; align-items: center; gap: var(--e2); }
+.catan-segmento {
+  display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--raio-3);
+  background: var(--superficie-1); border: 1px solid var(--borda-sutil);
+}
+.catan-segmento button {
+  padding: var(--e2) var(--e4m); border-radius: var(--raio-2);
+  color: var(--texto-2); font-size: var(--letra-painel); font-weight: var(--peso-forte);
+}
+.catan-segmento button:hover:not(:disabled):not(.ativo) { background: var(--superficie-3); color: var(--texto-forte); }
+.catan-segmento button.ativo { background: var(--acento-cheio); color: var(--sobre-acento); opacity: 1; }
+.catan-segmento button:disabled:not(.ativo) { opacity: .5; }
+
 /* --- a partida --------------------------------------------------------------- */
 .catan-partida { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: var(--e4); min-height: 0; }
 .catan-esquerda { display: flex; flex-direction: column; gap: var(--e2); min-width: 0; min-height: 0; }
@@ -67,6 +82,20 @@
   background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--raio-4); box-shadow: var(--sombra-3);
 }
 .catan-oferta, .catan-respostas { top: auto; bottom: var(--e4); transform: translateX(-50%); }
+
+/* A troca com tempo (04/10/2026): as cartas desenhadas em vez do texto, e os 15 s escorrendo numa
+   barra no alto. A barra anda pela largura, redesenhada de quarto em quarto de segundo pela tela
+   enquanto há prazo, aos saltos e sem transição (ver .catan-faixa-barra) — e para quando não há. A oferta que chega é
+   pergunta para você: ganha o anel do acento, para não passar despercebida. */
+.catan-oferta { width: min(560px, calc(100% - 32px)); border-color: var(--acento); box-shadow: 0 0 0 4px var(--acento-tenue-forte), var(--sombra-3); }
+.catan-oferta-barra { position: absolute; left: 0; top: 0; height: 4px; background: var(--acento); }
+.catan-oferta-cabeca { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.catan-oferta-tempo { margin-left: auto; font-size: var(--letra-menu); font-weight: var(--peso-forte); color: var(--texto-2); font-variant-numeric: tabular-nums; }
+.catan-oferta-troca { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--e3); }
+.catan-oferta-lado { display: flex; flex-direction: column; gap: var(--e1m); }
+.catan-oferta-cartas { display: flex; gap: var(--e1m); flex-wrap: wrap; }
+.catan-oferta-cartas.pequenas { gap: 3px; }
+.catan-oferta-seta { font-size: 24px; color: var(--texto-3); padding-top: var(--e4); }
 .catan-janela-cabeca { display: flex; align-items: center; gap: var(--e2); }
 .catan-janela-titulo { font-size: var(--letra-titulo); font-weight: var(--peso-forte); color: var(--texto-forte); }
 .catan-abas { margin-left: auto; display: flex; gap: var(--e1); }
@@ -170,3 +199,99 @@
 /* --- a capa (menu de jogos e convite) ---------------------------------------------- */
 .capa-do-catan { width: 76px; height: 76px; }
 .cartao-de-convite-capa > .capa-do-catan { display: block; width: 100%; height: 100%; padding: var(--e2) 0; box-sizing: border-box; background: var(--marinho); }
+
+/* --- a vez: a faixa, o botão de rolar e o aviso (04/10/2026) ------------------------------- */
+/* A opção A da prancheta "v2", que o dono deixou comigo: a faixa ACIMA do tabuleiro — por cima,
+   tapava os portos da fileira de cima —, com o tempo grande e a barra da cor de quem joga; na sua
+   vez, ela acende. A barra anda pela largura, redesenhada pela tela enquanto há prazo. */
+.catan-faixa {
+  position: relative; flex: none; display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e2) var(--e4); overflow: hidden;
+  background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3);
+}
+.catan-faixa.minha { background: var(--acento-tenue-forte); border-color: var(--acento); }
+.catan-faixa-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.catan-faixa-texto b { font-size: var(--letra-destaque); font-weight: var(--peso-versalete); color: var(--texto-forte); letter-spacing: -.01em; }
+.catan-faixa-texto span { font-size: var(--letra-menu); color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.catan-faixa-relogio {
+  margin-left: auto; display: flex; align-items: center; gap: var(--e1m);
+  font-size: var(--letra-destaque); font-weight: var(--peso-versalete); color: var(--texto-forte); font-variant-numeric: tabular-nums;
+}
+.catan-faixa-relogio svg { color: var(--texto-2); }
+.catan-faixa-relogio.acabando, .catan-faixa-relogio.acabando svg { color: var(--perigo-texto); }
+/* A barra anda aos saltos, quatro por segundo, SEM transição: com ela, cada salto virava uma
+   animação de 0,25 s emendada na seguinte — a janela se redesenhando a partida inteira, que é o
+   que o animacoes.test.ts existe para impedir (medido no Mac do dono: GPU perto de 100%). */
+.catan-faixa-barra { position: absolute; left: 0; bottom: 0; height: 3px; }
+
+/* Na sua vez de rolar, os dados viram o botão: grandes, no canto onde eles moram. */
+.catan-rolar {
+  position: absolute; right: var(--e4); bottom: var(--e4); display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e2) var(--e5) var(--e2) var(--e3); border-radius: var(--raio-4); text-align: left;
+  background: var(--acento-cheio); color: var(--sobre-acento); font-size: var(--letra-titulo); font-weight: var(--peso-versalete);
+  box-shadow: 0 0 0 6px var(--acento-tenue-forte), var(--sombra-3);
+}
+.catan-rolar:hover:not(:disabled) { background: var(--acento-cheio-hover); }
+.catan-rolar .catan-dado { width: 40px; height: 40px; }
+.catan-rolar small { display: block; font-size: var(--letra-legenda); font-weight: var(--peso-semi); opacity: .8; }
+
+/* "Sua vez!" / "Vez de Tava1" no meio do tabuleiro: entra, fica e some em 1,6 s, uma vez só — a
+   tela o tira do lugar ao fim. Não pega clique: a jogada de quem já está jogando não espera aviso. */
+.catan-aviso {
+  position: absolute; left: 50%; top: 50%; z-index: 3; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: var(--e2);
+  min-width: 260px; padding: var(--e5) var(--e6); box-sizing: border-box;
+  background: var(--veu-forte); border: 2px solid; border-radius: var(--raio-4); box-shadow: var(--sombra-3);
+  animation: catan-aviso 1.6s ease-out forwards;
+}
+.catan-aviso.minha { background: var(--acento-cheio); }
+.catan-aviso .catan-anel { width: 64px; height: 64px; border-width: 4px; box-sizing: border-box; }
+.catan-aviso .catan-anel > * { width: 52px; height: 52px; font-size: 22px; }
+.catan-aviso b { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); letter-spacing: -.01em; white-space: nowrap; }
+.catan-aviso.minha b { color: var(--sobre-acento); }
+.catan-aviso-detalhe { font-size: var(--letra-painel); font-weight: var(--peso-semi); color: var(--sobre-acento); opacity: .85; }
+@keyframes catan-aviso {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.85); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* --- a mão grande (a opção C, 04/10/2026) ---------------------------------------------------- */
+/* O dobro do tamanho de antes, com o nome e a quantidade em destaque e o total ao lado. Zerada,
+   só o contorno. A que chegou sobe com "+1 lã" por 2,5 s — e desce por transição, sem animação
+   que fique rodando. */
+.catan-cartas.grandes { gap: var(--e2); flex-wrap: nowrap; align-items: flex-end; }
+.catan-total {
+  display: flex; flex-direction: column; justify-content: flex-end; align-self: stretch;
+  padding-right: var(--e3); margin-right: var(--e1); border-right: 1px solid var(--borda-sutil);
+}
+.catan-total b { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); line-height: 1; }
+.catan-total span { font-size: var(--letra-rotulo); font-weight: var(--peso-forte); color: var(--texto-3); text-transform: uppercase; letter-spacing: .06em; }
+.catan-carta-mao { position: relative; flex: none; }
+.catan-carta.grande { width: 64px; height: 90px; border-radius: var(--raio-4); transition: transform .2s ease-out, box-shadow .2s ease-out; }
+.catan-carta.grande svg { inset: 10px 10px 34px; width: calc(100% - 20px); height: calc(100% - 44px); }
+.catan-carta-rotulo {
+  position: absolute; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 10.5px; line-height: 1;
+  font-weight: var(--peso-versalete); color: var(--branco); text-transform: uppercase; letter-spacing: .04em;
+  text-shadow: 0 1px 2px var(--preto-60);
+}
+.catan-carta-qtd {
+  position: absolute; top: 0; right: 0; min-width: 24px; height: 24px; padding: 0 var(--e1m); box-sizing: border-box;
+  border-radius: 0 0 0 var(--raio-3); background: var(--veu-forte); color: var(--branco);
+  font-size: 14px; font-weight: var(--peso-versalete); display: grid; place-items: center;
+}
+.catan-carta.grande.zerada { opacity: 1; background: transparent; border: 2px dashed var(--borda); box-shadow: none; }
+.catan-carta.grande.zerada svg { opacity: .3; filter: grayscale(1); }
+.catan-carta.grande.zerada .catan-carta-rotulo, .catan-carta.grande.zerada .catan-carta-qtd { color: var(--texto-3); text-shadow: none; background: none; }
+.catan-carta-mao.chegou .catan-carta { transform: translateY(-10px); box-shadow: 0 0 0 3px var(--aviso), 0 10px 24px var(--aviso-borda); }
+.catan-chegou {
+  position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); z-index: 2;
+  padding: 2px var(--e2); border-radius: var(--raio-cheio); background: var(--aviso); color: var(--cinza-1000);
+  font-size: var(--letra-legenda); font-weight: var(--peso-versalete); white-space: nowrap;
+}
+.catan-carta.desenvolvimento.grande { flex-direction: column; justify-content: flex-start; gap: var(--e1); padding: var(--e2) 3px 0; }
+.catan-carta.desenvolvimento.grande svg { position: static; flex: none; width: 26px; height: 26px; fill: currentColor; }
+.catan-carta.desenvolvimento.grande .catan-carta-nome { font-size: 11px; line-height: 1.15; padding: 0 2px; }
+.catan-carta.desenvolvimento.grande .catan-carta-rotulo { color: var(--berserk-claro); text-shadow: none; }
+.catan-carta.desenvolvimento.jogavel:hover .catan-carta-rotulo { color: var(--branco); }

@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { agirNaMesaDoCatan, verMesaDoCatan, type Membro } from '../api';
 import {
   CUSTOS, COR_DO_JOGADOR, NOME_DA_CARTA, NOME_DO_RECURSO, O_QUE_A_CARTA_FAZ, RECURSOS,
-  centroDoHex, chaveDoHex, hexesQueProduziram, lerHex, monteVazio, oQueEspera, pontasDaAresta, pontoDoCruzamento,
-  somaDoMonte, temTudo, textoDoEvento, textoDoMonte,
+  PRAZO_DA_TROCA, TEMPOS_DA_VEZ,
+  cartasQueChegaram, centroDoHex, chaveDoHex, deveTicar, faixaDaVez, hexesQueProduziram, lerHex, meuPrazo, monteVazio, oQueEspera, oQueTocarNaPartida,
+  pontasDaAresta, pontoDoCruzamento, segundosQueFaltam, somaDoMonte, tempoRestante, temTudo, textoDoEvento, textoDoMonte, vezQueComecou,
   type AcaoNaMesaDoCatan, type CartaDeDesenvolvimento, type Jogada, type MesaDoCatan, type Monte, type Partida,
-  type PessoaNoCatan, type Recurso,
+  type FaixaDaVez as Faixa, type PessoaNoCatan, type Recurso,
 } from '../catan';
 import { ALTURA, FUNDO_DA_CARTA, LARGURA, S, clarear, desenharFundo, desenharPecas, icone, noSvg, poli } from '../desenhoDoCatan';
 import { rolarOsDados } from '../somDosDados';
+import { tocarNoCatan } from '../somDoCatan';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
@@ -16,6 +18,48 @@ import { Icon } from './Icon';
 const INTERVALO = 800;
 /** Quanto os dados rolam na tela antes de parar no número que o servidor tirou. */
 const ROLANDO = 900;
+/** Entre um som e o seguinte, quando a mesma leitura traz vários: juntos, viram um barulho só. */
+const ENTRE_SONS = 180;
+/** O aviso "Vez de Tava1" no meio do tabuleiro: entra, fica o bastante para ler, e some sozinho. */
+const AVISO_DA_VEZ = 1600;
+/** O "+1 lã" em cima da carta que chegou. */
+const CHEGOU = 2500;
+/** A faixa fica vermelha nos últimos segundos — os mesmos do tique. */
+const ACABANDO = 5_000;
+
+/**
+ * Onde o relógio do servidor estava na última resposta, e quando ela chegou AQUI: a tela conta o
+ * que falta para um prazo sem nunca comparar o relógio deste computador com o de lá.
+ */
+type BaseDoRelogio = { servidor: number; local: number };
+
+/**
+ * Quanto falta para `prazo`, redesenhando de quarto em quarto de segundo só enquanto há prazo
+ * correndo — parado, nada anima (a mesma regra do `animacoes.test.ts`, que é do CSS).
+ */
+function useRestante(prazo: number | null | undefined, base: BaseDoRelogio): number | null {
+  const [agora, setAgora] = useState(() => Date.now());
+  const ms = tempoRestante(prazo, base.servidor, Math.max(agora, base.local) - base.local);
+  const correndo = ms !== null && ms > 0;
+  useEffect(() => {
+    if (!correndo) return;
+    const id = setInterval(() => setAgora(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [correndo]);
+  return ms;
+}
+
+/** Os últimos 5 s do prazo que corre contra você tiquetaqueiam. Não desenha nada. */
+function TiqueDoRelogio({ prazo, base, surdo }: { prazo: number; base: BaseDoRelogio; surdo: boolean }) {
+  const ms = useRestante(prazo, base);
+  const antes = useRef<number | null>(null);
+  useEffect(() => {
+    const a = antes.current;
+    antes.current = ms;
+    if (!surdo && deveTicar(a, ms)) tocarNoCatan('tique');
+  }, [ms, surdo]);
+  return null;
+}
 
 type Modo = 'aldeia' | 'estrada' | 'cidade' | null;
 type Janela =
@@ -55,10 +99,12 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
   // Resposta mais velha que a última aplicada não entra — o mesmo cuidado do xadrez: a busca
   // que saiu antes da sua jogada e voltou depois dela a desfaria na tela.
   const ultimoAgora = useRef(0);
+  const recebidaEm = useRef(0);
   const receber = useCallback((m: MesaDoCatan | null) => {
     if (!m) { fecharRef.current(); return; }
     if (m.agora < ultimoAgora.current) return;
     ultimoAgora.current = m.agora;
+    recebidaEm.current = Date.now();
     setMesa(m);
     setFalhou(null);
   }, []);
@@ -108,6 +154,20 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
 
   const souPlateia = !!mesa && mesa.eu === 'plateia';
   const partida = mesa?.partida ?? null;
+
+  // Os sons da partida saem da DIFERENÇA entre a leitura anterior e esta — a regra é pura e
+  // testada (`oQueTocarNaPartida`): a primeira leitura não toca nada, e nenhum evento toca duas vezes.
+  const anterior = useRef<Partida | null>(null);
+  useEffect(() => {
+    const antes = anterior.current;
+    anterior.current = partida;
+    if (!partida || surdo) return;
+    oQueTocarNaPartida(antes, partida).forEach((som, i) => {
+      if (i === 0) tocarNoCatan(som);
+      else setTimeout(() => tocarNoCatan(som), i * ENTRE_SONS);
+    });
+  }, [partida, surdo]);
+  const base: BaseDoRelogio = { servidor: mesa?.agora ?? 0, local: recebidaEm.current };
   const nome = useCallback((j: number) => mesa?.jogadores?.[j]?.nome ?? '…', [mesa?.jogadores]);
   const espera = partida ? oQueEspera(partida, nome) : null;
 
@@ -130,7 +190,7 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
         ) : mesa.estado === 'lobby' || !partida ? (
           <Lobby mesa={mesa} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} />
         ) : (
-          <Partida_ mesa={mesa} partida={partida} ocupado={ocupado} surdo={surdo} live={live}
+          <Partida_ mesa={mesa} partida={partida} ocupado={ocupado} surdo={surdo} live={live} base={base}
             nome={nome} onJogar={jogar} onAgir={agir} onSair={onFechar} />
         )}
       </div>
@@ -187,6 +247,20 @@ function Lobby({ mesa, euId, ocupado, membros, naCall, onAgir }: {
               </div>
             );
           })}
+        </div>
+        <div className="catan-tempo">
+          <span className="xadrez-rotulo">Tempo de cada vez</span>
+          {/* Só quem abriu escolhe; quem está sentado vê a escolha, sem mexer. */}
+          <div className="catan-segmento" role="group" aria-label="Tempo de cada vez">
+            {TEMPOS_DA_VEZ.map((t) => (
+              <button key={t.segundos} type="button" className={mesa.segundos === t.segundos ? 'ativo' : ''}
+                aria-pressed={mesa.segundos === t.segundos} disabled={!souAnfitriao || ocupado}
+                onClick={() => { if (mesa.segundos !== t.segundos) onAgir({ acao: 'tempo', segundos: t.segundos }); }}>
+                {t.rotulo}
+              </button>
+            ))}
+          </div>
+          <span className="muted small">Acabou o tempo, o jogo rola os dados e passa a vez por você. Troca: 15 s para responder.</span>
         </div>
         <div className="catan-lobby-botoes">
           {souAnfitriao ? (
@@ -247,8 +321,8 @@ function Lobby({ mesa, euId, ocupado, membros, naCall, onAgir }: {
 // A partida.
 // ---------------------------------------------------------------------------------------------
 
-function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgir, onSair }: {
-  mesa: MesaDoCatan; partida: Partida; ocupado: boolean; surdo: boolean; live?: ReactNode;
+function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar, onAgir, onSair }: {
+  mesa: MesaDoCatan; partida: Partida; ocupado: boolean; surdo: boolean; live?: ReactNode; base: BaseDoRelogio;
   nome: (j: number) => string;
   onJogar: (j: Jogada) => Promise<boolean>;
   onAgir: (a: AcaoNaMesaDoCatan) => Promise<boolean>;
@@ -270,6 +344,47 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
     const id = setTimeout(() => setRolando(false), ROLANDO);
     return () => clearTimeout(id);
   }, [p.rolagens, surdo]);
+
+  // A cada leitura: a vez que começou vira o aviso no meio do tabuleiro, e as cartas que chegaram
+  // à sua mão sobem com o "+1". As duas regras são puras e testadas (`vezQueComecou`,
+  // `cartasQueChegaram`); na primeira leitura, nenhuma das duas — abrir a tela não é acontecer.
+  const anterior = useRef<Partida | null>(null);
+  const [aviso, setAviso] = useState<{ j: number; n: number } | null>(null);
+  const [chegou, setChegou] = useState<{ cartas: Partial<Monte>; n: number } | null>(null);
+  useEffect(() => {
+    const antes = anterior.current;
+    anterior.current = p;
+    const j = vezQueComecou(antes, p);
+    if (j !== null) setAviso((a) => ({ j, n: (a?.n ?? 0) + 1 }));
+    const cartas = cartasQueChegaram(antes?.mao, p.mao);
+    if (Object.keys(cartas).length) setChegou((c) => ({ cartas, n: (c?.n ?? 0) + 1 }));
+  }, [p]);
+  useEffect(() => {
+    if (!aviso) return;
+    const id = setTimeout(() => setAviso(null), AVISO_DA_VEZ);
+    return () => clearTimeout(id);
+  }, [aviso]);
+  useEffect(() => {
+    if (!chegou) return;
+    const id = setTimeout(() => setChegou(null), CHEGOU);
+    return () => clearTimeout(id);
+  }, [chegou]);
+
+  // Na sua vez de rolar, a barra de espaço rola — o botão grande diz isso. Nunca dentro de um
+  // campo de texto nem sobre um botão (o espaço já o apertaria), e não com uma janela aberta.
+  const podeRolar = minhaVez && p.fase === 'rolar' && !!p.pode.rolar;
+  useEffect(() => {
+    if (!podeRolar || janela || ocupado) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(alvo.tagName))) return;
+      e.preventDefault();
+      onJogar({ tipo: 'rolar' });
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [podeRolar, janela, ocupado, onJogar]);
 
   // O modo de construir só vale enquanto a regra oferece: a vez passou, ele sai sozinho.
   const oferecidos = modo === 'aldeia' ? p.pode.aldeias : modo === 'estrada' ? p.pode.estradas : modo === 'cidade' ? p.pode.cidades : undefined;
@@ -310,14 +425,25 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
 
   const oferta = p.oferta;
   const souQuemOferece = oferta && minhaVez;
+  const prazoMeu = meuPrazo(p);
+  const faixa = faixaDaVez(p, nome);
 
   return (
     <div className="catan-partida">
+      {prazoMeu !== null && <TiqueDoRelogio key={prazoMeu} prazo={prazoMeu} base={base} surdo={surdo} />}
       <div className="catan-esquerda">
+        {faixa && <FaixaDaVez faixa={faixa} partida={p} pessoa={mesa.jogadores?.[faixa.j]} base={base} />}
         <div className="catan-tabuleiro-caixa">
           <TabuleiroDoCatan partida={p} acesos={acesos} modo={modoDaVez} corMinha={eu !== null ? COR_DO_JOGADOR[p.jogadores[eu].cor] : '#fff'}
             ocupado={ocupado} onCruzamento={clicarCruzamento} onAresta={clicarAresta} onTerreno={clicarTerreno} />
-          <Dados dados={p.dados} rolando={rolando} />
+          {podeRolar && !rolando ? (
+            <button type="button" className="catan-rolar" disabled={ocupado} onClick={() => onJogar({ tipo: 'rolar' })}>
+              <Dado n={3} vermelho={false} giro={-8} />
+              <Dado n={5} vermelho giro={10} />
+              <span>Rolar os dados<small>ou aperte espaço</small></span>
+            </button>
+          ) : <Dados dados={p.dados} rolando={rolando} />}
+          {aviso && <AvisoDaVez key={aviso.n} partida={p} j={aviso.j} pessoa={mesa.jogadores?.[aviso.j]} nome={nome} />}
           {modoDaVez && modoDaVez !== 'ladrao' && p.fase === 'acoes' && (
             <div className="catan-dica">Escolha onde vai {modoDaVez === 'estrada' ? 'a estrada' : modoDaVez === 'cidade' ? 'a cidade' : 'a aldeia'} · <button type="button" className="link" onClick={() => setModo(null)}>cancelar</button></div>
           )}
@@ -332,7 +458,7 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
           {(janela?.tipo === 'troca' || janela?.tipo === 'fartura' || janela?.tipo === 'monopolio' || janela?.tipo === 'vitima'
             || !!p.pode.descartar || p.fase === 'fim') && <div className="catan-veu" />}
           {oferta && !souQuemOferece && p.fase === 'acoes' && (
-            <OfertaRecebida partida={p} nome={nome} ocupado={ocupado} onJogar={onJogar}
+            <OfertaRecebida partida={p} nome={nome} ocupado={ocupado} base={base} onJogar={onJogar}
               onContra={() => setJanela({ tipo: 'troca', aba: 'jogadores', contra: true })} />
           )}
           {p.pode.descartar && <Descarte mao={p.mao!} quantas={p.pode.descartar} ocupado={ocupado} onJogar={onJogar} />}
@@ -341,7 +467,7 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
               onAba={(aba) => setJanela({ ...janela, aba })} onJogar={onJogar} onFechar={() => setJanela(null)} />
           )}
           {souQuemOferece && janela?.tipo !== 'troca' && (
-            <Respostas partida={p} nome={nome} ocupado={ocupado} onJogar={onJogar} />
+            <Respostas partida={p} nome={nome} ocupado={ocupado} base={base} onJogar={onJogar} />
           )}
           {janela?.tipo === 'fartura' && <Fartura banco={p.banco} ocupado={ocupado} onJogar={onJogar} onFechar={() => setJanela(null)} />}
           {janela?.tipo === 'monopolio' && <Monopolio ocupado={ocupado} onJogar={onJogar} onFechar={() => setJanela(null)} />}
@@ -364,8 +490,9 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
         </div>
         {eu !== null && p.mao && (
           <div className="catan-mao">
-            <div className="catan-cartas">
-              {RECURSOS.map((r) => <CartaDeRecurso key={r} recurso={r} n={p.mao![r]} />)}
+            <div className="catan-cartas grandes">
+              <div className="catan-total"><b>{somaDoMonte(p.mao)}</b><span>{somaDoMonte(p.mao) === 1 ? 'carta' : 'cartas'}</span></div>
+              {RECURSOS.map((r) => <CartaDaMao key={r} recurso={r} n={p.mao![r]} chegou={chegou?.cartas[r]} />)}
               {/* Iguais viram uma carta com a quantidade: oito cartas soltas empurravam o tabuleiro. */}
               {agruparCartas(p.cartas ?? []).map((c) => (
                 <CartaDeDesenvolvimento_ key={`${c.tipo}-${c.nova}`} carta={c.tipo} nova={c.nova} n={c.n}
@@ -380,7 +507,7 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, nome, onJogar, onAgi
                   {p.inicio?.segunda && minhaVez && p.inicio.falta === 'aldeia' ? ' Esta já rende as cartas dos terrenos em volta.' : ''}
                 </span>
               ) : p.fase === 'rolar' && minhaVez ? (
-                <button type="button" className="primary" disabled={ocupado} onClick={() => onJogar({ tipo: 'rolar' })}>Rolar os dados</button>
+                <span className="muted small">Role os dados para jogar</span>
               ) : (
                 <>
                   <button type="button" className={`secundario ${janela?.tipo === 'troca' ? 'ativo' : ''}`} disabled={!p.pode.trocar || ocupado}
@@ -409,6 +536,50 @@ function BotaoDeConstruir({ rotulo, custo, ativo, pode, ocupado, onClick }: {
       title={`${rotulo}: ${textoDoMonte(custo.reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}`}>
       {rotulo}
     </button>
+  );
+}
+
+/**
+ * A faixa acima do tabuleiro (a opção A que o dono deixou comigo, 04/10/2026): de quem é a vez, o
+ * que falta e o tempo — grande, e vermelho nos últimos 5 s —, com a barra da cor de quem joga
+ * esvaziando. Na sua vez ela acende: é o "mais evidente quando for minha rodada" do pedido. Fica
+ * ACIMA do tabuleiro, e não por cima dele: por cima, tapava os portos da fileira de cima.
+ */
+function FaixaDaVez({ faixa, partida: p, pessoa, base }: {
+  faixa: Faixa; partida: Partida; pessoa?: PessoaNoCatan; base: BaseDoRelogio;
+}) {
+  const ms = useRestante(faixa.prazo, base);
+  const total = (p.relogio?.segundos ?? 60) * 1000;
+  const cor = COR_DO_JOGADOR[p.jogadores[faixa.j].cor];
+  const s = ms === null ? null : segundosQueFaltam(ms);
+  return (
+    <div className={`catan-faixa ${faixa.minha ? 'minha' : ''}`}>
+      <span className="catan-anel" style={{ borderColor: cor }}><Avatar nome={pessoa?.nome ?? '?'} foto={pessoa?.foto} /></span>
+      <span className="catan-faixa-texto"><b>{faixa.titulo}</b><span>{faixa.detalhe}</span></span>
+      {s !== null && (
+        <span className={`catan-faixa-relogio ${ms! <= ACABANDO ? 'acabando' : ''}`}>
+          <Icon name="relogio" size={18} />{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}
+        </span>
+      )}
+      {ms !== null && <i className="catan-faixa-barra" style={{ width: `${Math.min(1, ms / total) * 100}%`, background: cor }} />}
+    </div>
+  );
+}
+
+/**
+ * "Sua vez!" ou "Vez de Tava1" no meio do tabuleiro, a cada vez que começa — pedido do dono
+ * (04/10/2026), mostrado e não falado. Some sozinho e não pega clique: quem já está jogando não
+ * pode ter a jogada barrada por um aviso.
+ */
+function AvisoDaVez({ partida: p, j, pessoa, nome }: { partida: Partida; j: number; pessoa?: PessoaNoCatan; nome: (j: number) => string }) {
+  const minha = j === p.eu;
+  const cor = COR_DO_JOGADOR[p.jogadores[j].cor];
+  return (
+    <div className={`catan-aviso ${minha ? 'minha' : ''}`} style={{ borderColor: cor }} aria-hidden="true">
+      <span className="catan-anel" style={{ borderColor: cor }}><Avatar nome={pessoa?.nome ?? '?'} foto={pessoa?.foto} /></span>
+      <b>{minha ? 'Sua vez!' : `Vez de ${nome(j)}`}</b>
+      {minha && p.fase === 'rolar' && <span className="catan-aviso-detalhe">Role os dados</span>}
+    </div>
   );
 }
 
@@ -534,16 +705,41 @@ function agruparCartas(cartas: { tipo: CartaDeDesenvolvimento; nova: boolean }[]
   return [...grupos.values()];
 }
 
+/**
+ * A carta de recurso na mão (a opção C que o dono deixou comigo, 04/10/2026): grande, com o nome e
+ * a quantidade em destaque; zerada, só o contorno, para a mão não parecer ter o que não tem. A que
+ * acabou de chegar sobe com "+1 lã" — antes a carta chegava sem ninguém ver, e daí veio o "não
+ * ganhei carta nenhuma" que o dono relatou.
+ */
+function CartaDaMao({ recurso, n, chegou }: { recurso: Recurso; n: number; chegou?: number }) {
+  const [a, b] = FUNDO_DA_CARTA[recurso];
+  return (
+    <div className={`catan-carta-mao ${chegou ? 'chegou' : ''}`} title={`${n} ${NOME_DO_RECURSO[recurso]}`}>
+      {chegou && <span className="catan-chegou">+{chegou} {NOME_DO_RECURSO[recurso]}</span>}
+      <div className={`catan-carta grande ${n === 0 ? 'zerada' : ''}`}
+        style={n === 0 ? undefined : { background: `radial-gradient(circle at 35% 25%, ${clarear(a, 0.15)}, ${a} 55%, ${b})` }}>
+        <svg viewBox="-1 -1 2 2" dangerouslySetInnerHTML={{ __html: icone(recurso) }} />
+        <span className="catan-carta-rotulo">{NOME_DO_RECURSO[recurso]}</span>
+        <span className="catan-carta-qtd">{n}</span>
+      </div>
+    </div>
+  );
+}
+
+/** A estrela das cartas de desenvolvimento: o que elas fazem está no nome, a estrela diz "não é recurso". */
+const ESTRELA = 'M0 -.62 L.18 -.2 L.62 -.2 L.27 .08 L.4 .52 L0 .26 L-.4 .52 L-.27 .08 L-.62 -.2 L-.18 -.2Z';
+
 function CartaDeDesenvolvimento_({ carta, nova, n, podeJogar, onJogar }: {
   carta: CartaDeDesenvolvimento; nova: boolean; n: number; podeJogar: boolean; onJogar: () => void;
 }) {
   const dica = `${NOME_DA_CARTA[carta]}: ${O_QUE_A_CARTA_FAZ[carta]}${nova && carta !== 'ponto' ? ' Comprada neste turno: vale a partir do próximo.' : ''}`;
   return (
-    <button type="button" className={`catan-carta desenvolvimento ${podeJogar ? 'jogavel' : ''}`} title={dica}
+    <button type="button" className={`catan-carta desenvolvimento grande ${podeJogar ? 'jogavel' : ''}`} title={dica}
       disabled={!podeJogar} onClick={onJogar}>
+      <svg viewBox="-1 -1 2 2" aria-hidden="true"><path d={ESTRELA} /></svg>
       <span className="catan-carta-nome">{NOME_DA_CARTA[carta]}</span>
-      {nova && <span className="catan-carta-nova">nova</span>}
-      {n > 1 && <span className="catan-carta-n">{n}</span>}
+      <span className="catan-carta-rotulo">{nova ? 'nova' : podeJogar ? 'jogar' : ''}</span>
+      {n > 1 && <span className="catan-carta-qtd">{n}</span>}
     </button>
   );
 }
@@ -647,15 +843,42 @@ function Troca({ partida: p, nome, ocupado, aba, contra, onAba, onJogar, onFecha
   );
 }
 
+/**
+ * Os 15 s da troca: a barra que esvazia no alto da janela e os segundos que faltam. Some quando
+ * a oferta fecha para respostas — aí não há mais tempo correndo para ninguém.
+ */
+function useTempoDaTroca(p: Partida, base: BaseDoRelogio) {
+  const o = p.oferta;
+  const ms = useRestante(o?.aberta ? o.prazo : null, base);
+  return ms === null ? null : { segundos: segundosQueFaltam(ms), fracao: Math.min(1, ms / PRAZO_DA_TROCA) };
+}
+
+/** As cartas de um monte, uma por carta: "2 minério" são duas cartas de minério. */
+function CartasDoMonte({ monte, pequenas = false }: { monte: Partial<Monte>; pequenas?: boolean }) {
+  return (
+    <div className={`catan-oferta-cartas ${pequenas ? 'pequenas' : ''}`}>
+      {expandir(monte).map((r, i) => <CartaDeRecurso key={i} recurso={r} pequena={pequenas} />)}
+    </div>
+  );
+}
+
 /** Quem ofereceu vê as respostas chegando, e fecha com quem quiser. */
-function Respostas({ partida: p, nome, ocupado, onJogar }: {
-  partida: Partida; nome: (j: number) => string; ocupado: boolean; onJogar: (j: Jogada) => Promise<boolean>;
+function Respostas({ partida: p, nome, ocupado, base, onJogar }: {
+  partida: Partida; nome: (j: number) => string; ocupado: boolean; base: BaseDoRelogio; onJogar: (j: Jogada) => Promise<boolean>;
 }) {
   const o = p.oferta!;
+  const tempo = useTempoDaTroca(p, base);
   const outros = p.jogadores.map((_, j) => j).filter((j) => j !== p.eu && !p.jogadores[j].fora);
   return (
     <div className="catan-janela catan-respostas">
-      <div className="catan-janela-titulo">Você oferece {textoDoMonte(o.da)} por {textoDoMonte(o.quer)}</div>
+      {tempo && <i className="catan-oferta-barra" style={{ width: `${tempo.fracao * 100}%` }} />}
+      <div className="catan-oferta-cabeca">
+        <span className="catan-janela-titulo">Você oferece</span>
+        <CartasDoMonte monte={o.da} pequenas />
+        <span className="catan-janela-titulo">por</span>
+        <CartasDoMonte monte={o.quer} pequenas />
+        {tempo && <span className="catan-oferta-tempo">{tempo.segundos} s</span>}
+      </div>
       {outros.map((j) => {
         const r = o.respostas[j];
         const c = o.contras[j];
@@ -666,7 +889,7 @@ function Respostas({ partida: p, nome, ocupado, onJogar }: {
             {r === 'aceita' ? <span className="catan-aceita">aceita</span>
               : r === 'recusa' ? <span className="muted">recusou</span>
               : r === 'contra' && c ? <span className="muted">propõe {textoDoMonte(c.da)} por {textoDoMonte(c.quer)}</span>
-              : <span className="muted">pensando…</span>}
+              : <span className="muted">pensando…{tempo ? ` ${tempo.segundos} s para responder` : ''}</span>}
             <span className="spacer" />
             {r === 'aceita' && <button type="button" className="primary sm" disabled={ocupado} onClick={() => onJogar({ tipo: 'fecharTroca', com: j })}>Trocar</button>}
             {r === 'contra' && c && <button type="button" className="secundario sm" disabled={ocupado || !temTudo(p.mao, expandir(c.quer))} onClick={() => onJogar({ tipo: 'fecharTroca', com: j, contra: true })}>Aceitar a dele</button>}
@@ -679,24 +902,41 @@ function Respostas({ partida: p, nome, ocupado, onJogar }: {
 }
 const expandir = (m: Partial<Monte>): Recurso[] => RECURSOS.flatMap((r) => Array<Recurso>(m[r] ?? 0).fill(r));
 
-/** Para quem não está na vez: a oferta de quem está, com a resposta a um clique. */
-function OfertaRecebida({ partida: p, nome, ocupado, onJogar, onContra }: {
-  partida: Partida; nome: (j: number) => string; ocupado: boolean; onJogar: (j: Jogada) => Promise<boolean>; onContra: () => void;
+/**
+ * Para quem não está na vez: a oferta de quem está, com as cartas desenhadas — o que você recebe
+ * e o que você dá —, a resposta a um clique e os 15 s escorrendo. Sem resposta, ela recusa sozinha.
+ */
+function OfertaRecebida({ partida: p, nome, ocupado, base, onJogar, onContra }: {
+  partida: Partida; nome: (j: number) => string; ocupado: boolean; base: BaseDoRelogio;
+  onJogar: (j: Jogada) => Promise<boolean>; onContra: () => void;
 }) {
   const o = p.oferta!;
+  const tempo = useTempoDaTroca(p, base);
   const minha = p.eu !== null ? o.respostas[p.eu] : undefined;
   if (p.eu === null) return <div className="catan-dica">{nome(p.vez)} oferece {textoDoMonte(o.da)} por {textoDoMonte(o.quer)}</div>;
+  const tenho = temTudo(p.mao, expandir(o.quer));
   return (
     <div className="catan-janela catan-oferta">
-      <div className="catan-janela-titulo">{nome(p.vez)} oferece {textoDoMonte(o.da)} por {textoDoMonte(o.quer)}</div>
+      {tempo && !minha && <i className="catan-oferta-barra" style={{ width: `${tempo.fracao * 100}%` }} />}
+      <div className="catan-oferta-cabeca">
+        <span className="catan-bolinha" style={{ background: COR_DO_JOGADOR[p.jogadores[p.vez].cor] }} />
+        <span className="catan-janela-titulo">{nome(p.vez)} quer trocar com você</span>
+        {tempo && !minha && <span className="catan-oferta-tempo">recusa sozinha em {tempo.segundos} s</span>}
+      </div>
+      <div className="catan-oferta-troca">
+        <div className="catan-oferta-lado"><span className="xadrez-rotulo">Você recebe</span><CartasDoMonte monte={o.da} /></div>
+        <span className="catan-oferta-seta" aria-hidden="true">⇄</span>
+        <div className="catan-oferta-lado"><span className="xadrez-rotulo">Você dá</span><CartasDoMonte monte={o.quer} /></div>
+      </div>
       {minha ? (
-        <span className="muted">{minha === 'aceita' ? 'Você aceitou: esperando a resposta.' : minha === 'recusa' ? 'Você recusou.' : 'Você propôs outra troca.'}</span>
+        <span className="muted">{minha === 'aceita' ? 'Você aceitou: esperando a resposta.'
+          : minha === 'recusa' ? (o.aberta ? 'Você recusou.' : 'O tempo acabou: recusada.') : 'Você propôs outra troca.'}</span>
       ) : (
         <div className="catan-janela-pe">
+          {!tenho && <span className="muted small">Você não tem essas cartas.</span>}
           <button type="button" className="link" disabled={ocupado} onClick={() => onJogar({ tipo: 'responder', resposta: 'recusa' })}>recusar</button>
           <button type="button" className="secundario sm" disabled={ocupado} onClick={onContra}>Propor outra</button>
-          <button type="button" className="primary sm" disabled={ocupado || !temTudo(p.mao, expandir(o.quer))}
-            title={temTudo(p.mao, expandir(o.quer)) ? undefined : 'Você não tem essas cartas.'}
+          <button type="button" className="primary sm" disabled={ocupado || !tenho}
             onClick={() => onJogar({ tipo: 'responder', resposta: 'aceita' })}>Aceitar</button>
         </div>
       )}
