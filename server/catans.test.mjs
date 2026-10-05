@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarMesasDoCatan, ABANDONO, ESQUECIDA, PLATEIA } from './catans.mjs';
+import { criarMesasDoCatan, ABANDONO, ESQUECIDA, PLATEIA, TEMPO_PADRAO } from './catans.mjs';
 import { ErroDeConta } from './contas.mjs';
 
 const TKP = 1, TAVA = 2, GUSTAVO = 3, JUNINHO = 4, BLANKITO = 5;
@@ -171,4 +171,52 @@ test('mesa de outro servidor responde como mesa que não existe', () => {
   const t = montar();
   const { id } = t.mesas.abrir(t.como(TKP));
   assert.throws(() => t.mesas.ver(t.como(TAVA, 2), id), recusa(404));
+});
+
+test('o tempo da vez: 60 de saída, só quem abriu escolhe, só 30 ou 60, e fica para a partida seguinte', () => {
+  const t = montar();
+  const id = sentados(t, TKP, TAVA);
+  assert.equal(t.mesas.ver(t.como(TAVA), id).segundos, TEMPO_PADRAO);
+  assert.equal(TEMPO_PADRAO, 60);
+  assert.throws(() => t.mesas.agir(t.como(TAVA), { id, acao: 'tempo', segundos: 30 }), recusa(403));
+  assert.throws(() => t.mesas.agir(t.como(TKP), { id, acao: 'tempo', segundos: 45 }), recusa(400, /30 ou de 60/));
+  assert.throws(() => t.mesas.agir(t.como(TKP), { id, acao: 'tempo', segundos: '30' }), recusa(400));
+  t.mesas.agir(t.como(TKP), { id, acao: 'tempo', segundos: 30 });
+  assert.equal(t.mesas.ver(t.como(TAVA), id).segundos, 30);
+  const { mesa } = t.mesas.agir(t.como(TKP), { id, acao: 'comecar' });
+  assert.equal(mesa.segundos, 30);
+  assert.deepEqual(mesa.partida.relogio, { segundos: 30, prazo: mesa.agora + 30_000, descarte: null, pausa: null });
+  assert.throws(() => t.mesas.agir(t.como(TKP), { id, acao: 'tempo', segundos: 60 }), recusa(409));
+  t.mesas.agir(t.como(TAVA), { id, acao: 'desistir' });
+  const { mesa: deNovo } = t.mesas.agir(t.como(TKP), { id, acao: 'jogarDeNovo' });
+  assert.equal(deNovo.estado, 'lobby');
+  assert.equal(deNovo.segundos, 30);
+});
+
+test('a vez estourada pela mesa: a leitura seguinte já encontra a vez com outro, e a jogada atrasada é recusada', () => {
+  const t = montar();
+  const id = sentados(t, TKP, TAVA);
+  t.mesas.agir(t.como(TKP), { id, acao: 'comecar' });
+  const primeiro = vez(t, id, TKP);
+  const antes = t.mesas.ver(t.como(primeiro), id);
+  t.passar(59_999);
+  assert.equal(vez(t, id, TKP), primeiro);
+  t.passar(1);
+  assert.throws(() => t.mesas.agir(t.como(primeiro), { id, acao: 'jogar', jogada: { tipo: 'aldeia', v: antes.partida.pode.aldeias[0] } }), recusa(409, /vez/));
+  const m = t.mesas.ver(t.como(TKP), id);
+  assert.notEqual(m.jogadores[m.partida.vez].id, primeiro);
+  assert.equal(m.partida.construcoes.length, 1);
+  assert.equal(m.partida.estradas.length, 1);
+  assert.deepEqual(m.partida.historico.find((e) => e.t === 'tempo'), { t: 'tempo', j: m.jogadores.findIndex((p) => p.id === primeiro), fase: 'inicio', rodada: 0 });
+  assert.equal(m.partida.relogio.prazo, m.agora + 60_000);
+});
+
+test('a busca de salas também vence a vez: quem saiu da tela não segura a partida', () => {
+  const t = montar();
+  const id = sentados(t, TKP, TAVA);
+  t.mesas.agir(t.como(TKP), { id, acao: 'comecar' });
+  const primeiro = vez(t, id, TKP);
+  t.passar(60_000);
+  const r = t.mesas.resumo(t.como(TAVA));
+  assert.notEqual(r.mesas[0].vez, primeiro);
 });

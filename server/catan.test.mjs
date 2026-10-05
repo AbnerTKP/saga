@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GEOMETRIA, POSICOES, RECURSOS, CUSTOS, ErroDeJogo, novaPartida, sortearTabuleiro, agir, sair, vista,
-  tamanhoDaEstrada, taxas, pontos, chaveDoHex,
+  tamanhoDaEstrada, taxas, pontos, chaveDoHex, ligarRelogio, vencerPrazos, PRAZO_DA_TROCA,
 } from './catan.mjs';
 
 const G = GEOMETRIA;
@@ -495,6 +495,54 @@ test('quem sai no começo: os passos dele são pulados e ninguém trava', () => 
 });
 
 /**
+ * O robô: sorteia uma ação qualquer do que a vista diz que `quem` pode fazer agora — quem tem a vez,
+ * ou o primeiro que deve descarte num 7.
+ */
+function acaoDoRobo(p, rnd) {
+  const escolher = (lista) => lista[Math.floor(rnd() * lista.length)];
+  const quem = p.fase === 'descartar' ? Number(Object.keys(p.descartes)[0]) : p.vez;
+  const v = vista(p, quem);
+  const x = v.pode;
+  if (x.descartar) {
+    const monte = {};
+    const mao = { ...v.mao };
+    for (let k = 0; k < x.descartar; k++) { const r = escolher(RECURSOS.filter((r2) => mao[r2] > 0)); mao[r]--; monte[r] = (monte[r] ?? 0) + 1; }
+    return { quem, acao: { tipo: 'descartar', recursos: monte } };
+  }
+  if (x.ladrao) {
+    const hex = escolher(Object.keys(x.ladrao));
+    return { quem, acao: { tipo: 'ladrao', hex, vitima: x.ladrao[hex].length ? escolher(x.ladrao[hex]) : undefined } };
+  }
+  if (x.rolar) return { quem, acao: rnd() < 0.2 && x.jogar?.includes('cavaleiro') ? { tipo: 'cavaleiro' } : { tipo: 'rolar' } };
+  const op = [];
+  if (x.aldeias?.length) op.push(() => ({ tipo: 'aldeia', v: escolher(x.aldeias) }), () => ({ tipo: 'aldeia', v: escolher(x.aldeias) }));
+  if (x.cidades?.length) op.push(() => ({ tipo: 'cidade', v: escolher(x.cidades) }), () => ({ tipo: 'cidade', v: escolher(x.cidades) }));
+  if (x.estradas?.length) op.push(() => ({ tipo: 'estrada', a: escolher(x.estradas) }));
+  if (x.comprar) op.push(() => ({ tipo: 'comprar' }));
+  if (x.jogar?.length) {
+    const c = escolher(x.jogar);
+    if (c === 'fartura') op.push(() => ({ tipo: 'fartura', recursos: [escolher(RECURSOS.filter((r) => v.banco[r] > 1)), escolher(RECURSOS.filter((r) => v.banco[r] > 1))] }));
+    else if (c === 'monopolio') op.push(() => ({ tipo: 'monopolio', recurso: escolher(RECURSOS) }));
+    else if (c !== 'estradas' || x.estradas?.length || v.jogadores[quem].pecas.estrada) op.push(() => ({ tipo: c }));
+  }
+  if (x.banco) {
+    const da = RECURSOS.find((r) => v.mao[r] >= x.banco[r]);
+    if (da) op.push(() => ({ tipo: 'banco', da, quer: escolher(RECURSOS.filter((r) => r !== da && v.banco[r] > 0)) }));
+  }
+  if (x.pararEstradas && !x.estradas?.length) op.push(() => ({ tipo: 'pararEstradas' }));
+  if (!op.length || (x.passar && rnd() < 0.25)) return { quem, acao: x.passar ? { tipo: 'passar' } : { tipo: 'pararEstradas' } };
+  return { quem, acao: escolher(op)() };
+}
+
+/** O que se confere a cada passo de uma partida de robôs. */
+function conferirPasso(p, s) {
+  conferirCartas(p);
+  // Ninguém fica com 10 na própria vez sem a partida acabar.
+  if (p.fase !== 'fim' && p.fase !== 'inicio') assert.ok(pontos(p, p.vez, true) < 10, `semente ${s}: 10 pontos sem vencer`);
+  for (const j of p.jogadores) assert.ok(j.pecas.estrada >= 0 && j.pecas.aldeia >= 0 && j.pecas.cidade >= 0);
+}
+
+/**
  * Partidas inteiras entre robôs que sorteiam uma ação qualquer do que a vista diz que pode.
  * O que se confere a cada passo: nada do que a vista oferece é recusado, e as cartas se conservam.
  */
@@ -504,43 +552,10 @@ test('partidas inteiras de robôs: o que a tela oferece sempre vale, e as cartas
     const rnd = semente(s * 7919);
     const n = 2 + (s % 3);
     const p = novaPartida(n, { sorteio: rnd });
-    const escolher = (lista) => lista[Math.floor(rnd() * lista.length)];
     let passos = 0;
     while (p.fase !== 'fim' && passos < 6000) {
       passos++;
-      const quem = p.fase === 'descartar' ? Number(Object.keys(p.descartes)[0]) : p.vez;
-      const v = vista(p, quem);
-      const x = v.pode;
-      let acao;
-      if (x.descartar) {
-        const monte = {};
-        const mao = { ...v.mao };
-        for (let k = 0; k < x.descartar; k++) { const r = escolher(RECURSOS.filter((r2) => mao[r2] > 0)); mao[r]--; monte[r] = (monte[r] ?? 0) + 1; }
-        acao = { tipo: 'descartar', recursos: monte };
-      } else if (x.ladrao) {
-        const hex = escolher(Object.keys(x.ladrao));
-        acao = { tipo: 'ladrao', hex, vitima: x.ladrao[hex].length ? escolher(x.ladrao[hex]) : undefined };
-      } else if (x.rolar) acao = rnd() < 0.2 && x.jogar?.includes('cavaleiro') ? { tipo: 'cavaleiro' } : { tipo: 'rolar' };
-      else {
-        const op = [];
-        if (x.aldeias?.length) op.push(() => ({ tipo: 'aldeia', v: escolher(x.aldeias) }), () => ({ tipo: 'aldeia', v: escolher(x.aldeias) }));
-        if (x.cidades?.length) op.push(() => ({ tipo: 'cidade', v: escolher(x.cidades) }), () => ({ tipo: 'cidade', v: escolher(x.cidades) }));
-        if (x.estradas?.length) op.push(() => ({ tipo: 'estrada', a: escolher(x.estradas) }));
-        if (x.comprar) op.push(() => ({ tipo: 'comprar' }));
-        if (x.jogar?.length) {
-          const c = escolher(x.jogar);
-          if (c === 'fartura') op.push(() => ({ tipo: 'fartura', recursos: [escolher(RECURSOS.filter((r) => v.banco[r] > 1)), escolher(RECURSOS.filter((r) => v.banco[r] > 1))] }));
-          else if (c === 'monopolio') op.push(() => ({ tipo: 'monopolio', recurso: escolher(RECURSOS) }));
-          else if (c !== 'estradas' || x.estradas?.length || v.jogadores[quem].pecas.estrada) op.push(() => ({ tipo: c }));
-        }
-        if (x.banco) {
-          const da = RECURSOS.find((r) => v.mao[r] >= x.banco[r]);
-          if (da) op.push(() => ({ tipo: 'banco', da, quer: escolher(RECURSOS.filter((r) => r !== da && v.banco[r] > 0)) }));
-        }
-        if (x.pararEstradas && !x.estradas?.length) op.push(() => ({ tipo: 'pararEstradas' }));
-        if (!op.length || (x.passar && rnd() < 0.25)) acao = x.passar ? { tipo: 'passar' } : { tipo: 'pararEstradas' };
-        else acao = escolher(op)();
-      }
+      const { quem, acao } = acaoDoRobo(p, rnd);
       try {
         agir(p, quem, acao, rnd);
       } catch (e) {
@@ -549,10 +564,7 @@ test('partidas inteiras de robôs: o que a tela oferece sempre vale, e as cartas
         if (e instanceof ErroDeJogo && /banco não tem|Não há onde/.test(e.message)) continue;
         throw new Error(`semente ${s}, passo ${passos}, fase ${p.fase}: ${JSON.stringify(acao)} → ${e.message}`);
       }
-      conferirCartas(p);
-      // Ninguém fica com 10 na própria vez sem a partida acabar.
-      if (p.fase !== 'fim' && p.fase !== 'inicio') assert.ok(pontos(p, p.vez, true) < 10, `semente ${s}: 10 pontos sem vencer`);
-      for (const j of p.jogadores) assert.ok(j.pecas.estrada >= 0 && j.pecas.aldeia >= 0 && j.pecas.cidade >= 0);
+      conferirPasso(p, s);
     }
     if (p.fase === 'fim') {
       acabaram++;
@@ -560,4 +572,280 @@ test('partidas inteiras de robôs: o que a tela oferece sempre vale, e as cartas
     }
   }
   assert.ok(acabaram >= 30, `só ${acabaram} de 40 acabaram`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// O relógio da vez.
+// ---------------------------------------------------------------------------------------------
+
+/** A `montada`, com o relógio ligado em `agora`: a vez do jogador 0, antes de rolar. */
+function comRelogio(n = 3, segundos = 60, agora = 0) {
+  const p = montada(n);
+  ligarRelogio(p, segundos, agora);
+  return p;
+}
+/** Primeiro os números dados, depois um sorteio com semente — para o que vem depois não importar. */
+const fixo = (...valores) => { const r = semente(77); return () => (valores.length ? valores.shift() : r()); };
+const eventos = (p, t) => p.historico.filter((e) => e.t === t);
+const cartasNaMao = (p, j) => RECURSOS.reduce((s, r) => s + p.jogadores[j].mao[r], 0);
+
+test('relógio na colocação: estourou, aldeia e estrada num lugar que vale, e a vez seguinte ganha o tempo inteiro', () => {
+  const p = novaPartida(3, { tabuleiro: tabuleiroDoManual(), sorteio: semente(3), segundos: 60, agora: 0 });
+  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: 60_000, descarte: null, pausa: null });
+  vencerPrazos(p, 59_999, semente(4));
+  assert.equal(Object.keys(p.construcoes).length, 0);
+  vencerPrazos(p, 60_000, semente(4));
+  assert.equal(p.vez, 1);
+  const [v] = Object.keys(p.construcoes);
+  assert.deepEqual(p.construcoes[v], { j: 0, tipo: 'aldeia' });
+  assert.ok(G.arestas.get(Object.keys(p.estradas)[0]).includes(v));
+  assert.deepEqual(eventos(p, 'tempo'), [{ t: 'tempo', j: 0, fase: 'inicio', rodada: 0 }]);
+  assert.equal(p.relogio.prazo, 120_000);
+
+  // Pôs a aldeia e não a estrada: a aldeia não recomeça o relógio, e ele põe só a estrada, saindo dela.
+  const v1 = vista(p, 1).pode.aldeias[0];
+  agir(p, 1, { tipo: 'aldeia', v: v1 }, Math.random, 70_000);
+  assert.equal(p.relogio.prazo, 120_000);
+  vencerPrazos(p, 120_000, semente(5));
+  assert.equal(p.vez, 2);
+  assert.equal(Object.values(p.construcoes).filter((c) => c.j === 1).length, 1);
+  assert.ok(Object.entries(p.estradas).some(([a, j]) => j === 1 && G.arestas.get(a).includes(v1)));
+
+  // O 2 põe duas seguidas, e cada uma é uma vez: o relógio recomeça entre elas.
+  vencerPrazos(p, 180_000, semente(6));
+  assert.equal(p.vez, 2);
+  assert.equal(p.relogio.prazo, 240_000);
+
+  // Ninguém perguntou por dez minutos: o resto da colocação e as vezes seguintes andam numa leitura só.
+  vencerPrazos(p, 600_000, semente(7));
+  assert.equal(Object.keys(p.construcoes).length, 6);
+  assert.notEqual(p.fase, 'inicio');
+  const proximo = p.relogio.prazo ?? p.relogio.descarte;
+  assert.ok(proximo > 600_000 && proximo <= 660_000, String(proximo));
+  conferirCartas(p);
+});
+
+test('relógio antes de rolar: rola por quem estourou e passa a vez; a jogada atrasada é recusada', () => {
+  const p = comRelogio();
+  por(p, 0, G.cantosDoHex.get(chave(hexDe(p, 'campo', 9)))[0]);
+  vencerPrazos(p, 60_000, dados(4, 5));
+  assert.equal(p.jogadores[0].mao.trigo, 1);
+  assert.equal(p.vez, 1);
+  assert.equal(p.fase, 'rolar');
+  assert.equal(p.relogio.prazo, 120_000);
+  assert.deepEqual(p.historico.slice(-3).map((e) => e.t), ['tempo', 'rolou', 'produziu']);
+  // Passar a vez dá à seguinte o tempo inteiro, a contar de quando passou.
+  agir(p, 1, { tipo: 'rolar' }, dados(2, 3), 100_000);
+  agir(p, 1, { tipo: 'passar' }, Math.random, 110_000);
+  assert.equal(p.relogio.prazo, 170_000);
+
+  // A jogada que chega depois do prazo: o relógio já jogou, e a vez é de outro.
+  const q = comRelogio();
+  assert.throws(() => agir(q, 0, { tipo: 'rolar' }, dados(2, 3), 60_000), recusa(/vez/));
+  assert.equal(q.vez, 1);
+  assert.equal(q.rolagens, 1);
+});
+
+test('relógio no 7: o descarte tem prazo próprio, a vez espera parada, e quem não descartou descarta por sorteio', () => {
+  const p = comRelogio();
+  dar(p, 1, { madeira: 5, la: 4 });   // 9 → descarta 4
+  dar(p, 0, { minerio: 8 });          // 8 → descarta 4
+  agir(p, 0, { tipo: 'rolar' }, dados(3, 4), 20_000);
+  assert.equal(p.fase, 'descartar');
+  assert.deepEqual(vista(p, 2).relogio, { segundos: 60, prazo: null, descarte: 80_000, pausa: 40_000 });
+  agir(p, 1, { tipo: 'descartar', recursos: { madeira: 4 } }, Math.random, 30_000);
+  vencerPrazos(p, 79_999);
+  assert.equal(p.fase, 'descartar');
+  vencerPrazos(p, 80_000, semente(8));
+  assert.equal(cartasNaMao(p, 0), 4);
+  assert.deepEqual(eventos(p, 'tempo'), [{ t: 'tempo', j: 0, fase: 'descartar', rodada: 1 }]);
+  assert.equal(p.fase, 'ladrao');
+  // Os 40 s que sobravam a quem rolou voltam inteiros.
+  assert.equal(p.relogio.prazo, 120_000);
+  assert.equal(p.relogio.pausa, null);
+  conferirCartas(p);
+
+  // E o ladrão também vence: um terreno sorteado, e a vez passa.
+  const antes = p.ladrao;
+  vencerPrazos(p, 120_000, semente(9));
+  assert.notEqual(p.ladrao, antes);
+  assert.equal(eventos(p, 'tempo').at(-1).fase, 'ladrao');
+  assert.equal(p.vez, 1);
+  assert.equal(p.relogio.prazo, 180_000);
+  conferirCartas(p);
+});
+
+test('relógio no 7 que ele mesmo rolou: o descarte dos outros, o ladrão e a vez andam numa cascata só', () => {
+  const p = comRelogio();
+  dar(p, 1, { madeira: 5, la: 4 });
+  vencerPrazos(p, 60_000, fixo((3 - 0.5) / 6, (4 - 0.5) / 6));
+  assert.equal(p.fase, 'descartar');
+  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: null, descarte: 120_000, pausa: 0 });
+  // Quem estourou não tem mais tempo: acabado o descarte, o ladrão sai no mesmo instante.
+  vencerPrazos(p, 120_000, semente(10));
+  assert.deepEqual(eventos(p, 'tempo').map((e) => [e.j, e.fase]), [[0, 'rolar'], [1, 'descartar'], [0, 'ladrao']]);
+  assert.equal(cartasNaMao(p, 1), 5);
+  assert.equal(p.vez, 1);
+  assert.equal(p.fase, 'rolar');
+  assert.equal(p.relogio.prazo, 180_000);
+  conferirCartas(p);
+});
+
+test('relógio no ladrão do cavaleiro: rouba de quem estiver lá, rola e passa', () => {
+  const p = comRelogio();
+  const pasto4 = hexDe(p, 'pasto', 4);
+  por(p, 1, G.cantosDoHex.get(chave(pasto4))[0]);
+  dar(p, 1, { la: 1 });
+  p.jogadores[0].cartas = [{ tipo: 'cavaleiro', turno: 0 }];
+  agir(p, 0, { tipo: 'cavaleiro' }, Math.random, 10_000);
+  assert.equal(p.fase, 'ladrao');
+  // O sorteio cai no pasto 4, onde só o 1 pode ser roubado; depois, os dados (2 e 3).
+  const terrenos = [...G.cantosDoHex.keys()].filter((h) => h !== p.ladrao);
+  vencerPrazos(p, 60_000, fixo((terrenos.indexOf(chave(pasto4)) + 0.5) / terrenos.length, 0, 0, 1.5 / 6, 2.5 / 6));
+  assert.equal(p.ladrao, chave(pasto4));
+  assert.equal(p.jogadores[0].mao.la, 1);
+  assert.deepEqual(p.historico.slice(-5).map((e) => e.t), ['tempo', 'ladrao', 'roubou', 'rolou', 'produziu']);
+  assert.deepEqual(eventos(p, 'tempo'), [{ t: 'tempo', j: 0, fase: 'ladrao', rodada: 1 }]);
+  assert.equal(p.vez, 1);
+  conferirCartas(p);
+});
+
+test('relógio na carta de estradas: para onde estava, e a vez passa', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  const [c0, c1] = G.cantosDoHex.get(chave(hexDe(p, 'campo', 12)));
+  por(p, 0, c0);
+  p.jogadores[0].cartas = [{ tipo: 'estradas', turno: 0 }];
+  agir(p, 0, { tipo: 'estradas' }, Math.random, 5_000);
+  agir(p, 0, { tipo: 'estrada', a: caminho(c0, c1)[0] }, Math.random, 6_000);
+  assert.equal(p.fase, 'estradas');
+  vencerPrazos(p, 60_000);
+  assert.equal(p.jogadores[0].pecas.estrada, 14);
+  assert.equal(eventos(p, 'tempo').at(-1).fase, 'estradas');
+  assert.equal(p.vez, 1);
+  assert.equal(p.estradasGratis, 0);
+});
+
+test('relógio nas ações com uma oferta aberta: a oferta vai junto com a vez', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  dar(p, 0, { trigo: 1 });
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 50_000);
+  assert.equal(vista(p, 1).oferta.prazo, 50_000 + PRAZO_DA_TROCA);
+  vencerPrazos(p, 60_000);
+  assert.equal(p.oferta, null);
+  assert.equal(p.vez, 1);
+  assert.deepEqual(eventos(p, 'tempo'), [{ t: 'tempo', j: 0, fase: 'acoes', rodada: 1 }]);
+  assert.equal(p.jogadores[0].mao.trigo, 1);
+});
+
+test('troca: 15 s para responder; ninguém quis, ela fecha; alguém aceitou, fica para quem ofereceu fechar', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  dar(p, 0, { trigo: 2 }); dar(p, 1, { la: 1 }); dar(p, 2, { la: 1 });
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 1_000);
+  assert.deepEqual([vista(p, 1).oferta.aberta, vista(p, 1).oferta.prazo], [true, 1_000 + PRAZO_DA_TROCA]);
+  agir(p, 1, { tipo: 'responder', resposta: 'recusa' }, Math.random, 2_000);
+  vencerPrazos(p, 15_999);
+  assert.ok(p.oferta);
+  vencerPrazos(p, 16_000);
+  assert.equal(p.oferta, null);
+  assert.deepEqual(p.historico.at(-1), { t: 'ofertaVenceu', j: 0, rodada: 1 });
+  assert.equal(p.vez, 0);   // a vez continua: venceu a troca, não o turno
+
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 20_000);
+  agir(p, 1, { tipo: 'responder', resposta: 'aceita' }, Math.random, 25_000);
+  vencerPrazos(p, 35_000);
+  assert.equal(p.oferta.aberta, false);
+  assert.deepEqual(p.oferta.respostas, { 1: 'aceita', 2: 'recusa' });
+  assert.equal(vista(p, 2).pode.responder, undefined);
+  assert.throws(() => agir(p, 2, { tipo: 'responder', resposta: 'aceita' }, Math.random, 36_000), recusa(/acabou/));
+  assert.throws(() => agir(p, 2, { tipo: 'contraproposta', da: { la: 1 }, quer: { trigo: 1 } }, Math.random, 36_000), recusa(/acabou/));
+  vencerPrazos(p, 50_000);   // fechada para respostas, ela não vence de novo
+  assert.ok(p.oferta);
+  agir(p, 0, { tipo: 'fecharTroca', com: 1 }, Math.random, 50_000);
+  assert.equal(p.jogadores[0].mao.la, 1);
+  assert.equal(p.oferta, null);
+  conferirCartas(p);
+});
+
+test('quem sai na própria vez: a vez seguinte começa com o tempo inteiro; com relógio, a hora é obrigatória', () => {
+  const p = comRelogio();
+  sair(p, 0, 30_000);
+  assert.equal(p.vez, 1);
+  assert.equal(p.relogio.prazo, 90_000);
+  assert.throws(() => agir(p, 1, { tipo: 'rolar' }), /que horas são/);
+  assert.throws(() => novaPartida(2, { segundos: 45, agora: 0 }), recusa(/30 ou de 60/));
+});
+
+/**
+ * As mesmas partidas de robôs, agora com relógio e robôs que às vezes dormem — e trocam entre si.
+ * Além do de sempre, a cada passo: nenhum prazo vencido fica para trás, e a partida nunca fica parada
+ * (fora do fim, sempre há um prazo pela frente).
+ */
+test('partidas de robôs que dormem: o relógio joga por eles e a regra continua de pé', () => {
+  let acabaram = 0;
+  let pelaMao = 0;
+  for (let s = 1; s <= 30; s++) {
+    const rnd = semente(s * 104729);
+    const escolher = (lista) => lista[Math.floor(rnd() * lista.length)];
+    const n = 2 + (s % 3);
+    let agora = 0;
+    const p = novaPartida(n, { sorteio: rnd, segundos: s % 2 ? 30 : 60, agora });
+    let passos = 0;
+    while (p.fase !== 'fim' && passos < 8000) {
+      passos++;
+      const r = p.relogio;
+      if (rnd() < 0.12) {
+        // Dormiu: ninguém mexe até o próximo prazo passar — às vezes, mais umas vezes inteiras.
+        const proximo = Math.min(r.prazo ?? Infinity, r.descarte ?? Infinity, p.oferta?.aberta ? p.oferta.prazo : Infinity);
+        agora = proximo + Math.floor(rnd() * 3) * r.segundos * 1000;
+        vencerPrazos(p, agora, rnd);
+      } else {
+        agora += Math.floor(rnd() * 4000);
+        // A leitura antes da jogada, como a mesa faz: a tela decide pelo que vê depois do relógio.
+        vencerPrazos(p, agora, rnd);
+        if (p.fase === 'fim') break;
+        let quem, acao;
+        const outros = p.jogadores.map((_, k) => k).filter((k) => k !== p.vez && !p.jogadores[k].fora);
+        if (p.oferta?.aberta && p.fase === 'acoes' && rnd() < 0.5) {
+          quem = escolher(outros);
+          const mao = p.jogadores[quem].mao;
+          if (rnd() < 0.2 && RECURSOS.some((x) => mao[x] > 0)) {
+            const da = escolher(RECURSOS.filter((x) => mao[x] > 0));
+            acao = { tipo: 'contraproposta', da: { [da]: 1 }, quer: { [escolher(RECURSOS.filter((x) => x !== da))]: 1 } };
+          } else acao = { tipo: 'responder', resposta: Object.entries(p.oferta.quer).every(([x, k]) => mao[x] >= k) ? 'aceita' : 'recusa' };
+        } else if (p.oferta && !p.oferta.aberta && p.fase === 'acoes' && rnd() < 0.5) {
+          const com = Object.entries(p.oferta.respostas).find(([, x]) => x === 'aceita' || x === 'contra');
+          quem = p.vez;
+          acao = com ? { tipo: 'fecharTroca', com: Number(com[0]), contra: com[1] === 'contra' } : { tipo: 'cancelarOferta' };
+        } else if (p.fase === 'acoes' && !p.oferta && rnd() < 0.1 && RECURSOS.some((x) => p.jogadores[p.vez].mao[x] > 0)) {
+          quem = p.vez;
+          const da = escolher(RECURSOS.filter((x) => p.jogadores[p.vez].mao[x] > 0));
+          acao = { tipo: 'oferecer', da: { [da]: 1 }, quer: { [escolher(RECURSOS.filter((x) => x !== da))]: 1 } };
+        } else ({ quem, acao } = acaoDoRobo(p, rnd));
+        try {
+          agir(p, quem, acao, rnd, agora);
+          pelaMao++;
+        } catch (e) {
+          // As do robô de sempre, e a troca que alguém já não pode cumprir porque gastou as cartas.
+          if (e instanceof ErroDeJogo && /banco não tem|Não há onde|não tem mais|Você não tem essas/.test(e.message)) continue;
+          throw new Error(`semente ${s}, passo ${passos}, fase ${p.fase}: ${JSON.stringify(acao)} → ${e.message}`);
+        }
+      }
+      conferirPasso(p, s);
+      if (p.fase !== 'fim') {
+        const prazos = [p.relogio.prazo, p.relogio.descarte, p.oferta?.aberta ? p.oferta.prazo : null].filter((x) => x !== null);
+        assert.ok(p.relogio.prazo !== null || (p.fase === 'descartar' && p.relogio.descarte !== null), `semente ${s}: partida parada`);
+        assert.ok(prazos.every((x) => x > agora), `semente ${s}: prazo vencido ficou para trás`);
+      }
+    }
+    if (p.fase === 'fim') {
+      acabaram++;
+      assert.ok(pontos(p, p.vencedor, true) >= 10);
+    }
+    assert.ok(eventos(p, 'tempo').length > 0, `semente ${s}: o relógio nunca jogou`);
+  }
+  assert.ok(pelaMao > 1000);
+  assert.ok(acabaram >= 20, `só ${acabaram} de 30 acabaram`);
 });

@@ -9,7 +9,9 @@
 // seria quem confiou na tela.
 //
 // O sorteio é injetado (`sorteio()`, um número em [0, 1)), para o teste jogar partidas inteiras
-// com dados decididos de antemão.
+// com dados decididos de antemão. A hora também (`agora`, em ms): o relógio da vez é um INSTANTE
+// guardado na partida, e quem o vence é a próxima leitura ou ação — não há timer esperando
+// ninguém, o mesmo acordo do relógio do xadrez.
 
 export class ErroDeJogo extends Error {}
 
@@ -20,6 +22,16 @@ export const MAX_JOGADORES = 4;
 export const PONTOS_PARA_VENCER = 10;
 /** Quem tem mais que isto quando sai 7 devolve metade. */
 export const LIMITE_DA_MAO = 7;
+/** O tempo de cada vez, em segundos, que o anfitrião escolhe antes de começar (decisão do dono, 04/10/2026). */
+export const TEMPOS_DA_VEZ = [30, 60];
+/** Quanto uma oferta de troca espera resposta: passou disso, quem não respondeu recusou. */
+export const PRAZO_DA_TROCA = 15_000;
+/**
+ * Quantos prazos uma leitura vence de uma vez, no máximo. Com a Saga aberta alguém pergunta pela
+ * mesa a cada segundo e vence um prazo por vez; a cascata é de quando ninguém perguntou por um
+ * tempo, e o limite é para um defeito virar uma partida parada em vez de um servidor pendurado.
+ */
+const PRAZOS_POR_LEITURA = 1000;
 
 const PRODUZ = { floresta: 'madeira', colina: 'tijolo', pasto: 'la', campo: 'trigo', montanha: 'minerio', deserto: null };
 const TERRENOS = [
@@ -154,13 +166,14 @@ function mover(de, para, custo) {
 
 /**
  * Uma partida nova para `n` jogadores. A ordem já é a da mesa: quem chama embaralha os lugares
- * antes, se quiser — aqui o jogador 0 começa.
+ * antes, se quiser — aqui o jogador 0 começa. Com `segundos` (30 ou 60), a vez tem relógio, e ele
+ * começa a correr em `agora`; sem, a partida espera quem estiver na vez.
  */
-export function novaPartida(n, { sorteio = Math.random, tabuleiro = sortearTabuleiro(sorteio) } = {}) {
+export function novaPartida(n, { sorteio = Math.random, tabuleiro = sortearTabuleiro(sorteio), segundos = null, agora } = {}) {
   if (!Number.isInteger(n) || n < MIN_JOGADORES || n > MAX_JOGADORES) throw new ErroDeJogo(`O Catan é de ${MIN_JOGADORES} a ${MAX_JOGADORES} jogadores.`);
   const deserto = tabuleiro.hexes.find((h) => h.terreno === 'deserto');
   const ordem = [...Array(n).keys()];
-  return {
+  const p = {
     hexes: tabuleiro.hexes,
     portos: tabuleiro.portos,
     ladrao: chaveDoHex(deserto.q, deserto.r),
@@ -190,10 +203,13 @@ export function novaPartida(n, { sorteio = Math.random, tabuleiro = sortearTabul
     maiorExercito: null,  // { j, tamanho }
     historico: [],
     vencedor: null,
+    relogio: null,
   };
+  if (segundos !== null) ligarRelogio(p, segundos, agora);
+  return p;
 }
 
-const anotar = (p, e) => { p.historico.push({ ...e, rodada: p.rodada }); if (p.historico.length > 200) p.historico.shift(); };
+const anotar =(p, e) => { p.historico.push({ ...e, rodada: p.rodada }); if (p.historico.length > 200) p.historico.shift(); };
 const ativos = (p) => p.jogadores.map((_, j) => j).filter((j) => !p.jogadores[j].fora);
 
 // --- o que vale onde ---
@@ -639,14 +655,17 @@ const acoes = {
     anotar(p, { t: 'banco', j, da, quer, taxa });
   },
 
-  oferecer(p, j, { da, quer }) {
+  oferecer(p, j, { da, quer }, _sorteio, agora) {
     exigirVez(p, j);
     exigirFase(p, 'acoes');
     const dou = lerMonte(da), peco = lerMonte(quer);
     exigir(soma(dou) > 0 && soma(peco) > 0, 'A troca precisa de cartas dos dois lados.');
     exigir(RECURSOS.every((r) => !(dou[r] && peco[r])), 'Não dá para dar e pedir o mesmo recurso.');
     exigir(temTudo(p.jogadores[j].mao, dou), 'Você não tem essas cartas.');
-    p.oferta = { da: dou, quer: peco, respostas: {}, contras: {} };
+    p.oferta = {
+      da: dou, quer: peco, respostas: {}, contras: {},
+      aberta: true, prazo: p.relogio ? agora + PRAZO_DA_TROCA : null,
+    };
     anotar(p, { t: 'ofereceu', j, da: dou, quer: peco });
   },
 
@@ -658,6 +677,7 @@ const acoes = {
   responder(p, j, { resposta }) {
     exigirFase(p, 'acoes');
     exigir(p.oferta, 'Não há troca oferecida.');
+    exigir(p.oferta.aberta, 'O tempo para responder a essa troca acabou.');
     exigir(p.vez !== j, 'A troca é sua: espere as respostas.');
     exigir(['aceita', 'recusa'].includes(resposta), 'Aceite ou recuse.');
     if (resposta === 'aceita') exigir(temTudo(p.jogadores[j].mao, p.oferta.quer), 'Você não tem o que ele pede.');
@@ -668,6 +688,7 @@ const acoes = {
   contraproposta(p, j, { da, quer }) {
     exigirFase(p, 'acoes');
     exigir(p.oferta, 'Não há troca oferecida.');
+    exigir(p.oferta.aberta, 'O tempo para responder a essa troca acabou.');
     exigir(p.vez !== j, 'A troca é sua.');
     const dou = lerMonte(da), peco = lerMonte(quer);
     exigir(soma(dou) > 0 && soma(peco) > 0, 'A troca precisa de cartas dos dois lados.');
@@ -706,22 +727,166 @@ const acoes = {
 };
 
 /**
- * Uma ação na partida. `j` é quem age; `acao` é `{ tipo, … }`. Muda `p` no lugar, ou lança
- * `ErroDeJogo` sem ter mexido em nada que se veja.
+ * Uma ação na partida. `j` é quem age; `acao` é `{ tipo, … }`; `agora` é a hora do servidor, que
+ * a partida com relógio exige. Primeiro vencem os prazos que já passaram — a jogada que chega
+ * depois do fim da vez não salva ninguém, e o que o relógio fez fica feito mesmo que ela seja
+ * recusada, porque aconteceu antes dela. Depois, muda `p` no lugar, ou lança `ErroDeJogo` sem ter
+ * mexido em mais nada.
  */
-export function agir(p, j, acao, sorteio = Math.random) {
+export function agir(p, j, acao, sorteio = Math.random, agora) {
+  vencerPrazos(p, agora, sorteio);
   exigir(p.jogadores[j] && !p.jogadores[j].fora, 'Você não está nesta partida.');
   const tipo = String(acao?.tipo);
   exigir(Object.hasOwn(acoes, tipo), 'Ação desconhecida.');
   if (p.fase === 'fim') throw new ErroDeJogo('A partida já terminou.');
-  acoes[tipo](p, j, acao, sorteio);
+  acoes[tipo](p, j, acao, sorteio, agora);
+  acertarRelogio(p, agora);
+  // O último descarte de um 7 que o relógio rolou devolve a vez a quem já não tinha tempo: o
+  // ladrão dele sai agora, e não na leitura seguinte com a tela mostrando um prazo vencido.
+  vencerPrazos(p, agora, sorteio);
+}
+
+// ---------------------------------------------------------------------------------------------
+// O relógio (decisão do dono, 04/10/2026, desfazendo a de 27/09 de jogar sem ele). Cada vez tem
+// 30 ou 60 segundos, escolhidos na mesa; estourou, o jogo joga por quem estava na vez — o mínimo
+// para a vez passar —, e a partida nunca fica parada esperando alguém que foi buscar café.
+//
+// São três prazos, todos INSTANTES do relógio do servidor guardados na partida:
+// - `relogio.prazo`: a vez de `p.vez`. Recomeça inteiro a cada vez nova — e cada passo da
+//   colocação inicial é uma vez, para o jogador que põe duas seguidas ter tempo para as duas.
+// - `relogio.descarte`: o 7. O descarte é de VÁRIOS ao mesmo tempo, e quem rolou não tem culpa da
+//   demora deles: enquanto ele dura, o relógio da vez fica parado (`pausa`, o que sobrava) e
+//   volta com o mesmo tanto quando o último descartar.
+// - `oferta.prazo`: 15 s fixos para responder à troca, correndo junto com o da vez.
+// ---------------------------------------------------------------------------------------------
+
+/** Quem está na vez, e em que passo dela. Mudou, a vez é outra e o relógio recomeça. */
+const chaveDaVez = (p) => `${p.turno}:${p.vez}:${p.inicio?.passo ?? ''}`;
+
+function exigirHora(agora) {
+  if (!Number.isFinite(agora)) throw new Error('A partida tem relógio: falta dizer que horas são.');
+}
+
+/**
+ * Liga o relógio na vez de agora. É o que `novaPartida` faz com `segundos`; o teste o usa depois
+ * de montar uma posição à mão.
+ */
+export function ligarRelogio(p, segundos, agora) {
+  if (!TEMPOS_DA_VEZ.includes(segundos)) throw new ErroDeJogo(`A vez é de ${TEMPOS_DA_VEZ.join(' ou de ')} segundos.`);
+  p.relogio = { segundos, chave: null, prazo: null, descarte: null, pausa: null };
+  acertarRelogio(p, agora);
+}
+
+/** Depois de toda mudança: vez nova recomeça o relógio; o 7 o pausa, e o fim do descarte o devolve. */
+function acertarRelogio(p, agora) {
+  const r = p.relogio;
+  if (!r) return;
+  exigirHora(agora);
+  if (p.fase === 'fim') {
+    Object.assign(r, { prazo: null, descarte: null, pausa: null });
+    return;
+  }
+  const ms = r.segundos * 1000;
+  const chave = chaveDaVez(p);
+  if (chave !== r.chave) Object.assign(r, { chave, prazo: agora + ms, descarte: null, pausa: null });
+  if (p.fase === 'descartar') {
+    if (r.descarte === null) Object.assign(r, { pausa: Math.max(0, r.prazo - agora), prazo: null, descarte: agora + ms });
+  } else if (r.descarte !== null) {
+    Object.assign(r, { prazo: agora + r.pausa, descarte: null, pausa: null });
+  }
+}
+
+/**
+ * O tempo da vez acabou: o jogo faz por `p.vez` o mínimo para a vez passar, pelas mesmas ações de
+ * quem joga — então nada do que ele faz foge da regra. Na colocação, aldeia e estrada num lugar
+ * sorteado; antes de rolar, rola; no ladrão, um terreno e uma vítima sorteados; na carta de
+ * estradas, para; nas ações, passa (e a oferta aberta vai junto). Saiu 7 com descarte, para ali:
+ * o descarte tem prazo próprio, e o relógio desta vez já está zerado para quando ele acabar.
+ */
+function jogarPeloRelogio(p, sorteio) {
+  const j = p.vez;
+  const dono = chaveDaVez(p);
+  const escolher = (lista) => lista[Math.floor(sorteio() * lista.length)];
+  anotar(p, { t: 'tempo', j, fase: p.fase });
+  // Uma vez tem poucos passos (aldeia e estrada; ou rolar, ladrão e passar). O limite é só para um
+  // defeito virar uma volta a mais da cascata, e não um laço sem fim.
+  for (let passo = 0; passo < 10 && chaveDaVez(p) === dono && !['fim', 'descartar'].includes(p.fase); passo++) {
+    if (p.fase === 'inicio') {
+      if (p.inicio.falta === 'aldeia') acoes.aldeia(p, j, { v: escolher(lugaresDeAldeia(p, j)) });
+      else {
+        const lugares = lugaresDeEstrada(p, j);
+        if (lugares.length) acoes.estrada(p, j, { a: escolher(lugares) });
+        else { p.inicio.passo++; avancarInicio(p); }
+      }
+    } else if (p.fase === 'rolar') acoes.rolar(p, j, {}, sorteio);
+    else if (p.fase === 'ladrao') {
+      const hex = escolher([...G.cantosDoHex.keys()].filter((h) => h !== p.ladrao));
+      const podem = vitimasEm(p, hex, j);
+      acoes.ladrao(p, j, { hex, vitima: podem.length ? escolher(podem) : undefined }, sorteio);
+    } else if (p.fase === 'estradas') acoes.pararEstradas(p, j);
+    else if (p.fase === 'acoes') acoes.passar(p, j);
+  }
+}
+
+/** O prazo do 7 acabou: quem ainda devia descarta por sorteio, carta a carta da mão. */
+function descartarPeloRelogio(p, sorteio) {
+  for (const k of Object.keys(p.descartes).map(Number)) {
+    const mao = p.jogadores[k].mao;
+    const monte = RECURSOS.flatMap((r) => Array(mao[r]).fill(r));
+    const escolhidas = vazia();
+    for (let i = 0; i < p.descartes[k]; i++) escolhidas[monte.splice(Math.floor(sorteio() * monte.length), 1)[0]]++;
+    anotar(p, { t: 'tempo', j: k, fase: 'descartar' });
+    acoes.descartar(p, k, { recursos: escolhidas });
+  }
+}
+
+/**
+ * Os 15 s da troca acabaram: quem não respondeu recusou. Sem aceite nem contraproposta, a oferta
+ * fecha; com, ela fica — fechada para respostas — para quem ofereceu escolher com quem trocar,
+ * dentro do relógio da própria vez.
+ */
+function vencerOferta(p) {
+  const o = p.oferta;
+  o.aberta = false;
+  for (const k of ativos(p)) if (k !== p.vez && !o.respostas[k]) o.respostas[k] = 'recusa';
+  if (!Object.values(o.respostas).some((r) => r === 'aceita' || r === 'contra')) {
+    p.oferta = null;
+    anotar(p, { t: 'ofertaVenceu', j: p.vez });
+  }
+}
+
+/**
+ * Vence, em ordem, todo prazo que passou até `agora` — cada um NO INSTANTE em que venceu, e não no
+ * da leitura: a vez seguinte de quem estourou começa quando a dele acabou. Quem chama é toda
+ * leitura e toda ação; ninguém perguntou por dez minutos, a cascata põe a partida em dia de uma vez.
+ */
+export function vencerPrazos(p, agora, sorteio = Math.random) {
+  const r = p.relogio;
+  if (!r) return;
+  exigirHora(agora);
+  for (let volta = 0; volta < PRAZOS_POR_LEITURA && p.fase !== 'fim'; volta++) {
+    const oferta = p.oferta?.aberta && p.oferta.prazo !== null ? p.oferta.prazo : Infinity;
+    const descarte = r.descarte ?? Infinity;
+    const vez = r.prazo ?? Infinity;
+    const t = Math.min(oferta, descarte, vez);
+    if (t > agora) return;
+    if (t === oferta) vencerOferta(p);
+    else if (t === descarte) descartarPeloRelogio(p, sorteio);
+    else jogarPeloRelogio(p, sorteio);
+    acertarRelogio(p, t);
+  }
 }
 
 /**
  * Alguém saiu da partida. As peças dele ficam no tabuleiro (e continuam cortando estradas), as
  * cartas voltam ao banco, e a vez anda se era dele. Sobrando um, esse vence.
  */
-export function sair(p, j) {
+export function sair(p, j, agora) {
+  tirarDaPartida(p, j);
+  acertarRelogio(p, agora);
+}
+
+function tirarDaPartida(p, j) {
   const jog = p.jogadores[j];
   if (!jog || jog.fora || p.fase === 'fim') return;
   jog.fora = true;
@@ -802,7 +967,7 @@ export function vista(p, j) {
     if (p.fase === 'descartar' && p.descartes[eu]) pode.descartar = p.descartes[eu];
     const cartas = ['cavaleiro', 'estradas', 'fartura', 'monopolio'].filter((t) => podeJogarCarta(p, eu, t));
     if (cartas.length) pode.jogar = cartas;
-    if (p.oferta && !daVez && p.fase === 'acoes') pode.responder = true;
+    if (p.oferta?.aberta && !daVez && p.fase === 'acoes') pode.responder = true;
   }
 
   return {
@@ -838,6 +1003,12 @@ export function vista(p, j) {
     oferta: p.oferta ? {
       da: { ...p.oferta.da }, quer: { ...p.oferta.quer },
       respostas: { ...p.oferta.respostas }, contras: structuredClone(p.oferta.contras),
+      aberta: p.oferta.aberta, prazo: p.oferta.prazo,
+    } : null,
+    // Os prazos são instantes do relógio do SERVIDOR; a mesa manda o `agora` dela junto, e a tela
+    // desconta o que passou desde a resposta, como no xadrez.
+    relogio: p.relogio ? {
+      segundos: p.relogio.segundos, prazo: p.relogio.prazo, descarte: p.relogio.descarte, pausa: p.relogio.pausa,
     } : null,
     historico: historicoPara(p, eu),
     vencedor: p.vencedor,

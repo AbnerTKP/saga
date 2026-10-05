@@ -8,11 +8,15 @@
 // publicar o servidor com gente jogando apaga a partida dela, e a tela de todos passa a ouvir
 // "essa mesa não existe mais".
 //
-// Sem relógio (decisão do dono, 27/09/2026): à mesa entre amigos ninguém cronometra a vez. O
-// preço é que alguém que fecha a Saga seguraria todo mundo — por isso quem não aparece há
-// `ABANDONO` sai da partida sozinho, e a vez anda.
+// Com relógio desde 04/10/2026: a vez é de 30 ou 60 segundos, escolhidos por quem abriu a mesa
+// antes de começar, e quem estoura tem a vez jogada pelo próprio jogo (ver `catan.mjs`). Nasceu
+// sem, por decisão do dono em 27/09 — "à mesa entre amigos ninguém cronometra a vez" —, e, jogando,
+// o dono pediu o contrário. O relógio cuida da vez parada; quem fecha a Saga continua saindo da
+// partida depois de `ABANDONO`, senão o jogo passaria para sempre a vez de quem já foi embora.
 import { ErroDeConta } from './contas.mjs';
-import { ErroDeJogo, MAX_JOGADORES, MIN_JOGADORES, agir as jogar, novaPartida, sair, vista } from './catan.mjs';
+import {
+  ErroDeJogo, MAX_JOGADORES, MIN_JOGADORES, TEMPOS_DA_VEZ, agir as jogar, novaPartida, sair, vencerPrazos, vista,
+} from './catan.mjs';
 
 export const PLATEIA = 6000;
 /** Mesa esperando gente, ou partida acabada, sem ninguém mexer há isto: some. */
@@ -22,6 +26,8 @@ export const ESQUECIDA = 30 * 60_000;
  * está aberta — saiu da partida. Quem só foi ler o chat continua aparecendo.
  */
 export const ABANDONO = 10 * 60_000;
+/** O tempo da vez de uma mesa nova, até quem abriu escolher outro. */
+export const TEMPO_PADRAO = 60;
 
 const naoExiste = () => new ErroDeConta('Essa mesa de Catan não existe mais.', 404);
 
@@ -52,8 +58,11 @@ export function criarMesasDoCatan({
   function faxina(agora) {
     for (const mesa of mesas.values()) {
       if (mesa.estado !== 'jogando') continue;
+      // Primeiro o relógio, como no xadrez: a vez que venceu anda antes de qualquer outra coisa, e
+      // a jogada que chega depois do prazo já encontra a vez com outro.
+      vencerPrazos(mesa.partida, agora, sorteio);
       mesa.ids.forEach((id, j) => {
-        if (!mesa.partida.jogadores[j].fora && agora - (mesa.vistos.get(id) ?? 0) >= ABANDONO) sair(mesa.partida, j);
+        if (!mesa.partida.jogadores[j].fora && agora - (mesa.vistos.get(id) ?? 0) >= ABANDONO) sair(mesa.partida, j, agora);
       });
       encerrarSeAcabou(mesa, agora);
     }
@@ -135,6 +144,14 @@ export function criarMesasDoCatan({
       mesa.lugares = mesa.lugares.filter((x) => x !== ctx.eu);
     },
 
+    /** O tempo de cada vez, escolhido antes de começar. Vale para as partidas seguintes da mesa. */
+    tempo(mesa, ctx, { segundos }) {
+      soNoLobby(mesa);
+      soAnfitriao(mesa, ctx);
+      if (!TEMPOS_DA_VEZ.includes(segundos)) throw new ErroDeConta(`A vez é de ${TEMPOS_DA_VEZ.join(' ou de ')} segundos.`, 400);
+      mesa.segundos = segundos;
+    },
+
     tirar(mesa, ctx, { alvo }) {
       soNoLobby(mesa);
       soAnfitriao(mesa, ctx);
@@ -160,7 +177,7 @@ export function criarMesasDoCatan({
       Object.assign(mesa, {
         estado: 'jogando',
         ids,
-        partida: novaPartida(ids.length, { sorteio }),
+        partida: novaPartida(ids.length, { sorteio, segundos: mesa.segundos, agora }),
         chamados: new Set(),
         recusaram: new Set(),
         vistos: new Map(ids.map((id) => [id, agora])),
@@ -168,24 +185,24 @@ export function criarMesasDoCatan({
       });
     },
 
-    jogar(mesa, ctx, { jogada }) {
+    jogar(mesa, ctx, { jogada }, agora) {
       if (mesa.estado === 'lobby') throw new ErroDeConta('A partida ainda não começou.', 409);
       const j = posicaoDe(mesa, ctx.eu);
       if (j < 0) throw new ErroDeConta('Você não está jogando esta partida.', 403);
       if (mesa.estado === 'fim') throw new ErroDeConta('A partida já terminou.', 409);
       try {
-        jogar(mesa.partida, j, jogada ?? {}, sorteio);
+        jogar(mesa.partida, j, jogada ?? {}, sorteio, agora);
       } catch (e) {
         if (e instanceof ErroDeJogo) throw new ErroDeConta(e.message, 409);
         throw e;
       }
     },
 
-    desistir(mesa, ctx) {
+    desistir(mesa, ctx, _dados, agora) {
       if (mesa.estado !== 'jogando') throw new ErroDeConta('Não há partida em andamento.', 409);
       const j = posicaoDe(mesa, ctx.eu);
       if (j < 0) throw new ErroDeConta('Você não está jogando esta partida.', 403);
-      sair(mesa.partida, j);
+      sair(mesa.partida, j, agora);
     },
 
     /** Depois do fim: a mesa volta a esperar, com quem pediu como anfitrião e os que ficaram sentados. */
@@ -241,6 +258,7 @@ export function criarMesasDoCatan({
       recusaram: [...mesa.recusaram],
       // Na ordem da partida: a posição j de `partida.jogadores` é a pessoa `jogadores[j]`.
       jogadores: mesa.ids ? mesa.ids.map(quem) : null,
+      segundos: mesa.segundos,
       partida: mesa.partida ? vista(mesa.partida, j >= 0 ? j : null) : null,
       plateia: plateiaDe(mesa, agora).map(quem),
       eu: papelDe(mesa, ctx.eu),
@@ -311,6 +329,7 @@ export function criarMesasDoCatan({
         vistos: new Map(),
         plateia: new Map(),
         rodadas: 0,
+        segundos: TEMPO_PADRAO,
         mexidaEm: agora,
       };
       soltarDeOutras(mesa, ctx.eu);
