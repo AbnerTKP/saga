@@ -704,6 +704,176 @@ async function roteiro(dados) {
     await clicar({ sel: '.tela-inicial button', texto: 'sair da conta' });
     await esperar('.connect-card');
   });
+
+  // O Catan com relógio (04/10/2026): a mesa abre e começa PELA TELA do TKP; os outros dois
+  // lugares — e o TKP, quando a foto não é dele — são robôs que fazem pela rede o que a `vista`
+  // oferece. O que se quer ver (o aviso da vez, a barra de espaço, o "+1", a troca que vence
+  // sozinha, a vez que estoura) acontece de verdade, contra o servidor local, com a vez de 30 s.
+  await passo('19-catan', async () => {
+    if (!(await existe('.connect-card'))) await sairDaConta();
+    const sid = dados.servidores.cantinho;
+    const RECURSOS = ['madeira', 'tijolo', 'la', 'trigo', 'minerio'];
+    const QUEM = ['TKP', 'Marina', 'Rafa'];
+    const api = async (ap, metodo, caminho, corpo) => {
+      const r = await fetch(dados.base + caminho, {
+        method: metodo, body: corpo ? JSON.stringify(corpo) : undefined,
+        headers: { 'content-type': 'application/json', 'x-sessao': dados.contas[ap].token, 'x-servidor': String(sid) },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(`${caminho} (${ap}) → ${r.status}: ${j.error ?? ''}`);
+      return j;
+    };
+    const { mesa: aberta } = await api('TKP', 'POST', '/catan/abrir', {});
+    const id = aberta.id;
+    for (const ap of ['Marina', 'Rafa']) await api('TKP', 'POST', '/catan/mesa', { id, acao: 'chamar', alvo: dados.contas[ap].id });
+    for (const ap of ['Marina', 'Rafa']) await api(ap, 'POST', '/catan/mesa', { id, acao: 'aceitar' });
+
+    const ver = async (ap = 'TKP') => (await api(ap, 'GET', `/catan/mesa?id=${id}`)).mesa;
+    const posDe = (m, ap) => m.jogadores.findIndex((j) => j.id === dados.contas[ap].id);
+    const sorteio = (l) => l[Math.floor(Math.random() * l.length)];
+    const jogar = (ap, jogada) => api(ap, 'POST', '/catan/mesa', { id, acao: 'jogar', jogada });
+    /** Quem tem de agir agora: quem deve descarte, ou quem está na vez. */
+    const quemAge = (m) => {
+      const p = m.partida;
+      if (!p || p.fase === 'fim') return null;
+      const k = p.fase === 'descartar' ? p.jogadores.findIndex((j) => j.descartar > 0) : p.vez;
+      return QUEM.find((ap) => posDe(m, ap) === k) ?? null;
+    };
+    /** Uma ação qualquer do que a vista oferece a `ap` — construindo quando dá, senão passando. */
+    async function robo(ap) {
+      const p = (await ver(ap)).partida;
+      const x = p.pode;
+      let j = null;
+      if (x.descartar) {
+        const mao = { ...p.mao }; const recursos = {};
+        for (let k = 0; k < x.descartar; k++) { const r = sorteio(RECURSOS.filter((z) => mao[z] > 0)); mao[r]--; recursos[r] = (recursos[r] ?? 0) + 1; }
+        j = { tipo: 'descartar', recursos };
+      } else if (x.ladrao) {
+        const hex = sorteio(Object.keys(x.ladrao));
+        j = { tipo: 'ladrao', hex, vitima: x.ladrao[hex].length ? sorteio(x.ladrao[hex]) : undefined };
+      } else if (x.rolar) j = { tipo: 'rolar' };
+      else if (p.fase === 'inicio') j = x.aldeias?.length ? { tipo: 'aldeia', v: sorteio(x.aldeias) } : { tipo: 'estrada', a: sorteio(x.estradas) };
+      else if (p.fase === 'estradas') j = x.estradas?.length ? { tipo: 'estrada', a: sorteio(x.estradas) } : { tipo: 'pararEstradas' };
+      else if (x.aldeias?.length) j = { tipo: 'aldeia', v: sorteio(x.aldeias) };
+      else if (x.cidades?.length) j = { tipo: 'cidade', v: sorteio(x.cidades) };
+      else if (x.estradas?.length && Math.random() < 0.5) j = { tipo: 'estrada', a: sorteio(x.estradas) };
+      else if (p.oferta && p.vez === p.eu) j = { tipo: 'cancelarOferta' };
+      else if (x.passar) j = { tipo: 'passar' };
+      if (j) await jogar(ap, j);
+    }
+    /** Os robôs jogam até `cond(mesa)` valer — conferida ANTES de cada ação. */
+    async function robosAte(cond, oque, teto = 600) {
+      for (let i = 0; i < teto; i++) {
+        const m = await ver();
+        if (cond(m)) return m;
+        const ap = quemAge(m);
+        if (!ap) throw new Error(`a partida acabou antes de: ${oque}`);
+        await robo(ap).catch((e) => log('robô:', e.message));
+      }
+      throw new Error(`os robôs não chegaram a: ${oque}`);
+    }
+    // O aviso e o "+1" duram 1,6 s e 2,5 s: a foto deles é NA HORA, sem esperar a tela parar.
+    async function fotoNaHora(nome, descricao) {
+      const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' });
+      const arquivo = join(pasta, `${nome}.png`);
+      writeFileSync(arquivo, Buffer.from(data, 'base64'));
+      manifesto.push({ arquivo, descricao, tamanho: tamanhoAtual.join('x') });
+      log('foto', arquivo);
+    }
+    // O aviso É a animação: congelado no meio dela.
+    async function fotoDoAviso(nome, descricao) {
+      await esperar('.catan-aviso', 5000);
+      await avaliar(`document.getAnimations().forEach((a) => { if (a.animationName === 'catan-aviso') { a.pause(); a.currentTime = 600; } })`);
+      await fotoNaHora(nome, descricao);
+      await esperarQue(`!document.querySelector('.catan-aviso')`, { teto: 4000, oque: 'o aviso sumir sozinho' });
+    }
+    const historico = (texto) => `[...document.querySelectorAll('.catan-historico .catan-evento')].some((e) => e.textContent.includes(${JSON.stringify(texto)}))`;
+
+    // --- a mesa, pela tela: o tempo de cada vez -------------------------------------------
+    await entrarComo('TKP');
+    await abrirServidor('Cantinho');
+    await clicar({ sel: '.faixa-da-partida .faixa-abrir' });
+    await esperar('.catan-lobby .catan-segmento');
+    await clicar({ sel: '.catan-segmento button', texto: '30 segundos' });
+    await esperarQue(`document.querySelector('.catan-segmento button.ativo')?.textContent === '30 segundos'`, { oque: 'a mesa em 30 s' });
+    await foto('19a-catan-mesa-tempo', 'Catan, a mesa esperando: quem abriu escolhe o tempo de cada vez (30 s ou 1 min).');
+    await clicar({ sel: '.catan-lobby-botoes button.primary', texto: 'Começar' });
+    await esperar('.catan-partida .catan-faixa', 10000);
+
+    // --- a colocação, pelos robôs; depois, a vez passando para o TKP ------------------------
+    let m = await robosAte((x) => x.partida.fase !== 'inicio', 'o fim da colocação');
+    const n = m.jogadores.length;
+    const eu = posDe(m, 'TKP');
+    const antesDeMim = (eu - 1 + n) % n;
+    const apAntes = QUEM.find((ap) => posDe(m, ap) === antesDeMim);
+    await robosAte((x) => x.partida.vez === antesDeMim && x.partida.fase === 'acoes', 'a vez de quem joga antes do TKP');
+    await jogar(apAntes, { tipo: 'passar' });
+    await fotoDoAviso('19b-catan-aviso-sua-vez', 'Catan: a vez passou para você — o aviso no meio do tabuleiro (congelado no meio dos 1,6 s em que ele aparece).');
+    await esperar('.catan-faixa.minha');
+    await esperar('.catan-rolar');
+    await foto('19c-catan-sua-vez-rolar', 'Catan, sua vez de rolar: a faixa acesa com o tempo, e os dados viraram o botão grande.');
+
+    // --- a barra de espaço rola; as cartas que chegam sobem com "+1" -------------------------
+    let chegou = false;
+    for (let tentativa = 0; tentativa < 8 && !chegou; tentativa++) {
+      if (tentativa > 0) {
+        await robosAte((x) => x.partida.vez === eu && x.partida.fase === 'rolar', 'a vez do TKP de novo');
+        await esperar('.catan-rolar');
+        await esperarQue(`!document.querySelector('.catan-aviso')`, { teto: 4000 });
+      }
+      const rolagens = (await ver()).partida.rolagens;
+      await avaliar('document.activeElement?.blur?.()');
+      if (tentativa === 0) await tecla('Space');
+      else await clicar('.catan-rolar');
+      await esperarQue(`!document.querySelector('.catan-rolar')`, { teto: 5000, oque: tentativa === 0 ? 'a barra de espaço rolar os dados' : 'o botão rolar' });
+      if ((await ver()).partida.rolagens !== rolagens + 1) throw new Error('rolou, mas o servidor não contou a rolagem');
+      await esperarQue(`!document.querySelector('.catan-dados.rolando')`, { teto: 4000 });
+      chegou = await existe('.catan-chegou');
+      if (chegou) await fotoNaHora('19d-catan-chegou-carta', 'Catan: rolou e rendeu — a carta que chegou sobe com "+1" e o nome, por 2,5 s.');
+      // O 7 e o resto da vez ficam com os robôs; o TKP passa pela tela.
+      await robosAte((x) => x.partida.vez === eu && x.partida.fase === 'acoes', 'o TKP de volta às ações');
+      // A tela pergunta de 800 em 800 ms: o botão só vale depois que ela vê o que os robôs fizeram.
+      await esperarQue(`[...document.querySelectorAll('.catan-acoes button.primary')].some((b) => b.textContent.includes('Passar a vez') && !b.disabled)`, { oque: '"Passar a vez" habilitado' });
+      await clicar({ sel: '.catan-acoes button.primary', texto: 'Passar a vez' });
+      await esperarQue(`!document.querySelector('.catan-faixa.minha')`, { teto: 5000, oque: 'a vez sair do TKP' });
+    }
+    if (!chegou) log('aviso: em 8 vezes, nenhuma rolagem rendeu carta ao TKP — sem a foto do "+1"');
+
+    // --- a vez de outro, e a troca que vence sozinha em 15 s ---------------------------------
+    m = await robosAte((x) => x.partida.vez !== eu && x.partida.fase === 'acoes', 'a vez de outro nas ações');
+    const apVez = QUEM.find((ap) => posDe(m, ap) === m.partida.vez);
+    await esperarQue(`!document.querySelector('.catan-aviso')`, { teto: 4000 });
+    await foto('19e-catan-vez-de-outro', `Catan, vez de ${apVez}: a faixa com o nome, o que está fazendo e o tempo dele.`);
+    const maoDele = (await ver(apVez)).partida.mao;
+    const da = RECURSOS.find((r) => maoDele[r] > 0);
+    if (da) {
+      const quer = RECURSOS.find((r) => r !== da);
+      await jogar(apVez, { tipo: 'oferecer', da: { [da]: 1 }, quer: { [quer]: 1 } });
+      await esperar('.catan-oferta .catan-oferta-barra', 5000);
+      await esperarQue(`/recusa sozinha em (1[0-2]) s/.test(document.querySelector('.catan-oferta-tempo')?.textContent ?? '')`, { teto: 6000, oque: 'a contagem da troca andar' });
+      await foto('19f-catan-troca-recebida', 'Catan: a troca que chega, com as cartas desenhadas e os 15 s escorrendo.');
+      await esperarQue(historico('ninguém quis'), { teto: 20000, oque: 'a troca fechar sozinha' });
+      await esperarQue(`!document.querySelector('.catan-oferta')`, { teto: 3000, oque: 'a janela da troca sumir' });
+    } else log('aviso: quem está na vez não tem carta para oferecer — sem a foto da troca');
+
+    // --- a vez do TKP estoura: o jogo rola e passa por ele -----------------------------------
+    await robosAte((x) => x.partida.vez === eu && x.partida.fase === 'rolar', 'a vez do TKP para estourar');
+    await esperarQue(`!!document.querySelector('.catan-faixa-relogio.acabando')`, { teto: 40000, oque: 'o relógio ficar vermelho' });
+    await foto('19g-catan-acabando', 'Catan: os últimos 5 s da sua vez — o relógio fica vermelho (e tiquetaqueia, o que a foto não mostra).');
+    await esperarQue(historico('ficou sem tempo'), { teto: 15000, oque: '"ficou sem tempo" no Acontecendo' });
+    // Se o dado que o jogo rolou deu 7 e você tem mais de 7 cartas, o descarte também estoura
+    // (mais 30 s) — e só então o ladrão vai sozinho e a vez passa.
+    await esperarQue(`!document.querySelector('.catan-faixa.minha')`, { teto: 45000, oque: 'a vez passar sozinha' });
+    await foto('19h-catan-sem-tempo', 'Catan: a vez estourou — o jogo rolou e passou por você, e o Acontecendo diz.');
+
+    // --- o fim: os outros desistem, e a mesa fecha pela tela --------------------------------
+    for (const ap of ['Marina', 'Rafa']) await api(ap, 'POST', '/catan/mesa', { id, acao: 'desistir' }).catch((e) => log(e.message));
+    await esperar('.catan-fim', 10000);
+    await foto('19i-catan-fim', 'Catan: o fim, com o placar e o gráfico dos dados da partida.');
+    await clicar({ sel: '.catan-fim button', texto: 'Fechar a mesa' });
+    await esperarQue(`!document.querySelector('.tela-do-catan')`, { teto: 10000, oque: 'a mesa fechar' });
+    await sairDaConta();
+  });
 }
 
 // ---------------------------------------------------------------------------------------
