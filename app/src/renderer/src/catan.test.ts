@@ -4,7 +4,7 @@ import {
   centroDoHex, pontoDoCruzamento, pontasDaAresta, textoDoEvento, textoDoMonte, oQueTocarNoCatan, minhaMesaDoCatan,
   temTudo, CUSTOS, monteVazio, type ResumoDaMesaDoCatan,
   tempoRestante, segundosQueFaltam, deveTicar, meuPrazo, eventosNovos, oQueTocarNaPartida,
-  faixaDaVez, vezQueComecou, cartasQueChegaram,
+  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA,
   type Evento, type Partida, type JogadorNaPartida,
 } from './catan.ts';
 
@@ -176,9 +176,9 @@ test('o relógio no "Acontecendo": quem ficou sem tempo e o que o jogo fez', () 
 test('a faixa da vez: de quem é, o que falta e o relógio que conta — no 7, o do descarte', () => {
   const nome = (j: number) => ['TKP', 'Tava1', 'Gustavo'][j];
   assert.deepEqual(faixaDaVez(partida({ vez: 0, fase: 'rolar' }), nome),
-    { j: 0, titulo: 'Sua vez', detalhe: 'Role os dados para começar', minha: true, prazo: 50_000 });
+    { j: 0, titulo: 'Sua vez', detalhe: 'Role os dados para começar', minha: true, prazo: 50_000, total: 60_000 });
   assert.deepEqual(faixaDaVez(partida({ vez: 1 }), nome),
-    { j: 1, titulo: 'Vez de Tava1', detalhe: 'Construindo e trocando', minha: false, prazo: 50_000 });
+    { j: 1, titulo: 'Vez de Tava1', detalhe: 'Construindo e trocando', minha: false, prazo: 50_000, total: 60_000 });
   // Quem só assiste nunca tem a vez.
   assert.equal(faixaDaVez(partida({ vez: 0, eu: null }), nome)?.titulo, 'Vez de TKP');
   const sete = { fase: 'descartar' as const, vez: 1, relogio: { segundos: 60 as const, prazo: null, descarte: 70_000, pausa: 20_000 } };
@@ -188,6 +188,35 @@ test('a faixa da vez: de quem é, o que falta e o relógio que conta — no 7, o
   assert.deepEqual([espero.titulo, espero.detalhe, espero.minha], ['Saiu 7', 'Esperando Tava1 e Gustavo devolver cartas', false]);
   assert.equal(faixaDaVez(partida({ fase: 'fim' }), nome), null);
   assert.equal(faixaDaVez(partida({ vez: 0, relogio: null }), nome)?.prazo, null);
+});
+
+test('a troca para a vez: a faixa conta os 20 s de montar e os 15 s de resposta, e diz onde a vez parou', () => {
+  const nome = (j: number) => ['TKP', 'Tava1', 'Gustavo'][j];
+  const parado = { segundos: 60 as const, prazo: null, descarte: null, pausa: 23_000, trocas: 1 };
+  const montando = { relogio: parado, montagem: { prazo: 90_000 } };
+  assert.deepEqual(faixaDaVez(partida({ ...montando, vez: 0 }), nome),
+    { j: 0, titulo: 'Monte a sua troca', detalhe: 'Escolha as cartas · a vez está parada em 0:23', minha: true, prazo: 90_000, total: PRAZO_DA_MONTAGEM });
+  assert.equal(faixaDaVez(partida({ ...montando, vez: 1 }), nome)?.titulo, 'Tava1 está montando uma troca');
+  // Montando, o que corre contra você (e tiquetaqueia) são os 20 s da troca.
+  assert.equal(meuPrazo(partida({ ...montando, vez: 0 })), 90_000);
+
+  const oferta = { da: { trigo: 1 }, quer: { la: 1 }, respostas: {}, contras: {}, aberta: true, prazo: 80_000, parada: true } as unknown as Partida['oferta'];
+  const esperando = { relogio: parado, oferta, pode: { responder: true } } as Partial<Partida>;
+  const paraMim = faixaDaVez(partida({ ...esperando, vez: 1 }), nome)!;
+  assert.deepEqual([paraMim.titulo, paraMim.minha, paraMim.prazo, paraMim.total], ['Tava1 quer trocar com você', true, 80_000, PRAZO_DA_TROCA]);
+  const minha = faixaDaVez(partida({ ...esperando, vez: 0, pode: {} }), nome)!;
+  assert.deepEqual([minha.titulo, minha.minha], ['Esperando as respostas da troca', false]);
+  // Já respondi: a troca segue na faixa, mas não é mais comigo.
+  const respondi = { ...oferta!, respostas: { 0: 'recusa' as const } };
+  assert.equal(faixaDaVez(partida({ ...esperando, oferta: respondi, vez: 1 }), nome)?.titulo, 'Troca de Tava1');
+  // A oferta que corre junto com a vez (das trocas além das que param o relógio) não muda a faixa.
+  const corrida = { ...oferta!, parada: false };
+  assert.equal(faixaDaVez(partida({ oferta: corrida, pode: { responder: true }, vez: 1 }), nome)?.titulo, 'Vez de Tava1');
+
+  assert.equal(vezParada(partida({ relogio: parado })), '0:23');
+  assert.equal(vezParada(partida()), null);
+  assert.equal(textoDoEvento({ t: 'montagemVenceu', j: 1, rodada: 2 }, nome, 0), 'O tempo de Tava1 para montar a troca acabou.');
+  assert.equal(textoDoEvento({ t: 'montagemVenceu', j: 0, rodada: 2 }, nome, 0), 'Seu tempo para montar a troca acabou.');
 });
 
 test('o aviso no meio: a vez que muda de mão e o começo da partida — nunca na primeira leitura', () => {

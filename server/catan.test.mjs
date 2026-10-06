@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GEOMETRIA, POSICOES, RECURSOS, CUSTOS, ErroDeJogo, novaPartida, sortearTabuleiro, agir, sair, vista,
-  tamanhoDaEstrada, taxas, pontos, chaveDoHex, ligarRelogio, vencerPrazos, PRAZO_DA_TROCA,
+  tamanhoDaEstrada, taxas, pontos, chaveDoHex, ligarRelogio, vencerPrazos, PRAZO_DA_TROCA, PRAZO_DA_MONTAGEM, TROCAS_COM_RELOGIO_PARADO,
 } from './catan.mjs';
 
 const G = GEOMETRIA;
@@ -591,7 +591,7 @@ const cartasNaMao = (p, j) => RECURSOS.reduce((s, r) => s + p.jogadores[j].mao[r
 
 test('relógio na colocação: estourou, aldeia e estrada num lugar que vale, e a vez seguinte ganha o tempo inteiro', () => {
   const p = novaPartida(3, { tabuleiro: tabuleiroDoManual(), sorteio: semente(3), segundos: 60, agora: 0 });
-  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: 60_000, descarte: null, pausa: null });
+  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: 60_000, descarte: null, pausa: null, trocas: 0 });
   vencerPrazos(p, 59_999, semente(4));
   assert.equal(Object.keys(p.construcoes).length, 0);
   vencerPrazos(p, 60_000, semente(4));
@@ -652,7 +652,7 @@ test('relógio no 7: o descarte tem prazo próprio, a vez espera parada, e quem 
   dar(p, 0, { minerio: 8 });          // 8 → descarta 4
   agir(p, 0, { tipo: 'rolar' }, dados(3, 4), 20_000);
   assert.equal(p.fase, 'descartar');
-  assert.deepEqual(vista(p, 2).relogio, { segundos: 60, prazo: null, descarte: 80_000, pausa: 40_000 });
+  assert.deepEqual(vista(p, 2).relogio, { segundos: 60, prazo: null, descarte: 80_000, pausa: 40_000, trocas: 0 });
   agir(p, 1, { tipo: 'descartar', recursos: { madeira: 4 } }, Math.random, 30_000);
   vencerPrazos(p, 79_999);
   assert.equal(p.fase, 'descartar');
@@ -680,7 +680,7 @@ test('relógio no 7 que ele mesmo rolou: o descarte dos outros, o ladrão e a ve
   dar(p, 1, { madeira: 5, la: 4 });
   vencerPrazos(p, 60_000, fixo((3 - 0.5) / 6, (4 - 0.5) / 6));
   assert.equal(p.fase, 'descartar');
-  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: null, descarte: 120_000, pausa: 0 });
+  assert.deepEqual(vista(p, 0).relogio, { segundos: 60, prazo: null, descarte: 120_000, pausa: 0, trocas: 0 });
   // Quem estourou não tem mais tempo: acabado o descarte, o ladrão sai no mesmo instante.
   vencerPrazos(p, 120_000, semente(10));
   assert.deepEqual(eventos(p, 'tempo').map((e) => [e.j, e.fase]), [[0, 'rolar'], [1, 'descartar'], [0, 'ladrao']]);
@@ -726,17 +726,120 @@ test('relógio na carta de estradas: para onde estava, e a vez passa', () => {
   assert.equal(p.estradasGratis, 0);
 });
 
-test('relógio nas ações com uma oferta aberta: a oferta vai junto com a vez', () => {
+test('relógio nas ações com uma oferta aberta: a vez espera parada, e volta com o que sobrava', () => {
   const p = comRelogio();
   p.fase = 'acoes';
   dar(p, 0, { trigo: 1 });
   agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 50_000);
   assert.equal(vista(p, 1).oferta.prazo, 50_000 + PRAZO_DA_TROCA);
-  vencerPrazos(p, 60_000);
+  assert.deepEqual([p.relogio.prazo, p.relogio.pausa], [null, 10_000]);
+  vencerPrazos(p, 60_000);   // era o fim da vez: parada, ela não acaba
+  assert.equal(p.vez, 0);
+  vencerPrazos(p, 65_000);   // ninguém respondeu: a oferta fecha, e a vez volta com os 10 s
   assert.equal(p.oferta, null);
+  assert.equal(p.relogio.prazo, 75_000);
+  vencerPrazos(p, 75_000);
   assert.equal(p.vez, 1);
   assert.deepEqual(eventos(p, 'tempo'), [{ t: 'tempo', j: 0, fase: 'acoes', rodada: 1 }]);
   assert.equal(p.jogadores[0].mao.trigo, 1);
+});
+
+test('montar a troca: 20 s com a vez parada, oferecer leva aos 15 s ainda parada, e a vez volta inteira', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  dar(p, 0, { trigo: 1 });
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 50_000);
+  assert.deepEqual(vista(p, 0).montagem, { prazo: 50_000 + PRAZO_DA_MONTAGEM });
+  assert.deepEqual(vista(p, 1).relogio, { segundos: 60, prazo: null, descarte: null, pausa: 10_000, trocas: 1 });
+  // Passa do fim da vez montando: nada acontece.
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 65_000);
+  assert.equal(p.montagem, null);
+  assert.deepEqual([p.vez, p.relogio.prazo, p.relogio.trocas], [0, null, 1]);   // a mesma troca: não gasta outra
+  vencerPrazos(p, 80_000);
+  assert.equal(p.oferta, null);
+  assert.equal(p.relogio.prazo, 90_000);
+  vencerPrazos(p, 89_999);
+  assert.equal(p.vez, 0);
+  vencerPrazos(p, 90_000);
+  assert.equal(p.vez, 1);
+  assert.equal(vista(p, 1).montagem, null);
+});
+
+test('os 20 s de montar acabaram, ou quem montou desistiu: a janela fecha e a vez volta de onde parou', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 50_000);
+  vencerPrazos(p, 50_000 + PRAZO_DA_MONTAGEM - 1);
+  assert.ok(p.montagem);
+  vencerPrazos(p, 50_000 + PRAZO_DA_MONTAGEM);
+  assert.equal(p.montagem, null);
+  assert.deepEqual(p.historico.at(-1), { t: 'montagemVenceu', j: 0, rodada: 1 });
+  assert.equal(p.relogio.prazo, 80_000);
+
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 75_000);
+  agir(p, 0, { tipo: 'desistirDaTroca' }, Math.random, 77_000);
+  assert.equal(p.montagem, null);
+  assert.equal(p.relogio.prazo, 82_000);
+  assert.throws(() => agir(p, 1, { tipo: 'montarTroca' }, Math.random, 78_000), recusa(/vez/));
+  // Desistir fora da vez (a janela fechou junto com o "passar") não recusa nem mexe em nada.
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 79_000);
+  agir(p, 1, { tipo: 'desistirDaTroca' }, Math.random, 79_500);
+  assert.ok(p.montagem);
+});
+
+test('todos responderam: a oferta fecha na hora, sem esperar o resto dos 15 s', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  dar(p, 0, { trigo: 2 }); dar(p, 1, { la: 1 });
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 10_000);
+  agir(p, 1, { tipo: 'responder', resposta: 'recusa' }, Math.random, 11_000);
+  assert.ok(p.oferta?.aberta);
+  agir(p, 2, { tipo: 'responder', resposta: 'recusa' }, Math.random, 12_000);
+  assert.equal(p.oferta, null);
+  assert.deepEqual(p.historico.at(-1), { t: 'ofertaVenceu', j: 0, rodada: 1 });
+  assert.equal(p.relogio.prazo, 62_000);
+
+  // Com um aceite, ela fica para quem ofereceu fechar — já no tempo da vez.
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 20_000);
+  agir(p, 1, { tipo: 'responder', resposta: 'aceita' }, Math.random, 21_000);
+  agir(p, 2, { tipo: 'responder', resposta: 'recusa' }, Math.random, 22_000);
+  assert.equal(p.oferta.aberta, false);
+  assert.equal(p.relogio.prazo, 64_000);
+  agir(p, 0, { tipo: 'fecharTroca', com: 1 }, Math.random, 23_000);
+  assert.equal(p.jogadores[0].mao.la, 1);
+  conferirCartas(p);
+});
+
+test(`até ${TROCAS_COM_RELOGIO_PARADO} trocas por vez param o relógio; as outras correm junto com a vez`, () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  dar(p, 0, { trigo: 1 });
+  for (let k = 0; k < TROCAS_COM_RELOGIO_PARADO; k++) {
+    agir(p, 0, { tipo: 'montarTroca' }, Math.random, 10_000);
+    agir(p, 0, { tipo: 'desistirDaTroca' }, Math.random, 10_000);
+  }
+  assert.equal(p.relogio.trocas, TROCAS_COM_RELOGIO_PARADO);
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 10_000);
+  assert.equal(p.montagem, null);
+  assert.equal(p.relogio.prazo, 60_000);
+  agir(p, 0, { tipo: 'oferecer', da: { trigo: 1 }, quer: { la: 1 } }, Math.random, 50_000);
+  assert.equal(p.oferta.parada, false);
+  assert.equal(p.relogio.prazo, 60_000);
+  vencerPrazos(p, 60_000);   // a oferta vai junto com a vez, como era antes
+  assert.equal(p.vez, 1);
+  assert.equal(p.oferta, null);
+  assert.equal(p.relogio.trocas, 0);   // a vez nova tem as dela
+});
+
+test('a carta jogada com a janela de troca aberta fecha a montagem', () => {
+  const p = comRelogio();
+  p.fase = 'acoes';
+  p.jogadores[0].cartas.push({ tipo: 'cavaleiro', turno: 0 });
+  agir(p, 0, { tipo: 'montarTroca' }, Math.random, 10_000);
+  agir(p, 0, { tipo: 'cavaleiro' }, Math.random, 12_000);
+  assert.equal(p.fase, 'ladrao');
+  assert.equal(p.montagem, null);
+  assert.equal(p.relogio.prazo, 62_000);   // os 2 s com a janela aberta não contaram
 });
 
 test('troca: 15 s para responder; ninguém quis, ela fecha; alguém aceitou, fica para quem ofereceu fechar', () => {
@@ -798,7 +901,8 @@ test('partidas de robôs que dormem: o relógio joga por eles e a regra continua
       const r = p.relogio;
       if (rnd() < 0.12) {
         // Dormiu: ninguém mexe até o próximo prazo passar — às vezes, mais umas vezes inteiras.
-        const proximo = Math.min(r.prazo ?? Infinity, r.descarte ?? Infinity, p.oferta?.aberta ? p.oferta.prazo : Infinity);
+        const proximo = Math.min(r.prazo ?? Infinity, r.descarte ?? Infinity, p.oferta?.aberta ? p.oferta.prazo : Infinity,
+          p.montagem?.prazo ?? Infinity);
         agora = proximo + Math.floor(rnd() * 3) * r.segundos * 1000;
         vencerPrazos(p, agora, rnd);
       } else {
@@ -819,6 +923,10 @@ test('partidas de robôs que dormem: o relógio joga por eles e a regra continua
           const com = Object.entries(p.oferta.respostas).find(([, x]) => x === 'aceita' || x === 'contra');
           quem = p.vez;
           acao = com ? { tipo: 'fecharTroca', com: Number(com[0]), contra: com[1] === 'contra' } : { tipo: 'cancelarOferta' };
+        } else if (p.fase === 'acoes' && !p.oferta && rnd() < 0.08) {
+          // Abre a janela de troca, ou fecha sem oferecer: o relógio para e volta.
+          quem = p.vez;
+          acao = { tipo: p.montagem && rnd() < 0.5 ? 'desistirDaTroca' : 'montarTroca' };
         } else if (p.fase === 'acoes' && !p.oferta && rnd() < 0.1 && RECURSOS.some((x) => p.jogadores[p.vez].mao[x] > 0)) {
           quem = p.vez;
           const da = escolher(RECURSOS.filter((x) => p.jogadores[p.vez].mao[x] > 0));
@@ -835,8 +943,12 @@ test('partidas de robôs que dormem: o relógio joga por eles e a regra continua
       }
       conferirPasso(p, s);
       if (p.fase !== 'fim') {
-        const prazos = [p.relogio.prazo, p.relogio.descarte, p.oferta?.aberta ? p.oferta.prazo : null].filter((x) => x !== null);
-        assert.ok(p.relogio.prazo !== null || (p.fase === 'descartar' && p.relogio.descarte !== null), `semente ${s}: partida parada`);
+        const prazos = [p.relogio.prazo, p.relogio.descarte, p.oferta?.aberta ? p.oferta.prazo : null, p.montagem?.prazo ?? null]
+          .filter((x) => x !== null);
+        // Parada só com um prazo próprio correndo: o do 7, o de montar a troca, o da resposta.
+        const esperando = (p.fase === 'descartar' && p.relogio.descarte !== null) || !!p.montagem?.prazo
+          || (!!p.oferta?.aberta && p.oferta.prazo !== null);
+        assert.ok(p.relogio.prazo !== null || esperando, `semente ${s}: partida parada`);
         assert.ok(prazos.every((x) => x > agora), `semente ${s}: prazo vencido ficou para trás`);
       }
     }

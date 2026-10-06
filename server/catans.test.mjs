@@ -185,7 +185,7 @@ test('o tempo da vez: 60 de saída, só quem abriu escolhe, só 30 ou 60, e fica
   assert.equal(t.mesas.ver(t.como(TAVA), id).segundos, 30);
   const { mesa } = t.mesas.agir(t.como(TKP), { id, acao: 'comecar' });
   assert.equal(mesa.segundos, 30);
-  assert.deepEqual(mesa.partida.relogio, { segundos: 30, prazo: mesa.agora + 30_000, descarte: null, pausa: null });
+  assert.deepEqual(mesa.partida.relogio, { segundos: 30, prazo: mesa.agora + 30_000, descarte: null, pausa: null, trocas: 0 });
   assert.throws(() => t.mesas.agir(t.como(TKP), { id, acao: 'tempo', segundos: 60 }), recusa(409));
   t.mesas.agir(t.como(TAVA), { id, acao: 'desistir' });
   const { mesa: deNovo } = t.mesas.agir(t.como(TKP), { id, acao: 'jogarDeNovo' });

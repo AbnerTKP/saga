@@ -341,6 +341,32 @@ A e C. Depois pediu o aviso no meio — "mostrando, não falando".
   rodada, o dado do relógio deu 7 e o ladrão foi sozinho). **Não foi exercido**: o DESCARTE vencendo
   na tela (só nos testes do servidor); nenhum som foi ouvido; o Electron; o Windows.
 
+### A troca para o relógio (06/10/2026)
+
+Pedido do dono, jogando: "a troca de cartas deve pausar o tempo da rodada e começar a contar o tempo
+da troca", e logo depois "ao abrir a aba de troca eu quero poder ter um tempo também, está passando
+muito rápido: 20 segundos para definir a troca, e depois o tempo para aceitarem ou recusarem".
+
+- **Abrir a janela de troca PARA o relógio da vez e dá 20 s para montar** (`montarTroca`); oferecer
+  leva aos 15 s de resposta, ainda parado; quando a troca fecha para respostas, a vez volta com o que
+  sobrava — o mesmo `pausa` do 7. Fechar a janela sem oferecer (`desistirDaTroca`) devolve o relógio
+  na hora; os 20 s vencendo fecham a janela sozinhos ("Seu tempo para montar a troca acabou"). A tela
+  avisa o servidor pela MUDANÇA da janela, num lugar só, para nenhum caminho de fechar (cancelar,
+  Esc, outra janela, "passar a vez") esquecer de devolver o relógio — e o `desistirDaTroca` não
+  recusa nada, porque fechar pode chegar junto com o "passar" que já levou a vez embora.
+- **Até 3 trocas por vez param o relógio** (`TROCAS_COM_RELOGIO_PARADO`) — escolha minha, dita ao
+  dono. Sem limite, abrir e fechar a janela seguraria a partida para sempre; da quarta em diante a
+  troca continua valendo, correndo junto com a vez, como era antes. A oferta que chega sem montagem
+  (o app antigo, que não avisa quando a janela abre) também para o relógio e gasta uma das três.
+- **Todos responderam, a oferta fecha na hora**, sem esperar o resto dos 15 s: com o relógio da vez
+  parado, esperar à toa seria tempo de ninguém.
+- **A faixa da vez conta o tempo da troca** enquanto ela para a vez ("Monte a sua troca", "Tava1
+  quer trocar com você"), e diz onde a vez parou ("a vez está parada em 0:23"); a janela de troca
+  ganhou a mesma barra e os mesmos segundos da oferta. Nenhuma peça nova de tela: é o desenho que a
+  oferta já tinha.
+- **O limite de cartas no 7 FICA.** O dono pediu para tirar ("tire o limite de cartas") e, minutos
+  depois, voltou atrás: "deixa do jeito que tá". Quem tem mais de 7 continua devolvendo metade.
+
 - **A mesa vive na MEMÓRIA do servidor, como as do xadrez**: publicar o servidor com gente jogando
   encerra a partida. Uma partida de Catan dura uma hora; se isso incomodar, é guardar no banco.
 - **Anda por HTTP, perguntando de 800 em 800 ms**, como o xadrez: é jogo de turno, poucas ações por

@@ -42,6 +42,8 @@ export const TEMPOS_DA_VEZ: { segundos: SegundosDaVez; rotulo: string }[] = [
 ];
 /** Quanto a troca fica aberta para resposta — fixo no servidor. */
 export const PRAZO_DA_TROCA = 15_000;
+/** Quanto se tem para montar a troca, da hora em que a janela abre — fixo no servidor. */
+export const PRAZO_DA_MONTAGEM = 20_000;
 
 export type PessoaNoCatan = { id: number; nome: string; foto: string | null; idExibido: string | null };
 
@@ -83,6 +85,8 @@ export type Evento =
   | { t: 'tempo'; j: number; fase: Exclude<Fase, 'fim'>; rodada: number }
   /** Os 15 s da troca de `j` passaram sem ninguém aceitar nem propor outra: ela fechou. */
   | { t: 'ofertaVenceu'; j: number; rodada: number }
+  /** Os 20 s de `j` montar a troca passaram sem oferta: a janela fechou. */
+  | { t: 'montagemVenceu'; j: number; rodada: number }
   | { t: 'venceu'; j: number; porAbandono?: true; rodada: number };
 
 export type JogadorNaPartida = {
@@ -128,7 +132,14 @@ export type Partida = {
     aberta: boolean;
     /** Instante (relógio do servidor) em que acabam os 15 s; null em partida sem relógio. */
     prazo: number | null;
+    /** Enquanto ela espera resposta, o relógio da vez está parado. Servidor antigo não manda. */
+    parada?: boolean;
   } | null;
+  /**
+   * Quem está na vez abriu a janela de troca: até `prazo` para montar, com o relógio da vez
+   * parado. Servidor antigo não manda — aí não há montagem nenhuma.
+   */
+  montagem?: { prazo: number } | null;
   /**
    * O relógio da vez. Os prazos são INSTANTES do relógio do servidor, comparáveis com o `agora`
    * da mesa — nunca com o relógio deste computador (ver `tempoRestante`).
@@ -139,8 +150,10 @@ export type Partida = {
     prazo: number | null;
     /** Quando acaba o descarte do 7, para todos que devem; só na fase 'descartar'. */
     descarte: number | null;
-    /** O que sobrava da vez de quem rolou o 7, parado enquanto os outros descartam. */
+    /** O que sobrava da vez, parado — enquanto os outros descartam no 7, ou durante a troca. */
     pausa: number | null;
+    /** Quantas trocas desta vez já pararam o relógio. */
+    trocas?: number;
   } | null;
   historico: Evento[];
   vencedor: number | null;
@@ -184,7 +197,7 @@ export type ConviteDeCatan = {
 export type CatanNoServidor = { mesas: ResumoDaMesaDoCatan[]; convites: ConviteDeCatan[] };
 
 export type Jogada =
-  | { tipo: 'rolar' | 'passar' | 'comprar' | 'cavaleiro' | 'estradas' | 'pararEstradas' | 'cancelarOferta' }
+  | { tipo: 'rolar' | 'passar' | 'comprar' | 'cavaleiro' | 'estradas' | 'pararEstradas' | 'cancelarOferta' | 'montarTroca' | 'desistirDaTroca' }
   | { tipo: 'aldeia' | 'cidade'; v: string }
   | { tipo: 'estrada'; a: string }
   | { tipo: 'descartar'; recursos: Partial<Monte> }
@@ -302,6 +315,7 @@ export function textoDoEvento(e: Evento, nome: (j: number) => string, eu: number
       return `${Q(e.j)} ficou sem tempo, e ${fez[e.fase] ?? 'a vez passou'}.`;
     }
     case 'ofertaVenceu': return `${e.j === eu ? 'Sua troca' : `A troca de ${nome(e.j)}`} fechou: ninguém quis.`;
+    case 'montagemVenceu': return `${e.j === eu ? 'Seu tempo' : `O tempo de ${nome(e.j)}`} para montar a troca acabou.`;
     case 'venceu': return e.porAbandono ? `${Q(e.j)} venceu: os outros saíram.` : `${Q(e.j)} venceu a partida!`;
   }
   return null;
@@ -392,7 +406,17 @@ export function meuPrazo(p: Partida): number | null {
   const eu = p.eu;
   if (eu === null || !p.relogio || p.fase === 'fim' || p.jogadores[eu]?.fora) return null;
   if (p.fase === 'descartar') return p.jogadores[eu].descartar > 0 ? p.relogio.descarte : null;
+  // Montando a troca, o que corre contra você são os 20 s dela; a vez está parada.
+  if (p.vez === eu && p.montagem) return p.montagem.prazo;
   return p.vez === eu ? p.relogio.prazo : null;
+}
+
+/** "0:23": o que sobrava da vez, parado durante o 7 ou a troca. Sem pausa, null. */
+export function vezParada(p: Partida): string | null {
+  const ms = p.relogio?.pausa;
+  if (ms === null || ms === undefined) return null;
+  const s = segundosQueFaltam(ms);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 // --- a vez na tela ------------------------------------------------------------------
@@ -409,6 +433,8 @@ export type FaixaDaVez = {
   minha: boolean;
   /** O prazo que a faixa conta (relógio do servidor); sem relógio, nenhum. */
   prazo: number | null;
+  /** O tempo inteiro desse prazo, em ms: a barra esvazia a partir dele. */
+  total: number;
 };
 
 /**
@@ -428,9 +454,36 @@ export function faixaDaVez(p: Partida, nome: (j: number) => string): FaixaDaVez 
       detalhe: devo > 0 ? 'Escolha as cartas que voltam ao banco' : `Esperando ${juntar(devendo)} devolver cartas`,
       minha: devo > 0,
       prazo: p.relogio?.descarte ?? null,
+      total: (p.relogio?.segundos ?? 60) * 1000,
     };
   }
   const minha = eu !== null && p.vez === eu;
+  // A troca para a vez (pedido do dono, 06/10/2026): a faixa conta o tempo dela, e diz quanto a
+  // vez guardou para depois.
+  const parada = vezParada(p);
+  const guardada = parada ? `a vez está parada em ${parada}` : null;
+  if (p.fase === 'acoes' && p.montagem) {
+    return {
+      j: p.vez,
+      titulo: minha ? 'Monte a sua troca' : `${nome(p.vez)} está montando uma troca`,
+      detalhe: guardada ? `Escolha as cartas · ${guardada}` : 'Escolha as cartas',
+      minha,
+      prazo: p.montagem.prazo,
+      total: PRAZO_DA_MONTAGEM,
+    };
+  }
+  const o = p.oferta;
+  if (p.fase === 'acoes' && o?.aberta && o.parada && o.prazo !== null) {
+    const devoResposta = eu !== null && !minha && !!p.pode.responder && !o.respostas[eu];
+    return {
+      j: p.vez,
+      titulo: minha ? 'Esperando as respostas da troca' : devoResposta ? `${nome(p.vez)} quer trocar com você` : `Troca de ${nome(p.vez)}`,
+      detalhe: guardada ? `Aceitar ou recusar · ${guardada}` : 'Aceitar ou recusar',
+      minha: devoResposta,
+      prazo: o.prazo,
+      total: PRAZO_DA_TROCA,
+    };
+  }
   const n = p.estradasGratis;
   const detalhe: Record<Exclude<Fase, 'fim' | 'descartar'>, [string, string]> = {
     inicio: p.inicio?.falta === 'estrada' ? ['Ponha a estrada, saindo da aldeia', 'Pondo a estrada'] : ['Clique num cruzamento para pôr a aldeia', 'Pondo uma aldeia'],
@@ -445,6 +498,7 @@ export function faixaDaVez(p: Partida, nome: (j: number) => string): FaixaDaVez 
     detalhe: detalhe[p.fase][minha ? 0 : 1],
     minha,
     prazo: p.relogio?.prazo ?? null,
+    total: (p.relogio?.segundos ?? 60) * 1000,
   };
 }
 

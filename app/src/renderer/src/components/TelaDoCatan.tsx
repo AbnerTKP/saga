@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { agirNaMesaDoCatan, verMesaDoCatan, type Membro } from '../api';
 import {
   CUSTOS, COR_DO_JOGADOR, NOME_DA_CARTA, NOME_DO_RECURSO, O_QUE_A_CARTA_FAZ, RECURSOS,
-  PRAZO_DA_TROCA, TEMPOS_DA_VEZ,
+  PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, TEMPOS_DA_VEZ,
   cartasQueChegaram, centroDoHex, chaveDoHex, deveTicar, faixaDaVez, hexesQueProduziram, lerHex, meuPrazo, monteVazio, oQueEspera, oQueTocarNaPartida,
-  pontasDaAresta, pontoDoCruzamento, segundosQueFaltam, somaDoMonte, tempoRestante, temTudo, textoDoEvento, textoDoMonte, vezQueComecou,
+  pontasDaAresta, pontoDoCruzamento, segundosQueFaltam, somaDoMonte, tempoRestante, temTudo, textoDoEvento, textoDoMonte, vezParada, vezQueComecou,
   type AcaoNaMesaDoCatan, type CartaDeDesenvolvimento, type Jogada, type MesaDoCatan, type Monte, type Partida,
   type FaixaDaVez as Faixa, type PessoaNoCatan, type Recurso,
 } from '../catan';
@@ -333,6 +333,30 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar,
   const [modo, setModo] = useState<Modo>(null);
   const [janela, setJanela] = useState<Janela>(null);
 
+  // A janela de troca de quem está na vez para o relógio dela (pedido do dono, 06/10/2026): abrir
+  // avisa o servidor, que dá 20 s para montar; fechar sem oferecer — por qualquer caminho: o
+  // "cancelar", o Esc, outra janela, o "passar a vez" — devolve o relógio. Num lugar só, pela
+  // MUDANÇA da janela, para nenhum caminho de fechar esquecer de avisar.
+  const montando = useRef(false);
+  montando.current = minhaVez && !!p.montagem;
+  const trocaAberta = janela?.tipo === 'troca' && !janela.contra;
+  const eraTroca = useRef(false);
+  useEffect(() => {
+    if (trocaAberta && !eraTroca.current) onJogar({ tipo: 'montarTroca' });
+    if (!trocaAberta && eraTroca.current && montando.current) onJogar({ tipo: 'desistirDaTroca' });
+    eraTroca.current = trocaAberta;
+  }, [trocaAberta, onJogar]);
+  // Os 20 s acabaram no servidor: a janela fecha sozinha. Oferecer também tira a montagem, mas aí
+  // há oferta, e a janela já fechou por conta própria.
+  const prazoDaMontagem = p.montagem?.prazo ?? null;
+  const montagemAntes = useRef(prazoDaMontagem);
+  useEffect(() => {
+    if (montagemAntes.current !== null && prazoDaMontagem === null && !p.oferta) {
+      setJanela((j) => (j?.tipo === 'troca' && !j.contra ? null : j));
+    }
+    montagemAntes.current = prazoDaMontagem;
+  }, [prazoDaMontagem, p.oferta]);
+
   // Os dados rolam na tela a cada rolagem nova — inclusive a dos outros —, e o som vai junto.
   const rolagens = useRef(p.rolagens);
   const [rolando, setRolando] = useState(false);
@@ -463,7 +487,7 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar,
           )}
           {p.pode.descartar && <Descarte mao={p.mao!} quantas={p.pode.descartar} ocupado={ocupado} onJogar={onJogar} />}
           {janela?.tipo === 'troca' && (
-            <Troca partida={p} nome={nome} ocupado={ocupado} aba={janela.aba} contra={!!janela.contra}
+            <Troca partida={p} nome={nome} ocupado={ocupado} aba={janela.aba} contra={!!janela.contra} base={base}
               onAba={(aba) => setJanela({ ...janela, aba })} onJogar={onJogar} onFechar={() => setJanela(null)} />
           )}
           {souQuemOferece && janela?.tipo !== 'troca' && (
@@ -549,7 +573,7 @@ function FaixaDaVez({ faixa, partida: p, pessoa, base }: {
   faixa: Faixa; partida: Partida; pessoa?: PessoaNoCatan; base: BaseDoRelogio;
 }) {
   const ms = useRestante(faixa.prazo, base);
-  const total = (p.relogio?.segundos ?? 60) * 1000;
+  const total = faixa.total;
   const cor = COR_DO_JOGADOR[p.jogadores[faixa.j].cor];
   const s = ms === null ? null : segundosQueFaltam(ms);
   return (
@@ -768,10 +792,13 @@ function Escolher({ valor, limite, onMudar }: { valor: Monte; limite?: Partial<M
 // As janelas sobre o tabuleiro.
 // ---------------------------------------------------------------------------------------------
 
-function Troca({ partida: p, nome, ocupado, aba, contra, onAba, onJogar, onFechar }: {
+function Troca({ partida: p, nome, ocupado, aba, contra, base, onAba, onJogar, onFechar }: {
   partida: Partida; nome: (j: number) => string; ocupado: boolean; aba: 'jogadores' | 'banco'; contra: boolean;
-  onAba: (a: 'jogadores' | 'banco') => void; onJogar: (j: Jogada) => Promise<boolean>; onFechar: () => void;
+  base: BaseDoRelogio; onAba: (a: 'jogadores' | 'banco') => void; onJogar: (j: Jogada) => Promise<boolean>; onFechar: () => void;
 }) {
+  // Os 20 s de montar, com a mesma barra e os mesmos segundos da oferta.
+  const ms = useRestante(!contra ? p.montagem?.prazo : null, base);
+  const parada = vezParada(p);
   const mao = p.mao ?? monteVazio();
   // A contraproposta começa pelo avesso da oferta: o que ele pede é o que você daria.
   const [da, setDa] = useState<Monte>(() => (contra && p.oferta ? { ...p.oferta.quer } : monteVazio()));
@@ -783,8 +810,10 @@ function Troca({ partida: p, nome, ocupado, aba, contra, onAba, onJogar, onFecha
 
   return (
     <div className="catan-janela catan-troca">
+      {ms !== null && <i className="catan-oferta-barra" style={{ width: `${Math.min(1, ms / PRAZO_DA_MONTAGEM) * 100}%` }} />}
       <div className="catan-janela-cabeca">
         <span className="catan-janela-titulo">{contra ? `Propor outra troca a ${nome(p.vez)}` : 'Trocar'}</span>
+        {ms !== null && <span className="catan-oferta-tempo">{segundosQueFaltam(ms)} s{parada ? ` · vez parada em ${parada}` : ''}</span>}
         {!contra && taxas && (
           <span className="catan-abas">
             <button type="button" className={aba === 'jogadores' ? 'primary sm' : 'secundario sm'} onClick={() => onAba('jogadores')}>Com os jogadores</button>

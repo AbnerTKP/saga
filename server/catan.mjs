@@ -26,6 +26,14 @@ export const LIMITE_DA_MAO = 7;
 export const TEMPOS_DA_VEZ = [30, 60];
 /** Quanto uma oferta de troca espera resposta: passou disso, quem não respondeu recusou. */
 export const PRAZO_DA_TROCA = 15_000;
+/** Quanto se tem para montar a troca, da hora em que a janela abre (pedido do dono, 06/10/2026). */
+export const PRAZO_DA_MONTAGEM = 20_000;
+/**
+ * Quantas trocas por vez param o relógio da vez. Montar e esperar a resposta não gastam o tempo da
+ * vez — e sem um limite, abrir e fechar a janela seguraria a partida para sempre. Da quarta em
+ * diante a troca continua valendo, só que correndo junto com a vez, como era antes.
+ */
+export const TROCAS_COM_RELOGIO_PARADO = 3;
 /**
  * Quantos prazos uma leitura vence de uma vez, no máximo. Com a Saga aberta alguém pergunta pela
  * mesa a cada segundo e vence um prazo por vez; a cascata é de quando ninguém perguntou por um
@@ -199,6 +207,7 @@ export function novaPartida(n, { sorteio = Math.random, tabuleiro = sortearTabul
     estradasGratis: 0,
     desenvolvimentoNoTurno: false,
     oferta: null,
+    montagem: null,       // { prazo }: quem está na vez abriu a janela de troca
     maiorEstrada: null,   // { j, tamanho }
     maiorExercito: null,  // { j, tamanho }
     historico: [],
@@ -370,6 +379,7 @@ function proximaVez(p) {
   p.dados = null;
   p.desenvolvimentoNoTurno = false;
   p.oferta = null;
+  p.montagem = null;
   p.estradasGratis = 0;
   conferirVitoria(p);
 }
@@ -655,6 +665,27 @@ const acoes = {
     anotar(p, { t: 'banco', j, da, quer, taxa });
   },
 
+  /**
+   * Quem está na vez abriu a janela de troca: 20 s para montar, com o relógio da vez parado —
+   * enquanto houver troca com o relógio parado sobrando nesta vez. Sem sobra (ou sem relógio), a
+   * janela abre do mesmo jeito e nada para.
+   */
+  montarTroca(p, j, _acao, _sorteio, agora) {
+    exigirVez(p, j);
+    exigirFase(p, 'acoes');
+    // Com uma oferta sua ainda na mesa, a janela abre sem parar nada: o relógio já está com ela.
+    if (p.oferta || p.montagem || !gastarTrocaComRelogioParado(p)) return;
+    p.montagem = { prazo: agora + PRAZO_DA_MONTAGEM };
+  },
+
+  /**
+   * Fechou a janela sem oferecer: o relógio da vez volta de onde parou. Não recusa nada — a tela o
+   * manda ao fechar a janela, e fechar pode vir junto com "passar a vez", que já levou a vez embora.
+   */
+  desistirDaTroca(p, j) {
+    if (p.vez === j) p.montagem = null;
+  },
+
   oferecer(p, j, { da, quer }, _sorteio, agora) {
     exigirVez(p, j);
     exigirFase(p, 'acoes');
@@ -662,9 +693,13 @@ const acoes = {
     exigir(soma(dou) > 0 && soma(peco) > 0, 'A troca precisa de cartas dos dois lados.');
     exigir(RECURSOS.every((r) => !(dou[r] && peco[r])), 'Não dá para dar e pedir o mesmo recurso.');
     exigir(temTudo(p.jogadores[j].mao, dou), 'Você não tem essas cartas.');
+    // Quem montou com o relógio parado oferece com ele parado. A oferta sem montagem é a do app
+    // antigo, que não avisa quando a janela abre: ela gasta uma troca com o relógio parado aqui.
+    const parada = !!p.montagem || gastarTrocaComRelogioParado(p);
+    p.montagem = null;
     p.oferta = {
       da: dou, quer: peco, respostas: {}, contras: {},
-      aberta: true, prazo: p.relogio ? agora + PRAZO_DA_TROCA : null,
+      aberta: true, prazo: p.relogio ? agora + PRAZO_DA_TROCA : null, parada,
     };
     anotar(p, { t: 'ofereceu', j, da: dou, quer: peco });
   },
@@ -682,6 +717,7 @@ const acoes = {
     exigir(['aceita', 'recusa'].includes(resposta), 'Aceite ou recuse.');
     if (resposta === 'aceita') exigir(temTudo(p.jogadores[j].mao, p.oferta.quer), 'Você não tem o que ele pede.');
     p.oferta.respostas[j] = resposta;
+    fecharSeTodosResponderam(p);
   },
 
   /** Quem não está na vez propõe outra troca a quem está: `da` é o que ELE dá. */
@@ -695,6 +731,7 @@ const acoes = {
     exigir(temTudo(p.jogadores[j].mao, dou), 'Você não tem essas cartas.');
     p.oferta.contras[j] = { da: dou, quer: peco };
     p.oferta.respostas[j] = 'contra';
+    fecharSeTodosResponderam(p);
   },
 
   fecharTroca(p, j, { com, contra = false }) {
@@ -757,7 +794,10 @@ export function agir(p, j, acao, sorteio = Math.random, agora) {
 // - `relogio.descarte`: o 7. O descarte é de VÁRIOS ao mesmo tempo, e quem rolou não tem culpa da
 //   demora deles: enquanto ele dura, o relógio da vez fica parado (`pausa`, o que sobrava) e
 //   volta com o mesmo tanto quando o último descartar.
-// - `oferta.prazo`: 15 s fixos para responder à troca, correndo junto com o da vez.
+// - `montagem.prazo`: 20 s para montar a troca, da hora em que a janela abre.
+// - `oferta.prazo`: 15 s fixos para responder à troca.
+// Montar e esperar resposta PARAM o relógio da vez (pedido do dono, 06/10/2026: "a troca deve
+// pausar o tempo da rodada"), como o 7 — até `TROCAS_COM_RELOGIO_PARADO` trocas por vez.
 // ---------------------------------------------------------------------------------------------
 
 /** Quem está na vez, e em que passo dela. Mudou, a vez é outra e o relógio recomeça. */
@@ -773,11 +813,14 @@ function exigirHora(agora) {
  */
 export function ligarRelogio(p, segundos, agora) {
   if (!TEMPOS_DA_VEZ.includes(segundos)) throw new ErroDeJogo(`A vez é de ${TEMPOS_DA_VEZ.join(' ou de ')} segundos.`);
-  p.relogio = { segundos, chave: null, prazo: null, descarte: null, pausa: null };
+  p.relogio = { segundos, chave: null, prazo: null, descarte: null, pausa: null, trocas: 0 };
   acertarRelogio(p, agora);
 }
 
-/** Depois de toda mudança: vez nova recomeça o relógio; o 7 o pausa, e o fim do descarte o devolve. */
+/**
+ * Depois de toda mudança: vez nova recomeça o relógio; o 7 o pausa, e o fim do descarte o devolve.
+ * A troca também o pausa — montando, ou esperando resposta — e devolve o mesmo tanto no fim.
+ */
 function acertarRelogio(p, agora) {
   const r = p.relogio;
   if (!r) return;
@@ -788,12 +831,30 @@ function acertarRelogio(p, agora) {
   }
   const ms = r.segundos * 1000;
   const chave = chaveDaVez(p);
-  if (chave !== r.chave) Object.assign(r, { chave, prazo: agora + ms, descarte: null, pausa: null });
+  if (chave !== r.chave) Object.assign(r, { chave, prazo: agora + ms, descarte: null, pausa: null, trocas: 0 });
+  // A janela de troca é das ações: uma carta jogada no meio dela (o cavaleiro leva ao ladrão)
+  // fecha a montagem, e o relógio volta.
+  if (p.fase !== 'acoes') p.montagem = null;
   if (p.fase === 'descartar') {
     if (r.descarte === null) Object.assign(r, { pausa: Math.max(0, r.prazo - agora), prazo: null, descarte: agora + ms });
   } else if (r.descarte !== null) {
     Object.assign(r, { prazo: agora + r.pausa, descarte: null, pausa: null });
+  } else if (trocaParada(p)) {
+    if (r.prazo !== null) Object.assign(r, { pausa: Math.max(0, r.prazo - agora), prazo: null });
+  } else if (r.pausa !== null) {
+    Object.assign(r, { prazo: agora + r.pausa, pausa: null });
   }
+}
+
+/** A vez está parada por uma troca: montando, ou com a oferta esperando resposta. */
+const trocaParada = (p) => p.fase === 'acoes' && (!!p.montagem || (!!p.oferta?.aberta && !!p.oferta.parada));
+
+/** Gasta uma das trocas com o relógio parado desta vez; sem relógio ou sem sobra, não gasta nada. */
+function gastarTrocaComRelogioParado(p) {
+  const r = p.relogio;
+  if (!r || (r.trocas ?? 0) >= TROCAS_COM_RELOGIO_PARADO) return false;
+  r.trocas = (r.trocas ?? 0) + 1;
+  return true;
 }
 
 /**
@@ -856,6 +917,20 @@ function vencerOferta(p) {
 }
 
 /**
+ * Todos já responderam: não há por que esperar o resto dos 15 s — a oferta fecha para respostas
+ * na hora, e o relógio da vez volta a correr para quem ofereceu escolher com quem trocar.
+ */
+function fecharSeTodosResponderam(p) {
+  if (ativos(p).every((k) => k === p.vez || p.oferta.respostas[k])) vencerOferta(p);
+}
+
+/** Os 20 s de montar a troca acabaram: a janela fecha, e o relógio da vez volta de onde parou. */
+function vencerMontagem(p) {
+  p.montagem = null;
+  anotar(p, { t: 'montagemVenceu', j: p.vez });
+}
+
+/**
  * Vence, em ordem, todo prazo que passou até `agora` — cada um NO INSTANTE em que venceu, e não no
  * da leitura: a vez seguinte de quem estourou começa quando a dele acabou. Quem chama é toda
  * leitura e toda ação; ninguém perguntou por dez minutos, a cascata põe a partida em dia de uma vez.
@@ -866,11 +941,13 @@ export function vencerPrazos(p, agora, sorteio = Math.random) {
   exigirHora(agora);
   for (let volta = 0; volta < PRAZOS_POR_LEITURA && p.fase !== 'fim'; volta++) {
     const oferta = p.oferta?.aberta && p.oferta.prazo !== null ? p.oferta.prazo : Infinity;
+    const montagem = p.montagem?.prazo ?? Infinity;
     const descarte = r.descarte ?? Infinity;
     const vez = r.prazo ?? Infinity;
-    const t = Math.min(oferta, descarte, vez);
+    const t = Math.min(oferta, montagem, descarte, vez);
     if (t > agora) return;
     if (t === oferta) vencerOferta(p);
+    else if (t === montagem) vencerMontagem(p);
     else if (t === descarte) descartarPeloRelogio(p, sorteio);
     else jogarPeloRelogio(p, sorteio);
     acertarRelogio(p, t);
@@ -1003,12 +1080,14 @@ export function vista(p, j) {
     oferta: p.oferta ? {
       da: { ...p.oferta.da }, quer: { ...p.oferta.quer },
       respostas: { ...p.oferta.respostas }, contras: structuredClone(p.oferta.contras),
-      aberta: p.oferta.aberta, prazo: p.oferta.prazo,
+      aberta: p.oferta.aberta, prazo: p.oferta.prazo, parada: !!p.oferta.parada,
     } : null,
+    montagem: p.montagem ? { prazo: p.montagem.prazo } : null,
     // Os prazos são instantes do relógio do SERVIDOR; a mesa manda o `agora` dela junto, e a tela
     // desconta o que passou desde a resposta, como no xadrez.
     relogio: p.relogio ? {
       segundos: p.relogio.segundos, prazo: p.relogio.prazo, descarte: p.relogio.descarte, pausa: p.relogio.pausa,
+      trocas: p.relogio.trocas ?? 0,
     } : null,
     historico: historicoPara(p, eu),
     vencedor: p.vencedor,
