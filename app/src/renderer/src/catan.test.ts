@@ -4,7 +4,7 @@ import {
   centroDoHex, pontoDoCruzamento, pontasDaAresta, textoDoEvento, textoDoMonte, oQueTocarNoCatan, minhaMesaDoCatan,
   temTudo, CUSTOS, monteVazio, type ResumoDaMesaDoCatan,
   tempoRestante, segundosQueFaltam, deveTicar, meuPrazo, eventosNovos, oQueTocarNaPartida,
-  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, lugaresEmVolta, oQueDaParaConstruir,
+  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, lugaresEmVolta, oQueDaParaConstruir, pecasQueChegaram,
   type Evento, type Partida, type JogadorNaPartida,
 } from './catan.ts';
 
@@ -260,4 +260,24 @@ test('a cola acende o que as suas cartas já pagam, com peça sobrando; para a p
   assert.deepEqual(oQueDaParaConstruir(naVez), { estrada: false, aldeia: false, cidade: false, desenvolvimento: true });
   // Antes de rolar ainda não há botão: vale o que as cartas pagam.
   assert.deepEqual(oQueDaParaConstruir({ ...naVez, fase: 'rolar' as const })?.aldeia, true);
+});
+
+test('o que caiu no tabuleiro: só o que é novo, e a aldeia que vira cidade cai de novo', () => {
+  const antes = { construcoes: [{ v: '1', j: 0, tipo: 'aldeia' as const }, { v: '2', j: 1, tipo: 'aldeia' as const }], estradas: [{ a: '1|3', j: 0 }] };
+  assert.deepEqual(pecasQueChegaram(null, antes), []);   // abrir a tela não é construir
+  assert.deepEqual(pecasQueChegaram(antes, antes), []);
+  const agora = {
+    construcoes: [{ v: '1', j: 0, tipo: 'cidade' as const }, { v: '2', j: 1, tipo: 'aldeia' as const }],
+    estradas: [{ a: '1|3', j: 0 }, { a: '2|4', j: 1 }],
+  };
+  assert.deepEqual(pecasQueChegaram(antes, agora), [
+    { chave: 'e:2|4', tipo: 'estrada', j: 1, a: '2|4' },
+    { chave: 'c:1:cidade', tipo: 'cidade', j: 0, v: '1' },
+  ]);
+});
+
+test('o ladrão que muda de terreno toca os passos para todo mundo', () => {
+  const p = { ...partida(), ladrao: '0,0', historico: [], rodada: 2 } as Partida;
+  assert.deepEqual(oQueTocarNaPartida(p, { ...p, ladrao: '1,-1' }), ['ladrao']);
+  assert.deepEqual(oQueTocarNaPartida(p, p), []);
 });

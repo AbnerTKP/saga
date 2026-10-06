@@ -12,7 +12,7 @@
  * numa camada de JSX por cima. Nada aqui vem de fora: é tudo número e cor escritos neste arquivo.
  */
 import type { Partida, Recurso, Terreno } from './catan.ts';
-import { COR_DO_JOGADOR, centroDoHex, chaveDoHex, lerHex, pontoDoCruzamento } from './catan.ts';
+import { COR_DO_JOGADOR, centroDoHex, chaveDaConstrucao, chaveDaEstrada, chaveDoHex, lerHex, pontoDoCruzamento, type Chegada } from './catan.ts';
 
 const R3 = Math.sqrt(3);
 
@@ -242,7 +242,7 @@ function barco(x: number, y: number, k: number, virado: boolean): string {
  * a touca e a máscara somem no verde escuro. Ids fixos — só há um ladrão no tabuleiro.
  */
 const TORSO = 'M-9.5 12C-10.5 2 -8.5 -3.4 -5 -5.4H5C8.5 -3.4 10.5 2 9.5 12Z';
-const FIGURA_DO_LADRAO = `<ellipse cx="2" cy="19" rx="14" ry="3.8" fill="rgba(0,0,0,.42)"/>
+export const FIGURA_DO_LADRAO = `<ellipse cx="2" cy="19" rx="14" ry="3.8" fill="rgba(0,0,0,.42)"/>
   <defs><filter id="ladrao-contorno" x="-30%" y="-30%" width="160%" height="160%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.3" result="d"/><feFlood flood-color="#fff6dc" flood-opacity=".8"/><feComposite in2="d" operator="in" result="borda"/><feMerge><feMergeNode in="borda"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <clipPath id="ladrao-listras"><path d="${TORSO}"/></clipPath></defs>
   <g filter="url(#ladrao-contorno)">
@@ -342,7 +342,25 @@ export function desenharFundo(p: Pick<Partida, 'hexes' | 'portos'>): string {
  * O que muda na partida: fichas (acendem com o número que saiu), ladrão, estradas, aldeias e
  * cidades. `acesos` são os terrenos que acabaram de render.
  */
-export function desenharPecas(p: Pick<Partida, 'hexes' | 'ladrao' | 'estradas' | 'construcoes' | 'jogadores'>, acesos: Set<string>): string {
+/**
+ * Onde o ladrão fica: no centro do terreno, ou ao lado da ficha do número quando há uma.
+ */
+export function posicaoDoLadrao(p: Pick<Partida, 'hexes' | 'ladrao'>): { x: number; y: number } {
+  const L = noSvg(centroDoHex(lerHex(p.ladrao).q, lerHex(p.ladrao).r));
+  const temNumero = !!p.hexes.find((h) => chaveDoHex(h.q, h.r) === p.ladrao)?.numero;
+  return { x: L.x + (temNumero ? S * 0.42 : 0), y: L.y + S * 0.05 };
+}
+
+/**
+ * As peças. `semLadrao` e `esconder` são da animação (06/10/2026): o ladrão e a peça que está
+ * caindo moram numa camada por cima do tabuleiro, onde se mexem sem redesenhar este SVG — que é
+ * grande, e redesenhá-lo a cada quadro é o que daria lag.
+ */
+export function desenharPecas(
+  p: Pick<Partida, 'hexes' | 'ladrao' | 'estradas' | 'construcoes' | 'jogadores'>,
+  acesos: Set<string>,
+  { semLadrao = false, esconder }: { semLadrao?: boolean; esconder?: ReadonlySet<string> } = {},
+): string {
   const s = S;
   let out = '';
   for (const h of p.hexes) {
@@ -352,17 +370,46 @@ export function desenharPecas(p: Pick<Partida, 'hexes' | 'ladrao' | 'estradas' |
     if (aceso) out += `<polygon points="${poli(c.x, c.y, s * 0.9)}" fill="rgba(255,243,176,.16)" stroke="#fff3b0" stroke-width="${f(s * 0.07)}"/>`;
     if (h.numero) out += ficha(c.x, c.y + s * 0.08, s, h.numero, aceso);
   }
-  const L = noSvg(centroDoHex(lerHex(p.ladrao).q, lerHex(p.ladrao).r));
-  out += ladrao(L.x + (p.hexes.find((h) => chaveDoHex(h.q, h.r) === p.ladrao)?.numero ? s * 0.42 : 0), L.y + s * 0.05, s);
+  if (!semLadrao) {
+    const L = posicaoDoLadrao(p);
+    out += ladrao(L.x, L.y, s);
+  }
   const cor = (j: number) => COR_DO_JOGADOR[p.jogadores[j]?.cor ?? 'branco'];
   for (const e of p.estradas) {
+    if (esconder?.has(chaveDaEstrada(e))) continue;
     const [v, w] = e.a.split('|').map((x) => noSvg(pontoDoCruzamento(x)));
     out += estrada([v.x, v.y], [w.x, w.y], cor(e.j), s);
   }
   // De cima para baixo, para a casa de baixo cobrir a sombra da de cima.
   for (const c of [...p.construcoes].sort((a, b) => pontoDoCruzamento(a.v).y - pontoDoCruzamento(b.v).y)) {
+    if (esconder?.has(chaveDaConstrucao(c))) continue;
     const q = noSvg(pontoDoCruzamento(c.v));
     out += casa(q.x, q.y, cor(c.j), s, c.tipo === 'cidade');
   }
   return out;
+}
+
+/**
+ * Uma peça sozinha, no MESMO lugar e com o MESMO desenho do tabuleiro: a caixa dela em unidades do
+ * tabuleiro (x, y, largura, altura) e o desenho em coordenadas do tabuleiro — a camada de cima a
+ * mostra com `viewBox` = caixa, e quando ela termina de cair, a do tabuleiro assume sem pular.
+ * `base` é onde ela toca o chão: é dali que sobe a poeira.
+ */
+export function desenhoDaChegada(ch: Chegada, cor: string): { caixa: [number, number, number, number]; base: { x: number; y: number }; svg: string } {
+  const s = S;
+  if (ch.tipo === 'estrada') {
+    const [v, w] = ch.a.split('|').map((x) => noSvg(pontoDoCruzamento(x)));
+    const x0 = Math.min(v.x, w.x) - s * .2, y0 = Math.min(v.y, w.y) - s * .2;
+    const x1 = Math.max(v.x, w.x) + s * .2, y1 = Math.max(v.y, w.y) + s * .25;
+    return { caixa: [x0, y0, x1 - x0, y1 - y0], base: { x: (v.x + w.x) / 2, y: (v.y + w.y) / 2 }, svg: estrada([v.x, v.y], [w.x, w.y], cor, s) };
+  }
+  const q = noSvg(pontoDoCruzamento(ch.v));
+  const cidade = ch.tipo === 'cidade';
+  const [l, t, r, b] = cidade ? [-17, -24, 15, 13] : [-13, -18, 14, 13];
+  return { caixa: [q.x + l, q.y + t, r - l, b - t], base: { x: q.x, y: q.y + s * .12 }, svg: casa(q.x, q.y, cor, s, cidade) };
+}
+
+/** Quanto o ladrão leva correndo de um terreno a outro, em ms: mais longe, mais tempo — até um teto. */
+export function duracaoDaCorrida(de: { x: number; y: number }, para: { x: number; y: number }): number {
+  return Math.round(Math.min(1300, 520 + Math.hypot(para.x - de.x, para.y - de.y) * 1.6));
 }

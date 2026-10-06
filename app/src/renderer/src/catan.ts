@@ -526,7 +526,7 @@ export function cartasQueChegaram(antes: Monte | null | undefined, agora: Monte 
 
 // --- os sons ------------------------------------------------------------------------
 
-export type SomDoCatan = 'suaVez' | 'vezDeOutro' | 'tique' | 'troca' | 'estrada' | 'aldeia' | 'cidade' | 'carta' | 'ganhou';
+export type SomDoCatan = 'suaVez' | 'vezDeOutro' | 'tique' | 'troca' | 'estrada' | 'aldeia' | 'cidade' | 'carta' | 'ganhou' | 'ladrao';
 
 /**
  * Os eventos que chegaram desde a leitura anterior. O registro não tem número de evento, e o do
@@ -548,7 +548,7 @@ export function eventosNovos(antes: Evento[], agora: Evento[]): Evento[] {
 }
 
 /** Na ordem em que tocam, quando várias coisas chegam na mesma leitura. */
-const ORDEM_DOS_SONS: SomDoCatan[] = ['suaVez', 'troca', 'ganhou', 'cidade', 'aldeia', 'estrada', 'carta', 'vezDeOutro'];
+const ORDEM_DOS_SONS: SomDoCatan[] = ['suaVez', 'troca', 'ganhou', 'ladrao', 'cidade', 'aldeia', 'estrada', 'carta', 'vezDeOutro'];
 
 /**
  * O que tocar entre duas leituras da partida, na tela dela. A vez que muda (a sua, mais alto; a
@@ -574,6 +574,8 @@ export function oQueTocarNaPartida(antes: Partida | null, agora: Partida): SomDo
       if (!mesma) sons.add('troca');
     }
   }
+  // O ladrão que mudou de terreno corre até lá, com os passos (a corrida é de todos, como as peças).
+  if (agora.ladrao !== antes.ladrao) sons.add('ladrao');
   for (const e of eventosNovos(antes.historico, agora.historico)) {
     if (e.t === 'estrada' || e.t === 'aldeia' || e.t === 'cidade') sons.add(e.t);
     else if (e.t === 'comprou') sons.add('carta');
@@ -581,6 +583,31 @@ export function oQueTocarNaPartida(antes: Partida | null, agora: Partida): SomDo
     else if (jogo && e.t === 'recebeu' && e.j === eu && somaDoMonte(e.recursos) > 0) sons.add('ganhou');
   }
   return ORDEM_DOS_SONS.filter((s) => sons.has(s));
+}
+
+// --- o que chegou ao tabuleiro (06/10/2026) ---------------------------------------------------
+
+/** Uma peça que acabou de ser posta: a aldeia, a cidade (que é a aldeia trocada) ou a estrada. */
+export type Chegada =
+  | { chave: string; tipo: 'aldeia' | 'cidade'; j: number; v: string }
+  | { chave: string; tipo: 'estrada'; j: number; a: string };
+
+/** A chave de uma peça no tabuleiro: a aldeia que vira cidade é OUTRA peça, e cai de novo. */
+export const chaveDaConstrucao = (c: { v: string; tipo: 'aldeia' | 'cidade' }) => `c:${c.v}:${c.tipo}`;
+export const chaveDaEstrada = (e: { a: string }) => `e:${e.a}`;
+
+/**
+ * O que foi posto no tabuleiro entre duas leituras — o que a tela faz cair do alto, com a poeira,
+ * para todo mundo ver ONDE foi (pedido do dono, 06/10/2026). Na primeira leitura, nada: abrir a
+ * tela não é construir.
+ */
+export function pecasQueChegaram(antes: Pick<Partida, 'construcoes' | 'estradas'> | null, agora: Pick<Partida, 'construcoes' | 'estradas'>): Chegada[] {
+  if (!antes) return [];
+  const tinha = new Set([...antes.construcoes.map(chaveDaConstrucao), ...antes.estradas.map(chaveDaEstrada)]);
+  const chegou: Chegada[] = [];
+  for (const e of agora.estradas) if (!tinha.has(chaveDaEstrada(e))) chegou.push({ chave: chaveDaEstrada(e), tipo: 'estrada', j: e.j, a: e.a });
+  for (const c of agora.construcoes) if (!tinha.has(chaveDaConstrucao(c))) chegou.push({ chave: chaveDaConstrucao(c), tipo: c.tipo, j: c.j, v: c.v });
+  return chegou;
 }
 
 // --- a mesa em volta (06/10/2026) -------------------------------------------------------------

@@ -1,0 +1,100 @@
+/* Os dados no copo (06/10/2026). O componente é `components/DadosNoCopo.tsx`.
+
+   Tudo aqui anima só `transform` e `opacity`: o compositor move as camadas sem redesenhar a
+   página — nem o tabuleiro, que é um SVG grande. O `will-change` vive só nos elementos da rolagem,
+   que somem quando ela acaba (a tela volta aos dois dados parados), e nenhuma animação é infinita.
+
+   A linha do tempo (1,45 s, a `DURACAO_DA_ROLAGEM`): o copo entra e chacoalha até ~0,48 s, tomba
+   pela base até ~0,61 s, e os dados saem pela boca a partir de 0,5 s, girando até parar em 1,4 s.
+   O copo some no fim.
+
+   A geometria: o copo fica acima e à ESQUERDA dos dados — sobre o canto do tabuleiro, onde nada o
+   corta (à direita, a caixa do tabuleiro acaba logo depois dos dados) — e tomba para a direita pela
+   base. A boca termina acima do meio dos dois dados, e cada um se espalha dela para o seu lugar. */
+
+.catan-dados { --dado-tam: 48px; }
+.catan-dados.rolando { gap: var(--e2); }
+
+/* O copo, em pé acima e à esquerda dos dados; tomba para a direita pela base. */
+.copo-de-dados {
+  position: absolute; left: -52px; bottom: calc(100% + 15px); width: 64px; height: 76px;
+  transform-origin: 82% 94%; opacity: 0; will-change: transform, opacity;
+  animation: copo-de-dados 1.45s linear both;
+}
+.copo-de-dados svg { display: block; width: 100%; height: 100%; }
+@keyframes copo-de-dados {
+  0%   { opacity: 0; transform: translate(0, 10px) rotate(0deg) scale(.85); }
+  6%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  10%  { transform: translate(-3px, 0) rotate(-12deg) scale(1); }
+  14%  { transform: translate(3px, -2px) rotate(11deg) scale(1); }
+  18%  { transform: translate(-3px, 0) rotate(-12deg) scale(1); }
+  22%  { transform: translate(3px, -2px) rotate(10deg) scale(1); }
+  26%  { transform: translate(-2px, 0) rotate(-8deg) scale(1); }
+  30%  { transform: translate(1px, -1px) rotate(5deg) scale(1); }
+  33%  { transform: translate(0, 0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(.5, 0, .75, .5); }
+  42%  { opacity: 1; transform: translate(0, 0) rotate(100deg) scale(1); }
+  64%  { opacity: 1; transform: translate(0, 0) rotate(100deg) scale(1); }
+  84%  { opacity: 0; transform: translate(-6px, -8px) rotate(100deg) scale(.95); }
+  100% { opacity: 0; transform: translate(-6px, -8px) rotate(100deg) scale(.95); }
+}
+
+/* O voo: da boca do copo até o lugar do dado, num arco (perto da câmera no meio, maior) e com um
+   quique antes de parar. `--de-x/--de-y` é onde a boca fica, medido a partir do lugar de cada um. */
+.dado3d-voo {
+  position: relative; display: block; width: var(--dado-tam); height: var(--dado-tam); flex: none;
+  will-change: transform, opacity; animation: dado-voa .9s cubic-bezier(.25, .6, .35, 1) .5s both;
+}
+.dado3d-0 { --de-x: 36px; --de-y: -54px; }
+.dado3d-1 { --de-x: -20px; --de-y: -54px; }
+@keyframes dado-voa {
+  0%   { opacity: 0; transform: translate(var(--de-x, 0px), var(--de-y, 0px)) scale(.5); }
+  12%  { opacity: 1; }
+  40%  { transform: translate(calc(var(--de-x, 0px) * .5), calc(var(--de-y, 0px) * .5 - 16px)) scale(1.18); }
+  62%  { transform: translate(calc(var(--de-x, 0px) * .12), 0px) scale(1); }
+  78%  { transform: translate(calc(var(--de-x, 0px) * .04), -6px) scale(1.05); }
+  100% { opacity: 1; transform: translate(0px, 0px) scale(1); }
+}
+
+/* O cubo: seis faces num `preserve-3d`, girando dos ângulos de dentro do copo até a face sorteada
+   de frente (`--fim-x/--fim-y`) e torto como o dado parado (`--giro`). Mesma lista de giros nos
+   dois quadros-chave: o navegador interpola cada ângulo, e o cubo dá as voltas inteiras. */
+.dado3d-cena { position: absolute; inset: 0; perspective: 320px; }
+.dado3d {
+  position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform;
+  transform: rotateZ(var(--giro, 0deg)) rotateX(var(--fim-x, 0deg)) rotateY(var(--fim-y, 0deg));
+  animation: dado-gira .9s cubic-bezier(.12, .62, .22, 1) .5s both;
+}
+@keyframes dado-gira {
+  from { transform: rotateZ(var(--ini-z, 0deg)) rotateX(var(--ini-x, 0deg)) rotateY(var(--ini-y, 0deg)); }
+  to   { transform: rotateZ(var(--giro, 0deg)) rotateX(var(--fim-x, 0deg)) rotateY(var(--fim-y, 0deg)); }
+}
+.dado3d-face { position: absolute; inset: 0; backface-visibility: hidden; }
+.dado3d-face svg { display: block; width: 100%; height: 100%; }
+
+/* A sombra na mesa: cresce quando o dado desce e encolhe no quique. */
+.dado3d-sombra {
+  position: absolute; left: 10%; right: 10%; bottom: -12%; height: 26%; border-radius: 50%;
+  background: radial-gradient(closest-side, var(--preto-45), transparent);
+  animation: sombra-do-dado .9s ease-out .5s both;
+}
+@keyframes sombra-do-dado {
+  0%   { opacity: 0; transform: scale(.4); }
+  40%  { opacity: .45; transform: scale(.7); }
+  62%  { opacity: 1; transform: scale(1); }
+  78%  { opacity: .8; transform: scale(.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Janela baixa: o dado parado encolhe (catan.css), e o do copo junto. */
+@media (max-height: 720px) {
+  .catan-dados { --dado-tam: 38px; }
+  .copo-de-dados { left: -42px; bottom: calc(100% + 12px); width: 52px; height: 62px; }
+  .dado3d-0 { --de-x: 29px; --de-y: -43px; }
+  .dado3d-1 { --de-x: -17px; --de-y: -43px; }
+}
+
+/* "Reduzir movimento" no sistema: nem copo, nem giro — os dados aparecem parados na face. */
+@media (prefers-reduced-motion: reduce) {
+  .copo-de-dados { display: none; }
+  .dado3d-voo, .dado3d, .dado3d-sombra { animation: none; }
+}

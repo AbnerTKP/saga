@@ -60,8 +60,7 @@
 .catan-alvo-terreno:hover { fill: var(--acento-tenue-forte); opacity: 1; stroke-dasharray: none; }
 
 .catan-dados { position: absolute; right: var(--e4); bottom: var(--e4); display: flex; align-items: center; gap: var(--e2); pointer-events: none; }
-.catan-dado { width: 48px; height: 48px; transition: transform .08s linear; }
-.catan-dados.rolando .catan-dado { width: 56px; height: 56px; }
+.catan-dado { width: 48px; height: 48px; }
 .catan-soma { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); min-width: 36px; }
 .catan-dados.sete .catan-soma { color: var(--perigo-texto); }
 

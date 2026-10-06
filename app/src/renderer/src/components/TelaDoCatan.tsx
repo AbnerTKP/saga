@@ -1,26 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { agirNaMesaDoCatan, verMesaDoCatan, type Membro } from '../api';
 import {
   CUSTOS, COR_DO_JOGADOR, NOME_DA_CARTA, NOME_DO_RECURSO, O_QUE_A_CARTA_FAZ, RECURSOS,
   PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, TEMPOS_DA_VEZ,
   cartasQueChegaram, centroDoHex, chaveDoHex, deveTicar, faixaDaVez, hexesQueProduziram, lerHex, meuPrazo, monteVazio, oQueEspera, oQueTocarNaPartida,
   pontasDaAresta, pontoDoCruzamento, segundosQueFaltam, somaDoMonte, tempoRestante, temTudo, textoDoEvento, textoDoMonte, vezParada, vezQueComecou,
-  lugaresEmVolta, oQueDaParaConstruir, PONTOS_DA_CONSTRUCAO,
+  lugaresEmVolta, oQueDaParaConstruir, PONTOS_DA_CONSTRUCAO, chaveDaConstrucao, chaveDaEstrada, pecasQueChegaram,
+  type Chegada,
   type AcaoNaMesaDoCatan, type CartaDeDesenvolvimento, type Construcao, type Jogada, type Lugar, type MesaDoCatan, type Monte, type Partida,
   type FaixaDaVez as Faixa, type PessoaNoCatan, type Recurso,
 } from '../catan';
 import { CORES_DA_MESA, SIMBOLO, simbolosDasCartas } from '../cartasDoCatan';
-import { ALTURA, LARGURA, S, clarear, desenharFundo, desenharPecas, noSvg, poli } from '../desenhoDoCatan';
+import { ALTURA, LARGURA, S, clarear, desenharFundo, desenharPecas, duracaoDaCorrida, noSvg, poli, posicaoDoLadrao } from '../desenhoDoCatan';
 import { iconeDeConstruir } from '../iconesDoCatan';
 import { rolarOsDados } from '../somDosDados';
+import { Dado, DadosNoCopo, duracaoDaRolagem } from './DadosNoCopo';
 import { tocarNoCatan } from '../somDoCatan';
+import { CHEGADA_MS, POUSO_MS, SobreOTabuleiro, type Corrida } from './SobreOTabuleiro';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
 /** De quanto em quanto a tela pergunta pela mesa: a jogada dos outros chega em até isto. */
 const INTERVALO = 800;
-/** Quanto os dados rolam na tela antes de parar no número que o servidor tirou. */
-const ROLANDO = 900;
 /** Entre um som e o seguinte, quando a mesma leitura traz vários: juntos, viram um barulho só. */
 const ENTRE_SONS = 180;
 /** O aviso "Vez de Tava1" no meio do tabuleiro: entra, fica o bastante para ler, e some sozinho. */
@@ -180,8 +181,14 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
     anterior.current = partida;
     if (!partida || surdo) return;
     oQueTocarNaPartida(antes, partida).forEach((som, i) => {
-      if (i === 0) tocarNoCatan(som);
-      else setTimeout(() => tocarNoCatan(som), i * ENTRE_SONS);
+      // A construção soa quando a peça bate no chão (POUSO_MS), e os passos do ladrão duram a corrida.
+      // As cartas que renderam soam quando os dados PARAM: antes disso, o som entregava o número.
+      const rolou = !!antes && partida.rolagens !== antes.rolagens;
+      const opcoes = som === 'estrada' || som === 'aldeia' || som === 'cidade' ? { atraso: POUSO_MS }
+        : som === 'ladrao' && antes ? { duracao: duracaoDaCorrida(posicaoDoLadrao(antes), posicaoDoLadrao(partida)) }
+        : som === 'ganhou' && rolou ? { atraso: duracaoDaRolagem() } : {};
+      if (i === 0) tocarNoCatan(som, undefined, opcoes);
+      else setTimeout(() => tocarNoCatan(som, undefined, opcoes), i * ENTRE_SONS);
     });
   }, [partida, surdo]);
   const base: BaseDoRelogio = { servidor: mesa?.agora ?? 0, local: recebidaEm.current };
@@ -380,17 +387,23 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
     montagemAntes.current = prazoDaMontagem;
   }, [prazoDaMontagem, p.oferta]);
 
-  // Os dados rolam na tela a cada rolagem nova — inclusive a dos outros —, e o som vai junto.
+  // Os dados rolam na tela a cada rolagem nova — inclusive a dos outros —, no copo
+  // (`DadosNoCopo`), e o som vai junto. Antes da pintura (`useLayoutEffect`): com o efeito comum, a
+  // leitura nova pintava UM quadro com o resultado já parado antes de o copo aparecer. O ouvido vai
+  // por referência: ligar ou desligar o fone no meio da rolagem refazia o efeito, que cancelava o
+  // relógio e deixava os dados rolando para sempre.
   const rolagens = useRef(p.rolagens);
   const [rolando, setRolando] = useState(false);
-  useEffect(() => {
+  const surdoNaRolagem = useRef(surdo);
+  surdoNaRolagem.current = surdo;
+  useLayoutEffect(() => {
     if (p.rolagens === rolagens.current) return;
     rolagens.current = p.rolagens;
     setRolando(true);
-    if (!surdo) rolarOsDados();
-    const id = setTimeout(() => setRolando(false), ROLANDO);
+    if (!surdoNaRolagem.current) rolarOsDados();
+    const id = setTimeout(() => setRolando(false), duracaoDaRolagem());
     return () => clearTimeout(id);
-  }, [p.rolagens, surdo]);
+  }, [p.rolagens]);
 
   // A cada leitura: a vez que começou vira o aviso no meio do tabuleiro, e as cartas que chegaram
   // à sua mão sobem com o "+1". As duas regras são puras e testadas (`vezQueComecou`,
@@ -398,13 +411,19 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
   const anterior = useRef<Partida | null>(null);
   const [aviso, setAviso] = useState<{ j: number; n: number } | null>(null);
   const [chegou, setChegou] = useState<{ cartas: Partial<Monte>; n: number } | null>(null);
+  // Com rolagem nova na mesma leitura, o "+1" espera os dados pararem: subir antes entregava o número.
+  const esperaOsDados = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (esperaOsDados.current) clearTimeout(esperaOsDados.current); }, []);
   useEffect(() => {
     const antes = anterior.current;
     anterior.current = p;
     const j = vezQueComecou(antes, p);
     if (j !== null) setAviso((a) => ({ j, n: (a?.n ?? 0) + 1 }));
     const cartas = cartasQueChegaram(antes?.mao, p.mao);
-    if (Object.keys(cartas).length) setChegou((c) => ({ cartas, n: (c?.n ?? 0) + 1 }));
+    if (!Object.keys(cartas).length) return;
+    const mostrar = () => setChegou((c) => ({ cartas, n: (c?.n ?? 0) + 1 }));
+    if (antes && p.rolagens !== antes.rolagens) esperaOsDados.current = setTimeout(mostrar, duracaoDaRolagem());
+    else mostrar();
   }, [p]);
   useEffect(() => {
     if (!aviso) return;
@@ -511,7 +530,7 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
               <Dado n={5} vermelho giro={10} />
               <span>Rolar os dados<small>ou aperte espaço</small></span>
             </button>
-          ) : <Dados dados={p.dados} rolando={rolando} />}
+          ) : <DadosNoCopo dados={p.dados} rolando={rolando} rolagem={p.rolagens} />}
           {aviso && <AvisoDaVez key={aviso.n} partida={p} j={aviso.j} pessoa={mesa.jogadores?.[aviso.j]} nome={nome} />}
           {modoDaVez && modoDaVez !== 'ladrao' && p.fase === 'acoes' && (
             <div className="catan-dica">Escolha onde vai {modoDaVez === 'estrada' ? 'a estrada' : modoDaVez === 'cidade' ? 'a cidade' : 'a aldeia'} · <button type="button" className="link" onClick={() => setModo(null)}>cancelar</button></div>
@@ -670,15 +689,42 @@ function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruza
   const chaveDoFundo = JSON.stringify([p.hexes, p.portos]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const fundo = useMemo(() => desenharFundo(p), [chaveDoFundo]);
-  const chaveDasPecas = JSON.stringify([p.construcoes, p.estradas, p.ladrao, [...acesos], p.jogadores.map((j) => j.cor)]);
+
+  // O que mudou desde a leitura anterior vira animação na camada de cima (`SobreOTabuleiro`): a peça
+  // nova cai do alto com poeira, e o ladrão corre até o terreno novo. Calculado DURANTE o desenho
+  // (o "estado da leitura anterior" do React), e não num efeito: num efeito, a peça nova apareceria
+  // um quadro no tabuleiro antes de sumir para cair — um piscar. Na primeira leitura, nada.
+  const chaves = [...p.construcoes.map(chaveDaConstrucao), ...p.estradas.map(chaveDaEstrada)].sort().join(' ');
+  const [visto, setVisto] = useState<{ chaves: string; ladrao: string; pecas: Pick<Partida, 'construcoes' | 'estradas'> } | null>(null);
+  const [chegando, setChegando] = useState<{ lista: Chegada[]; n: number }>({ lista: [], n: 0 });
+  const [corrida, setCorrida] = useState<Corrida | null>(null);
+  if (!visto || visto.chaves !== chaves || visto.ladrao !== p.ladrao) {
+    if (visto) {
+      const novas = pecasQueChegaram(visto.pecas, p);
+      if (novas.length) setChegando((c) => ({ lista: [...c.lista.filter((x) => !novas.some((n) => n.chave === x.chave)), ...novas], n: c.n + 1 }));
+      if (visto.ladrao !== p.ladrao) setCorrida((c) => ({ de: visto.ladrao, para: p.ladrao, n: (c?.n ?? 0) + 1 }));
+    }
+    setVisto({ chaves, ladrao: p.ladrao, pecas: { construcoes: p.construcoes, estradas: p.estradas } });
+  }
+  // Terminada a queda, a peça volta a morar no tabuleiro — no mesmo desenho, então não pula.
+  useEffect(() => {
+    if (!chegando.lista.length) return;
+    const id = setTimeout(() => setChegando((c) => ({ ...c, lista: [] })), CHEGADA_MS);
+    return () => clearTimeout(id);
+  }, [chegando.n, chegando.lista.length]);
+  const caindo = chegando.lista.map((c) => c.chave).join(' ');
+
+  // O ladrão não entra aqui: ele mora na camada de cima. Assim, ele correr não redesenha as peças.
+  const chaveDasPecas = JSON.stringify([p.construcoes, p.estradas, [...acesos], p.jogadores.map((j) => j.cor), caindo]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pecas = useMemo(() => desenharPecas(p, acesos), [chaveDasPecas]);
+  const pecas = useMemo(() => desenharPecas(p, acesos, { semLadrao: true, esconder: new Set(chegando.lista.map((c) => c.chave)) }), [chaveDasPecas]);
 
   const cruzamentos = modo === 'aldeia' ? p.pode.aldeias : modo === 'cidade' ? p.pode.cidades : undefined;
   const arestas = modo === 'estrada' ? p.pode.estradas : undefined;
   const terrenos = modo === 'ladrao' && p.pode.ladrao ? Object.keys(p.pode.ladrao) : undefined;
 
   return (
+    <>
     <svg className={`catan-tabuleiro ${ocupado ? 'ocupado' : ''}`} viewBox={`0 0 ${LARGURA.toFixed(0)} ${ALTURA.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Tabuleiro do Catan">
       <g dangerouslySetInnerHTML={{ __html: fundo }} />
       <g dangerouslySetInnerHTML={{ __html: pecas }} />
@@ -711,45 +757,8 @@ function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruza
         );
       })}
     </svg>
-  );
-}
-
-const FACES: Record<number, [number, number][]> = {
-  1: [[.5, .5]], 2: [[.28, .28], [.72, .72]], 3: [[.26, .26], [.5, .5], [.74, .74]],
-  4: [[.28, .28], [.72, .28], [.28, .72], [.72, .72]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]],
-  6: [[.28, .24], [.72, .24], [.28, .5], [.72, .5], [.28, .76], [.72, .76]],
-};
-
-function Dado({ n, vermelho, giro }: { n: number; vermelho: boolean; giro: number }) {
-  const cor = vermelho ? '#d8453b' : '#f4efe4';
-  const pip = vermelho ? '#ffffff' : '#1d1d1d';
-  return (
-    <svg className="catan-dado" viewBox="-6 -6 112 116" style={{ transform: `rotate(${giro}deg)` }} aria-hidden="true">
-      <rect x="0" y="6" width="100" height="100" rx="22" fill="rgba(0,0,0,.4)" />
-      <rect x="0" y="0" width="100" height="100" rx="22" fill={vermelho ? '#a8322b' : '#c9c3b6'} />
-      <rect x="0" y="0" width="100" height="94" rx="22" fill={cor} />
-      <rect x="6" y="5" width="88" height="20" rx="10" fill="#fff" opacity=".22" />
-      {FACES[n].map(([x, y], i) => <circle key={i} cx={x * 100} cy={y * 100} r="9" fill={pip} />)}
-    </svg>
-  );
-}
-
-/** Os dois dados no canto do tabuleiro: rolando, trocam de face a cada 80 ms; parados, o número grande do lado. */
-function Dados({ dados, rolando }: { dados: [number, number] | null; rolando: boolean }) {
-  const [faces, setFaces] = useState<[number, number]>([1, 1]);
-  useEffect(() => {
-    if (!rolando) return;
-    const id = setInterval(() => setFaces([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]), 80);
-    return () => clearInterval(id);
-  }, [rolando]);
-  if (!dados) return null;
-  const [a, b] = rolando ? faces : dados;
-  return (
-    <div className={`catan-dados ${rolando ? 'rolando' : ''} ${!rolando && a + b === 7 ? 'sete' : ''}`}>
-      <Dado n={a} vermelho={false} giro={rolando ? faces[1] * 40 : -6} />
-      <Dado n={b} vermelho giro={rolando ? faces[0] * -40 : 8} />
-      {!rolando && <span className="catan-soma">{a + b}</span>}
-    </div>
+    <SobreOTabuleiro partida={p} chegando={chegando.lista} corrida={corrida} />
+    </>
   );
 }
 

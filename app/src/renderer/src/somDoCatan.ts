@@ -18,18 +18,24 @@
  * medidos simulando este mesmo gráfico a 48 kHz. Os sons do tabuleiro (estrada, aldeia,
  * cidade, carta) continuam onde estavam: tocam a cada jogada de qualquer um.
  *
+ * A construção ganhou corpo em 06/10/2026, junto com a animação da peça caindo ("uma poeira, um
+ * som de construção sendo colocada"): o golpe da madeira, as marteladas ou a pedra, e depois o
+ * "puf" da poeira subindo — tudo com `atraso`, para bater na hora em que a peça toca o chão, e não
+ * quando a leitura chega. O ladrão (`ladrao`) são passos rápidos durante a `duracao` da corrida e
+ * um baque surdo quando ele chega.
+ *
  * Se ficou bom é de ouvido, e isso é do dono: a bancada de teste é muda.
  */
 import type { SomDoCatan } from './catan';
 
 let contexto: AudioContext | null = null;
 
-export function tocarNoCatan(som: SomDoCatan, volume = 0.5) {
+export function tocarNoCatan(som: SomDoCatan, volume = 0.5, { atraso = 0, duracao = 0 }: { atraso?: number; duracao?: number } = {}) {
   try {
     contexto ??= new AudioContext();
     const ctx = contexto;
     if (ctx.state === 'suspended') void ctx.resume();
-    const t0 = ctx.currentTime + 0.02;
+    const t0 = ctx.currentTime + 0.02 + Math.max(0, atraso) / 1000;
 
     /** Uma nota com ataque curto e queda exponencial; `forca` relativa ao volume. */
     const nota = (quando: number, freq: number, dur: number, forca: number, tipo: OscillatorType = 'sine') => {
@@ -76,6 +82,9 @@ export function tocarNoCatan(som: SomDoCatan, volume = 0.5) {
       fonte.start(quando);
     };
 
+    /** A poeira subindo: um sopro de ruído grave que abre e fecha. */
+    const puf = (quando: number, forca: number) => ruido(quando, 0.28, 'lowpass', 1400, 0.7, forca, 260);
+
     switch (som) {
       case 'suaVez': {
         // Sol5, si5, ré6 → sol6 sustentado: subir é chamar, e o acorde inteiro é o que se ouve por
@@ -107,19 +116,36 @@ export function tocarNoCatan(som: SomDoCatan, volume = 0.5) {
         }
         break;
       case 'estrada':
-        ruido(t0, 0.06, 'bandpass', 750, 4, 0.7);
-        baque(t0, 220, 120, 0.09, 0.3);
+        // A tábua batendo no chão, e a poeira.
+        ruido(t0, 0.06, 'bandpass', 750, 4, 0.8);
+        baque(t0, 220, 110, 0.11, 0.42);
+        puf(t0 + 0.02, 0.32);
         break;
       case 'aldeia':
-        for (const [t, k] of [[t0, 1], [t0 + 0.17, 0.8]] as const) {
-          ruido(t, 0.05, 'bandpass', 1900, 2.5, 0.6 * k);
-          baque(t, 180, 110, 0.1, 0.32 * k);
+        // O baque da casa, a poeira, e três marteladas de quem termina de pregar.
+        baque(t0, 160, 80, 0.16, 0.5);
+        puf(t0 + 0.02, 0.38);
+        for (const [t, k] of [[0.2, 1], [0.33, 0.85], [0.46, 0.7]] as const) {
+          ruido(t0 + t, 0.05, 'bandpass', 1900, 2.5, 0.6 * k);
+          baque(t0 + t, 180, 110, 0.1, 0.3 * k);
         }
         break;
       case 'cidade':
-        ruido(t0, 0.18, 'lowpass', 500, 0.8, 0.5);
-        baque(t0, 95, 45, 0.38, 0.5);
+        // A pedra pesada, a poeira mais grossa, e duas batidas de cinzel.
+        ruido(t0, 0.18, 'lowpass', 500, 0.8, 0.6);
+        baque(t0, 95, 42, 0.42, 0.62);
+        puf(t0 + 0.03, 0.5);
+        for (const [t, k] of [[0.3, 1], [0.44, 0.8]] as const) ruido(t0 + t, 0.04, 'bandpass', 3000, 3, 0.45 * k);
         break;
+      case 'ladrao': {
+        // Passos rápidos e leves durante a corrida, e o baque surdo da chegada.
+        const fim = Math.max(0.4, duracao / 1000);
+        let i = 0;
+        for (let t = 0; t < fim - 0.06; t += 0.11, i++) ruido(t0 + t, 0.035, 'lowpass', i % 2 ? 700 : 900, 1, 0.38);
+        baque(t0 + fim, 120, 55, 0.18, 0.45);
+        puf(t0 + fim, 0.22);
+        break;
+      }
       case 'carta':
         // O arrasto sobe de tom, como papel deslizando sobre papel.
         ruido(t0, 0.13, 'bandpass', 1800, 1.5, 0.35, 6500);

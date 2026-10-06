@@ -1,8 +1,12 @@
 /**
- * O som dos dados rolando, sintetizado na hora como o motor da Fórmula 1 (`motor.ts`): uns doze
- * estalos de ruído curto, filtrados na faixa de um dado de plástico batendo na mesa, cada vez mais
- * espaçados e mais baixos — e as duas batidas do fim, quando eles param. Nenhum arquivo a mais no
- * pacote, e cada rolagem soa um pouco diferente, como à mesa.
+ * O som dos dados rolando no copo, sintetizado na hora como o motor da Fórmula 1 (`motor.ts`) —
+ * nenhum arquivo a mais no pacote, e cada rolagem soa um pouco diferente, como à mesa. Vai no tempo
+ * da animação de `DadosNoCopo` (1,45 s):
+ *
+ * - até ~0,45 s, o CHACOALHAR: estalos abafados (passa-baixa), os dados batendo DENTRO do copo de
+ *   couro, e um baque surdo a cada virada de mão;
+ * - ~0,55 s, os dados escorregando pela boca;
+ * - ~1,06 s, os dois batendo na mesa; um rolar curto; e ~1,38 s, o assento final.
  *
  * Se ficou bom é de ouvido, e isso é do dono: a bancada de teste é muda.
  */
@@ -18,7 +22,8 @@ export function rolarOsDados(volume = 0.5) {
     const dados = ruido.getChannelData(0);
     for (let i = 0; i < dados.length; i++) dados[i] = (Math.random() * 2 - 1) * (1 - i / dados.length) ** 3;
 
-    const estalo = (quando: number, forca: number, tom: number) => {
+    /** Um estalo de ruído curto numa faixa; `abafado` passa por um passa-baixa, como dentro do copo. */
+    const estalo = (quando: number, forca: number, tom: number, abafado = 0) => {
       const fonte = ctx.createBufferSource();
       fonte.buffer = ruido;
       const filtro = ctx.createBiquadFilter();
@@ -27,18 +32,33 @@ export function rolarOsDados(volume = 0.5) {
       filtro.Q.value = 3;
       const ganho = ctx.createGain();
       ganho.gain.value = volume * forca;
-      fonte.connect(filtro).connect(ganho).connect(ctx.destination);
+      let saida: AudioNode = fonte.connect(filtro);
+      if (abafado) {
+        const baixa = ctx.createBiquadFilter();
+        baixa.type = 'lowpass';
+        baixa.frequency.value = abafado;
+        saida = saida.connect(baixa);
+      }
+      saida.connect(ganho).connect(ctx.destination);
       fonte.start(quando);
     };
+    const sorte = (a: number, b: number) => a + Math.random() * (b - a);
 
-    let t = 0;
-    for (let i = 0; i < 12; i++) {
-      t += 0.035 + i * 0.012 + Math.random() * 0.02;
-      estalo(agora + t, 0.9 - i * 0.05, 2200 + Math.random() * 1800);
+    // O chacoalhar: os dados batendo no couro, rápido e abafado, com um baque a cada virada.
+    let t = 0.03;
+    for (let i = 0; i < 11; i++) {
+      t += sorte(0.028, 0.045);
+      estalo(agora + t, sorte(0.45, 0.7), sorte(1100, 1700), 1600);
     }
-    // As duas batidas do fim: mais graves, uma para cada dado.
-    estalo(agora + t + 0.09, 0.8, 1300);
-    estalo(agora + t + 0.14, 0.6, 1100);
+    for (const virada of [0.1, 0.2, 0.3, 0.4]) estalo(agora + virada, 0.5, 260, 500);
+    // Saindo pela boca do copo.
+    for (const s of [0.53, 0.58, 0.62]) estalo(agora + s + sorte(0, 0.015), 0.35, sorte(2400, 3200));
+    // Na mesa: as duas batidas, um rolar curto e o assento.
+    estalo(agora + 1.05, 0.9, 1400);
+    estalo(agora + 1.09, 0.75, 1200);
+    for (let i = 0; i < 4; i++) estalo(agora + 1.13 + i * sorte(0.035, 0.05), 0.42 - i * 0.07, sorte(2000, 2800));
+    estalo(agora + 1.37, 0.55, 1150);
+    estalo(agora + 1.4, 0.4, 1000);
   } catch {
     // Sem áudio (máquina sem saída, contexto recusado): os dados rolam calados, e está tudo bem.
   }

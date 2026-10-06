@@ -203,6 +203,10 @@ export function simbolosDasCartas(): string {
  */
 export const CORES_DA_MESA: Record<string, string> = {
   '--mesa-feltro': 'radial-gradient(ellipse 75% 70% at 50% 46%, #245c4d 0%, #1a4439 48%, #0f2621 100%)',
+  // A camada de animação do tabuleiro (SobreOTabuleiro.tsx): a poeira, o clarão e a sombra da peça caindo.
+  '--mesa-poeira': 'radial-gradient(circle, rgb(246 236 210 / 1), rgb(220 202 166 / .75) 50%, transparent 70%)',
+  '--mesa-clarao': 'radial-gradient(closest-side, rgb(255 246 214 / .95), rgb(255 230 160 / .35) 55%, transparent)',
+  '--mesa-sombra-da-queda': 'radial-gradient(closest-side, rgb(0 0 0 / .55), transparent)',
   '--mesa-papel': 'linear-gradient(170deg, #f6ead0, #e8d5ad)',
   '--mesa-papel-borda': '#c9a25e',
   '--mesa-papel-claro': '#f6ead0',

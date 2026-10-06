@@ -469,4 +469,52 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
   maciças): cada peça num pedacinho de grama, em isométrico, com parede creme e telhado ou bandeirola
   na cor de quem joga (`iconesDoCatan.ts`). Sem `<defs>` nem id, porque a mesma peça aparece no botão e
   na cola ao mesmo tempo. As peças NO tabuleiro continuam as de antes — ele não pediu para mudar.
+- **Os dados rolam num copo** (pedido do dono depois da v0.68.0: "girando também em uma espécie de
+  copo, foco em desempenho sem lag"). Numa rolagem nova, de qualquer um, o copo de couro aparece
+  acima e à esquerda dos dados — sobre o canto do tabuleiro; à direita a caixa acaba logo depois
+  dos dados e o cortaria —, chacoalha, tomba para a direita, e os dois dados saem pela boca como
+  cubos 3D de CSS, girando até parar com a face sorteada de frente (`dadosNoCopo.ts`, puro e
+  testado: onde cada face mora e o giro que a traz para a frente). São 1,45 s; o som
+  (`somDosDados.ts`) chacoalha abafado no copo e bate na mesa no tempo da animação. O
+  `useLayoutEffect` que liga a rolagem existe porque, com o efeito comum, a leitura nova pintava UM
+  quadro com o resultado já parado antes do copo aparecer.
+  **Só `transform` e `opacity`, por keyframes de CSS**, e nenhum relógio de JS — o de antes trocava a
+  face a cada 80 ms e re-renderizava. Medido na bancada (Chrome headless, `--mute-audio`): o tracing
+  do Chrome dá as quatro animações (copo, voo, giro, sombra) rodando no compositor — nenhuma com
+  `compositeFailed`, inclusive as que leem `var()` nos quadros-chave; um controle animando `left`
+  aparece com a falha, então a medida acusa quando é o caso. O processo principal gasta +25 a 33 ms
+  por rolagem inteira (montar e desmontar o copo e os cubos), e não por quadro. Os dados sozinhos
+  numa página: 0 long-animation-frame acima de 50 ms em 8 de 9 rodadas (a outra, um quadro isolado
+  de 258 ms que não se repetiu). Na mesa da bancada há quadros longos com e sem a animação, nas mesmas
+  faixas (3–8 contra 3–5): são do jogo rodando dentro da própria página e da mesa redesenhando pelo
+  relógio. "Reduzir movimento" no sistema tira o copo e o giro: os dados aparecem parados.
+
+### O ladrão correndo e a peça caindo (06/10/2026)
+
+Pedido do dono, depois da v0.68.0: "animação do ladrão correndo para o campo novo", "uma animação mais
+efetiva de quando algo for colocado no tabuleiro pra sabermos onde está sendo colocado as coisas, por
+exemplo uma poeira, um som de construção" — com "foco em desempenho sem lag".
+
+- **As animações moram numa camada POR CIMA do tabuleiro** (`SobreOTabuleiro.tsx`), e não dentro do
+  SVG dele. O tabuleiro é um SVG grande (terrenos ilustrados, fichas, peças); mexer nele a cada quadro
+  faria o navegador redesenhá-lo inteiro — o lag. Cada coisa que se mexe é uma caixa HTML pequena,
+  animada só em `transform` e `opacity`, que a placa de vídeo desliza pronta. A camada cobre o desenho
+  exatamente (a proporção do `viewBox`, pelas unidades `cq` da caixa, que é um container) e as posições
+  são as coordenadas do próprio tabuleiro em porcentagem.
+- **O ladrão saiu do SVG das peças de vez** (`desenharPecas(..., { semLadrao: true })`) e mora na camada:
+  ele correr não redesenha as peças. Corre em linha reta do terreno antigo ao novo, sacudindo a cada
+  passada; o tempo cresce com a distância, até 1,3 s (`duracaoDaCorrida`, a mesma conta nos passos do
+  som), e chega com um tufo de poeira.
+- **A peça nova cai do alto** (`pecasQueChegaram`, pura e testada: a aldeia que vira cidade é peça nova;
+  na primeira leitura, nada), com a sombra crescendo no chão enquanto cai — é a sombra que diz ONDE ela
+  vai pousar —, amassa ao bater, e no pouso vêm o clarão, dois anéis na cor de quem construiu e a
+  poeira. Enquanto cai, ela sai do SVG (`esconder`) e volta a ele no fim, no mesmo desenho, sem pular.
+  A diferença é calculada DURANTE o desenho (o "estado da leitura anterior" do React), e não num
+  efeito: num efeito, a peça apareceria um quadro no tabuleiro antes de sumir para cair.
+- **O som é da animação**: a construção toca quando a peça bate no chão (`POUSO_MS`), com o "puf" da
+  poeira; os passos do ladrão duram a corrida. A primeira versão da queda era tímida (37 px em 0,4 s,
+  poeira miúda) — vista quadro a quadro na gravação, não dizia onde; a de agora cai de ~4× a altura.
+- **Medido** na bancada (Chrome headless, quadros pelo CDP e rastro de desempenho): durante a corrida e
+  a queda, nenhuma tarefa longa na thread principal; montar a camada quando a peça chega custa um quadro
+  de ~40 ms UMA vez, numa máquina sem placa de vídeo. `prefers-reduced-motion` desliga tudo.
 
