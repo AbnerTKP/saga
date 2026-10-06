@@ -582,3 +582,50 @@ export function oQueTocarNaPartida(antes: Partida | null, agora: Partida): SomDo
   }
   return ORDEM_DOS_SONS.filter((s) => sons.has(s));
 }
+
+// --- a mesa em volta (06/10/2026) -------------------------------------------------------------
+
+/** Onde cada um senta na mesa, visto da sua cadeira. */
+export type Lugar = 'baixo' | 'esquerda' | 'cima' | 'direita';
+
+/**
+ * A cadeira de cada jogador na mesa em volta, como no UNO: você embaixo e os outros na ordem da
+ * vez, girando para a sua esquerda — quem joga depois de você senta à esquerda. Com quatro,
+ * esquerda, cima e direita; com três, esquerda e direita (o lugar de cima fica vazio e o tabuleiro
+ * cresce para ele); com dois, o outro em frente. Quem só assiste vê o jogador 0 embaixo.
+ */
+export function lugaresEmVolta(n: number, eu: number | null): Lugar[] {
+  const ordem: Lugar[] = n >= 4 ? ['baixo', 'esquerda', 'cima', 'direita'] : n === 3 ? ['baixo', 'esquerda', 'direita'] : ['baixo', 'cima'];
+  const minha = eu ?? 0;
+  return Array.from({ length: n }, (_, j) => ordem[(j - minha + n) % n] ?? 'cima');
+}
+
+export type Construcao = 'estrada' | 'aldeia' | 'cidade' | 'desenvolvimento';
+
+/**
+ * O que a cola de custos acende. Na SUA vez, nas ações, exatamente o que os botões deixam fazer
+ * (`pode`): a cola acesa com o botão apagado — cartas na mão, mas nenhum lugar onde a cidade caiba
+ * — parecia defeito. Fora dela, o que as suas cartas já pagam, com peça (ou carta no baralho)
+ * sobrando, para você saber o que fará quando a vez chegar. Para quem só assiste, nada (null): a
+ * cola fica inteira, sem acender nem apagar.
+ */
+export function oQueDaParaConstruir(p: Pick<Partida, 'eu' | 'mao' | 'jogadores' | 'baralho'> & Partial<Pick<Partida, 'vez' | 'fase' | 'pode'>>): Record<Construcao, boolean> | null {
+  const eu = p.eu;
+  if (eu === null || !p.mao || !p.jogadores[eu] || p.jogadores[eu].fora) return null;
+  if (p.vez === eu && p.fase === 'acoes' && p.pode) {
+    return {
+      estrada: !!p.pode.estradas?.length, aldeia: !!p.pode.aldeias?.length,
+      cidade: !!p.pode.cidades?.length, desenvolvimento: !!p.pode.comprar,
+    };
+  }
+  const pecas = p.jogadores[eu].pecas;
+  return {
+    estrada: pecas.estrada > 0 && temTudo(p.mao, CUSTOS.estrada),
+    aldeia: pecas.aldeia > 0 && temTudo(p.mao, CUSTOS.aldeia),
+    cidade: pecas.cidade > 0 && temTudo(p.mao, CUSTOS.cidade),
+    desenvolvimento: p.baralho > 0 && temTudo(p.mao, CUSTOS.desenvolvimento),
+  };
+}
+
+/** Os pontos que cada coisa da cola vale, como na carta do jogo de tabuleiro. */
+export const PONTOS_DA_CONSTRUCAO: Record<Construcao, string> = { estrada: '0', aldeia: '1', cidade: '2', desenvolvimento: '?' };

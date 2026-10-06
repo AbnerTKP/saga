@@ -47,7 +47,12 @@ test('cor escrita à mão só no tokens.css (e o styles.css não ganha nenhuma)'
 });
 
 /** Variáveis que o código escreve na hora (style={{ '--x': … }}), e não o CSS. */
-const DA_HORA = new Set(['--cheio', '--nivel', '--corte', '--avisos-fundo', '--topo-da-janela', '--cor-do-cargo', '--fundo-da-presenca']);
+const DA_HORA = new Set(['--cheio', '--nivel', '--corte', '--avisos-fundo', '--topo-da-janela', '--cor-do-cargo', '--fundo-da-presenca',
+  // A mesa do Catan: as cores do JOGO moram no desenho (cartasDoCatan.ts, CORES_DA_MESA), e a cor de
+  // cada jogador vem da partida.
+  '--cor-do-jogador', '--mesa-feltro', '--mesa-papel', '--mesa-papel-borda', '--mesa-papel-claro', '--mesa-tinta', '--mesa-tinta-2',
+  '--mesa-disco', '--mesa-disco-tinta', '--mesa-fita', '--mesa-pode', '--mesa-pode-borda', '--mesa-placa', '--mesa-placa-borda',
+  '--mesa-selo', '--mesa-selo-tinta', '--mesa-selo-dev', '--mesa-selo-dev-tinta']);
 
 test('toda var() sem reserva aponta para uma variável que existe', () => {
   const tudo = todosOsCss().map((a) => semComentario(readFileSync(a, 'utf8'))).join('\n');

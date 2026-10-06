@@ -367,6 +367,77 @@ muito rápido: 20 segundos para definir a troca, e depois o tempo para aceitarem
 - **O limite de cartas no 7 FICA.** O dono pediu para tirar ("tire o limite de cartas") e, minutos
   depois, voltou atrás: "deixa do jeito que tá". Quem tem mais de 7 continua devolvendo metade.
 
+### A mesa em volta (06/10/2026)
+
+Pedido do dono, jogando: "pense um pouco no UNO de PC, que aparece o pessoal em volta da mesa, o
+baralho deles — poderia ter mostrando na mesa as cartas escondidas, a quantidade, a carta de
+desenvolvimento separadinha, as cartas do banco"; "melhora também a cola da carta de custos"; "quero
+o jogo mais jogo e não tão integrado com a Saga — ao iniciar e estar dentro do jogo ele ser mais um
+jogo individual"; e "faça design das cartas de desenvolvimento também, capricha". Na prancheta
+(claude.ai/artifact/AmMrgETf88y4h215ACtUEB, página "Mesa em volta") havia A (mesa reta) e B (mesa
+inclinada, como o UNO); **ele escolheu a A**. A B — a mesa em perspectiva com as cartas deitadas —
+ficou recusada; o desenho das cartas era proposta única e entrou como estava.
+
+- **Começada a partida, a janela inteira é o jogo.** A trilha, a barra de salas e a lista de pessoas
+  saem pelo CSS (`.app:has(> .stage .catan-mesa)`, no catan.css), e não por estado no App: quem sabe
+  que a partida começou é a tela do jogo, e o App não precisa perguntar. ESCONDIDAS, não
+  desmontadas — a barra lateral continua com a rolagem e o que estava aberto. O áudio da call nunca
+  dependeu delas (`getAudioRoot()`, no useRoom), e a live assistida continua chegando pelo `jogo(live)`
+  do Stage. A mesa esperando gente, o convite e o "Começar" continuam dentro da Saga.
+- **A barra da mesa traz o que a Saga escondida levaria junto**: "Voltar para a Saga" (o "Sair da
+  tela" de antes — a partida continua e fica no alto do chat), a sala da call, o microfone e o fone
+  (os MESMOS `toggleMic`/`toggleDeafen` do painel da conta, passados pelo App em `call`), a rodada, o
+  "assistindo" e o "⋯" com o desistir, que continua armando no próprio botão.
+- **Cada um senta num lado, na ordem da vez** (`lugaresEmVolta`, puro e testado): você embaixo, e
+  quem joga depois de você à sua esquerda, como no UNO. Com quatro: esquerda, cima e direita. Com
+  três: **esquerda e direita** — o lugar de cima fica vazio e o tabuleiro cresce para ele (escolha
+  minha). Com dois: em frente. Quem só assiste vê o jogador 0 embaixo, como um lugar comum.
+- **O lugar mostra o baralho de cada um**: a foto no anel da cor dele, o nome, o disco de pontos,
+  cavaleiros e tamanho da estrada, as fitas de maior estrada e maior exército, as cartas de recurso
+  VIRADAS em leque com a quantidade num selo, e as de desenvolvimento num montinho à parte com outro
+  verso. Na vez dele, o tempo corre num anel em volta da foto (o mesmo prazo da pílula) e o lugar
+  acende na cor dele. Quem deve cartas no 7 ganha "devolvendo N".
+- **O banco vai para a mesa** (no alto à esquerda): cinco montes virados para cima, cada um com
+  quantas cartas sobram, e o baralho de desenvolvimento virado, com quantas restam.
+- **A faixa da vez virou a PÍLULA acima da sua mão**, com os mesmos dados (`faixaDaVez`, inclusive a
+  troca parando a vez e o 7). Quem joga agora já acende na mesa — o anel e o lugar —, e o que sobra
+  dizer fica junto da mão, onde se joga.
+- **O "Acontecendo" ficou pequeno no alto à direita**, com as linhas mais novas embaixo e a de cima
+  se apagando (máscara, em vez de cortar a linha ao meio); "abrir" mostra a partida inteira por cima
+  do lugar da direita. A coluna de antes não cabe na mesa em volta.
+- **A cola de custos é a carta do jogo de tabuleiro**: papel creme com borda dourada, a peça na sua
+  cor (`iconeDeConstruir`, de `iconesDoCatan.ts`), as cartas que ela custa e o disco de pontos (a
+  carta de desenvolvimento leva "?": algumas valem ponto). **Na sua vez, nas ações, acende exatamente
+  o que os botões deixam fazer** (`pode`); fora dela, o que as SUAS cartas já pagam, com peça
+  sobrando, para planejar a vez que vem (`oQueDaParaConstruir`, puro e testado). A primeira versão
+  acendia pelas cartas sempre, e a foto da sua vez mostrou a linha da Cidade acesa com o botão Cidade
+  apagado — cartas na mão, nenhuma aldeia para virar cidade: parecia defeito. Para quem assiste, e
+  no fim, ela fica inteira.
+- **A arte das cartas é um sprite** (`cartasDoCatan.ts`): as de recurso trazem o terreno do PRÓPRIO
+  tabuleiro num medalhão (`defs()` + `terreno()`), as cinco de desenvolvimento têm ilustração e o
+  que fazem escrito, o verso de recurso é o mar com os seis terrenos e o de desenvolvimento é vinho
+  com a coroa. Tudo vira `<symbol>`s montados UMA vez, escondidos na mesa, e cada carta é um `<svg>`
+  com `<use>`: a tela redesenha a cada leitura (800 ms) e tem dezenas de cartas — repetir o SVG
+  inteiro de cada uma (o terreno passa de 10 KB) seria refazer centenas de KB de DOM a cada leitura.
+  As cartas pequenas das janelas (troca, descarte, fartura, monopólio) usam a mesma arte, sem o nome.
+- **As cores da mesa moram no desenho**, não no CSS: o feltro, o papel, o ouro e os selos estão em
+  `CORES_DA_MESA` e a tela os escreve como variáveis no elemento da mesa; o `design.test.ts` as
+  conhece pela lista `DA_HORA`. O catan.css continua só com tokens.
+- **As medidas acompanham o espaço de verdade**: os lados são `clamp(196px, 23vw, 296px)`, e a
+  carta da mão é `min(62px, 10cqw, 8.4vh)` do meio da mesa (container query) — com cinco recursos e
+  as de desenvolvimento ao lado, ela tem de caber sem empurrar os lados. Com três ou mais tipos de
+  desenvolvimento, as cartas se sobrepõem. Os dados e o botão de rolar ficam junto da borda do
+  TABULEIRO (a caixa é mais larga que ele; numa tela larga eles iam parar longe), calculada pela
+  proporção do SVG em `cqh`. Na janela baixa (até 720 px) tudo aperta; na mínima da Saga (900×560)
+  a cola perde a coluna do nome e o banco quebra em duas linhas, mas nada sobrepõe nem rola.
+- **A live assistida fica na coluna da direita, abaixo do lugar de quem senta ali** — nunca por cima
+  do tabuleiro, a mesma regra de antes.
+- **Visto** numa bancada no Chrome headless e mudo, com a TelaDoCatan de verdade e a partida vinda do
+  `server/catan.mjs` rodando ali, jogada por robôs: sua vez, vez de outro, rolar, troca montando, 7 com
+  descarte, três jogadores, dois, plateia, fim, histórico aberto, o "⋯", live, e 900×560, 1100×700,
+  1280×800 e 1920×1080. **Não foi visto**: o Electron, o Windows de verdade, foto de gente (a bancada
+  usa a inicial), a live de verdade, e nenhum som.
+
 - **A mesa vive na MEMÓRIA do servidor, como as do xadrez**: publicar o servidor com gente jogando
   encerra a partida. Uma partida de Catan dura uma hora; se isso incomodar, é guardar no banco.
 - **Anda por HTTP, perguntando de 800 em 800 ms**, como o xadrez: é jogo de turno, poucas ações por

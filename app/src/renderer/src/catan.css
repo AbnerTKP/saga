@@ -1,8 +1,10 @@
 /*
- * O Catan (TelaDoCatan.tsx). A disposição é a A que o dono escolheu em 27/09/2026: tabuleiro e
- * mão à esquerda, coluna à direita, como o xadrez. As cores do JOGO (terrenos, cartas, peças)
- * moram no desenho (desenhoDoCatan.ts), não aqui: as da casa servem para o app, não para um
- * jogo — foi a lição da primeira Fórmula 1. Aqui só há tokens.
+ * O Catan (TelaDoCatan.tsx). Desde 06/10/2026 a partida é a MESA EM VOLTA (a opção A da prancheta
+ * "Mesa em volta"): o tabuleiro no meio, cada um sentado no seu lado com as cartas à vista, o banco,
+ * a cola e a sua mão — e, começada a partida, a janela inteira é o jogo. As cores do JOGO
+ * (terrenos, cartas, peças, o feltro, o papel da cola, o ouro) moram no desenho
+ * (desenhoDoCatan.ts e cartasDoCatan.ts), não aqui: as da casa servem para o app, não para um jogo
+ * — foi a lição da primeira Fórmula 1. Aqui só há tokens, e as `--mesa-*` que a tela escreve.
  */
 
 .tela-do-catan { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -42,13 +44,8 @@
 .catan-segmento button.ativo { background: var(--acento-cheio); color: var(--sobre-acento); opacity: 1; }
 .catan-segmento button:disabled:not(.ativo) { opacity: .5; }
 
-/* --- a partida --------------------------------------------------------------- */
-.catan-partida { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: var(--e4); min-height: 0; }
-.catan-esquerda { display: flex; flex-direction: column; gap: var(--e2); min-width: 0; min-height: 0; }
-.catan-tabuleiro-caixa {
-  position: relative; flex: 1; min-height: 0; background: var(--superficie-0); border-radius: var(--raio-4);
-  display: flex; align-items: center; justify-content: center; overflow: hidden;
-}
+/* --- o tabuleiro e o que acontece em cima dele -------------------------------------- */
+.catan-tabuleiro-caixa { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .catan-tabuleiro { width: 100%; height: 100%; display: block; }
 .catan-tabuleiro.ocupado { cursor: progress; }
 
@@ -85,7 +82,7 @@
 
 /* A troca com tempo (04/10/2026): as cartas desenhadas em vez do texto, e os 15 s escorrendo numa
    barra no alto. A barra anda pela largura, redesenhada de quarto em quarto de segundo pela tela
-   enquanto há prazo, aos saltos e sem transição (ver .catan-faixa-barra) — e para quando não há. A oferta que chega é
+   enquanto há prazo, aos saltos e sem transição (ver .mesa-pilula-barra) — e para quando não há. A oferta que chega é
    pergunta para você: ganha o anel do acento, para não passar despercebida. */
 .catan-oferta { width: min(560px, calc(100% - 32px)); border-color: var(--acento); box-shadow: 0 0 0 4px var(--acento-tenue-forte), var(--sombra-3); }
 .catan-oferta-barra { position: absolute; left: 0; top: 0; height: 4px; background: var(--acento); }
@@ -120,70 +117,6 @@
 .catan-resposta { display: flex; align-items: center; gap: var(--e2); font-size: var(--letra-painel); }
 .catan-aceita { color: var(--ok-texto); }
 
-/* --- a mão ---------------------------------------------------------------------- */
-.catan-mao {
-  display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3);
-  background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3);
-}
-.catan-cartas { display: flex; gap: var(--e1m); flex-wrap: wrap; }
-.catan-acoes { margin-left: auto; display: flex; gap: var(--e1m); flex-wrap: wrap; justify-content: flex-end; max-width: 380px; }
-.catan-acoes .secundario, .catan-acoes .primary { padding: 7px 12px; font-size: var(--letra-menu); }
-.catan-acoes .secundario.ativo { background: var(--acento-tenue-forte); color: var(--acento-texto); }
-.catan-acoes button:disabled { opacity: .4; }
-
-.catan-carta {
-  position: relative; width: 46px; height: 62px; border-radius: var(--raio-3); flex: none; overflow: hidden;
-  border: 2px solid var(--azul-ceu); box-shadow: var(--sombra-1); box-sizing: border-box; padding: 0;
-}
-.catan-carta svg { position: absolute; inset: 8px 3px 14px; width: calc(100% - 6px); height: calc(100% - 22px); }
-.catan-carta.pequena { width: 26px; height: 34px; border-width: 1px; border-radius: var(--raio-1); }
-.catan-carta.pequena svg { inset: 3px 1px 5px; width: calc(100% - 2px); height: calc(100% - 8px); }
-.catan-carta.zerada { opacity: .35; }
-.catan-carta-n {
-  position: absolute; right: 2px; bottom: 2px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box;
-  border-radius: 9px; background: var(--veu-forte); color: var(--branco); font-size: 11px; line-height: 18px;
-  font-weight: var(--peso-versalete); text-align: center;
-}
-.catan-carta.desenvolvimento {
-  background: var(--berserk-tenue); border-color: var(--berserk-claro); color: var(--berserk-claro);
-  display: flex; align-items: center; justify-content: center; text-align: center;
-}
-.catan-carta.desenvolvimento.jogavel { cursor: pointer; box-shadow: 0 0 0 2px var(--berserk); }
-.catan-carta.desenvolvimento.jogavel:hover { background: var(--berserk); color: var(--branco); }
-.catan-carta-nome { font-size: 9px; line-height: 1.1; font-weight: var(--peso-versalete); padding: 2px; }
-.catan-carta-nova { position: absolute; top: 2px; left: 0; right: 0; font-size: 8px; color: var(--texto-2); text-transform: uppercase; }
-
-/* --- a coluna -------------------------------------------------------------------- */
-.catan-coluna { display: flex; flex-direction: column; gap: var(--e3); min-height: 0; }
-.catan-caixa { background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3); }
-.catan-jogadores { overflow: hidden; }
-.catan-jogador { display: grid; grid-template-columns: 40px 1fr auto; gap: 2px var(--e2); align-items: center; padding: var(--e2) var(--e3); }
-.catan-jogador + .catan-jogador { border-top: 1px solid var(--borda-sutil); }
-.catan-jogador.vez { background: var(--acento-tenue); box-shadow: inset 3px 0 0 var(--acento); }
-.catan-jogador.fora { opacity: .5; }
-.catan-anel { grid-row: span 2; width: 36px; height: 36px; border-radius: 50%; border: 3px solid; display: grid; place-items: center; overflow: hidden; }
-.catan-anel > * { width: 30px; height: 30px; }
-.catan-jogador-nome { display: flex; align-items: center; gap: var(--e1m); min-width: 0; font-weight: var(--peso-forte); color: var(--texto-forte); font-size: var(--letra-painel); }
-.catan-voce { font-weight: var(--peso-medio); color: var(--texto-3); font-size: var(--letra-legenda); }
-.catan-selo {
-  font-size: 9px; font-weight: var(--peso-versalete); letter-spacing: .04em; padding: 1px 4px; border-radius: var(--raio-1);
-  background: var(--aviso-tenue); color: var(--aviso); border: 1px solid var(--aviso-borda);
-}
-.catan-pontos { grid-row: span 2; text-align: right; font-size: 20px; font-weight: var(--peso-versalete); color: var(--texto-forte); line-height: 1; }
-.catan-pontos small { display: block; font-size: 10px; color: var(--texto-3); font-weight: var(--peso-forte); letter-spacing: .04em; text-transform: uppercase; }
-.catan-jogador-detalhe { display: flex; flex-wrap: wrap; gap: 2px var(--e2); font-size: var(--letra-legenda); color: var(--texto-2); }
-.catan-deve { color: var(--aviso); }
-
-.catan-custos { padding: var(--e2) var(--e3); display: flex; flex-direction: column; gap: var(--e1m); }
-.catan-custo { display: flex; align-items: center; gap: var(--e2); font-size: var(--letra-legenda); color: var(--texto); }
-.catan-custo > span:first-child { width: 104px; }
-.catan-custo-cartas { display: flex; gap: 3px; }
-.catan-custo .catan-carta.pequena { width: 18px; height: 24px; }
-
-.catan-acontecendo { flex: 1; min-height: 80px; padding: var(--e2) var(--e3); display: flex; flex-direction: column; gap: var(--e1m); }
-.catan-historico { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--e1); font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.4; }
-.catan-evento.rolou, .catan-evento.venceu, .catan-evento.maiorEstrada, .catan-evento.maiorExercito { color: var(--texto-forte); font-weight: var(--peso-semi); }
-
 /* --- o fim ------------------------------------------------------------------------ */
 .catan-fim { width: min(460px, calc(100% - 32px)); }
 .catan-fim-titulo { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); text-align: center; }
@@ -200,30 +133,7 @@
 .capa-do-catan { width: 76px; height: 76px; }
 .cartao-de-convite-capa > .capa-do-catan { display: block; width: 100%; height: 100%; padding: var(--e2) 0; box-sizing: border-box; background: var(--marinho); }
 
-/* --- a vez: a faixa, o botão de rolar e o aviso (04/10/2026) ------------------------------- */
-/* A opção A da prancheta "v2", que o dono deixou comigo: a faixa ACIMA do tabuleiro — por cima,
-   tapava os portos da fileira de cima —, com o tempo grande e a barra da cor de quem joga; na sua
-   vez, ela acende. A barra anda pela largura, redesenhada pela tela enquanto há prazo. */
-.catan-faixa {
-  position: relative; flex: none; display: flex; align-items: center; gap: var(--e3);
-  padding: var(--e2) var(--e4); overflow: hidden;
-  background: var(--superficie-1); border: 1px solid var(--borda-sutil); border-radius: var(--raio-3);
-}
-.catan-faixa.minha { background: var(--acento-tenue-forte); border-color: var(--acento); }
-.catan-faixa-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.catan-faixa-texto b { font-size: var(--letra-destaque); font-weight: var(--peso-versalete); color: var(--texto-forte); letter-spacing: -.01em; }
-.catan-faixa-texto span { font-size: var(--letra-menu); color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.catan-faixa-relogio {
-  margin-left: auto; display: flex; align-items: center; gap: var(--e1m);
-  font-size: var(--letra-destaque); font-weight: var(--peso-versalete); color: var(--texto-forte); font-variant-numeric: tabular-nums;
-}
-.catan-faixa-relogio svg { color: var(--texto-2); }
-.catan-faixa-relogio.acabando, .catan-faixa-relogio.acabando svg { color: var(--perigo-texto); }
-/* A barra anda aos saltos, quatro por segundo, SEM transição: com ela, cada salto virava uma
-   animação de 0,25 s emendada na seguinte — a janela se redesenhando a partida inteira, que é o
-   que o animacoes.test.ts existe para impedir (medido no Mac do dono: GPU perto de 100%). */
-.catan-faixa-barra { position: absolute; left: 0; bottom: 0; height: 3px; }
-
+/* --- a vez: o botão de rolar e o aviso (04/10/2026) ------------------------------------------ */
 /* Na sua vez de rolar, os dados viram o botão: grandes, no canto onde eles moram. */
 .catan-rolar {
   position: absolute; right: var(--e4); bottom: var(--e4); display: flex; align-items: center; gap: var(--e2);
@@ -245,6 +155,7 @@
   animation: catan-aviso 1.6s ease-out forwards;
 }
 .catan-aviso.minha { background: var(--acento-cheio); }
+.catan-anel { width: 36px; height: 36px; border-radius: 50%; border: 3px solid; display: grid; place-items: center; overflow: hidden; }
 .catan-aviso .catan-anel { width: 64px; height: 64px; border-width: 4px; box-sizing: border-box; }
 .catan-aviso .catan-anel > * { width: 52px; height: 52px; font-size: 22px; }
 .catan-aviso b { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); letter-spacing: -.01em; white-space: nowrap; }
@@ -257,41 +168,279 @@
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
-/* --- a mão grande (a opção C, 04/10/2026) ---------------------------------------------------- */
-/* O dobro do tamanho de antes, com o nome e a quantidade em destaque e o total ao lado. Zerada,
-   só o contorno. A que chegou sobe com "+1 lã" por 2,5 s — e desce por transição, sem animação
-   que fique rodando. */
-.catan-cartas.grandes { gap: var(--e2); flex-wrap: nowrap; align-items: flex-end; }
-.catan-total {
-  display: flex; flex-direction: column; justify-content: flex-end; align-self: stretch;
-  padding-right: var(--e3); margin-right: var(--e1); border-right: 1px solid var(--borda-sutil);
+/* --- a mesa em volta (06/10/2026) ---------------------------------------------------------- */
+/* Pedido do dono: "pense no UNO de PC, que aparece o pessoal em volta da mesa, o baralho deles",
+   "o jogo mais jogo e não tão integrado com a Saga". Ele escolheu a A da prancheta (mesa reta).
+
+   Dentro da partida, só o jogo: a Saga sai da frente — trilha, salas e pessoas — e a mesa ocupa
+   a janela abaixo da barra da janela. Sai pelo CSS, com :has(), e não por estado no App: quem
+   sabe que a partida começou é a tela do jogo. ESCONDER, e não desmontar: a barra lateral
+   continua montada (a lista de salas, a rolagem), e o áudio da call nunca morou nela. */
+.app:has(> .stage .catan-mesa) { grid-template-columns: minmax(0, 1fr); }
+.app:has(> .stage .catan-mesa) > .sidebar,
+.app:has(> .stage .catan-mesa) > .trilha,
+.app:has(> .stage .catan-mesa) > .lista-membros { display: none; }
+
+/* A mesa: o tabuleiro no meio, um lado de cada vez em volta. As medidas das cartas descem com a
+   janela — a mínima da Saga é 900×560, e lá a mesa ainda precisa caber sem rolar. */
+.catan-mesa {
+  --carta-l: 30px; --carta-a: 42px; --passo: 13px;
+  position: relative; flex: 1; min-height: 0;
+  display: grid; grid-template-columns: clamp(196px, 23vw, 296px) minmax(0, 1fr) clamp(196px, 23vw, 296px);
+  grid-template-rows: auto minmax(0, 1fr); gap: var(--e3) var(--e4); padding: var(--e3) var(--e4) var(--e4);
+  background: var(--mesa-feltro); color: var(--texto); overflow: hidden;
 }
-.catan-total b { font-size: var(--letra-tela); font-weight: var(--peso-versalete); color: var(--texto-forte); line-height: 1; }
-.catan-total span { font-size: var(--letra-rotulo); font-weight: var(--peso-forte); color: var(--texto-3); text-transform: uppercase; letter-spacing: .06em; }
-.catan-carta-mao { position: relative; flex: none; }
-.catan-carta.grande { width: 64px; height: 90px; border-radius: var(--raio-4); transition: transform .2s ease-out, box-shadow .2s ease-out; }
-.catan-carta.grande svg { inset: 10px 10px 34px; width: calc(100% - 20px); height: calc(100% - 44px); }
-.catan-carta-rotulo {
-  position: absolute; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 10.5px; line-height: 1;
-  font-weight: var(--peso-versalete); color: var(--branco); text-transform: uppercase; letter-spacing: .04em;
-  text-shadow: 0 1px 2px var(--preto-60);
+.mesa-simbolos { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+/* A barra do jogo. */
+.mesa-barra { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--e2); min-width: 0; }
+.mesa-hud {
+  height: 36px; display: inline-flex; align-items: center; gap: var(--e1m); padding: 0 var(--e3); box-sizing: border-box;
+  border-radius: var(--raio-3); background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda);
+  color: var(--texto-forte); font-size: var(--letra-menu); font-weight: var(--peso-semi); white-space: nowrap;
 }
-.catan-carta-qtd {
-  position: absolute; top: 0; right: 0; min-width: 24px; height: 24px; padding: 0 var(--e1m); box-sizing: border-box;
-  border-radius: 0 0 0 var(--raio-3); background: var(--veu-forte); color: var(--branco);
-  font-size: 14px; font-weight: var(--peso-versalete); display: grid; place-items: center;
+button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie-3); }
+.mesa-hud.icone { width: 38px; padding: 0; justify-content: center; }
+.mesa-hud.off { color: var(--perigo-texto); }
+.mesa-hud[aria-disabled="true"] { opacity: .5; cursor: default; }
+.mesa-hud-call i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok-texto); box-shadow: 0 0 0 3px var(--ok-tenue); }
+.mesa-hud-texto { color: var(--texto-2); }
+.mesa-hud-texto.forte { color: var(--texto-forte); font-weight: var(--peso-forte); }
+.mesa-menu { position: relative; }
+.mesa-menu-lista {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); min-width: 220px;
+  display: flex; flex-direction: column; padding: var(--e2); border-radius: var(--raio-4);
+  background: var(--superficie-2); border: 1px solid var(--borda); box-shadow: var(--sombra-3);
 }
-.catan-carta.grande.zerada { opacity: 1; background: transparent; border: 2px dashed var(--borda); box-shadow: none; }
-.catan-carta.grande.zerada svg { opacity: .3; filter: grayscale(1); }
-.catan-carta.grande.zerada .catan-carta-rotulo, .catan-carta.grande.zerada .catan-carta-qtd { color: var(--texto-3); text-shadow: none; background: none; }
-.catan-carta-mao.chegou .catan-carta { transform: translateY(-10px); box-shadow: 0 0 0 3px var(--aviso), 0 10px 24px var(--aviso-borda); }
+
+/* Os três lados. As pontas de cada lado vão para as pontas; o meio, para o meio. */
+.mesa-lado { display: flex; flex-direction: column; justify-content: space-between; gap: var(--e3); min-width: 0; min-height: 0; container-type: inline-size; }
+.mesa-lado-meio { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--e3); }
+.mesa-centro { display: flex; flex-direction: column; align-items: center; gap: var(--e2); min-width: 0; min-height: 0; container-type: inline-size; }
+.mesa-centro > .catan-tabuleiro-caixa { flex: 1; min-height: 0; width: 100%; }
+.mesa-baixo { flex: none; display: flex; flex-direction: column; align-items: center; gap: var(--e2); max-width: 100%; }
+.mesa-live { width: 100%; }
+
+.mesa-placa { background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda); border-radius: var(--raio-5); }
+.mesa-rotulo { font-size: var(--letra-selo); font-weight: var(--peso-versalete); letter-spacing: .08em; text-transform: uppercase; color: var(--texto-2); }
+.mesa-link { margin-left: auto; font-size: var(--letra-legenda); font-weight: var(--peso-semi); color: var(--link); }
+
+/* As cartas: um <svg> com o <use> do sprite (cartasDoCatan.ts). */
+.mesa-carta { display: block; flex: none; overflow: visible; filter: drop-shadow(0 2px 2px var(--preto-45)); }
+.mesa-carta.pequena { width: 26px; height: 36px; }
+.mesa-carta.media { width: 44px; height: 62px; }
+.mesa-carta-vazia { display: block; width: var(--carta-l); height: var(--carta-a); border: 2px dashed var(--branco-14); border-radius: var(--raio-2); box-sizing: border-box; }
+
+/* O disco dourado dos pontos, e as fitas de maior estrada e maior exército. */
+.mesa-disco {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--mesa-disco); color: var(--mesa-disco-tinta); font-size: var(--letra-titulo); font-weight: var(--peso-versalete);
+  box-shadow: 0 2px 6px var(--preto-45);
+}
+.mesa-disco.pequeno { width: 24px; height: 24px; font-size: var(--letra-legenda); }
+.mesa-fita {
+  font-size: var(--letra-selo); font-weight: var(--peso-versalete); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--mesa-disco-tinta); background: var(--mesa-fita); border-radius: var(--raio-1); padding: 1px var(--e1m); white-space: nowrap;
+}
+
+/* A foto no anel da cor do jogador; na vez dele, o tempo corre em volta. */
+.mesa-anel {
+  position: relative; flex: none; box-sizing: border-box; border-radius: 50%; padding: 3px;
+  background: var(--cor-do-jogador); box-shadow: 0 0 0 2px var(--preto-45);
+}
+.mesa-anel-foto { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; }
+.mesa-anel-foto .avatar { width: 100%; height: 100%; font-size: 18px; }
+.mesa-anel-tempo {
+  position: absolute; inset: -7px; border-radius: 50%; color: var(--cor-do-jogador);
+  -webkit-mask: radial-gradient(circle, transparent 63%, black 64%); mask: radial-gradient(circle, transparent 63%, black 64%);
+}
+.mesa-anel-tempo.acabando { color: var(--perigo-texto); }
+
+/* Um lugar na mesa: a cabeça (foto, nome, pontos) e as cartas dele (o leque e o montinho). */
+.mesa-lugar {
+  position: relative; display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3);
+  background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda); border-radius: var(--raio-5); min-width: 0;
+}
+.mesa-lugar::before { content: ""; position: absolute; left: var(--e4); right: var(--e4); top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--cor-do-jogador); }
+.mesa-lugar.vez { border-color: var(--cor-do-jogador); box-shadow: 0 0 26px color-mix(in srgb, var(--cor-do-jogador) 40%, transparent); }
+.mesa-lugar.fora { opacity: .5; }
+.mesa-lugar.cima, .mesa-lugar.baixo { flex-direction: row; align-items: center; gap: var(--e5); padding: var(--e2) var(--e4); }
+.mesa-lugar-cabeca { display: flex; align-items: center; gap: var(--e2); min-width: 0; }
+.mesa-lugar-nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.mesa-lugar-nome b { font-size: var(--letra-texto); color: var(--texto-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-lugar-nota { font-size: var(--letra-legenda); color: var(--texto-3); }
+.mesa-lugar-cartas { display: flex; align-items: flex-end; gap: var(--e4); padding-left: var(--e1); }
+.mesa-selos { display: flex; align-items: center; gap: var(--e1m); flex-wrap: wrap; }
+.mesa-selo-info { display: inline-flex; align-items: center; gap: 3px; color: var(--texto-2); font-size: var(--letra-legenda); font-weight: var(--peso-forte); }
+.mesa-deve { font-size: var(--letra-legenda); font-weight: var(--peso-forte); color: var(--aviso); align-self: center; }
+
+/* O leque de cartas viradas e o montinho de desenvolvimento, com o selo da quantidade. */
+.mesa-leque { position: relative; flex: none; height: calc(var(--carta-a) + 10px); }
+.mesa-leque > .mesa-carta { position: absolute; top: 4px; width: var(--carta-l); height: var(--carta-a); transform-origin: 50% 120%; }
+.mesa-montinho { position: relative; flex: none; width: calc(var(--carta-l) + 6px); height: calc(var(--carta-a) + 6px); }
+.mesa-montinho > .mesa-carta { position: absolute; width: var(--carta-l); height: var(--carta-a); }
+.mesa-leque > .mesa-carta-vazia, .mesa-montinho > .mesa-carta-vazia { margin-top: 4px; }
+.mesa-selo {
+  position: absolute; right: -6px; bottom: -2px; z-index: 1; min-width: 24px; height: 24px; padding: 0 var(--e1m); box-sizing: border-box;
+  border-radius: var(--raio-cheio); background: var(--mesa-selo); color: var(--mesa-selo-tinta); border: 2px solid var(--mesa-selo-tinta);
+  font-size: var(--letra-menu); font-weight: var(--peso-versalete); line-height: 20px; text-align: center; box-shadow: 0 2px 6px var(--preto-45);
+}
+.mesa-selo.dev { right: -9px; min-width: 20px; height: 20px; line-height: 16px; font-size: var(--letra-rotulo); background: var(--mesa-selo-dev); color: var(--mesa-selo-dev-tinta); border-color: var(--mesa-selo-dev-tinta); }
+
+/* O banco: cinco montes e o baralho, cada um com quantas cartas sobram. */
+.mesa-banco { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e2) var(--e3) var(--e3); }
+.mesa-banco-montes { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: flex-end; }
+.mesa-banco-monte { display: flex; flex-direction: column; align-items: center; gap: var(--e1); }
+.mesa-banco-monte b { font-size: var(--letra-menu); color: var(--texto-forte); font-variant-numeric: tabular-nums; }
+.mesa-pilha { position: relative; width: calc(var(--carta-l) + 3px); height: calc(var(--carta-a) + 3px); }
+.mesa-pilha > .mesa-carta { position: absolute; left: 0; top: 3px; width: var(--carta-l); height: var(--carta-a); }
+.mesa-pilha > .mesa-carta.atras { left: 3px; top: 0; }
+
+/* O que está acontecendo: pequeno, e "abrir" cobre o lugar da direita com a partida inteira. */
+.mesa-acontecendo-lugar { position: relative; flex: none; height: 116px; }
+.mesa-acontecendo { position: absolute; left: 0; right: 0; top: 0; height: 100%; display: flex; flex-direction: column; padding: var(--e2) var(--e3); box-sizing: border-box; }
+.mesa-acontecendo.aberto { z-index: 4; height: auto; max-height: min(64vh, 520px); background: var(--superficie-2); border-color: var(--borda); box-shadow: var(--sombra-3); }
+.mesa-acontecendo-cabeca { display: flex; align-items: center; gap: var(--e1m); padding: 0 0 var(--e1); color: var(--texto-2); background: none; text-align: left; }
+.mesa-historico { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 2px; font-size: var(--letra-legenda); color: var(--texto-2); line-height: 1.4; }
+/* Fechado, as linhas mais novas ficam embaixo e a de cima se apaga, em vez de ser cortada ao meio. */
+.mesa-acontecendo:not(.aberto) .mesa-historico { justify-content: flex-end; -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px); mask-image: linear-gradient(to bottom, transparent, black 16px); }
+.mesa-historico > div { flex: none; }
+.mesa-historico > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-acontecendo.aberto .mesa-historico { overflow-y: auto; }
+.mesa-acontecendo.aberto .mesa-historico > div { white-space: normal; }
+.catan-evento.rolou, .catan-evento.venceu, .catan-evento.maiorEstrada, .catan-evento.maiorExercito { color: var(--texto-forte); font-weight: var(--peso-semi); }
+
+/* A cola de custos: papel creme com borda dourada, como a carta do jogo de tabuleiro. */
+.mesa-cola {
+  flex: none; padding: var(--e3) var(--e3) var(--e2); border-radius: var(--raio-4); color: var(--mesa-tinta);
+  background: var(--mesa-papel); box-shadow: 0 10px 24px var(--preto-45), inset 0 0 0 2px var(--mesa-papel-borda), inset 0 0 0 5px var(--mesa-papel-claro), inset 0 0 0 6px var(--mesa-papel-borda);
+}
+.mesa-cola-titulo { text-align: center; font-size: var(--letra-legenda); font-weight: var(--peso-versalete); letter-spacing: .06em; text-transform: uppercase; color: var(--mesa-tinta-2); margin-bottom: var(--e1); }
+.mesa-cola-linha {
+  display: grid; grid-template-columns: 34px 52px minmax(0, 1fr) 24px; align-items: center; gap: var(--e1m);
+  padding: var(--e1) var(--e1m); border-radius: var(--raio-3); border: 1.5px solid transparent;
+}
+.mesa-cola-linha.pode { background: var(--mesa-pode); border-color: var(--mesa-pode-borda); }
+.mesa-cola-linha.falta { opacity: .45; filter: saturate(.5); }
+.mesa-cola-peca { height: 30px; display: grid; place-items: center; }
+.mesa-cola-nome { font-size: var(--letra-menu); font-weight: var(--peso-versalete); }
+.mesa-cola-custo { display: flex; gap: 3px; }
+.mesa-carta.na-cola { width: 19px; height: 27px; filter: none; }
+.mesa-cola-peca > .mesa-carta.na-cola { width: 20px; height: 28px; }
+.mesa-peca { display: grid; place-items: center; width: 30px; height: 28px; }
+.mesa-peca svg { width: 100%; height: 100%; }
+
+/* A pílula da vez, acima da sua mão: o que falta fazer e o tempo; acende quando é com você. */
+.mesa-pilula {
+  position: relative; display: flex; align-items: center; gap: var(--e2); max-width: 100%; box-sizing: border-box;
+  padding: var(--e2) var(--e4) 10px; border-radius: var(--raio-4); overflow: hidden;
+  background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda); color: var(--texto-2);
+}
+.mesa-pilula.minha { background: var(--marinho); border-color: var(--azul-300); color: var(--azul-ceu); box-shadow: 0 6px 18px var(--preto-45); }
+.mesa-pilula b { color: var(--texto-forte); font-size: var(--letra-texto); white-space: nowrap; }
+.mesa-pilula-detalhe { font-size: var(--letra-menu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mesa-pilula b.mesa-pilula-tempo { margin-left: var(--e2); font-size: var(--letra-titulo); font-variant-numeric: tabular-nums; }
+.mesa-pilula b.mesa-pilula-tempo.acabando { color: var(--perigo-texto); }
+/* A barra anda aos saltos, quatro por segundo, SEM transição: com ela, cada salto virava uma
+   animação de 0,25 s emendada na seguinte — a janela se redesenhando a partida inteira, que é o
+   que o animacoes.test.ts existe para impedir (medido no Mac do dono: GPU perto de 100%). */
+.mesa-pilula-barra { position: absolute; left: 0; bottom: 0; height: 3px; }
+
+/* A sua mão: a foto, os pontos e quantas cartas; as de recurso; e, à parte, as de desenvolvimento. */
+.mesa-eu {
+  /* A carta da mão acompanha a largura do meio da mesa (10cqw) e a altura da janela: com cinco
+     recursos e as de desenvolvimento ao lado, ela tem de caber sem empurrar os lados. */
+  --mao-l: max(34px, min(62px, 10cqw, 8.4vh)); --mao-a: calc(var(--mao-l) * 1.4);
+  display: flex; align-items: flex-end; gap: var(--e4); max-width: 100%; box-sizing: border-box;
+  padding: var(--e3) var(--e4) var(--e3); border-radius: var(--raio-5);
+  background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda);
+}
+.mesa-eu.acesa { border-color: var(--azul-300); box-shadow: 0 0 0 3px var(--acento-tenue), 0 0 36px var(--acento-tenue-forte); }
+.mesa-eu-quem { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
+.mesa-eu-quem > .mesa-disco { position: absolute; right: -4px; top: -6px; width: 26px; height: 26px; font-size: var(--letra-menu); }
+.mesa-eu-quem b { font-size: var(--letra-menu); color: var(--texto-forte); margin-top: var(--e1); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-eu-quem > span:last-child { font-size: var(--letra-rotulo); color: var(--texto-3); white-space: nowrap; }
+.mesa-eu-cartas { display: flex; gap: var(--e2); align-items: flex-end; }
+.mesa-carta-mao { position: relative; flex: none; }
+.mesa-carta.na-mao { width: var(--mao-l); height: var(--mao-a); transition: transform .2s ease-out; }
+.mesa-carta-mao.zerada .mesa-carta { opacity: .32; filter: saturate(.3); }
+.mesa-carta-mao.chegou .mesa-carta { transform: translateY(-10px); filter: drop-shadow(0 0 6px var(--aviso)); }
+.mesa-carta-qtd {
+  position: absolute; right: -6px; top: -8px; min-width: 24px; height: 24px; padding: 0 5px; box-sizing: border-box;
+  border-radius: var(--raio-cheio); background: var(--cinza-1000); color: var(--branco); border: 2px solid var(--texto-forte);
+  font-size: var(--letra-menu); font-weight: var(--peso-versalete); line-height: 20px; text-align: center;
+}
+.mesa-carta-mao.zerada .mesa-carta-qtd { opacity: .45; }
 .catan-chegou {
   position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); z-index: 2;
   padding: 2px var(--e2); border-radius: var(--raio-cheio); background: var(--aviso); color: var(--cinza-1000);
   font-size: var(--letra-legenda); font-weight: var(--peso-versalete); white-space: nowrap;
 }
-.catan-carta.desenvolvimento.grande { flex-direction: column; justify-content: flex-start; gap: var(--e1); padding: var(--e2) 3px 0; }
-.catan-carta.desenvolvimento.grande svg { position: static; flex: none; width: 26px; height: 26px; fill: currentColor; }
-.catan-carta.desenvolvimento.grande .catan-carta-nome { font-size: 11px; line-height: 1.15; padding: 0 2px; }
-.catan-carta.desenvolvimento.grande .catan-carta-rotulo { color: var(--berserk-claro); text-shadow: none; }
-.catan-carta.desenvolvimento.jogavel:hover .catan-carta-rotulo { color: var(--branco); }
+.mesa-eu-dev { display: flex; flex-direction: column; gap: var(--e1m); padding-left: var(--e4); border-left: 1px solid var(--branco-07); }
+.mesa-eu-dev-cartas { display: flex; gap: var(--e2); }
+.mesa-eu-dev-cartas.apertadas > .mesa-dev + .mesa-dev { margin-left: calc(var(--mao-l) * -.45); }
+.mesa-dev { position: relative; flex: none; padding: 0; background: none; border-radius: var(--raio-2); }
+.mesa-dev .mesa-carta.na-mao { width: calc(var(--mao-l) * .86); height: calc(var(--mao-a) * .86); }
+.mesa-dev.nova .mesa-carta { opacity: .55; }
+.mesa-dev.jogavel { cursor: pointer; }
+.mesa-dev.jogavel .mesa-carta { filter: drop-shadow(0 0 5px var(--roxo-500)); }
+.mesa-dev.jogavel:hover .mesa-carta { transform: translateY(-6px); }
+.mesa-dev-nova, .mesa-dev-jogar {
+  position: absolute; left: 3px; right: 3px; bottom: 4px; text-align: center;
+  font-size: 8px; line-height: 1.1; font-weight: var(--peso-versalete); letter-spacing: .03em; text-transform: uppercase;
+  color: var(--roxo-300); background: var(--superficie-0); border: 1px solid var(--roxo-500); border-radius: var(--raio-1); padding: 1px 2px;
+}
+.mesa-dev-jogar { color: var(--branco); background: var(--roxo-600); }
+
+/* Os botões da vez, embaixo à direita, com a peça desenhada ao lado do nome. */
+.mesa-acoes { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+.mesa-acoes-dica { grid-column: 1 / -1; padding: var(--e3); border-radius: var(--raio-4); background: var(--mesa-placa); font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.4; }
+.mesa-b {
+  display: flex; align-items: center; gap: var(--e2); height: 40px; padding: 0 var(--e3); box-sizing: border-box;
+  border-radius: var(--raio-3); background: var(--mesa-placa); border: 1px solid var(--branco-14);
+  color: var(--texto-forte); font-size: var(--letra-menu); font-weight: var(--peso-forte);
+}
+.mesa-b:hover:not(:disabled) { background: var(--superficie-3); }
+.mesa-b.ativo { background: var(--acento-tenue-forte); border-color: var(--acento); color: var(--acento-texto); }
+.mesa-b:disabled { opacity: .4; }
+.mesa-b.primario {
+  grid-column: 1 / -1; justify-content: center; height: 44px; font-size: var(--letra-painel);
+  background: var(--acento-cheio); border-color: var(--acento-cheio); color: var(--sobre-acento); box-shadow: var(--sombra-2);
+}
+.mesa-b.primario:hover:not(:disabled) { background: var(--acento-cheio-hover); }
+.mesa-b-icone { flex: none; width: 26px; height: 24px; display: grid; place-items: center; }
+.mesa-b-icone .mesa-peca { width: 26px; height: 24px; }
+.mesa-carta.no-botao { width: 16px; height: 22px; filter: none; }
+
+/* No meio da mesa, o tabuleiro sem caixa: o feltro é o fundo. O véu das janelas, arredondado.
+   A caixa é mais larga que o tabuleiro (ele cabe pela altura); os dados e o botão de rolar ficam
+   junto da BORDA DO TABULEIRO, e não no canto da caixa — numa tela larga eles iam parar longe. A
+   largura desenhada é a menor entre a da caixa e a altura vezes 696/607 (a proporção do SVG). */
+.catan-mesa .catan-tabuleiro-caixa { background: none; container-type: size; }
+.catan-mesa .catan-veu { border-radius: var(--raio-5); }
+.catan-mesa .catan-dados, .catan-mesa .catan-rolar { right: max(var(--e2), calc((100cqw - min(100cqw, 114.7cqh)) / 2 - 150px)); }
+
+/* Lado estreito (janela pequena): a cola perde a coluna do nome — a peça já diz o que é —, e o
+   banco aperta os montes. */
+@container (max-width: 250px) {
+  .mesa-cola-linha { grid-template-columns: 30px minmax(0, 1fr) 22px; }
+  .mesa-cola-nome { display: none; }
+  .mesa-banco-montes { gap: var(--e1m); }
+  .mesa-lugar-cartas { gap: var(--e3); }
+}
+
+/* Janela baixa (a mínima da Saga é 900×560): a mesa aperta antes de rolar. */
+@media (max-height: 720px) {
+  .catan-mesa { --carta-l: 24px; --carta-a: 34px; --passo: 10px; gap: var(--e2) var(--e3); padding-top: var(--e2); }
+  .mesa-lugar { padding: var(--e2); gap: var(--e1m); }
+  .mesa-acontecendo-lugar { height: 92px; }
+  .mesa-cola { padding: var(--e2) var(--e2) var(--e1); }
+  .mesa-cola-linha { padding: 2px var(--e1); }
+  .mesa-cola-peca { height: 24px; }
+  .mesa-banco { padding: var(--e1m) var(--e2) var(--e2); }
+  .mesa-b { height: 34px; }
+  .mesa-b.primario { height: 38px; }
+  .catan-rolar { padding: var(--e1m) var(--e4) var(--e1m) var(--e2); font-size: var(--letra-texto); box-shadow: 0 0 0 4px var(--acento-tenue-forte), var(--sombra-2); }
+  .catan-rolar .catan-dado { width: 30px; height: 30px; }
+  .catan-dado { width: 38px; height: 38px; }
+}

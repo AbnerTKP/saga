@@ -4,7 +4,7 @@ import {
   centroDoHex, pontoDoCruzamento, pontasDaAresta, textoDoEvento, textoDoMonte, oQueTocarNoCatan, minhaMesaDoCatan,
   temTudo, CUSTOS, monteVazio, type ResumoDaMesaDoCatan,
   tempoRestante, segundosQueFaltam, deveTicar, meuPrazo, eventosNovos, oQueTocarNaPartida,
-  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA,
+  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, lugaresEmVolta, oQueDaParaConstruir,
   type Evento, type Partida, type JogadorNaPartida,
 } from './catan.ts';
 
@@ -235,4 +235,29 @@ test('as cartas que chegaram: só o que subiu, e nada na primeira leitura', () =
   // Na troca, saiu lã e madeira e entraram dois minérios: aparece só o que entrou.
   assert.deepEqual(cartasQueChegaram(m(2, 2, 0), m(1, 1, 2)), { minerio: 2 });
   assert.deepEqual(cartasQueChegaram(m(2, 2, 0), m(2, 2, 0)), {});
+});
+
+test('a mesa em volta: você embaixo, e quem joga depois de você senta à sua esquerda', () => {
+  assert.deepEqual(lugaresEmVolta(4, 0), ['baixo', 'esquerda', 'cima', 'direita']);
+  assert.deepEqual(lugaresEmVolta(4, 2), ['cima', 'direita', 'baixo', 'esquerda']);
+  // Com três, o lugar de cima fica vazio: o tabuleiro cresce para ele.
+  assert.deepEqual(lugaresEmVolta(3, 1), ['direita', 'baixo', 'esquerda']);
+  assert.deepEqual(lugaresEmVolta(2, 1), ['cima', 'baixo']);
+  // Quem só assiste vê o jogador 0 embaixo.
+  assert.deepEqual(lugaresEmVolta(3, null), ['baixo', 'esquerda', 'direita']);
+});
+
+test('a cola acende o que as suas cartas já pagam, com peça sobrando; para a plateia, nada', () => {
+  const eu = jogador({ pecas: { estrada: 0, aldeia: 3, cidade: 4 } });
+  const p = { eu: 0, baralho: 10, jogadores: [eu, jogador()], mao: { madeira: 1, tijolo: 1, la: 1, trigo: 1, minerio: 1 } };
+  // A estrada é paga, mas as peças acabaram.
+  assert.deepEqual(oQueDaParaConstruir(p), { estrada: false, aldeia: true, cidade: false, desenvolvimento: true });
+  assert.deepEqual(oQueDaParaConstruir({ ...p, baralho: 0 })?.desenvolvimento, false);
+  assert.equal(oQueDaParaConstruir({ ...p, eu: null, mao: null }), null);
+  assert.equal(oQueDaParaConstruir({ ...p, jogadores: [jogador({ fora: true }), jogador()] }), null);
+  // Na sua vez, nas ações, a cola diz o mesmo que os botões: carta na mão sem lugar não acende.
+  const naVez = { ...p, vez: 0, fase: 'acoes' as const, pode: { aldeias: [], comprar: true as const } };
+  assert.deepEqual(oQueDaParaConstruir(naVez), { estrada: false, aldeia: false, cidade: false, desenvolvimento: true });
+  // Antes de rolar ainda não há botão: vale o que as cartas pagam.
+  assert.deepEqual(oQueDaParaConstruir({ ...naVez, fase: 'rolar' as const })?.aldeia, true);
 });

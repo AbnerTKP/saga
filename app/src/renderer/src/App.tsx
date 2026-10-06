@@ -1702,7 +1702,8 @@ export function App() {
           </div>
         )}
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
-        // coluna dela — flutuando no canto, taparia o tabuleiro.
+        // coluna dela — flutuando no canto, taparia o tabuleiro. O Catan começado toma a JANELA:
+        // a Saga sai da frente pelo CSS (`.app:has(.catan-mesa)`, no catan.css).
         jogo={jogoAberto?.tipo === 'catan' ? (live) => (
           <TelaDoCatan
             key={`catan-${jogoAberto.mesaId}`}
@@ -1713,6 +1714,9 @@ export function App() {
             naCall={naMinhaCall}
             surdo={rm.deafened}
             live={live}
+            // Dentro da partida a Saga sai da frente, e o painel da conta com ela: a barra da mesa
+            // ganha a sala, o microfone e o fone — os mesmos controles, não cópias.
+            call={{ sala: rm.salaDaVoz?.nome ?? null, conectado: rm.status !== 'idle', micOn: rm.micOn, alternarMic: rm.toggleMic, alternarSurdo: rm.toggleDeafen }}
             onFechar={() => setJogoAberto(null)}
             onAviso={notas.mostrar}
           />

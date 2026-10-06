@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { agirNaMesaDoCatan, verMesaDoCatan, type Membro } from '../api';
 import {
   CUSTOS, COR_DO_JOGADOR, NOME_DA_CARTA, NOME_DO_RECURSO, O_QUE_A_CARTA_FAZ, RECURSOS,
   PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, TEMPOS_DA_VEZ,
   cartasQueChegaram, centroDoHex, chaveDoHex, deveTicar, faixaDaVez, hexesQueProduziram, lerHex, meuPrazo, monteVazio, oQueEspera, oQueTocarNaPartida,
   pontasDaAresta, pontoDoCruzamento, segundosQueFaltam, somaDoMonte, tempoRestante, temTudo, textoDoEvento, textoDoMonte, vezParada, vezQueComecou,
-  type AcaoNaMesaDoCatan, type CartaDeDesenvolvimento, type Jogada, type MesaDoCatan, type Monte, type Partida,
+  lugaresEmVolta, oQueDaParaConstruir, PONTOS_DA_CONSTRUCAO,
+  type AcaoNaMesaDoCatan, type CartaDeDesenvolvimento, type Construcao, type Jogada, type Lugar, type MesaDoCatan, type Monte, type Partida,
   type FaixaDaVez as Faixa, type PessoaNoCatan, type Recurso,
 } from '../catan';
-import { ALTURA, FUNDO_DA_CARTA, LARGURA, S, clarear, desenharFundo, desenharPecas, icone, noSvg, poli } from '../desenhoDoCatan';
+import { CORES_DA_MESA, SIMBOLO, simbolosDasCartas } from '../cartasDoCatan';
+import { ALTURA, LARGURA, S, clarear, desenharFundo, desenharPecas, noSvg, poli } from '../desenhoDoCatan';
+import { iconeDeConstruir } from '../iconesDoCatan';
 import { rolarOsDados } from '../somDosDados';
 import { tocarNoCatan } from '../somDoCatan';
 import { Avatar } from './Avatar';
@@ -61,6 +64,19 @@ function TiqueDoRelogio({ prazo, base, surdo }: { prazo: number; base: BaseDoRel
   return null;
 }
 
+/**
+ * O microfone e o fone da call, para a barra da mesa: dentro da partida a Saga sai da frente, e
+ * com ela o painel da conta onde esses dois moram. São os MESMOS controles (useRoom), não cópias.
+ */
+export type ControlesDaCall = {
+  /** A sala de voz em que você está; null fora de call. */
+  sala: string | null;
+  conectado: boolean;
+  micOn: boolean;
+  alternarMic: () => void;
+  alternarSurdo: () => void;
+};
+
 type Modo = 'aldeia' | 'estrada' | 'cidade' | null;
 type Janela =
   | { tipo: 'troca'; aba: 'jogadores' | 'banco'; contra?: boolean }
@@ -74,7 +90,7 @@ type Janela =
  * sua mão à esquerda, a coluna dos jogadores, dos custos e do que está acontecendo à direita, como
  * o xadrez. É a mesma tela do começo ao fim: a mesa esperando gente, a partida e o fim.
  */
-export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, live, onFechar, onAviso }: {
+export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, live, call, onFechar, onAviso }: {
   mesaId: number;
   /** O servidor DA MESA: é a ele que toda pergunta vai, mesmo com outro aberto. */
   servidorId: number;
@@ -84,6 +100,7 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
   /** Fone desligado: os dados rolam calados. */
   surdo: boolean;
   live?: ReactNode;
+  call?: ControlesDaCall;
   onFechar: () => void;
   onAviso: (tipo: 'erro' | 'info', texto: string) => void;
 }) {
@@ -171,6 +188,15 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
   const nome = useCallback((j: number) => mesa?.jogadores?.[j]?.nome ?? '…', [mesa?.jogadores]);
   const espera = partida ? oQueEspera(partida, nome) : null;
 
+  // Começada a partida, a tela é só o jogo (a mesa em volta, 06/10/2026): a Saga sai da frente
+  // pelo CSS (`.app:has(.catan-mesa)`, no catan.css). A mesa esperando gente fica dentro da Saga.
+  if (mesa && mesa.estado !== 'lobby' && partida) {
+    return (
+      <Partida_ mesa={mesa} partida={partida} ocupado={ocupado} surdo={surdo} live={live} base={base} call={call}
+        nome={nome} onJogar={jogar} onAgir={agir} onSair={onFechar} />
+    );
+  }
+
   return (
     <div className="tela-do-catan">
       <header className="stage-head">
@@ -187,11 +213,8 @@ export function TelaDoCatan({ mesaId, servidorId, euId, membros, naCall, surdo, 
           <div className="xadrez-carregando muted">
             {falhou ? `Não consegui abrir a mesa (${falhou}). Tentando de novo…` : 'Abrindo a mesa…'}
           </div>
-        ) : mesa.estado === 'lobby' || !partida ? (
-          <Lobby mesa={mesa} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} />
         ) : (
-          <Partida_ mesa={mesa} partida={partida} ocupado={ocupado} surdo={surdo} live={live} base={base}
-            nome={nome} onJogar={jogar} onAgir={agir} onSair={onFechar} />
+          <Lobby mesa={mesa} euId={euId} ocupado={ocupado} membros={membros} naCall={naCall} onAgir={agir} />
         )}
       </div>
     </div>
@@ -321,8 +344,8 @@ function Lobby({ mesa, euId, ocupado, membros, naCall, onAgir }: {
 // A partida.
 // ---------------------------------------------------------------------------------------------
 
-function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar, onAgir, onSair }: {
-  mesa: MesaDoCatan; partida: Partida; ocupado: boolean; surdo: boolean; live?: ReactNode; base: BaseDoRelogio;
+function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, onJogar, onAgir, onSair }: {
+  mesa: MesaDoCatan; partida: Partida; ocupado: boolean; surdo: boolean; live?: ReactNode; base: BaseDoRelogio; call?: ControlesDaCall;
   nome: (j: number) => string;
   onJogar: (j: Jogada) => Promise<boolean>;
   onAgir: (a: AcaoNaMesaDoCatan) => Promise<boolean>;
@@ -452,11 +475,33 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar,
   const prazoMeu = meuPrazo(p);
   const faixa = faixaDaVez(p, nome);
 
+  // Quem senta onde: você embaixo, os outros em volta na ordem da vez (`lugaresEmVolta`).
+  const lugares = lugaresEmVolta(p.jogadores.length, eu);
+  const quem = (l: Lugar) => lugares.indexOf(l);
+  const esquerda = quem('esquerda'), cima = quem('cima'), direita = quem('direita'), baixo = quem('baixo');
+  const lugar = (k: number, onde: Lugar) => k < 0 ? null : (
+    <LugarNaMesa partida={p} k={k} onde={onde} pessoa={mesa.jogadores?.[k]} nome={nome(k)}
+      relogio={faixa && faixa.j === k ? faixa : null} base={base} />
+  );
+  const minhaCor = COR_DO_JOGADOR[p.jogadores[eu ?? 0].cor];
+  const jogando = eu !== null && !p.jogadores[eu].fora && p.fase !== 'fim';
+  // O sprite das cartas vai uma vez na mesa; cada carta é um `<use>` dele (ver cartasDoCatan.ts).
+  const simbolos = useMemo(() => simbolosDasCartas(), []);
+
   return (
-    <div className="catan-partida">
+    <div className="catan-mesa" style={CORES_DA_MESA as CSSProperties}>
+      <svg className="mesa-simbolos" aria-hidden="true" dangerouslySetInnerHTML={{ __html: simbolos }} />
       {prazoMeu !== null && <TiqueDoRelogio key={prazoMeu} prazo={prazoMeu} base={base} surdo={surdo} />}
-      <div className="catan-esquerda">
-        {faixa && <FaixaDaVez faixa={faixa} partida={p} pessoa={mesa.jogadores?.[faixa.j]} base={base} />}
+      <BarraDaMesa mesa={mesa} partida={p} ocupado={ocupado} surdo={surdo} call={call} jogando={jogando} onAgir={onAgir} onSair={onSair} />
+
+      <div className="mesa-lado esquerda">
+        <Banco partida={p} />
+        <div className="mesa-lado-meio">{lugar(esquerda, 'esquerda')}</div>
+        <Cola partida={p} cor={minhaCor} />
+      </div>
+
+      <div className="mesa-centro">
+        {lugar(cima, 'cima')}
         <div className="catan-tabuleiro-caixa">
           <TabuleiroDoCatan partida={p} acesos={acesos} modo={modoDaVez} corMinha={eu !== null ? COR_DO_JOGADOR[p.jogadores[eu].cor] : '#fff'}
             ocupado={ocupado} onCruzamento={clicarCruzamento} onAresta={clicarAresta} onTerreno={clicarTerreno} />
@@ -512,84 +557,90 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, nome, onJogar,
           )}
           {p.fase === 'fim' && <Fim mesa={mesa} partida={p} nome={nome} ocupado={ocupado} onAgir={onAgir} onSair={onSair} />}
         </div>
-        {eu !== null && p.mao && (
-          <div className="catan-mao">
-            <div className="catan-cartas grandes">
-              <div className="catan-total"><b>{somaDoMonte(p.mao)}</b><span>{somaDoMonte(p.mao) === 1 ? 'carta' : 'cartas'}</span></div>
-              {RECURSOS.map((r) => <CartaDaMao key={r} recurso={r} n={p.mao![r]} chegou={chegou?.cartas[r]} />)}
-              {/* Iguais viram uma carta com a quantidade: oito cartas soltas empurravam o tabuleiro. */}
-              {agruparCartas(p.cartas ?? []).map((c) => (
-                <CartaDeDesenvolvimento_ key={`${c.tipo}-${c.nova}`} carta={c.tipo} nova={c.nova} n={c.n}
-                  podeJogar={!c.nova && !!p.pode.jogar?.includes(c.tipo) && !ocupado} onJogar={() => jogar(c.tipo)} />
-              ))}
-            </div>
-            <div className="catan-acoes">
-              {p.fase === 'fim' ? null : p.fase === 'inicio' ? (
-                <span className="muted small">
-                  {minhaVez ? (p.inicio?.falta === 'estrada' ? 'Agora a estrada, saindo da aldeia.' : 'Clique num cruzamento para pôr a aldeia.')
-                    : 'Cada um põe uma aldeia e uma estrada; depois de novo, na volta.'}
-                  {p.inicio?.segunda && minhaVez && p.inicio.falta === 'aldeia' ? ' Esta já rende as cartas dos terrenos em volta.' : ''}
-                </span>
-              ) : p.fase === 'rolar' && minhaVez ? (
-                <span className="muted small">Role os dados para jogar</span>
-              ) : (
-                <>
-                  <button type="button" className={`secundario ${janela?.tipo === 'troca' ? 'ativo' : ''}`} disabled={!p.pode.trocar || ocupado}
-                    onClick={() => setJanela(janela?.tipo === 'troca' ? null : { tipo: 'troca', aba: 'jogadores' })}>Trocar</button>
-                  <BotaoDeConstruir rotulo="Estrada" custo={CUSTOS.estrada} ativo={modo === 'estrada'} pode={!!p.pode.estradas?.length && p.fase === 'acoes'} ocupado={ocupado} onClick={() => setModo(modo === 'estrada' ? null : 'estrada')} />
-                  <BotaoDeConstruir rotulo="Aldeia" custo={CUSTOS.aldeia} ativo={modo === 'aldeia'} pode={!!p.pode.aldeias?.length && p.fase === 'acoes'} ocupado={ocupado} onClick={() => setModo(modo === 'aldeia' ? null : 'aldeia')} />
-                  <BotaoDeConstruir rotulo="Cidade" custo={CUSTOS.cidade} ativo={modo === 'cidade'} pode={!!p.pode.cidades?.length} ocupado={ocupado} onClick={() => setModo(modo === 'cidade' ? null : 'cidade')} />
-                  <BotaoDeConstruir rotulo="Carta" custo={CUSTOS.desenvolvimento} ativo={false} pode={!!p.pode.comprar} ocupado={ocupado} onClick={() => onJogar({ tipo: 'comprar' })} />
-                  <button type="button" className="primary" disabled={!p.pode.passar || ocupado} onClick={() => { setModo(null); setJanela(null); onJogar({ tipo: 'passar' }); }}>Passar a vez</button>
-                </>
-              )}
-            </div>
+        <div className="mesa-baixo">
+          {faixa && <PilulaDaVez faixa={faixa} partida={p} base={base} />}
+          {eu !== null && p.mao ? (
+            <MinhaMao partida={p} nome={nome(eu)} pessoa={mesa.jogadores?.[eu]} chegou={chegou?.cartas}
+              relogio={faixa && faixa.j === eu ? faixa : null} base={base} ocupado={ocupado} onJogarCarta={jogar} />
+          ) : lugar(baixo, 'baixo')}
+        </div>
+      </div>
+
+      <div className="mesa-lado direita">
+        <Acontecendo partida={p} nome={nome} />
+        <div className="mesa-lado-meio">
+          {lugar(direita, 'direita')}
+          {live && <div className="xadrez-live mesa-live">{live}</div>}
+        </div>
+        {eu !== null && (
+          <div className="mesa-acoes">
+            {p.fase === 'fim' ? null : p.fase === 'inicio' ? (
+              <span className="mesa-acoes-dica">
+                {minhaVez ? (p.inicio?.falta === 'estrada' ? 'Agora a estrada, saindo da aldeia.' : 'Clique num cruzamento para pôr a aldeia.')
+                  : 'Cada um põe uma aldeia e uma estrada; depois de novo, na volta.'}
+                {p.inicio?.segunda && minhaVez && p.inicio.falta === 'aldeia' ? ' Esta já rende as cartas dos terrenos em volta.' : ''}
+              </span>
+            ) : p.fase === 'rolar' && minhaVez ? (
+              <span className="mesa-acoes-dica">Role os dados para jogar</span>
+            ) : (
+              <>
+                <button type="button" className={`mesa-b ${janela?.tipo === 'troca' ? 'ativo' : ''}`} disabled={!p.pode.trocar || ocupado}
+                  onClick={() => setJanela(janela?.tipo === 'troca' ? null : { tipo: 'troca', aba: 'jogadores' })}>
+                  <span className="mesa-b-icone"><Traco nome="trocar" tamanho={20} /></span>Trocar
+                </button>
+                <BotaoDeConstruir tipo="estrada" cor={minhaCor} ativo={modo === 'estrada'} pode={!!p.pode.estradas?.length && p.fase === 'acoes'} ocupado={ocupado} onClick={() => setModo(modo === 'estrada' ? null : 'estrada')} />
+                <BotaoDeConstruir tipo="aldeia" cor={minhaCor} ativo={modo === 'aldeia'} pode={!!p.pode.aldeias?.length && p.fase === 'acoes'} ocupado={ocupado} onClick={() => setModo(modo === 'aldeia' ? null : 'aldeia')} />
+                <BotaoDeConstruir tipo="cidade" cor={minhaCor} ativo={modo === 'cidade'} pode={!!p.pode.cidades?.length} ocupado={ocupado} onClick={() => setModo(modo === 'cidade' ? null : 'cidade')} />
+                <BotaoDeConstruir tipo="desenvolvimento" cor={minhaCor} ativo={false} pode={!!p.pode.comprar} ocupado={ocupado} onClick={() => onJogar({ tipo: 'comprar' })} />
+                <button type="button" className="mesa-b primario" disabled={!p.pode.passar || ocupado} onClick={() => { setModo(null); setJanela(null); onJogar({ tipo: 'passar' }); }}>Passar a vez</button>
+              </>
+            )}
           </div>
         )}
       </div>
-      <Coluna mesa={mesa} partida={p} nome={nome} ocupado={ocupado} live={live} onAgir={onAgir} onSair={onSair} />
     </div>
   );
 }
 
-function BotaoDeConstruir({ rotulo, custo, ativo, pode, ocupado, onClick }: {
-  rotulo: string; custo: Recurso[]; ativo: boolean; pode: boolean; ocupado: boolean; onClick: () => void;
+const ROTULO_DE_CONSTRUIR: Record<Construcao, string> = { estrada: 'Estrada', aldeia: 'Aldeia', cidade: 'Cidade', desenvolvimento: 'Carta' };
+
+/** O botão de construir, com a peça desenhada na sua cor (os ícones moram em iconesDoCatan.ts). */
+function BotaoDeConstruir({ tipo, cor, ativo, pode, ocupado, onClick }: {
+  tipo: Construcao; cor: string; ativo: boolean; pode: boolean; ocupado: boolean; onClick: () => void;
 }) {
+  const custo = CUSTOS[tipo];
   return (
-    <button type="button" className={`secundario ${ativo ? 'ativo' : ''}`} disabled={!pode || ocupado} onClick={onClick}
-      title={`${rotulo}: ${textoDoMonte(custo.reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}`}>
-      {rotulo}
+    <button type="button" className={`mesa-b ${ativo ? 'ativo' : ''}`} disabled={!pode || ocupado} onClick={onClick}
+      title={`${tipo === 'desenvolvimento' ? 'Carta de desenvolvimento' : ROTULO_DE_CONSTRUIR[tipo]}: ${textoDoMonte(custo.reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}`}>
+      <span className="mesa-b-icone">
+        {tipo === 'desenvolvimento' ? <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="no-botao" />
+          : <span className="mesa-peca" dangerouslySetInnerHTML={{ __html: iconeDeConstruir(tipo, cor) }} />}
+      </span>
+      {ROTULO_DE_CONSTRUIR[tipo]}
     </button>
   );
 }
 
 /**
- * A faixa acima do tabuleiro (a opção A que o dono deixou comigo, 04/10/2026): de quem é a vez, o
- * que falta e o tempo — grande, e vermelho nos últimos 5 s —, com a barra da cor de quem joga
- * esvaziando. Na sua vez ela acende: é o "mais evidente quando for minha rodada" do pedido. Fica
- * ACIMA do tabuleiro, e não por cima dele: por cima, tapava os portos da fileira de cima.
+ * A pílula da vez, acima da sua mão — era a faixa acima do tabuleiro (04/10/2026) e mudou de lugar
+ * com a mesa em volta: quem joga agora já acende na mesa, e o que sobra dizer (o que falta fazer,
+ * o tempo, a troca parando a vez, o 7) fica junto da mão, onde se joga. Na sua vez ela acende; a
+ * barra esvazia aos saltos e fica vermelha nos últimos 5 s.
  */
-function FaixaDaVez({ faixa, partida: p, pessoa, base }: {
-  faixa: Faixa; partida: Partida; pessoa?: PessoaNoCatan; base: BaseDoRelogio;
-}) {
+function PilulaDaVez({ faixa, partida: p, base }: { faixa: Faixa; partida: Partida; base: BaseDoRelogio }) {
   const ms = useRestante(faixa.prazo, base);
-  const total = faixa.total;
   const cor = COR_DO_JOGADOR[p.jogadores[faixa.j].cor];
   const s = ms === null ? null : segundosQueFaltam(ms);
   return (
-    <div className={`catan-faixa ${faixa.minha ? 'minha' : ''}`}>
-      <span className="catan-anel" style={{ borderColor: cor }}><Avatar nome={pessoa?.nome ?? '?'} foto={pessoa?.foto} /></span>
-      <span className="catan-faixa-texto"><b>{faixa.titulo}</b><span>{faixa.detalhe}</span></span>
-      {s !== null && (
-        <span className={`catan-faixa-relogio ${ms! <= ACABANDO ? 'acabando' : ''}`}>
-          <Icon name="relogio" size={18} />{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}
-        </span>
-      )}
-      {ms !== null && <i className="catan-faixa-barra" style={{ width: `${Math.min(1, ms / total) * 100}%`, background: cor }} />}
+    <div className={`mesa-pilula ${faixa.minha ? 'minha' : ''}`}>
+      <Icon name="relogio" size={16} />
+      <b>{faixa.titulo}</b>
+      <span className="mesa-pilula-detalhe">{faixa.detalhe}</span>
+      {s !== null && <b className={`mesa-pilula-tempo ${ms! <= ACABANDO ? 'acabando' : ''}`}>{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}</b>}
+      {ms !== null && <i className="mesa-pilula-barra" style={{ width: `${Math.min(1, ms / faixa.total) * 100}%`, background: cor }} />}
     </div>
   );
 }
-
 /**
  * "Sua vez!" ou "Vez de Tava1" no meio do tabuleiro, a cada vez que começa — pedido do dono
  * (04/10/2026), mostrado e não falado. Some sozinho e não pega clique: quem já está jogando não
@@ -706,15 +757,19 @@ function Dados({ dados, rolando }: { dados: [number, number] | null; rolando: bo
 // As cartas.
 // ---------------------------------------------------------------------------------------------
 
-function CartaDeRecurso({ recurso, n, pequena = false }: { recurso: Recurso; n?: number; pequena?: boolean }) {
-  const [a, b] = FUNDO_DA_CARTA[recurso];
+/** Uma carta do sprite (`cartasDoCatan.ts`): um `<svg>` com o `<use>` do símbolo dela. */
+function Carta({ simbolo, className = '', estilo, titulo }: { simbolo: string; className?: string; estilo?: CSSProperties; titulo?: string }) {
   return (
-    <div className={`catan-carta ${pequena ? 'pequena' : ''} ${n === 0 ? 'zerada' : ''}`} title={NOME_DO_RECURSO[recurso]}
-      style={{ background: `radial-gradient(circle at 35% 25%, ${clarear(a, 0.15)}, ${a} 55%, ${b})` }}>
-      <svg viewBox="-1 -1 2 2" dangerouslySetInnerHTML={{ __html: icone(recurso) }} />
-      {n !== undefined && <span className="catan-carta-n">{n}</span>}
-    </div>
+    <svg className={`mesa-carta ${className}`} viewBox="0 0 100 140" style={estilo}
+      role={titulo ? 'img' : undefined} aria-label={titulo} aria-hidden={titulo ? undefined : true}>
+      <use href={`#${simbolo}`} />
+    </svg>
   );
+}
+
+/** A carta pequena de recurso das janelas (troca, descarte, fartura, monopólio): a mesma arte, sem o nome. */
+function CartaDeRecurso({ recurso, pequena = false }: { recurso: Recurso; pequena?: boolean }) {
+  return <Carta simbolo={SIMBOLO.recursoPequeno(recurso)} className={pequena ? 'pequena' : 'media'} titulo={NOME_DO_RECURSO[recurso]} />;
 }
 
 /** As cartas de desenvolvimento juntas por tipo; as compradas neste turno à parte, porque ainda não valem. */
@@ -730,44 +785,39 @@ function agruparCartas(cartas: { tipo: CartaDeDesenvolvimento; nova: boolean }[]
 }
 
 /**
- * A carta de recurso na mão (a opção C que o dono deixou comigo, 04/10/2026): grande, com o nome e
- * a quantidade em destaque; zerada, só o contorno, para a mão não parecer ter o que não tem. A que
- * acabou de chegar sobe com "+1 lã" — antes a carta chegava sem ninguém ver, e daí veio o "não
- * ganhei carta nenhuma" que o dono relatou.
+ * A carta de recurso na mão (a opção C, 04/10/2026, com a arte da mesa em volta): o terreno do
+ * tabuleiro no medalhão, o nome na faixa e a quantidade no selo; zerada, apagada, para a mão não
+ * parecer ter o que não tem. A que acabou de chegar sobe com "+1 lã" — antes a carta chegava sem
+ * ninguém ver, e daí veio o "não ganhei carta nenhuma" que o dono relatou.
  */
 function CartaDaMao({ recurso, n, chegou }: { recurso: Recurso; n: number; chegou?: number }) {
-  const [a, b] = FUNDO_DA_CARTA[recurso];
   return (
-    <div className={`catan-carta-mao ${chegou ? 'chegou' : ''}`} title={`${n} ${NOME_DO_RECURSO[recurso]}`}>
+    <div className={`mesa-carta-mao ${chegou ? 'chegou' : ''} ${n === 0 ? 'zerada' : ''}`} title={`${n} ${NOME_DO_RECURSO[recurso]}`}>
       {chegou && <span className="catan-chegou">+{chegou} {NOME_DO_RECURSO[recurso]}</span>}
-      <div className={`catan-carta grande ${n === 0 ? 'zerada' : ''}`}
-        style={n === 0 ? undefined : { background: `radial-gradient(circle at 35% 25%, ${clarear(a, 0.15)}, ${a} 55%, ${b})` }}>
-        <svg viewBox="-1 -1 2 2" dangerouslySetInnerHTML={{ __html: icone(recurso) }} />
-        <span className="catan-carta-rotulo">{NOME_DO_RECURSO[recurso]}</span>
-        <span className="catan-carta-qtd">{n}</span>
-      </div>
+      <Carta simbolo={SIMBOLO.recurso(recurso)} className="na-mao" />
+      <span className="mesa-carta-qtd">{n}</span>
     </div>
   );
 }
 
-/** A estrela das cartas de desenvolvimento: o que elas fazem está no nome, a estrela diz "não é recurso". */
-const ESTRELA = 'M0 -.62 L.18 -.2 L.62 -.2 L.27 .08 L.4 .52 L0 .26 L-.4 .52 L-.27 .08 L-.62 -.2 L-.18 -.2Z';
-
+/**
+ * A carta de desenvolvimento na sua mão: a ilustração dela, a quantidade quando há mais de uma, e
+ * "comprada agora" na que ainda não vale. Jogável, ela acende e um clique a joga.
+ */
 function CartaDeDesenvolvimento_({ carta, nova, n, podeJogar, onJogar }: {
   carta: CartaDeDesenvolvimento; nova: boolean; n: number; podeJogar: boolean; onJogar: () => void;
 }) {
   const dica = `${NOME_DA_CARTA[carta]}: ${O_QUE_A_CARTA_FAZ[carta]}${nova && carta !== 'ponto' ? ' Comprada neste turno: vale a partir do próximo.' : ''}`;
   return (
-    <button type="button" className={`catan-carta desenvolvimento grande ${podeJogar ? 'jogavel' : ''}`} title={dica}
-      disabled={!podeJogar} onClick={onJogar}>
-      <svg viewBox="-1 -1 2 2" aria-hidden="true"><path d={ESTRELA} /></svg>
-      <span className="catan-carta-nome">{NOME_DA_CARTA[carta]}</span>
-      <span className="catan-carta-rotulo">{nova ? 'nova' : podeJogar ? 'jogar' : ''}</span>
-      {n > 1 && <span className="catan-carta-qtd">{n}</span>}
+    <button type="button" className={`mesa-dev ${podeJogar ? 'jogavel' : ''} ${nova ? 'nova' : ''}`} title={dica}
+      aria-label={dica} disabled={!podeJogar} onClick={onJogar}>
+      <Carta simbolo={SIMBOLO.desenvolvimentoCurto(carta)} className="na-mao" />
+      {n > 1 && <span className="mesa-carta-qtd">{n}</span>}
+      {nova && <span className="mesa-dev-nova">comprada agora</span>}
+      {podeJogar && <span className="mesa-dev-jogar">jogar</span>}
     </button>
   );
 }
-
 /** Escolher cartas com − e +. `limite` é quanto se tem de cada uma. */
 function Escolher({ valor, limite, onMudar }: { valor: Monte; limite?: Partial<Monte>; onMudar: (m: Monte) => void }) {
   return (
@@ -1073,86 +1123,322 @@ function Fim({ mesa, partida: p, nome, ocupado, onAgir, onSair }: {
 }
 
 // ---------------------------------------------------------------------------------------------
-// A coluna: jogadores, custos, o que está acontecendo, plateia e desistir.
+// A mesa em volta (06/10/2026): a barra do jogo, os lugares, o banco, o que está acontecendo, a
+// cola de custos e a sua mão. Era a coluna da direita; o dono escolheu a mesa A — "pense no UNO
+// de PC, o pessoal em volta da mesa, o baralho deles" —, e a coluna se espalhou pela mesa.
 // ---------------------------------------------------------------------------------------------
 
-function Coluna({ mesa, partida: p, nome, ocupado, live, onAgir, onSair }: {
-  mesa: MesaDoCatan; partida: Partida; nome: (j: number) => string; ocupado: boolean; live?: ReactNode;
+const TRACOS = {
+  voltar: 'M15 6l-6 6 6 6M9 12h11',
+  trocar: 'M4 8h13l-3-3M20 16H7l3 3',
+  estrada: 'M7 21 10 3M17 21 14 3M12 6v2M12 12v2M12 18v2',
+} as const;
+/** Os três ícones de traço que o `Icon` da casa não tem. */
+function Traco({ nome, tamanho = 16 }: { nome: keyof typeof TRACOS; tamanho?: number }) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={TRACOS[nome]} /></svg>
+  );
+}
+
+/**
+ * A barra da mesa: voltar para a Saga (a partida continua, e fica no alto do chat), a call — a
+ * sala, o microfone e o fone, que dentro do jogo não têm outro lugar —, a rodada e o "⋯" com o
+ * desistir. Quem só assiste vê "assistindo" e volta pelo mesmo botão.
+ */
+function BarraDaMesa({ mesa, partida: p, ocupado, surdo, call, jogando, onAgir, onSair }: {
+  mesa: MesaDoCatan; partida: Partida; ocupado: boolean; surdo: boolean; call?: ControlesDaCall; jogando: boolean;
   onAgir: (a: AcaoNaMesaDoCatan) => Promise<boolean>; onSair: () => void;
 }) {
-  const lista = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = lista.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [p.historico.length]);
+  const rodada = p.fase === 'fim' ? 'fim da partida' : p.fase === 'inicio' ? 'colocação' : `rodada ${Math.max(1, p.rodada)}`;
+  return (
+    <div className="mesa-barra">
+      <button type="button" className="mesa-hud" onClick={onSair} title="A partida continua; ela fica no alto do chat.">
+        <Traco nome="voltar" />Voltar para a Saga
+      </button>
+      {call?.sala && <span className="mesa-hud mesa-hud-call"><i />{call.sala}</span>}
+      {call && (
+        <>
+          <button type="button" className={`mesa-hud icone ${!call.micOn && call.conectado ? 'off' : ''}`}
+            aria-disabled={!call.conectado || surdo} onClick={() => { if (call.conectado && !surdo) call.alternarMic(); }}
+            title={!call.conectado ? 'Fora de call' : call.micOn ? 'Mutar microfone' : 'Desmutar microfone'}>
+            <Icon name={call.micOn || !call.conectado ? 'mic' : 'micOff'} size={18} />
+          </button>
+          <button type="button" className={`mesa-hud icone ${surdo ? 'off' : ''}`} onClick={call.alternarSurdo}
+            title={surdo ? 'Voltar a ouvir' : 'Ensurdecer'}>
+            <Icon name={surdo ? 'headOff' : 'head'} size={18} />
+          </button>
+        </>
+      )}
+      <span className="spacer" />
+      {mesa.eu === 'plateia' && <span className="mesa-hud mesa-hud-texto"><Icon name="olho" size={14} />assistindo</span>}
+      {mesa.plateia.length > 0 && mesa.eu !== 'plateia' && (
+        <span className="mesa-hud mesa-hud-texto" title={`Assistindo: ${mesa.plateia.map((x) => x.nome).join(', ')}`}>
+          <Icon name="olho" size={14} />{mesa.plateia.length} assistindo
+        </span>
+      )}
+      <span className="mesa-hud mesa-hud-texto forte">Catan · {rodada}</span>
+      {jogando && <MenuDaMesa ocupado={ocupado} onDesistir={() => onAgir({ acao: 'desistir' })} />}
+    </div>
+  );
+}
 
+/** O "⋯" da barra: desistir arma no próprio botão, como antes — abandonar não é coisa de um clique só. */
+function MenuDaMesa({ ocupado, onDesistir }: { ocupado: boolean; onDesistir: () => void }) {
+  const [aberto, setAberto] = useState(false);
   const [armado, setArmado] = useState(false);
+  const raiz = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!aberto) { setArmado(false); return; }
+    const fora = (e: MouseEvent) => { if (!raiz.current?.contains(e.target as Node)) setAberto(false); };
+    window.addEventListener('mousedown', fora);
+    return () => window.removeEventListener('mousedown', fora);
+  }, [aberto]);
   useEffect(() => {
     if (!armado) return;
     const id = setTimeout(() => setArmado(false), 4000);
     return () => clearTimeout(id);
   }, [armado]);
-
-  const eventos = p.historico.map((e, i) => ({ i, texto: textoDoEvento(e, nome, p.eu), t: e.t })).filter((e) => e.texto);
-  const pessoa = (j: number): PessoaNoCatan | undefined => mesa.jogadores?.[j];
-  const jogando = p.eu !== null && !p.jogadores[p.eu].fora && p.fase !== 'fim';
-
   return (
-    <div className="catan-coluna">
-      <div className="catan-caixa catan-jogadores">
-        {p.jogadores.map((j, k) => {
-          const quem = pessoa(k);
-          return (
-            <div key={k} className={`catan-jogador ${p.vez === k && p.fase !== 'fim' ? 'vez' : ''} ${j.fora ? 'fora' : ''}`}>
-              <span className="catan-anel" style={{ borderColor: COR_DO_JOGADOR[j.cor] }}>
-                <Avatar nome={quem?.nome ?? '?'} foto={quem?.foto} />
-              </span>
-              <span className="catan-jogador-nome">
-                {nome(k)}{k === p.eu && <span className="catan-voce">você</span>}
-                {p.maiorEstrada?.j === k && <span className="catan-selo" title={`Maior estrada: ${p.maiorEstrada.tamanho}`}>ESTRADA</span>}
-                {p.maiorExercito?.j === k && <span className="catan-selo" title={`Maior exército: ${p.maiorExercito.tamanho} cavaleiros`}>EXÉRCITO</span>}
-              </span>
-              <span className="catan-pontos">{j.pontos}<small>{j.pontos === 1 ? 'ponto' : 'pontos'}</small></span>
-              <span className="catan-jogador-detalhe">
-                <span title="Cartas na mão">{j.cartas} {j.cartas === 1 ? 'carta' : 'cartas'}</span>
-                <span title="Cartas de desenvolvimento">{j.desenvolvimento} desenv.</span>
-                <span title="Cavaleiros jogados">{j.cavaleiros} cav.</span>
-                <span title="A estrada mais comprida">estrada {j.estrada}</span>
-                {j.fora && <span>saiu</span>}
-                {j.descartar > 0 && <span className="catan-deve">devolvendo {j.descartar}</span>}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="catan-caixa catan-custos">
-        <span className="xadrez-rotulo">Custos</span>
-        {([['Estrada', CUSTOS.estrada], ['Aldeia', CUSTOS.aldeia], ['Cidade', CUSTOS.cidade], ['Desenvolvimento', CUSTOS.desenvolvimento]] as const).map(([rotulo, custo]) => (
-          <div key={rotulo} className="catan-custo">
-            <span>{rotulo}</span>
-            <span className="catan-custo-cartas">{custo.map((r, i) => <CartaDeRecurso key={i} recurso={r} pequena />)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="catan-caixa catan-acontecendo">
-        <span className="xadrez-rotulo">Acontecendo</span>
-        <div className="catan-historico" ref={lista}>
-          {eventos.map((e) => <div key={e.i} className={`catan-evento ${e.t}`}>{e.texto}</div>)}
-        </div>
-      </div>
-      {live && <div className="xadrez-live">{live}</div>}
-      {mesa.plateia.length > 0 && (
-        <div className="xadrez-plateia" title={`Assistindo: ${mesa.plateia.map((x) => x.nome).join(', ')}`}>
-          <Icon name="olho" size={13} /><span>{mesa.plateia.length} assistindo</span>
+    <div className="mesa-menu" ref={raiz}>
+      <button type="button" className="mesa-hud icone" aria-haspopup="menu" aria-expanded={aberto} onClick={() => setAberto((a) => !a)} title="Mais">
+        <Icon name="pontos" size={18} />
+      </button>
+      {aberto && (
+        <div className="mesa-menu-lista" role="menu">
+          {armado ? (
+            <button type="button" role="menuitem" className="primary destrutivo" disabled={ocupado} autoFocus
+              onClick={() => { setAberto(false); onDesistir(); }}>Confirmar: sair da partida</button>
+          ) : (
+            <button type="button" role="menuitem" className="perigo" disabled={ocupado} onClick={() => setArmado(true)}>Desistir da partida</button>
+          )}
         </div>
       )}
-      {jogando && (armado ? (
-        <button type="button" className="primary destrutivo" disabled={ocupado} autoFocus
-          onClick={() => { setArmado(false); onAgir({ acao: 'desistir' }); }}>Confirmar: sair da partida</button>
-      ) : (
-        <button type="button" className="perigo" disabled={ocupado} onClick={() => setArmado(true)}>Desistir</button>
+    </div>
+  );
+}
+
+/** O disco dourado dos pontos, como as fichas do jogo de tabuleiro. */
+function Disco({ n, pequeno = false, titulo = 'Pontos' }: { n: number | string; pequeno?: boolean; titulo?: string }) {
+  return <span className={`mesa-disco ${pequeno ? 'pequeno' : ''}`} title={titulo}>{n}</span>;
+}
+
+/**
+ * A foto no anel da cor do jogador. Na vez dele, o tempo corre em volta: o anel vai se fechando
+ * conforme o prazo escorre — a pessoa da vez brilha na mesa, como no UNO.
+ */
+function AnelDaFoto({ pessoa, nome, cor, relogio, base, tamanho }: {
+  pessoa?: PessoaNoCatan; nome: string; cor: string; relogio: Faixa | null; base: BaseDoRelogio; tamanho: number;
+}) {
+  const ms = useRestante(relogio?.prazo, base);
+  const fracao = ms === null || !relogio ? null : Math.min(1, ms / relogio.total);
+  return (
+    <span className={`mesa-anel ${relogio ? 'vez' : ''}`} style={{ '--cor-do-jogador': cor, width: tamanho, height: tamanho } as CSSProperties}>
+      {fracao !== null && (
+        <span className={`mesa-anel-tempo ${ms! <= ACABANDO ? 'acabando' : ''}`}
+          style={{ background: `conic-gradient(currentColor ${fracao * 360}deg, transparent 0)` }} />
+      )}
+      <span className="mesa-anel-foto"><Avatar nome={pessoa?.nome ?? nome} foto={pessoa?.foto} /></span>
+    </span>
+  );
+}
+
+/** As cartas viradas de quem não é você, em leque, com a quantidade num selo. */
+function Leque({ n }: { n: number }) {
+  const k = Math.min(n, 9);
+  const meio = (k - 1) / 2;
+  return (
+    <span className="mesa-leque" style={{ width: `calc(var(--carta-l) + var(--passo) * ${Math.max(0, k - 1)})` }} title={`${n} ${n === 1 ? 'carta' : 'cartas'} na mão`}>
+      {k === 0 ? <span className="mesa-carta-vazia" /> : Array.from({ length: k }, (_, i) => (
+        <Carta key={i} simbolo={SIMBOLO.versoDeRecurso} className="no-leque"
+          estilo={{ left: `calc(var(--passo) * ${i})`, transform: `translateY(${Math.abs(i - meio) * 1.5}px) rotate(${((i - meio) * (k > 1 ? 16 / (k - 1) : 0)).toFixed(1)}deg)` }} />
       ))}
-      {p.eu === null && p.fase !== 'fim' && <button type="button" className="secundario" onClick={onSair}>Parar de assistir</button>}
+      <span className="mesa-selo">{n}</span>
+    </span>
+  );
+}
+
+/** O montinho de desenvolvimento de alguém, à parte, com o outro verso e a quantidade. */
+function Montinho({ n }: { n: number }) {
+  return (
+    <span className="mesa-montinho" title={`${n} ${n === 1 ? 'carta' : 'cartas'} de desenvolvimento`}>
+      {n === 0 ? <span className="mesa-carta-vazia" /> : Array.from({ length: Math.min(n, 3) }, (_, i) => (
+        <Carta key={i} simbolo={SIMBOLO.versoDeDesenvolvimento} className="no-montinho"
+          estilo={{ left: `${i * 3}px`, top: `${6 - i * 3}px` }} />
+      ))}
+      <span className="mesa-selo dev">{n}</span>
+    </span>
+  );
+}
+
+/** Cavaleiros e tamanho da estrada, e as fitas de quem tem o maior exército ou a maior estrada. */
+function Selos({ partida: p, k }: { partida: Partida; k: number }) {
+  const j = p.jogadores[k];
+  return (
+    <span className="mesa-selos">
+      <span className="mesa-selo-info" title="Cavaleiros jogados"><Icon name="escudo" size={13} />{j.cavaleiros}</span>
+      <span className="mesa-selo-info" title="A estrada mais comprida"><Traco nome="estrada" tamanho={14} />{j.estrada}</span>
+      {p.maiorEstrada?.j === k && <span className="mesa-fita" title={`Maior estrada: ${p.maiorEstrada.tamanho}`}>Maior estrada</span>}
+      {p.maiorExercito?.j === k && <span className="mesa-fita" title={`Maior exército: ${p.maiorExercito.tamanho} cavaleiros`}>Maior exército</span>}
+    </span>
+  );
+}
+
+/**
+ * O lugar de quem não é você: a foto no anel, o nome, os pontos, o leque de cartas viradas com a
+ * quantidade, o montinho de desenvolvimento à parte e os selos. O de cima fica deitado, em linha,
+ * para não roubar altura do tabuleiro.
+ */
+function LugarNaMesa({ partida: p, k, onde, pessoa, nome, relogio, base }: {
+  partida: Partida; k: number; onde: Lugar; pessoa?: PessoaNoCatan; nome: string; relogio: Faixa | null; base: BaseDoRelogio;
+}) {
+  const j = p.jogadores[k];
+  const cor = COR_DO_JOGADOR[j.cor];
+  const vez = p.fase !== 'fim' && p.vez === k;
+  return (
+    <div className={`mesa-lugar ${onde} ${vez ? 'vez' : ''} ${j.fora ? 'fora' : ''}`} style={{ '--cor-do-jogador': cor } as CSSProperties}>
+      <div className="mesa-lugar-cabeca">
+        <AnelDaFoto pessoa={pessoa} nome={nome} cor={cor} relogio={relogio} base={base} tamanho={46} />
+        <span className="mesa-lugar-nome">
+          <b>{nome}</b>
+          {j.fora ? <span className="mesa-lugar-nota">saiu</span> : <Selos partida={p} k={k} />}
+        </span>
+        <Disco n={j.pontos} />
+      </div>
+      <div className="mesa-lugar-cartas">
+        <Leque n={j.cartas} />
+        <Montinho n={j.desenvolvimento} />
+        {j.descartar > 0 && <span className="mesa-deve">devolvendo {j.descartar}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** O banco na mesa: os cinco montes virados para cima com quantas sobram, e o baralho virado. */
+function Banco({ partida: p }: { partida: Partida }) {
+  return (
+    <div className="mesa-placa mesa-banco">
+      <span className="mesa-rotulo">Banco</span>
+      <div className="mesa-banco-montes">
+        {RECURSOS.map((r) => (
+          <span key={r} className="mesa-banco-monte" title={`${p.banco[r]} ${NOME_DO_RECURSO[r]} no banco`}>
+            <span className="mesa-pilha">
+              {p.banco[r] === 0 ? <span className="mesa-carta-vazia" /> : (
+                <>
+                  {p.banco[r] > 1 && <Carta simbolo={SIMBOLO.recursoPequeno(r)} className="no-banco atras" />}
+                  <Carta simbolo={SIMBOLO.recursoPequeno(r)} className="no-banco" />
+                </>
+              )}
+            </span>
+            <b>{p.banco[r]}</b>
+          </span>
+        ))}
+        <span className="mesa-banco-monte" title={`${p.baralho} ${p.baralho === 1 ? 'carta' : 'cartas'} de desenvolvimento no baralho`}>
+          <span className="mesa-pilha">
+            {p.baralho === 0 ? <span className="mesa-carta-vazia" /> : (
+              <>
+                {p.baralho > 1 && <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="no-banco atras" />}
+                <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="no-banco" />
+              </>
+            )}
+          </span>
+          <b>{p.baralho}</b>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * O que está acontecendo, pequeno no canto: as últimas linhas, e "abrir" mostra a partida inteira
+ * por cima do lugar da direita — a coluna inteira de antes não cabe na mesa em volta.
+ */
+function Acontecendo({ partida: p, nome }: { partida: Partida; nome: (j: number) => string }) {
+  const [aberto, setAberto] = useState(false);
+  const lista = useRef<HTMLDivElement>(null);
+  const eventos = p.historico.map((e, i) => ({ i, texto: textoDoEvento(e, nome, p.eu), t: e.t })).filter((e) => e.texto);
+  const vistos = aberto ? eventos : eventos.slice(-4);
+  useEffect(() => {
+    const el = lista.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [eventos.length, aberto]);
+  return (
+    <div className="mesa-acontecendo-lugar">
+      <div className={`mesa-placa mesa-acontecendo ${aberto ? 'aberto' : ''}`}>
+        <button type="button" className="mesa-acontecendo-cabeca" aria-expanded={aberto} onClick={() => setAberto((a) => !a)}>
+          <Icon name="lista" size={15} /><span className="mesa-rotulo">Acontecendo</span><span className="mesa-link">{aberto ? 'fechar' : 'abrir'}</span>
+        </button>
+        <div className="mesa-historico" ref={lista}>
+          {vistos.map((e) => <div key={e.i} className={`catan-evento ${e.t}`}>{e.texto}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const LINHAS_DA_COLA: [Construcao, string][] = [['estrada', 'Estrada'], ['aldeia', 'Aldeia'], ['cidade', 'Cidade'], ['desenvolvimento', 'Carta']];
+
+/**
+ * A cola de custos como a carta do jogo de tabuleiro: a peça na sua cor, as cartas que ela custa e
+ * o disco com os pontos. O que as suas cartas já pagam acende em verde, o que falta fica apagado —
+ * mesmo fora da sua vez (`oQueDaParaConstruir`). Para quem só assiste, inteira, sem acender nada.
+ */
+function Cola({ partida: p, cor }: { partida: Partida; cor: string }) {
+  // Acabada a partida, não há mais o que construir: a cola fica inteira.
+  const pode = p.fase === 'fim' ? null : oQueDaParaConstruir(p);
+  return (
+    <div className="mesa-cola">
+      <div className="mesa-cola-titulo">Custos de construção</div>
+      {LINHAS_DA_COLA.map(([c, rotulo]) => (
+        <div key={c} className={`mesa-cola-linha ${pode === null ? '' : pode[c] ? 'pode' : 'falta'}`}
+          title={`${rotulo}: ${textoDoMonte(CUSTOS[c].reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}${pode?.[c] ? ' — dá para fazer' : ''}`}>
+          <span className="mesa-cola-peca">
+            {c === 'desenvolvimento' ? <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="na-cola" />
+              : <span className="mesa-peca" dangerouslySetInnerHTML={{ __html: iconeDeConstruir(c, cor) }} />}
+          </span>
+          <span className="mesa-cola-nome">{rotulo}</span>
+          <span className="mesa-cola-custo">{CUSTOS[c].map((r, i) => <Carta key={i} simbolo={SIMBOLO.recursoPequeno(r)} className="na-cola" />)}</span>
+          <Disco n={PONTOS_DA_CONSTRUCAO[c]} pequeno titulo={c === 'desenvolvimento' ? 'Algumas valem ponto' : 'Pontos'} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A sua mão, embaixo no meio: a sua foto no anel (com o tempo, na sua vez), os pontos e quantas
+ * cartas você tem, as de recurso com a arte da mesa e, separadas, as de desenvolvimento.
+ */
+function MinhaMao({ partida: p, nome, pessoa, chegou, relogio, base, ocupado, onJogarCarta }: {
+  partida: Partida; nome: string; pessoa?: PessoaNoCatan; chegou?: Partial<Monte>; relogio: Faixa | null; base: BaseDoRelogio;
+  ocupado: boolean; onJogarCarta: (c: CartaDeDesenvolvimento) => void;
+}) {
+  const eu = p.eu!;
+  const j = p.jogadores[eu];
+  const total = somaDoMonte(p.mao);
+  const grupos = agruparCartas(p.cartas ?? []);
+  return (
+    <div className={`mesa-eu ${relogio?.minha ? 'acesa' : ''}`} style={{ '--cor-do-jogador': COR_DO_JOGADOR[j.cor] } as CSSProperties}>
+      <div className="mesa-eu-quem">
+        <AnelDaFoto pessoa={pessoa} nome={nome} cor={COR_DO_JOGADOR[j.cor]} relogio={relogio} base={base} tamanho={54} />
+        <Disco n={j.pontos} />
+        <b>{nome}</b>
+        <span>{total} {total === 1 ? 'carta' : 'cartas'}</span>
+      </div>
+      <div className="mesa-eu-cartas">
+        {RECURSOS.map((r) => <CartaDaMao key={r} recurso={r} n={p.mao![r]} chegou={chegou?.[r]} />)}
+      </div>
+      {grupos.length > 0 && (
+        <div className="mesa-eu-dev">
+          <span className="mesa-rotulo">Desenvolvimento</span>
+          <div className={`mesa-eu-dev-cartas ${grupos.length > 2 ? 'apertadas' : ''}`}>
+            {grupos.map((c) => (
+              <CartaDeDesenvolvimento_ key={`${c.tipo}-${c.nova}`} carta={c.tipo} nova={c.nova} n={c.n}
+                podeJogar={!c.nova && !!p.pode.jogar?.includes(c.tipo) && !ocupado} onJogar={() => onJogarCarta(c.tipo)} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
