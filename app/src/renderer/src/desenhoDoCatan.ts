@@ -11,8 +11,8 @@
  * isto uma vez por partida (o fundo) e uma vez por mudança de peça, e os alvos de clique ficam
  * numa camada de JSX por cima. Nada aqui vem de fora: é tudo número e cor escritos neste arquivo.
  */
-import type { Partida, Recurso, Terreno } from './catan';
-import { COR_DO_JOGADOR, centroDoHex, chaveDoHex, lerHex, pontoDoCruzamento } from './catan';
+import type { Partida, Recurso, Terreno } from './catan.ts';
+import { COR_DO_JOGADOR, centroDoHex, chaveDoHex, lerHex, pontoDoCruzamento } from './catan.ts';
 
 const R3 = Math.sqrt(3);
 
@@ -51,7 +51,6 @@ export function defs(): string {
     <radialGradient id="g-mar" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#3d8fc9"/><stop offset=".75" stop-color="#2a6aa3"/><stop offset="1" stop-color="#1f5486"/></radialGradient>
     <linearGradient id="g-moldura" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ecd9a6"/><stop offset="1" stop-color="#c7a86a"/></linearGradient>
     <radialGradient id="g-ficha" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#fffaf0"/><stop offset=".7" stop-color="#f3e5c2"/><stop offset="1" stop-color="#dcc796"/></radialGradient>
-    <linearGradient id="g-ladrao" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5b5b66"/><stop offset=".45" stop-color="#3a3a44"/><stop offset="1" stop-color="#1e1e24"/></linearGradient>
     <linearGradient id="g-vela" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9d3c3"/></linearGradient>
   </defs>`;
 }
@@ -236,8 +235,39 @@ function barco(x: number, y: number, k: number, virado: boolean): string {
   const d = virado ? -1 : 1;
   return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(k * d)} ${f(k)})"><path d="M-14 2H14L9 9H-9Z" fill="#6b4423" stroke="#3d2511" stroke-width="1.2"/><path d="M-14 2H14" stroke="#8d5d33" stroke-width="2"/><path d="M0 2V-18" stroke="#3d2511" stroke-width="1.6"/><path d="M1 -17Q11 -8 1 0Z" fill="url(#g-vela)" stroke="#9c9481" stroke-width=".8"/><path d="M-1 -15Q-9 -8 -1 -1Z" fill="url(#g-vela)" stroke="#9c9481" stroke-width=".8"/><path d="M0 -18l5 1.5l-5 1.5" fill="#d8453b"/></g>`;
 }
+/**
+ * O ladrão: o mascarado de pele escura (escolha do dono, 06/10/2026 — "quero algo mais ladrão
+ * mesmo"; era um peão cinza). Touca, máscara nos olhos, camisa listrada e o saco de moedas nas
+ * costas. O contorno claro (`ladrao-contorno`) é o que o separa da floresta e da montanha: sem ele,
+ * a touca e a máscara somem no verde escuro. Ids fixos — só há um ladrão no tabuleiro.
+ */
+const TORSO = 'M-9.5 12C-10.5 2 -8.5 -3.4 -5 -5.4H5C8.5 -3.4 10.5 2 9.5 12Z';
+const FIGURA_DO_LADRAO = `<ellipse cx="2" cy="19" rx="14" ry="3.8" fill="rgba(0,0,0,.42)"/>
+  <defs><filter id="ladrao-contorno" x="-30%" y="-30%" width="160%" height="160%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.3" result="d"/><feFlood flood-color="#fff6dc" flood-opacity=".8"/><feComposite in2="d" operator="in" result="borda"/><feMerge><feMergeNode in="borda"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <clipPath id="ladrao-listras"><path d="${TORSO}"/></clipPath></defs>
+  <g filter="url(#ladrao-contorno)">
+    <path d="M2 -14C1 -25 19 -26 19 -12C20 -1 6 0 4 -6Z" fill="#b8874c" stroke="#5e3f1d" stroke-width="1"/>
+    <path d="M6 -19c2 -3 6 -3 7 -1" stroke="#5e3f1d" stroke-width=".9" fill="none"/>
+    <circle cx="12.6" cy="-10.6" r="3" fill="#f0bd4f" stroke="#8a6526" stroke-width=".8"/><path d="M11.6 -10.6h2" stroke="#8a6526" stroke-width=".7"/>
+    <rect x="-6.4" y="10" width="5" height="7.6" rx="1.6" fill="#2b2f3a"/><rect x="1.4" y="10" width="5" height="7.6" rx="1.6" fill="#2b2f3a"/>
+    <ellipse cx="-4" cy="18" rx="3.8" ry="1.9" fill="#111115"/><ellipse cx="4.2" cy="18" rx="3.8" ry="1.9" fill="#111115"/>
+    <path d="${TORSO}" fill="#f4f4f6"/>
+    <g clip-path="url(#ladrao-listras)" fill="#1b1b22">${[-5, -1.6, 1.8, 5.2, 8.6].map((y) => `<rect x="-12" y="${y}" width="24" height="1.8"/>`).join('')}</g>
+    <path d="${TORSO}" fill="none" stroke="#1b1b22" stroke-width="1"/>
+    <path d="M-7.5 -2.5L-10.5 6" stroke="#f4f4f6" stroke-width="3.6" stroke-linecap="round"/><path d="M-7.5 -2.5L-10.5 6" stroke="#1b1b22" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="1.6 1.6"/>
+    <circle cx="-10.8" cy="7" r="2" fill="#1b1b22"/>
+    <path d="M5.5 -3.5L6.5 -12.5" stroke="#f4f4f6" stroke-width="3.6" stroke-linecap="round"/><path d="M5.5 -3.5L6.5 -12.5" stroke="#1b1b22" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="1.6 1.6"/>
+    <circle cx="6.7" cy="-13.6" r="2" fill="#1b1b22"/>
+    <circle cx="0" cy="-12" r="7.6" fill="#6e4428" stroke="#2e1a0e" stroke-width=".9"/>
+    <path d="M-7.9 -12.6A7.9 7.9 0 0 1 7.9 -12.6Z" fill="#1d1d25"/><rect x="-8.4" y="-14.2" width="16.8" height="2.8" rx="1.3" fill="#33333f"/>
+    <path d="M-8.2 -11.4Q0 -13.8 8.2 -11.4L7.8 -8Q0 -10.2 -7.8 -8Z" fill="#111114"/>
+    <ellipse cx="-3.1" cy="-10.1" rx="1.9" ry="1.25" fill="#fff"/><ellipse cx="3.1" cy="-10.1" rx="1.9" ry="1.25" fill="#fff"/>
+    <circle cx="-2.6" cy="-10" r=".85" fill="#111"/><circle cx="3.6" cy="-10" r=".85" fill="#111"/>
+    <path d="M-2.4 -6.2q2.4 1.5 4.8 -.4" stroke="#2a140a" stroke-width=".9" fill="none" stroke-linecap="round"/>
+    <path d="M-5.4 -6.6a2 1.2 0 0 0 1.6 1" stroke="#8f5c3a" stroke-width=".6" fill="none" opacity=".8"/>
+  </g>`;
 export function ladrao(x: number, y: number, s: number): string {
-  return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s / 58)})"><ellipse cx="2" cy="18" rx="14" ry="4" fill="rgba(0,0,0,.4)"/><path d="M-11 17C-11 6 -7 1 -5 -3A9.5 9.5 0 1 1 5 -3C7 1 11 6 11 17Z" fill="url(#g-ladrao)" stroke="#111114" stroke-width="1.5"/><circle cx="0" cy="-13" r="8" fill="url(#g-ladrao)" stroke="#111114" stroke-width="1.5"/><path d="M-4 -16a5 5 0 0 1 5 -3" stroke="#8a8a96" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M-9 6q3 -3 4 2" stroke="#6a6a76" stroke-width="1.2" fill="none"/></g>`;
+  return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(s / 58)})">${FIGURA_DO_LADRAO}</g>`;
 }
 
 

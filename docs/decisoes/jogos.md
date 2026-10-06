@@ -458,3 +458,15 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
   recusa, fechar), o descarte do 7, o lobby, o fim com o placar e o gráfico dos dados, o menu de jogos
   e o cartão de convite. **Não foi exercido**: o app no Electron, o convite chegando pela busca de
   salas numa Saga de verdade, a faixa da partida, o som dos dados (a bancada é muda), o Windows.
+- **O ladrão é o mascarado de pele escura** (prancheta, página "Peças e ladrão": o dono escolheu o 1
+  dos três e pediu a pele escura). Era um peão cinza, e ele queria "algo mais ladrão mesmo": touca,
+  máscara nos olhos, camisa listrada e o saco de moedas nas costas. Tem um contorno claro
+  (`ladrao-contorno`, um filtro de dilatação) porque, sem ele, a touca e a máscara somem na floresta.
+  Os ids são fixos: só há um ladrão no tabuleiro. O gradiente do ladrão antigo saiu dos `defs`, e o
+  `desenhoDoCatan.test.ts` confere que todo `url(#…)` do tabuleiro aponta para algo que existe —
+  referência solta não dá erro, o desenho só some.
+- **Os ícones de construir são as miniaturas** (opção 2 da mesma página; a 1 eram peças de madeira
+  maciças): cada peça num pedacinho de grama, em isométrico, com parede creme e telhado ou bandeirola
+  na cor de quem joga (`iconesDoCatan.ts`). Sem `<defs>` nem id, porque a mesma peça aparece no botão e
+  na cola ao mesmo tempo. As peças NO tabuleiro continuam as de antes — ele não pediu para mudar.
+
