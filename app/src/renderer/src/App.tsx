@@ -72,6 +72,7 @@ import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
+import { tocarNoCatan } from './somDoCatan';
 import { useJanelaEmFoco } from './imagemParada';
 import { useMusica } from './useMusica';
 import { MenuDoBot } from './components/MenuDoBot';
@@ -1383,7 +1384,10 @@ export function App() {
     const aviso = oQueTocarNoCatan(catanAnterior.current, minhaMesaCatan, euIdAgora);
     catanAnterior.current = minhaMesaCatan;
     if (aviso === 'vez' && catanNaTela !== null && catanNaTela === minhaMesaCatan?.id) return;
-    if (aviso) tocarAviso(aviso === 'vez' ? 'lance' : 'fimDaPartida', rm.deafened);
+    // A vez chamando de fora da tela é o MESMO chamado da tela, e não a madeira baixa do lance:
+    // é justamente quem está noutro lugar que precisa ouvir (pedido do dono, 06/10/2026).
+    if (aviso === 'vez') { if (!rm.deafened) tocarNoCatan('suaVez'); }
+    else if (aviso) tocarAviso('fimDaPartida', rm.deafened);
   }, [minhaMesaCatan, euIdAgora, catanNaTela, rm.deafened, tocarAviso]);
 
   // Os sons da corrida saem pela mesma regra dos avisos — o mesmo som não empilha —, e o fone

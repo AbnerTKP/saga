@@ -152,3 +152,31 @@ Supressão de ruído, corte automático, soundboard e os sons de aviso.
   dos avisos porque toca a cada jogada. Ele sai da busca de salas, e não da tela do jogo:
   o som existe justamente para quem está com o tabuleiro fora da tela (`oQueTocarNaMesa`,
   puro e testado — o seu próprio lance não toca nada, e quem assiste não ouve nenhum).
+- **Chamado não é aviso: o que é dirigido a você toca ALTO** (06/10/2026). Pedido do dono: "o
+  som do saga deve ser bem mais, ao receber mensagem, ao ser a minha vez no catan… um som mais
+  evidente". Tudo tocava a `0.45`, e mensagem e convite tinham pico a -3 e -6 dB: somavam um
+  sino curto embaixo do som de um jogo — que é onde a pessoa está quando eles chegam. Agora há
+  duas classes (`CHAMADOS` em `avisos.ts`, testado): **mensagem e convite** tocam a `0.9`, e o
+  resto continua a `0.45`, cada um por um motivo — entrar e sair da call não são com você; mutar,
+  desmutar e a live confirmam o que a sua mão fez; e o **lance do xadrez fica de fora** porque
+  toca a cada jogada do outro, dezenas de vezes por partida. Os dois arquivos foram refeitos, mais
+  longos e mais cheios, e continuam distinguíveis sem olhar: a **mensagem** é sino de metal (dois
+  toques, lá5 → mi6, com as parciais 2,76× e 5,40× de uma barra livre, que é o "ding" e atravessa
+  um jogo), 1,7 s; o **convite** são as duas notas subindo de sempre (ré5 → lá5, com a oitava e a
+  quinta de cima), chamando duas vezes como telefone, 2,2 s. Pico a -1 dB nos dois. Medido (EBU
+  R128, momentânea máxima): mensagem de -13,9 a -9,6 LUFS, convite de -12,2 a -8,7 — somado ao
+  volume, ~10 dB acima do que eram. No Catan, **sua vez** virou quatro notas subindo (sol, si,
+  ré → sol sustentado) e a **troca**, três "plim"; simulando o gráfico do WebAudio a 48 kHz, o
+  pico foi de 0,21 a 0,71 e de 0,11 a 0,38. Duas coisas que a medida cobrou ao gerar:
+  - **a soma das notas passa de 1,0, e o `.wav` de 16 bits a CORTA.** A primeira leva do convite
+    saiu com energia a -38 dB acima de 10 kHz (o antigo: -73), e cada nota sozinha dava -90: era
+    o corte no arquivo intermediário. Gerar em `pcm_f32le` e só então medir e aplicar o ganho
+    resolveu (-70).
+  - **o ataque é rampa de cosseno, e não reta.** Na reta, a quina no fim do ataque respingava no
+    espectrograma de cima a baixo — o mesmo risco vertical do estalo de corte. O sino ataca em
+    3 ms (é a batida do metal); as notas, em 12 ms.
+  **A vez do Catan com a tela do jogo fechada tocava o LANCE** — a madeira baixa do xadrez —, e não
+  o chamado: justo o caso em que a pessoa está noutro lugar. Agora a busca de salas toca o mesmo
+  "sua vez" da tela (`tocarNoCatan('suaVez')` no `App.tsx`).
+  **Não foi ouvido**: tudo foi medido (pico, loudness, espectrograma) numa máquina em que o dono
+  podia estar em call. Se algum soar errado, é de ouvido que se conserta.

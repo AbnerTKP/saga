@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { podeTocar, criarAvisos, INTERVALO, type Aviso } from './avisos.ts';
+import { podeTocar, criarAvisos, INTERVALO, VOLUME_DO_AVISO, VOLUME_DO_CHAMADO, volumeDo, type Aviso } from './avisos.ts';
 
 test('o primeiro aviso sempre toca', () => {
   assert.equal(podeTocar(1000, undefined, false), true);
@@ -64,4 +64,23 @@ test('tocar que lança na hora também não derruba quem avisou', () => {
   const avisar = criarAvisos(ARQUIVOS, () => { throw new Error('sem Audio'); }, (qual) => falhas.push(qual));
   assert.doesNotThrow(() => avisar('live', false, 1000));
   assert.deepEqual(falhas, ['live']);
+});
+
+test('mensagem e convite chamam alto; o resto continua baixo', () => {
+  assert.ok(VOLUME_DO_CHAMADO >= 2 * VOLUME_DO_AVISO, 'chamado tem de se ouvir por cima de um jogo');
+  assert.ok(VOLUME_DO_CHAMADO <= 1, 'o Audio não toca acima de 1');
+  assert.equal(volumeDo('mensagem'), VOLUME_DO_CHAMADO);
+  assert.equal(volumeDo('convite'), VOLUME_DO_CHAMADO);
+  // O lance toca a cada jogada do outro; entrar, sair e o microfone não são com você.
+  for (const baixo of ['lance', 'entrou', 'saiu', 'micLigou', 'micMutou', 'liveEntrou'] as const) {
+    assert.equal(volumeDo(baixo), VOLUME_DO_AVISO, baixo);
+  }
+});
+
+test('o volume que chega a quem toca é o do aviso', () => {
+  const tocados: [string, number][] = [];
+  const avisar = criarAvisos(ARQUIVOS, (url, volume) => tocados.push([url, volume]));
+  avisar('mensagem', false, 1000);
+  avisar('entrou', false, 1000);
+  assert.deepEqual(tocados, [['e', VOLUME_DO_CHAMADO], ['a', VOLUME_DO_AVISO]]);
 });

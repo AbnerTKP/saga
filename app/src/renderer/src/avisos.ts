@@ -16,6 +16,22 @@ export type Aviso =
 export const VOLUME_DO_AVISO = 0.45;
 
 /**
+ * Os CHAMADOS: o que chega dirigido a você e pede que você olhe — a mensagem privada e o convite
+ * para jogar. O dono pediu "um som mais evidente" (06/10/2026): no volume dos outros, eles se
+ * perdiam embaixo do som de um jogo, que é justamente onde a pessoa está quando eles chegam.
+ *
+ * O resto continua baixo, e por um motivo cada: entrar e sair da call acontecem o tempo todo e
+ * não são com você; mutar, desmutar e a live são confirmação do que a sua mão acabou de fazer; e
+ * o LANCE do xadrez toca a cada jogada do outro — numa partida, dezenas de vezes —, então chamar
+ * alto em cada um seria o aviso que a pessoa desliga. O Catan tem os seus em `somDoCatan.ts`.
+ */
+export const CHAMADOS: ReadonlySet<Aviso> = new Set<Aviso>(['mensagem', 'convite']);
+export const VOLUME_DO_CHAMADO = 0.9;
+
+/** O volume de cada aviso: o dos chamados, ou o baixo de sempre. */
+export const volumeDo = (qual: Aviso) => (CHAMADOS.has(qual) ? VOLUME_DO_CHAMADO : VOLUME_DO_AVISO);
+
+/**
  * Quando três pessoas entram no mesmo instante, o LiveKit avisa três vezes e o mesmo som
  * sairia empilhado, virando ruído. Um intervalo mínimo entre repetições do MESMO aviso
  * resolve isso e não atrapalha o caso legítimo — alguém entra agora, outro entra depois.
@@ -59,7 +75,7 @@ export function criarAvisos(
     if (!podeTocar(agora, ultimos[qual], surdo)) return false;
     ultimos[qual] = agora;
     try {
-      const tocando = tocar(arquivos[qual], VOLUME_DO_AVISO);
+      const tocando = tocar(arquivos[qual], volumeDo(qual));
       if (tocando instanceof Promise) tocando.catch((e) => aoFalhar?.(qual, e));
     } catch (e) {
       aoFalhar?.(qual, e);

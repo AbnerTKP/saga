@@ -3,8 +3,10 @@
 import entrou from './entrou.ogg';
 import saiu from './saiu.ogg';
 import live from './live.ogg';
-// Duas notas subindo, feitas aqui (ffmpeg, senoides com decaimento), no volume médio do
-// "entrou": é um chamado, e não pode assustar mais que alguém chegando na call.
+// O CONVITE é um chamado (ver `CHAMADOS` em avisos.ts): as duas notas subindo de sempre,
+// ré5 → lá5, chamando DUAS vezes como telefone, com a oitava e a quinta de cima no timbre para
+// atravessar o som de um jogo. Pico a -1 dB, 2,2 s. Era uma vez só, a -6 dB, no volume baixo:
+// o dono pediu "um som mais evidente" (06/10/2026).
 import convite from './convite.ogg';
 // Os sete abaixo nasceram do mesmo jeito e da mesma família — senoides curtas com
 // decaimento, entre 400 e 1400 Hz, pico a -3 dB como os de cima. Duas regras que o
@@ -20,8 +22,10 @@ import liveEntrou from './live-entrou.ogg';
 import liveSaiu from './live-saiu.ogg';
 import micLigou from './mic-ligou.ogg';
 import micMutou from './mic-mutou.ogg';
-// Um sino curto, e não duas notas: duas notas é o convite, e os dois chegam pelo canto
-// da tela — precisam ser distinguíveis de ouvido, sem olhar.
+// Um SINO, e não notas: notas é o convite, e os dois chegam pelo canto da tela — precisam ser
+// distinguíveis de ouvido, sem olhar. Também é chamado desde 06/10/2026: dois toques subindo
+// uma quinta (lá5 → mi6), com as parciais de metal (2,76× e 5,40× a fundamental) que é o que
+// faz "ding" e passa por cima de um jogo. Pico a -1 dB, 1,7 s.
 import mensagem from './mensagem.ogg';
 // O lance é MADEIRA, não nota: estalo de ruído com um baque grave embaixo. Fica 4 dB
 // abaixo dos avisos porque toca a cada jogada do outro.
