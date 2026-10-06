@@ -211,6 +211,42 @@ coluna seria migração sem ganho), e a leitura soma; o freio de 3 s e o "você 
   0,3% de CPU; urna com o cursor piscando, 2 quadros/s e 0,5%. **Não foi ouvido** nenhum som (a bancada é
   muda) nem visto no Windows.
 
+### O 2º turno (05/10/2026)
+
+Pedido do dono: "atualiza o jogo da urna para somente os 2 candidatos do segundo turno, aprimore a parte
+do jogo antes da votação também", e no meio, "melhore a mão do personagem na hora de votar". Ele viu as
+telas do motor e escolheu **digital + caderno** na mesa e a **apuração do zero**.
+
+- **13 Lula × 22 Flávio Bolsonaro**, como o TSE deu na madrugada de 05/10 (99,99% apuradas). Saíram de
+  `candidatos.ts`, de `retratos.ts` e de `NUMEROS`; as onze chapas do 1º turno estão no git.
+- **O 2º turno começa do zero, e o 1º fica guardado.** A migração 58 refaz `urna_votos` e
+  `urna_eleitores` com o `turno` na chave; tudo o que havia virou turno 1. A apuração, o "você votou N
+  vezes" e o freio leem só `TURNO` (2). O 1º turno da Saga, na produção: 13 com 51, 14 com 49, 22 com 19,
+  70 com 3, 16 com 1, branco 1. O voto continua secreto: o turno entrou nas duas tabelas e nenhuma ganhou
+  a coluna da outra.
+- **O app de antes vota numa chapa que saiu** e o servidor recusa com "Essa chapa não está no 2º turno.
+  Atualize a Saga para votar." — contar como nulo seria registrar em silêncio um voto que a pessoa viu
+  ir para alguém.
+- **A mesa ganhou duas etapas de SEGURAR ESPAÇO** (ou o botão do mouse) depois do título: o leitor de
+  digital, que na primeira leitura da abertura NÃO reconhece ("esfrega o dedo na camisa"), e soltar
+  antes do fim recomeça; e o caderno de votação, com a linha do jogador marcada e a caneta assinando
+  enquanto se segura — solta, ela para onde parou. Segurar e não só apertar porque apertar ESPAÇO já
+  era tudo o que a mesa fazia. Ao terminar uma etapa, o aperto seguinte só avança; a próxima pede outro
+  aperto, senão o mesmo ESPAÇO que fechou o leitor começaria a assinar. **Quem volta pula as duas**: o
+  mesário já conhece, e votar de novo é o jogo. O celular fica na mesa depois de liberado.
+- **O mural com as duas chapas** substituiu a janela da sala, porque a seção de verdade afixa os
+  candidatos; de perto (ESPAÇO), abre grande com foto, número, partido e vice. A lousa diz 2º turno, e
+  há santinhos no chão perto da porta, metade de cada cor.
+- **A apuração virou frente a frente**: a lista de treze ficava com duas linhas e muito vazio. Cada
+  chapa no seu lado, sempre na ordem do número; a porcentagem é dos VÁLIDOS, como a do TSE, e soma 100
+  (`porcentagens`, testada); quem está na frente em dourado; o cabo de guerra com o meio marcado.
+- **A mão da cabine é desenhada letra a letra** (`MAO`, em `cabine.ts`), como os glifos: em retângulos
+  ela era um bastão com um bloco embaixo. Vista por trás — indicador com unha e duas dobras, os outros
+  dedos fechados em degrau, polegar do lado —, com a manga azul da camisa do bonequinho vindo de baixo,
+  pela direita, e alargando ao descer. Uma tentativa de gerar a mão juntando peças arredondadas com
+  contorno automático deixou costuras no meio da palma e foi descartada.
+- A fonte ganhou `º` nos dois tamanhos e `%` na grande.
+
 ## O Catan (27/09/2026)
 
 Pedido do dono: "faça o gameboard Catan para o Saga, poder jogar multiplayer, analise o game e traga

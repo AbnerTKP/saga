@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LUGARES } from './secao.ts';
 import {
-  type EstadoDaUrna, agir, andar, animando, avancar, comandoDaTecla, dicaDaSecao, escolhaDoVisor, falaDaMesa,
-  novoEstado, teclar, voltar, TEMPO_DO_FIM,
+  type EstadoDaUrna, agir, andar, animando, avancar, celularNaMesa, comandoDaTecla, dicaDaSecao, escolhaDoVisor, falaDaMesa,
+  novoEstado, soltar, teclar, voltar, TEMPO_DA_ASSINATURA, TEMPO_DA_DIGITAL, TEMPO_DO_FIM,
 } from './jogo.ts';
 import { CANDIDATOS } from './candidatos.ts';
 import { RETRATOS } from './retratos.ts';
@@ -14,13 +14,31 @@ function irAte(e: EstadoDaUrna, x: number) {
   andar(e, 0, 0);
 }
 
+/** Segura ESPAÇO por `segundos`, em quadros de 1/60, e devolve o último som. */
+function segurar(e: EstadoDaUrna, segundos: number) {
+  agir(e);
+  let som = null;
+  for (let t = 0; t < segundos; t += 1 / 60) som = avancar(e, 1 / 60) ?? som;
+  return som;
+}
+
+/** Da mesa até liberado, na primeira vez: título, digital (que falha uma vez) e caderno. */
+function passarPelaMesa(e: EstadoDaUrna) {
+  agir(e); assert.equal(e.etapa, 'pedindo'); assert.ok(falaDaMesa(e));
+  agir(e); assert.equal(e.etapa, 'titulo');
+  agir(e); assert.equal(e.etapa, 'digital');
+  segurar(e, TEMPO_DA_DIGITAL + 0.1); assert.equal(e.leitor.estado, 'falhou');
+  segurar(e, TEMPO_DA_DIGITAL + 0.1); assert.equal(e.leitor.estado, 'ok');
+  agir(e); assert.equal(e.etapa, 'caderno');
+  segurar(e, TEMPO_DA_ASSINATURA + 0.1); assert.equal(e.assinatura, 1);
+  agir(e); assert.equal(e.etapa, 'liberando');
+}
+
 function atePodeVotar(votos = 0) {
   const e = novoEstado(votos);
   irAte(e, LUGARES.mesa);
   assert.equal(dicaDaSecao(e), 'ESPAÇO: ENTREGAR O TÍTULO');
-  agir(e); assert.equal(e.etapa, 'pedindo'); assert.ok(falaDaMesa(e));
-  agir(e); assert.equal(e.etapa, 'titulo');
-  agir(e); assert.equal(e.etapa, 'liberando');
+  passarPelaMesa(e);
   agir(e); assert.equal(e.etapa, 'liberado');
   irAte(e, LUGARES.cabine);
   assert.equal(dicaDaSecao(e), 'ESPAÇO: ENTRAR NA CABINE');
@@ -58,6 +76,90 @@ test('sem título a cabine não abre, e a mesária avisa', () => {
   assert.equal(falaDaMesa(e), null, 'andar tira o recado');
 });
 
+test('o leitor: segurar lê, soltar cedo não vale, a primeira leitura falha e a segunda passa', () => {
+  const e = novoEstado();
+  irAte(e, LUGARES.mesa);
+  agir(e); agir(e); agir(e);
+  assert.equal(e.etapa, 'digital');
+  assert.match(falaDaMesa(e)!.texto, /República da Saga/);
+  agir(e);
+  avancar(e, TEMPO_DA_DIGITAL / 2);
+  assert.equal(e.leitor.estado, 'lendo');
+  assert.equal(animando(e), true, 'lendo precisa de laço');
+  soltar(e);
+  assert.deepEqual(e.leitor, { estado: 'esperando', progresso: 0 }, 'soltou cedo: começa de novo');
+  assert.match(falaDaMesa(e)!.texto, /cedo/);
+  assert.equal(animando(e), false);
+  assert.equal(segurar(e, TEMPO_DA_DIGITAL + 0.1), 'tecla', 'o leitor bipa quando decide');
+  assert.equal(e.leitor.estado, 'falhou');
+  assert.match(falaDaMesa(e)!.texto, /camisa/);
+  avancar(e, 5);
+  assert.equal(e.leitor.estado, 'falhou', 'continuar segurando depois do bipe não relê: precisa soltar e apertar');
+  soltar(e);
+  segurar(e, TEMPO_DA_DIGITAL + 0.1);
+  assert.equal(e.leitor.estado, 'ok');
+  const x = e.x;
+  andar(e, 1, 1);
+  assert.equal(e.x, x, 'na mesa o bonequinho não sai');
+});
+
+test('o caderno: a caneta só anda segurando, e para onde parou', () => {
+  const e = novoEstado();
+  irAte(e, LUGARES.mesa);
+  agir(e); agir(e); agir(e);
+  segurar(e, TEMPO_DA_DIGITAL + 0.1); segurar(e, TEMPO_DA_DIGITAL + 0.1);
+  agir(e);
+  assert.equal(e.etapa, 'caderno');
+  assert.equal(e.segurando, false, 'o aperto que saiu do leitor não começa a assinar');
+  avancar(e, 1);
+  assert.equal(e.assinatura, 0);
+  agir(e); avancar(e, TEMPO_DA_ASSINATURA / 2); soltar(e);
+  const metade = e.assinatura;
+  assert.ok(metade > 0.4 && metade < 0.6);
+  avancar(e, 1);
+  assert.equal(e.assinatura, metade, 'solto, a caneta para');
+  agir(e);
+  assert.equal(e.etapa, 'caderno', 'assinatura pela metade não libera');
+  avancar(e, TEMPO_DA_ASSINATURA);
+  assert.equal(e.assinatura, 1);
+  assert.equal(celularNaMesa(e), false);
+  agir(e);
+  assert.equal(e.etapa, 'liberando');
+  assert.match(falaDaMesa(e)!.texto, /celular/);
+  assert.equal(celularNaMesa(e), true, 'o celular fica na mesa');
+  agir(e);
+  assert.equal(dicaDaSecao(e), 'AGORA, A CABINE >');
+});
+
+test('o mural abre de perto, segura o bonequinho e fecha com ESPAÇO ou Esc', () => {
+  const e = novoEstado();
+  irAte(e, LUGARES.mural);
+  assert.equal(dicaDaSecao(e), 'ESPAÇO: VER OS CANDIDATOS');
+  agir(e);
+  assert.equal(e.mural, true);
+  assert.equal(dicaDaSecao(e), null);
+  const x = e.x;
+  andar(e, 1, 1);
+  assert.equal(e.x, x);
+  agir(e);
+  assert.equal(e.mural, false);
+  agir(e);
+  voltar(e);
+  assert.equal(e.mural, false);
+  assert.equal(e.saiu, false, 'Esc no mural fecha o mural, não o jogo');
+});
+
+test('Esc no meio da mesa devolve o título, e a mesa recomeça', () => {
+  const e = novoEstado();
+  irAte(e, LUGARES.mesa);
+  agir(e); agir(e); agir(e); agir(e);
+  assert.equal(e.segurando, true);
+  voltar(e);
+  assert.equal(e.etapa, 'semTitulo');
+  assert.equal(e.segurando, false);
+  assert.equal(e.saiu, false);
+});
+
 test('fala aberta segura o bonequinho', () => {
   const e = novoEstado();
   irAte(e, LUGARES.mesa);
@@ -87,6 +189,7 @@ test('a mesária repara em quem volta', () => {
   agir(e);
   assert.match(falaDaMesa(e)!.texto, /de novo/);
   agir(e); agir(e);
+  assert.equal(e.etapa, 'liberando', 'quem volta pula a digital e o caderno');
   assert.match(falaDaMesa(e)!.texto, /número 3/);
 });
 

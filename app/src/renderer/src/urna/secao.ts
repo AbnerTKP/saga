@@ -1,7 +1,8 @@
 /**
- * A seção eleitoral vista de lado: uma sala de escola com a lousa, a mesa receptora com dois
- * mesários e o terminal, e a cabine de papelão com a urna. O bonequinho entra pela porta, entrega o
- * título na mesa e vai à cabine — lá a tela vira a urna em primeira pessoa (`cabine.ts`).
+ * A seção eleitoral vista de lado, em dia de 2º turno: uma sala de escola com a lousa, a mesa
+ * receptora com dois mesários e o terminal, o mural com as duas chapas e a cabine de papelão com a
+ * urna. O bonequinho entra pela porta, passa pela mesa (título, digital no leitor, assinatura no
+ * caderno, celular entregue) e vai à cabine — lá a tela vira a urna em primeira pessoa (`cabine.ts`).
  *
  * O fundo é pintado uma vez e guardado; por cima vão só o que muda: o bonequinho, a dica, a fala do
  * mesário e o título aberto. As pessoas são desenhadas por conta (retângulos com contorno), e não
@@ -10,10 +11,14 @@
 import { type Cor, type Quadro, colar, cor, criarQuadro, linha, pixel, retangulo } from '../dragao/quadro.ts';
 import { escrever, medir } from '../dragao/fonte.ts';
 import { pontilhar } from '../dragao/cenario.ts';
-import { type Regiao, H, W, caber, caixa } from './comum.ts';
+import { type Regiao, H, W, caber, caixa, rosto, rostoPequeno } from './comum.ts';
+import { CANDIDATOS } from './candidatos.ts';
 
-/** Onde as coisas estão no chão, para quem anda: a porta, a frente da mesa e a frente da cabine. */
-export const LUGARES = { porta: 26, mesa: 150, cabine: 318, pe: 204 } as const;
+/** Onde as coisas estão no chão, para quem anda: a porta, a frente da mesa, o mural e a cabine. */
+export const LUGARES = { porta: 26, mesa: 150, mural: 260, cabine: 318, pe: 204 } as const;
+
+/** O leitor de digital: esperando o dedo, lendo (com o quanto já leu), não reconheceu, reconheceu. */
+export type Leitor = { estado: 'esperando' | 'lendo' | 'falhou' | 'ok'; progresso: number };
 
 export type Fala = { quem: string; texto: string };
 
@@ -29,6 +34,14 @@ export type DadosDaSecao = {
   fala: Fala | null;
   /** O título aberto no meio da tela. */
   titulo: { apelido: string; inscricao: string } | null;
+  /** O leitor de digital da mesa, aberto no meio da tela. */
+  leitor: Leitor | null;
+  /** O caderno de votação aberto, com a assinatura até onde já foi (0 a 1). */
+  caderno: { apelido: string; progresso: number } | null;
+  /** O mural das chapas, de perto. */
+  mural: boolean;
+  /** Depois da mesa, o celular fica nela: na cabine não entra. */
+  celularNaMesa: boolean;
   /** Quantas vezes já votou nesta abertura: o adesivo EU VOTEI aparece depois da primeira. */
   votou: boolean;
 };
@@ -54,6 +67,14 @@ const C = {
   caixaFala: cor('#1f2330'), caixaFalaBorda: cor('#f4f1e6'), textoFala: cor('#f4f1e6'), nomeFala: cor('#f2c230'),
   tituloPapel: cor('#e5efd8'), tituloVerde: cor('#2f6b4a'), tituloLinha: cor('#b8cba9'),
   adesivo: cor('#f2c230'),
+  cortica: cor('#b88a58'), corticaEscura: cor('#9a6f43'), alfinete: cor('#d9443a'),
+  aparelho: cor('#3a3d44'), aparelhoClaro: cor('#50545d'), aparelhoEscuro: cor('#24262b'),
+  vidroLeitor: cor('#22343c'), cristaLeitor: cor('#4d7383'), luzVerde: cor('#5fdc7c'), luzVermelha: cor('#ef5a4a'),
+  telaLeitor: cor('#16221d'), textoLeitor: cor('#bfe8c9'), barraLeitor: cor('#0b120f'),
+  folha: cor('#f6f0dc'), folhaSombra: cor('#ddd3b4'), folhaLinha: cor('#cfc4a2'), lombada: cor('#b9ad8a'),
+  caneta: cor('#2a54b8'), canetaClara: cor('#5b84e0'), tintaCaneta: cor('#1d3f99'), marcaTexto: cor('#f7e27a'),
+  celular: cor('#1b1d22'), celularTela: cor('#4f6b8c'),
+  santinho: cor('#f4f1e6'), santinhoA: cor('#c8372d'), santinhoB: cor('#2a62b8'),
 };
 
 let fundoPronto: Quadro | null = null;
@@ -77,6 +98,7 @@ function fundo(): Quadro {
       q.px[y * W + x] = c;
     }
   }
+  santinhos(q);
   // A porta, à esquerda, com a placa da seção.
   retangulo(q, 6, 50, 42, 86, C.madeiraEscura);
   retangulo(q, 9, 53, 36, 83, C.porta);
@@ -92,15 +114,13 @@ function fundo(): Quadro {
   retangulo(q, 69, 17, 144, 64, C.lousa);
   for (let y = 17; y < 81; y++) for (let x = 69; x < 213; x++) if (pontilhar(x, y, 0.1) && (x + y) % 5 === 0) pixel(q, x, y, C.lousaClara);
   retangulo(q, 70, 84, 142, 3, C.madeiraClara);
-  escrever(q, 'ELEIÇÕES 2026', 141, 26, C.giz, { tamanho: 'grande', alinhar: 'centro' });
-  escrever(q, 'ZONA 042 - SEÇÃO 0059', 141, 50, C.gizApagado, { alinhar: 'centro' });
-  escrever(q, 'SILÊNCIO NA CABINE', 141, 62, C.giz, { alinhar: 'centro' });
+  escrever(q, 'ELEIÇÕES 2026 - ZONA 042', 141, 23, C.gizApagado, { alinhar: 'centro' });
+  escrever(q, '2º TURNO', 141, 36, C.giz, { tamanho: 'grande', alinhar: 'centro' });
+  escrever(q, '25 DE OUTUBRO', 141, 57, C.giz, { alinhar: 'centro' });
+  escrever(q, 'SILÊNCIO NA CABINE', 141, 69, C.gizApagado, { alinhar: 'centro' });
   retangulo(q, 180, 83, 6, 2, C.giz);
-  // A janela, entre a lousa e a cabine.
-  retangulo(q, 236, 22, 50, 58, C.caixilho);
-  retangulo(q, 240, 26, 19, 24, C.vidro); retangulo(q, 263, 26, 19, 24, C.vidro);
-  retangulo(q, 240, 52, 19, 24, C.vidro); retangulo(q, 263, 52, 19, 24, C.vidro);
-  linha(q, 242, 40, 250, 28, C.vidroClaro); linha(q, 265, 66, 275, 54, C.vidroClaro);
+  // Onde era a janela, o mural com as chapas.
+  muralNaParede(q);
   // O relógio.
   retangulo(q, 352, 22, 16, 16, C.contorno);
   retangulo(q, 353, 23, 14, 14, C.papel);
@@ -142,6 +162,48 @@ function fundo(): Quadro {
   escrever(q, 'CABINE', 332, 88, C.contorno, { alinhar: 'centro' });
   fundoPronto = q;
   return q;
+}
+
+/**
+ * O mural da seção, entre a lousa e a cabine: a folha com as duas chapas do 2º turno presa na
+ * cortiça, que é onde a seção de verdade afixa os candidatos. De perto (ESPAÇO), abre grande.
+ */
+function muralNaParede(q: Quadro) {
+  const x = 222, y = 18, l = 76, a = 68;
+  retangulo(q, x, y, l, a, C.madeiraEscura);
+  retangulo(q, x + 2, y + 2, l - 4, a - 4, C.cortica);
+  for (let yy = y + 2; yy < y + a - 2; yy++) for (let xx = x + 2; xx < x + l - 2; xx++) if ((xx * 5 + yy * 11) % 23 === 0) pixel(q, xx, yy, C.corticaEscura);
+  caixa(q, x + 5, y + 5, l - 10, a - 10, C.papel, C.papelSombra);
+  pixel(q, x + 7, y + 6, C.alfinete); pixel(q, x + l - 8, y + 6, C.alfinete);
+  escrever(q, 'PRESIDENTE', x + l / 2, y + 9, C.contorno, { alinhar: 'centro' });
+  escrever(q, '2º TURNO', x + l / 2, y + 17, C.tituloVerde, { alinhar: 'centro' });
+  CANDIDATOS.slice(0, 2).forEach((c, i) => {
+    const cx = x + 21 + i * 34;
+    const r = rostoPequeno(c.numero);
+    retangulo(q, cx - 8, y + 25, 17, 17, C.papelSombra);
+    if (r) colar(q, r, cx - 7, y + 26);
+    escrever(q, String(c.numero), cx, y + 45, C.contorno, { alinhar: 'centro' });
+    escrever(q, caber(c.nome.split(' ')[0], 32), cx, y + 53, C.contorno, { alinhar: 'centro' });
+  });
+}
+
+/** Os santinhos no chão perto da porta: o retrato de todo dia de eleição. Metade de cada cor. */
+function santinhos(q: Quadro) {
+  const onde = [[8, 196], [21, 205], [37, 191], [52, 208], [63, 198], [79, 206], [14, 210], [45, 200], [70, 189], [90, 199], [30, 212], [58, 192]];
+  onde.forEach(([x, y], i) => {
+    const deitado = i % 3 !== 0;
+    const l = deitado ? 5 : 3, a = deitado ? 3 : 5;
+    retangulo(q, x, y, l, a, C.santinho);
+    if (deitado) retangulo(q, x, y, 2, a, i % 2 ? C.santinhoA : C.santinhoB);
+    else retangulo(q, x, y, l, 2, i % 2 ? C.santinhoA : C.santinhoB);
+  });
+}
+
+/** O celular deitado na mesa, ao lado do terminal: entregue antes de ir à cabine. */
+function celular(q: Quadro) {
+  retangulo(q, 184, 143, 9, 3, C.contorno);
+  retangulo(q, 185, 143, 7, 2, C.celular);
+  retangulo(q, 186, 143, 5, 1, C.celularTela);
 }
 
 /** Um mesário sentado atrás da mesa: só dali para cima aparece. `y` é a altura do tampo. */
@@ -275,12 +337,155 @@ export function desenharTitulo(q: Quadro, apelido: string, inscricao: string) {
   escrever(q, 'ASSINATURA', x + 12, y + 108, C.tituloVerde);
 }
 
+/** A impressão digital: arcos em volta de um miolo, desenhados linha a linha até `ate` (de 0 a 1). */
+function digital(q: Quadro, x: number, y: number, l: number, a: number, ate: number, c: Cor) {
+  const cx = x + l / 2, cy = y + a * 0.55;
+  const limite = y + Math.round(a * ate);
+  for (let yy = y; yy < Math.min(y + a, limite); yy++) for (let xx = x; xx < x + l; xx++) {
+    const dx = (xx - cx) / (l / 2), dy = (yy - cy) / (a / 2);
+    if (dx * dx + dy * dy * 0.8 > 1) continue;
+    const anel = Math.sqrt(dx * dx * 1.3 + dy * dy) * 9 + Math.sin(dx * 3) * 0.6;
+    if (Math.floor(anel) % 2 === 0) pixel(q, xx, yy, c);
+  }
+}
+
+/**
+ * O leitor de digital da mesa, de perto: o vidro à esquerda com a digital aparecendo enquanto lê, a
+ * telinha à direita com o que ele diz e a barra de leitura. Segurar ESPAÇO é o dedo no vidro.
+ */
+export function desenharLeitor(q: Quadro, d: Leitor) {
+  const l = 200, a = 112, x = Math.round((W - l) / 2), y = 48;
+  retangulo(q, x + 3, y + 3, l, a, C.contorno);
+  caixa(q, x, y, l, a, C.aparelho, C.contorno);
+  retangulo(q, x + 1, y + 1, l - 2, 1, C.aparelhoClaro);
+  escrever(q, 'LEITOR BIOMÉTRICO', x + l / 2, y + 6, C.textoLeitor, { alinhar: 'centro' });
+  // O vidro, com a luz em volta: verde quando reconhece, vermelha quando não.
+  const vx = x + 14, vy = y + 20, vl = 52, va = 64;
+  const luz = d.estado === 'ok' ? C.luzVerde : d.estado === 'falhou' ? C.luzVermelha : d.estado === 'lendo' ? C.cristaLeitor : C.aparelhoEscuro;
+  retangulo(q, vx - 3, vy - 3, vl + 6, va + 6, luz);
+  retangulo(q, vx - 1, vy - 1, vl + 2, va + 2, C.aparelhoEscuro);
+  retangulo(q, vx, vy, vl, va, C.vidroLeitor);
+  const ate = d.estado === 'esperando' ? 0 : d.estado === 'lendo' ? d.progresso : 1;
+  digital(q, vx + 6, vy + 6, vl - 12, va - 12, ate, d.estado === 'falhou' ? C.luzVermelha : d.estado === 'ok' ? C.luzVerde : C.cristaLeitor);
+  if (d.estado === 'lendo') retangulo(q, vx, vy + 6 + Math.round((va - 12) * d.progresso), vl, 1, C.luzVerde);
+  if (d.estado === 'esperando') {
+    // O contorno do dedo, pontilhado, mostrando onde pôr.
+    for (let i = 0; i < 40; i += 3) { pixel(q, vx + 14, vy + 18 + i, C.cristaLeitor); pixel(q, vx + vl - 15, vy + 18 + i, C.cristaLeitor); }
+    for (let i = 0; i < 24; i += 3) pixel(q, vx + 15 + i, vy + 14 + Math.round(Math.abs(i - 11) / 3), C.cristaLeitor);
+  }
+  // A telinha.
+  const tx = x + 80, ty = y + 20, tl = 106, ta = 40;
+  retangulo(q, tx - 1, ty - 1, tl + 2, ta + 2, C.aparelhoEscuro);
+  retangulo(q, tx, ty, tl, ta, C.telaLeitor);
+  const linhas: [string, Cor][] = d.estado === 'esperando' ? [['COLOQUE O DEDO', C.textoLeitor], ['NO LEITOR', C.textoLeitor]]
+    : d.estado === 'lendo' ? [['LENDO A DIGITAL...', C.textoLeitor], [`${Math.floor(d.progresso * 100)}%`, C.luzVerde]]
+      : d.estado === 'falhou' ? [['DIGITAL NÃO', C.luzVermelha], ['RECONHECIDA', C.luzVermelha]]
+        : [['ELEITOR', C.luzVerde], ['IDENTIFICADO', C.luzVerde]];
+  linhas.forEach(([t, c], i) => escrever(q, t, tx + tl / 2, ty + 10 + i * 12, c, { alinhar: 'centro' }));
+  // A barra de leitura.
+  retangulo(q, tx, ty + ta + 8, tl, 6, C.barraLeitor);
+  const cheia = d.estado === 'esperando' ? 0 : d.estado === 'lendo' ? d.progresso : 1;
+  retangulo(q, tx + 1, ty + ta + 9, Math.round((tl - 2) * cheia), 4, d.estado === 'falhou' ? C.luzVermelha : C.luzVerde);
+  const dica = d.estado === 'ok' ? 'ESPAÇO: CONTINUAR' : d.estado === 'lendo' ? 'NÃO SOLTE...' : 'SEGURE ESPAÇO';
+  escrever(q, dica, tx + tl / 2, y + a - 13, C.nomeFala, { alinhar: 'centro' });
+}
+
+/** Os eleitores de antes no caderno: nomes de mentira, cada um com o rabisco dele. */
+const OUTROS = ['ADEMIR S.', 'BEATRIZ L.', 'CLEUSA F.', 'DIEGO R.', 'EDNA M.', 'FABIO N.', 'GILDA S.', 'HELENA T.'];
+
+/** O rabisco de uma assinatura, sempre o mesmo para o mesmo nome: os pontos de uma linha que sobe e desce. */
+function rabisco(nome: string, x: number, y: number, l: number): [number, number][] {
+  const pts: [number, number][] = [];
+  let semente = 7;
+  for (const ch of nome) semente = (semente * 31 + ch.charCodeAt(0)) % 9973;
+  for (let i = 0; i <= l; i += 2) {
+    const onda = Math.sin(i / 3 + semente) * 3 + Math.sin(i / 7 + semente / 3) * 2;
+    pts.push([x + i, Math.round(y + onda * (i < 6 ? i / 6 : 1))]);
+  }
+  return pts;
+}
+
+/** Risca o rabisco até `ate` (de 0 a 1) e devolve onde a caneta parou. */
+function riscar(q: Quadro, pts: [number, number][], ate: number, c: Cor): [number, number] {
+  const n = Math.floor((pts.length - 1) * ate);
+  for (let i = 0; i < n; i++) linha(q, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], c);
+  return pts[n];
+}
+
+/**
+ * O caderno de votação aberto na mesa: à esquerda quem já votou, à direita a sua linha, marcada de
+ * amarelo, e a caneta assinando enquanto ESPAÇO está apertado.
+ */
+export function desenharCaderno(q: Quadro, apelido: string, progresso: number) {
+  const l = 252, a = 116, x = Math.round((W - l) / 2), y = 48;
+  retangulo(q, x + 3, y + 3, l, a, C.contorno);
+  retangulo(q, x, y, l, a, C.contorno);
+  retangulo(q, x + 1, y + 1, l - 2, a - 2, C.folha);
+  retangulo(q, x + l / 2 - 2, y + 1, 4, a - 2, C.lombada);
+  escrever(q, 'CADERNO DE VOTAÇÃO', x + 8, y + 7, C.tituloVerde);
+  escrever(q, 'SEÇÃO 0059', x + l - 8, y + 7, C.tituloVerde, { alinhar: 'direita' });
+  retangulo(q, x + 6, y + 15, l / 2 - 10, 1, C.folhaSombra);
+  retangulo(q, x + l / 2 + 4, y + 15, l / 2 - 10, 1, C.folhaSombra);
+  const linhaDoCaderno = (px: number, ly: number, n: number, nome: string, assinado: boolean) => {
+    escrever(q, String(n).padStart(3, '0'), px, ly, C.mesaEscura);
+    escrever(q, caber(nome, 44), px + 16, ly, C.contorno);
+    retangulo(q, px + 16, ly + 12, 100, 1, C.folhaLinha);
+    if (assinado) riscar(q, rabisco(nome, px + 66, ly + 7, 44), 1, C.tintaCaneta);
+  };
+  OUTROS.slice(0, 6).forEach((nome, i) => linhaDoCaderno(x + 8, y + 22 + i * 15, 112 + i, nome, true));
+  // A página da direita: dois que vieram antes, você marcado de amarelo, e as linhas vazias de quem vem.
+  const dx = x + l / 2 + 8;
+  linhaDoCaderno(dx, y + 22, 118, OUTROS[6], true);
+  linhaDoCaderno(dx, y + 37, 119, OUTROS[7], true);
+  const ly = y + 52;
+  retangulo(q, dx - 3, ly - 3, 122, 18, C.marcaTexto);
+  linhaDoCaderno(dx, ly, 120, apelido, false);
+  for (let i = 1; i <= 2; i++) linhaDoCaderno(dx, ly + i * 15, 120 + i, '', false);
+  const ponta = riscar(q, rabisco(apelido.toUpperCase(), dx + 66, ly + 7, 44), progresso, C.tintaCaneta);
+  // A caneta, deitada na diagonal, com a ponta onde o rabisco parou (parada, fica ao lado da linha).
+  const [cx, cy] = progresso > 0 && progresso < 1 ? ponta : [dx + 118, ly + 6];
+  for (let i = 0; i < 20; i++) {
+    const px = cx + 1 + i, py = cy - 1 - Math.floor(i / 2);
+    pixel(q, px, py, i < 2 ? C.contorno : i < 15 ? C.caneta : C.canetaClara);
+    pixel(q, px, py - 1, C.contorno);
+    pixel(q, px, py + 1, i < 2 ? 0 : C.contorno);
+  }
+  const dica = progresso >= 1 ? 'ESPAÇO: CONTINUAR' : progresso > 0 ? 'ASSINANDO...' : 'SEGURE ESPAÇO PARA ASSINAR';
+  escrever(q, dica, x + l - 8, y + a - 11, C.tituloVerde, { alinhar: 'direita' });
+}
+
+/** O mural de perto: as duas chapas do 2º turno, com foto, número, partido e vice, como no santinho. */
+export function desenharMural(q: Quadro) {
+  const l = 268, a = 140, x = Math.round((W - l) / 2), y = 44;
+  retangulo(q, x + 3, y + 3, l, a, C.contorno);
+  caixa(q, x, y, l, a, C.papel, C.contorno);
+  escrever(q, 'CANDIDATOS A PRESIDENTE', x + l / 2, y + 6, C.contorno, { alinhar: 'centro' });
+  escrever(q, '2º TURNO - 25 DE OUTUBRO', x + l / 2, y + 14, C.tituloVerde, { alinhar: 'centro' });
+  CANDIDATOS.slice(0, 2).forEach((c, i) => {
+    const cl = l / 2 - 12, cx = x + 8 + i * (cl + 8), cy = y + 26, ca = 98;
+    caixa(q, cx, cy, cl, ca, C.folha, C.papelSombra);
+    const r = rosto(c.numero, 'titular');
+    if (r) { retangulo(q, cx + 5, cy + 5, r.largura + 2, r.altura + 2, C.contorno); colar(q, r, cx + 6, cy + 6); }
+    const meio = cx + 42 + (cl - 42) / 2;
+    escrever(q, String(c.numero), meio, cy + 10, C.contorno, { tamanho: 'grande', alinhar: 'centro' });
+    escrever(q, c.partido, meio, cy + 30, C.tituloVerde, { alinhar: 'centro' });
+    escrever(q, caber(c.nome, cl - 10), cx + 5, cy + 56, C.contorno);
+    escrever(q, 'VICE', cx + 5, cy + 70, C.mesaEscura);
+    escrever(q, caber(c.vice, cl - 10), cx + 5, cy + 78, C.contorno);
+  });
+  escrever(q, 'ESPAÇO FECHA', x + l - 8, y + a - 10, C.mesaEscura, { alinhar: 'direita' });
+}
+
 export function desenharSecao(q: Quadro, d: DadosDaSecao): Regiao[] {
   colar(q, fundo(), 0, 0);
+  if (d.celularNaMesa) celular(q);
   bonequinho(q, Math.round(d.x), LUGARES.pe, d.passo, d.virado, d.comTitulo);
   if (d.votou) adesivo(q, Math.round(d.x), LUGARES.pe);
   if (d.dica) balao(q, d.dica, Math.round(d.x), LUGARES.pe - 38);
   if (d.fala) fala(q, d.fala);
   if (d.titulo) desenharTitulo(q, d.titulo.apelido, d.titulo.inscricao);
+  if (d.leitor) desenharLeitor(q, d.leitor);
+  if (d.caderno) desenharCaderno(q, d.caderno.apelido, d.caderno.progresso);
+  if (d.mural) desenharMural(q);
   return [];
 }

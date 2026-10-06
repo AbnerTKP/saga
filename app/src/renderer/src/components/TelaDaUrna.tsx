@@ -6,8 +6,8 @@ import { desenharApuracao } from '../urna/apuracao';
 import { desenharCabine } from '../urna/cabine';
 import { H, W, regiaoEm, type Regiao } from '../urna/comum';
 import {
-  agir, alternarCola, andar, animando, avancar, comandoDaTecla, dicaDaSecao, escolherNaApuracao, falaDaMesa,
-  novoEstado, passoDoDesenho, teclar, voltar, type Som,
+  agir, alternarCola, andar, animando, avancar, celularNaMesa, comandoDaTecla, dicaDaSecao, escolherNaApuracao, falaDaMesa,
+  novoEstado, passoDoDesenho, soltar, teclar, voltar, type Som,
 } from '../urna/jogo';
 import { desenharSecao } from '../urna/secao';
 import somDaTecla from '../urna/sons/tecla.ogg';
@@ -18,8 +18,9 @@ import somDoFim from '../urna/sons/fim.ogg';
  * Quadrado. É um jogo de uma pessoa — o que é de todos é a apuração, que soma a Saga inteira e,
  * enquanto está na tela, é buscada de novo a cada 3 s para os votos dos outros aparecerem.
  *
- * Nada anima sozinho: o laço só roda enquanto o bonequinho anda, uma tecla sobe ou o FIM conta; o
- * cursor da urna pisca num relógio de meio segundo só dentro da cabine.
+ * Nada anima sozinho: o laço só roda enquanto o bonequinho anda, uma tecla sobe, o FIM conta ou
+ * ESPAÇO está seguro no leitor ou no caderno; o cursor da urna pisca num relógio de meio segundo só
+ * dentro da cabine. Segurar é ESPAÇO (ou Enter, ou E) apertado, ou o botão do mouse sobre o jogo.
  */
 export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }: {
   servidorId: number;
@@ -82,7 +83,7 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
       else direcao = falta > 0 ? 1 : -1;
     }
     andar(e, direcao, dt);
-    avancar(e, dt);
+    tocar(avancar(e, dt));
     mandarVoto();
     redesenhar();
     if (animando(e) || direcao !== 0) laco.current = requestAnimationFrame(passo);
@@ -120,15 +121,19 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
       else if (c.tipo === 'escolher') escolherNaApuracao(e, c.qual);
       depois();
     };
-    const sobe = (ev: KeyboardEvent) => { seguradas.current.delete(ev.code); };
-    const soltar = () => seguradas.current.clear();
+    const sobe = (ev: KeyboardEvent) => {
+      seguradas.current.delete(ev.code);
+      // Soltar a tecla de agir tira o dedo do leitor e a caneta do caderno.
+      if (comandoDaTecla(e.fase, ev.code)?.tipo === 'agir') { soltar(e); depois(); }
+    };
+    const largarTudo = () => { seguradas.current.clear(); soltar(e); depois(); };
     window.addEventListener('keydown', desce);
     window.addEventListener('keyup', sobe);
-    window.addEventListener('blur', soltar);
+    window.addEventListener('blur', largarTudo);
     return () => {
       window.removeEventListener('keydown', desce);
       window.removeEventListener('keyup', sobe);
-      window.removeEventListener('blur', soltar);
+      window.removeEventListener('blur', largarTudo);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -176,6 +181,9 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
         x: e.x, passo: passoDoDesenho(e), virado: e.virado, comTitulo: e.etapa === 'pedindo',
         dica: dicaDaSecao(e), fala: falaDaMesa(e), votou: e.votos > 0,
         titulo: e.etapa === 'titulo' ? { apelido, inscricao } : null,
+        leitor: e.etapa === 'digital' ? e.leitor : null,
+        caderno: e.etapa === 'caderno' ? { apelido, progresso: e.assinatura } : null,
+        mural: e.mural, celularNaMesa: celularNaMesa(e),
       });
     } else if (e.fase === 'cabine') {
       regioes.current = desenharCabine(quadro, { visor: e.visor, piscar, apertada: e.apertada, dedo: e.dedo, cola: e.cola });
@@ -199,7 +207,19 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
     const [x, y] = pontoNoJogo(ev);
     ev.currentTarget.style.cursor = regiaoEm(regioes.current, x, y) || e.fase === 'secao' ? 'pointer' : 'default';
   };
+  /** No leitor e no caderno, o botão do mouse é o ESPAÇO: apertar põe o dedo, soltar tira. */
+  const seguraComOMouse = (fase: string, etapa: string) => fase === 'secao' && (etapa === 'digital' || etapa === 'caderno');
+  const apertouNoLeitor = useRef(false);
+  const apertar = (ev: React.MouseEvent<HTMLCanvasElement>) => {
+    if (ev.button !== 0 || !seguraComOMouse(e.fase, e.etapa)) return;
+    apertouNoLeitor.current = true;
+    agir(e);
+    depois();
+  };
+  const largar = () => { soltar(e); depois(); };
   const clicar = (ev: React.MouseEvent<HTMLCanvasElement>) => {
+    // O aperto já foi tratado no mousedown; o clique que vem depois dele não é outro ESPAÇO.
+    if (apertouNoLeitor.current) { apertouNoLeitor.current = false; return; }
     const [x, y] = pontoNoJogo(ev);
     const reg = regiaoEm(regioes.current, x, y);
     if (reg) {
@@ -210,7 +230,7 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
       else if (a.tipo === 'sair') { escolherNaApuracao(e, 1); agir(e); }
     } else if (e.fase === 'secao') {
       // Com fala aberta, ou clicando perto de onde já está, o clique é o ESPAÇO; senão, é andar.
-      if (falaDaMesa(e) || e.etapa === 'titulo' || dicaDaSecao(e) && Math.abs(x - e.x) < 24) agir(e);
+      if (falaDaMesa(e) || e.etapa === 'titulo' || e.mural || dicaDaSecao(e) && Math.abs(x - e.x) < 24) agir(e);
       else destino.current = Math.round(x);
     }
     depois();
@@ -219,7 +239,10 @@ export function TelaDaUrna({ servidorId, euId, apelido, surdo, live, onFechar }:
   return (
     <div className="tela-da-urna">
       <div ref={caixa} className="luta-palco">
-        <canvas ref={canvas} className="luta-canvas" width={W} height={H} onMouseMove={apontar} onClick={clicar} />
+        <canvas
+          ref={canvas} className="luta-canvas" width={W} height={H}
+          onMouseMove={apontar} onMouseDown={apertar} onMouseUp={largar} onMouseLeave={largar} onClick={clicar}
+        />
       </div>
       {live && <div className="xadrez-live">{live}</div>}
     </div>

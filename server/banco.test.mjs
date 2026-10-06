@@ -69,6 +69,7 @@ const IMPRESSOES = [
   'ebc5a9ec323b',  // 55 urna_eleitores: quantas vezes cada pessoa votou, sem em quem
   '515a01a2c443',  // 56 enquadramento da foto e da capa do servidor
   '93906f078740',  // 57 mensagens.bot: o cartão do bot de música
+  '6fe331481858',  // 58 urna_votos e urna_eleitores ganham o turno (a tabela é refeita)
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -133,6 +134,37 @@ test('refazer a tabela de mensagens não perde o que já foi dito', () => {
   recusa("INSERT INTO mensagens (texto, criado_em) VALUES ('lugar nenhum', 1)");
   db.prepare('INSERT INTO conversas (criada_em) VALUES (1)').run();
   recusa("INSERT INTO mensagens (sala_id, conversa_id, texto, criado_em) VALUES (1, 1, 'os dois', 1)");
+});
+
+test('o 2º turno da Urna guarda o 1º inteiro, e o voto continua secreto', () => {
+  // A mesma reconstrução de tabela, agora nas duas da Urna: o que havia vira 1º turno, voto
+  // a voto e eleitor a eleitor, e nenhuma das duas ganha a coluna que ligaria pessoa e chapa.
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  const refazer = MIGRACOES.findIndex((sql) => sql.includes('urna_votos_nova'));
+  assert.ok(refazer > 0, 'a migração do 2º turno sumiu');
+  for (const sql of MIGRACOES.slice(0, refazer)) db.exec(sql);
+  db.prepare("INSERT INTO servidores (nome, criado_em) VALUES ('CORNUME', 1)").run();
+  db.prepare("INSERT INTO usuarios (apelido, apelido_chave, senha_hash, criado_em) VALUES ('TKP','tkp','x',1)").run();
+  db.exec("INSERT INTO urna_votos (servidor_id, escolha, votos) VALUES (1, '13', 51), (1, '14', 49), (1, 'branco', 1)");
+  db.exec('INSERT INTO urna_eleitores (servidor_id, usuario_id, votos, ultimo_em) VALUES (1, 1, 7, 1234)');
+
+  db.exec('BEGIN');
+  db.exec(MIGRACOES[refazer]);
+  db.exec('COMMIT');
+
+  assert.deepEqual(db.prepare('SELECT turno, servidor_id, escolha, votos FROM urna_votos ORDER BY escolha').all().map((l) => ({ ...l })),
+    [{ turno: 1, servidor_id: 1, escolha: '13', votos: 51 }, { turno: 1, servidor_id: 1, escolha: '14', votos: 49 }, { turno: 1, servidor_id: 1, escolha: 'branco', votos: 1 }]);
+  assert.deepEqual({ ...db.prepare('SELECT * FROM urna_eleitores').get() }, { turno: 1, servidor_id: 1, usuario_id: 1, votos: 7, ultimo_em: 1234 });
+  // O mesmo número em outro turno é outra linha.
+  db.exec("INSERT INTO urna_votos (turno, servidor_id, escolha, votos) VALUES (2, 1, '13', 1)");
+  const colunas = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+  assert.ok(!colunas('urna_votos').includes('usuario_id'));
+  assert.ok(!colunas('urna_eleitores').includes('escolha'));
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  // Apagar o servidor ainda leva os votos junto.
+  db.exec('DELETE FROM servidores');
+  assert.equal(db.prepare('SELECT count(*) c FROM urna_votos').get().c, 0);
 });
 
 test('as colunas acrescentadas depois existem e têm padrão seguro', () => {

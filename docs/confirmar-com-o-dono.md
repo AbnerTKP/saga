@@ -2,6 +2,16 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A Urna do 2º turno (05/10/2026): 13 × 22, a mesa com digital e caderno, o mural, a mão nova e a
+  apuração frente a frente.** O que está medido: a regra (`jogo.test.ts`: segurar e soltar no leitor,
+  a primeira leitura falhando, a caneta parando onde parou, o mural, quem volta pulando a mesa), a
+  porcentagem dos válidos (`apuracao.test.ts`), o servidor (`urnas.test.mjs`, `api.test.mjs`) e a
+  migração 58 contra dados do 1º turno (`banco.test.mjs`); as telas desenhadas pelo motor a partir do
+  estado de verdade da regra. **Não foi exercido**: a Saga aberta com o jogo — segurar ESPAÇO e o botão
+  do mouse no `TelaDaUrna.tsx` só foram conferidos no typecheck; o bipe do leitor (é o som da tecla da
+  urna, não foi ouvido); o Windows; o app de antes do 2º turno votando numa chapa que saiu (a recusa
+  está testada no servidor, a frase na tela dele é dedução).
+
 - **O relógio do Catan, os avisos e as cartas grandes (04/10/2026).** O que está medido: as regras do
   relógio (`catan.test.mjs`, inclusive 30 partidas de robôs que às vezes dormem e deixam o relógio
   jogar), as funções da tela (`catan.test.ts`) e a tela inteira no RENDERER pelo passo `19-catan` do

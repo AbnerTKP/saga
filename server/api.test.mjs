@@ -2056,13 +2056,17 @@ test('urna pela rede: vota, soma e só devolve totais', async () => {
   const quem = (await cadastrar('urna_quem')).corpo;
   const antes = await chamar('GET', '/urna', { sessao: quem.token });
   assert.equal(antes.status, 200, JSON.stringify(antes.corpo));
-  const votou = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } });
+  // A 80 era chapa no 1º turno: o app de antes do 2º ainda a mostra, e o servidor recusa dizendo por quê.
+  const velho = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } });
+  assert.equal(velho.status, 400);
+  assert.match(velho.corpo.error, /2º turno/);
+  const votou = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 22 } });
   assert.equal(votou.status, 200, JSON.stringify(votou.corpo));
-  const samara = votou.corpo.contagem.find((c) => c.numero === 80);
-  assert.equal(samara.votos, (antes.corpo.contagem.find((c) => c.numero === 80)?.votos ?? 0) + 1);
+  const chapa = votou.corpo.contagem.find((c) => c.numero === 22);
+  assert.equal(chapa.votos, (antes.corpo.contagem.find((c) => c.numero === 22)?.votos ?? 0) + 1);
   assert.equal(votou.corpo.meus, 1);
-  assert.equal((await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } })).status, 429);
-  assert.equal((await chamar('POST', '/urna/votos', { corpo: { escolha: 80 } })).status, 401);
+  assert.equal((await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 22 } })).status, 429);
+  assert.equal((await chamar('POST', '/urna/votos', { corpo: { escolha: 22 } })).status, 401);
 });
 
 // --- e-mail, com o envio desligado ----------------------------------------------------

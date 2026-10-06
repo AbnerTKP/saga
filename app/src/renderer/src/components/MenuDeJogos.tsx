@@ -69,7 +69,7 @@ export function MenuDeJogos({ em, minha, corrida, luta, catan, onXadrez, onCorri
     },
     { nome: 'Catan', sub: catan, fundo: '#2a6aa3', abrir: onCatan, capa: <CapaDoCatan className="capa-do-catan" /> },
     {
-      nome: 'Urna', sub: votos === null ? 'votar para presidente' : `${votos} ${votos === 1 ? 'voto' : 'votos'} na Saga`,
+      nome: 'Urna', sub: votos === null ? '2º turno para presidente' : `2º turno · ${votos} ${votos === 1 ? 'voto' : 'votos'}`,
       fundo: '#2e6fb0', abrir: onUrna,
       capa: <QuadroNaTela chave="capa" className="capa-de-urna" quadro={() => { const q = criarQuadro(48, 32); desenharCapa(q); return q; }} />,
     },

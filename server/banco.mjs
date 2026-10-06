@@ -385,6 +385,36 @@ export const MIGRACOES = [
   // `texto` continua preenchido com a mesma notícia em uma linha — é o que o app de antes
   // desta versão mostra. 22/09/2026: a produção na 56; esta é a 57.
   `ALTER TABLE mensagens ADD COLUMN bot TEXT`,
+
+  // O 2º turno da Urna (05/10/2026): a apuração começa do zero, como na eleição de verdade
+  // — escolha do dono —, e o 1º turno fica guardado em vez de apagado. As duas tabelas
+  // ganham o `turno` na chave; o que já existia é todo do 1º. Mudar a chave primária no
+  // SQLite é reconstruir a tabela, como na 49. O voto continua secreto do mesmo jeito: o
+  // turno entra nas DUAS tabelas, e nenhuma ganha a coluna da outra. 05/10/2026: a
+  // produção na 57; esta é a 58.
+  `CREATE TABLE urna_votos_nova (
+     turno       INTEGER NOT NULL,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     escolha     TEXT    NOT NULL,
+     votos       INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (turno, servidor_id, escolha)
+   );
+   INSERT INTO urna_votos_nova (turno, servidor_id, escolha, votos)
+        SELECT 1, servidor_id, escolha, votos FROM urna_votos;
+   DROP TABLE urna_votos;
+   ALTER TABLE urna_votos_nova RENAME TO urna_votos;
+   CREATE TABLE urna_eleitores_nova (
+     turno       INTEGER NOT NULL,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+     votos       INTEGER NOT NULL DEFAULT 0,
+     ultimo_em   INTEGER NOT NULL,
+     PRIMARY KEY (turno, servidor_id, usuario_id)
+   );
+   INSERT INTO urna_eleitores_nova (turno, servidor_id, usuario_id, votos, ultimo_em)
+        SELECT 1, servidor_id, usuario_id, votos, ultimo_em FROM urna_eleitores;
+   DROP TABLE urna_eleitores;
+   ALTER TABLE urna_eleitores_nova RENAME TO urna_eleitores`,
 ];
 
 export function abrirBanco(caminho) {

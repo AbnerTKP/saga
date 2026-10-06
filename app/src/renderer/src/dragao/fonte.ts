@@ -108,6 +108,8 @@ const PEQUENA: Record<string, Glifo> = {
   '#': glifo('.X.X.', 'XXXXX', '.X.X.', 'XXXXX', '.X.X.'),
   '*': glifo('...', 'X.X', '.X.', 'X.X', '...'),
   '×': glifo('...', 'X.X', '.X.', 'X.X', '...'),
+  // O ordinal do "2º TURNO" da Urna: o O pequeno no alto, com o traço embaixo.
+  'º': glifo('XXX', 'X.X', 'XXX', '...', 'XXX'),
   ' ': { largura: 2, px: [] },
 };
 
@@ -231,6 +233,10 @@ const GRANDE: Record<string, Glifo> = {
     '...XXX...', '...XXX...', '.........', '.........', '...XXX...', '...XXX...'),
   '.': glifo('...', '...', '...', '...', '...', '...', '...', '...', '...', '...', '...', 'XXX', 'XXX'),
   '-': { largura: 7, px: grade(['XXXXXXX', 'XXXXXXX'], 5) },
+  'º': glifo('.XXXXX.', 'XXXXXXX', 'XX...XX', 'XXXXXXX', '.XXXXX.', '.......', 'XXXXXXX', 'XXXXXXX'),
+  // A porcentagem da apuração da Urna, na altura dos algarismos.
+  '%': glifo('XXX....XX', 'XXX...XXX', 'XXX..XXX.', '.....XXX.', '....XXX..', '....XXX..', '...XXX...',
+    '..XXX....', '..XXX....', '.XXX.....', '.XXX..XXX', 'XXX...XXX', 'XX....XXX'),
 };
 GRANDE.O = GRANDE['0'];
 

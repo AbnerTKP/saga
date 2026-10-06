@@ -31,6 +31,14 @@ export function regiaoEm(regioes: Regiao[], x: number, y: number): Regiao | null
 export const PRETO = cor('#15161a');
 export const BRANCO = cor('#f4f4ef');
 
+/** Cola `s` ampliado `k` vezes, cada pixel virando um quadrado: o rosto grande da apuração, o FIM da urna. */
+export function ampliar(q: Quadro, s: Quadro, x: number, y: number, k: number) {
+  for (let yy = 0; yy < s.altura; yy++) for (let xx = 0; xx < s.largura; xx++) {
+    const c = s.px[yy * s.largura + xx];
+    if (c) retangulo(q, x + xx * k, y + yy * k, k, k, c);
+  }
+}
+
 /** Caixa com borda de um pixel. */
 export function caixa(q: Quadro, x: number, y: number, l: number, a: number, fundo: Cor, borda: Cor) {
   retangulo(q, x, y, l, a, borda);

@@ -9,9 +9,9 @@
  *
  * Nada anima sozinho: quem chama redesenha quando algo muda, e o `piscar` é o do cursor da caixa.
  */
-import { type Quadro, colar, cor, criarQuadro, linha, pixel, retangulo } from '../dragao/quadro.ts';
+import { type Cor, type Quadro, colar, cor, criarQuadro, linha, pixel, retangulo } from '../dragao/quadro.ts';
 import { escrever, medir } from '../dragao/fonte.ts';
-import { type Regiao, type Tecla, H, W, caber, caixa, rosto } from './comum.ts';
+import { type Regiao, type Tecla, H, W, ampliar, caber, caixa, rosto } from './comum.ts';
 import { CANDIDATOS, candidatoDoNumero } from './candidatos.ts';
 
 export type Visor =
@@ -38,7 +38,10 @@ const C = {
   branco: cor('#f7f7f2'), brancoSombra: cor('#b9bab5'),
   laranja: cor('#ef6a24'), laranjaBrilho: cor('#ff9656'), laranjaSombra: cor('#a8440f'),
   verde: cor('#3fae5a'), verdeBrilho: cor('#6fd584'), verdeSombra: cor('#257a3a'),
-  pele: cor('#e3a982'), peleClara: cor('#f3c9a8'), peleSombra: cor('#b97a57'), peleContorno: cor('#6e4430'), manga: cor('#8fb3d9'), mangaSombra: cor('#6a8db4'),
+  pele: cor('#e3a982'), peleClara: cor('#f3c9a8'), peleSombra: cor('#b97a57'), peleContorno: cor('#6e4430'),
+  unha: cor('#efc2ab'), unhaBrilho: cor('#fbe4d8'),
+  // A manga é a camisa azul do bonequinho da seção: a mão é dele.
+  manga: cor('#3e8fb8'), mangaClara: cor('#5aa7cf'), mangaSombra: cor('#2d6d8e'), mangaContorno: cor('#1c4660'),
   papel: cor('#f2ebc9'), papelSombra: cor('#d6cda4'), fita: cor('#cfe3e8'),
 };
 
@@ -87,7 +90,7 @@ function fundo(q: Quadro) {
   retangulo(q, 251, 87, 126, 82, C.corpo);
   escrever(q, 'URNA DA SAGA', 314, 60, C.cinza, { alinhar: 'centro' });
   linha(q, 262, 70, 366, 70, C.corpoSombra);
-  escrever(q, 'ELEIÇÕES 2026', 314, 74, C.cinza, { alinhar: 'centro' });
+  escrever(q, 'ELEIÇÕES 2026 - 2º TURNO', 314, 74, C.cinza, { alinhar: 'centro' });
 }
 
 function tecla(q: Quadro, t: Tecla, afundada: boolean): Regiao {
@@ -110,29 +113,76 @@ function tecla(q: Quadro, t: Tecla, afundada: boolean): Regiao {
   return { x: g.x, y: g.y, l: g.l, a: g.a, alvo: { tipo: 'tecla', tecla: t } };
 }
 
-/** A mão entra por baixo e o indicador para no meio da tecla. */
+/**
+ * A mão direita de quem vota, vista por trás como na cabine: o indicador esticado com a unha na ponta e
+ * as duas dobras, os outros três dedos fechados com as juntas em degrau, o polegar deitado do lado e o
+ * pulso. Pintada letra a letra como os glifos, porque mão em retângulos virava um bastão com um bloco
+ * embaixo. A ponta do indicador é a coluna `MAO_PONTA` da primeira linha.
+ *
+ * o contorno · p pele · c luz · s sombra · k dobra · u unha · b brilho da unha
+ */
+const MAO = [
+  '......ooo..............',
+  '.....oubuo.............',
+  '....oubbuso............',
+  '....ouuuuso............',
+  '....ocppsso............',
+  '....ocppsso............',
+  '....ocppsso............',
+  '....ockkkso............',
+  '....ocppsso............',
+  '....ocppsso............',
+  '....ocppssoooo.........',
+  '....ocppssocpso........',
+  '....ockkksocppsooo.....',
+  '....ocppssocppsocpso...',
+  '....ocppssocppsocppsoo.',
+  '...oocppssockksocppscso',
+  '..ocpocppsssssssockksso',
+  '.ocppocpppppppsssssssso',
+  '.ocpppocppppppppppppsso',
+  '.ocpppocpppppppppppppso',
+  '.ocpppocpppppppppppppso',
+  '.ocppppocppppppppppppso',
+  '..ocpppocpppppppppppsso',
+  '..oscppocpppppppppppsso',
+  '...ossoocpppppppppppsso',
+  '....ooo.ocppppppppppso.',
+  '........ocpppppppppsso.',
+  '........ocpppppppppsso.',
+  '........ocppppppppssso.',
+];
+const MAO_PONTA = 7;
+
+let tintaDaMao: Record<string, Cor> | null = null;
+
+/** A mão entra por baixo, a manga vindo na diagonal da direita, e a ponta do indicador para no meio da tecla. */
 function dedo(q: Quadro, t: Tecla, afundada: boolean) {
   const g = TECLAS[t];
-  const px = Math.round(g.x + g.l / 2), py = g.y + (afundada ? 7 : 5);
-  // O indicador, de 5 de largura, com a unha na ponta.
-  retangulo(q, px - 3, py - 1, 7, H, C.peleContorno);
-  retangulo(q, px - 2, py, 5, H, C.pele);
-  retangulo(q, px + 1, py + 1, 2, H, C.peleSombra);
-  pixel(q, px - 3, py - 1, 0); pixel(q, px + 3, py - 1, 0);
-  retangulo(q, px - 1, py + 1, 3, 2, C.peleClara);
-  linha(q, px - 1, py + 10, px + 1, py + 10, C.peleSombra);
-  // A mão fechada e o punho da manga, bem mais embaixo: mão grande tapava o teclado inteiro.
-  const my = py + 26;
-  retangulo(q, px - 9, my - 1, 17, H, C.peleContorno);
-  retangulo(q, px - 8, my, 15, H, C.pele);
-  retangulo(q, px - 2, my - 1, 5, 2, C.pele);
-  retangulo(q, px - 8, my + 4, 9, 1, C.peleSombra);
-  retangulo(q, px - 8, my + 8, 9, 1, C.peleSombra);
-  retangulo(q, px + 4, my, 3, H, C.peleSombra);
-  const cy = my + 13;
-  retangulo(q, px - 11, cy - 1, 21, H, C.peleContorno);
-  retangulo(q, px - 10, cy, 19, H, C.manga);
-  retangulo(q, px + 4, cy, 5, H, C.mangaSombra);
+  const px = Math.round(g.x + g.l / 2), py = g.y + (afundada ? 6 : 4);
+  tintaDaMao ??= { o: C.peleContorno, p: C.pele, c: C.peleClara, s: C.peleSombra, k: C.peleSombra, u: C.unha, b: C.unhaBrilho };
+  const x0 = px - MAO_PONTA;
+  // A manga primeiro, para o pulso ficar por cima do punho dela. O antebraço vem da direita, de
+  // baixo, e alarga descendo: é o pedaço mais perto de quem olha.
+  const my = py + MAO.length - 3;
+  for (let y = my; y < H; y++) {
+    const k = y - my;
+    const xa = x0 + 7 + Math.round(k * 0.3), xb = x0 + 23 + Math.round(k * 0.6);
+    retangulo(q, xa, y, xb - xa, 1, C.mangaContorno);
+    if (k === 0) continue;
+    const punho = k <= 4;
+    retangulo(q, xa + 1, y, xb - xa - 2, 1, punho ? C.mangaClara : C.manga);
+    retangulo(q, xb - 1 - Math.max(3, Math.round((xb - xa) / 4)), y, Math.max(3, Math.round((xb - xa) / 4)), 1, punho ? C.manga : C.mangaSombra);
+    if (k === 5) retangulo(q, xa + 1, y, xb - xa - 2, 1, C.mangaContorno);
+  }
+  // O botão do punho.
+  pixel(q, x0 + 11, my + 2, C.unhaBrilho);
+  MAO.forEach((l, y) => {
+    for (let x = 0; x < l.length; x++) {
+      const c = tintaDaMao![l[x]];
+      if (c) pixel(q, x0 + x, py + y, c);
+    }
+  });
 }
 
 const tx = (q: Quadro, t: string, x: number, y: number, c = C.tinta) => escrever(q, t, VISOR.x + x, VISOR.y + y, c);
@@ -175,7 +225,7 @@ function desenharVisor(q: Quadro, v: Visor, piscar: boolean) {
   if (v.tela === 'fim') {
     const g = criarQuadro(40, 16);
     escrever(g, 'FIM', 20, 1, C.tinta, { tamanho: 'grande', alinhar: 'centro' });
-    ampliarEm(q, g, VISOR.x + VISOR.l / 2 - 60, VISOR.y + 44, 3);
+    ampliar(q, g, VISOR.x + VISOR.l / 2 - 60, VISOR.y + 44, 3);
     escrever(q, 'VOTOU', VISOR.x + VISOR.l - 6, VISOR.y + VISOR.a - 10, C.cinza, { alinhar: 'direita' });
     return;
   }
@@ -208,25 +258,20 @@ function desenharVisor(q: Quadro, v: Visor, piscar: boolean) {
   rodape(q);
 }
 
-function ampliarEm(q: Quadro, s: Quadro, x: number, y: number, k: number) {
-  for (let yy = 0; yy < s.altura; yy++) for (let xx = 0; xx < s.largura; xx++) {
-    const c = s.px[yy * s.largura + xx];
-    if (c) retangulo(q, x + xx * k, y + yy * k, k, k, c);
-  }
-}
-
 /** A cola do eleitor, presa na parede da cabine por cima de tudo: os números em ordem. */
 function cola(q: Quadro): Regiao {
-  const l = 250, a = 118, x = Math.round((W - l) / 2), y = 40;
+  // Até quatro chapas cabem numa coluna só; mais que isso (o 1º turno teve treze), em duas.
+  const colunas = CANDIDATOS.length > 4 ? 2 : 1;
+  const porColuna = Math.ceil(CANDIDATOS.length / colunas);
+  const l = colunas === 2 ? 250 : 170, a = 42 + porColuna * 12, x = Math.round((W - l) / 2), y = 40;
   retangulo(q, x + 3, y + 3, l, a, C.paredeEscura);
   caixa(q, x, y, l, a, C.papel, C.papelSombra);
   retangulo(q, x + l / 2 - 16, y - 3, 32, 7, C.fita);
   escrever(q, 'COLA - PRESIDENTE', x + l / 2, y + 9, C.tinta, { alinhar: 'centro' });
-  const porColuna = Math.ceil(CANDIDATOS.length / 2);
   CANDIDATOS.forEach((c, i) => {
     const cx = x + 10 + (i >= porColuna ? l / 2 : 0), cy = y + 22 + (i % porColuna) * 12;
     escrever(q, String(c.numero), cx, cy, C.tinta);
-    escrever(q, caber(c.nome, l / 2 - 30), cx + 14, cy, C.tinta);
+    escrever(q, caber(c.nome, l / colunas - 30), cx + 14, cy, C.tinta);
   });
   escrever(q, 'TAB FECHA', x + l - 6, y + a - 9, C.cinza, { alinhar: 'direita' });
   return { x, y, l, a, alvo: { tipo: 'cola' } };
