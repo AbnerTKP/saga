@@ -36,7 +36,7 @@ import { useAvisos } from './useAvisos';
 import { Avisos } from './components/Avisos';
 import { CartaoDoPerfil } from './components/CartaoDoPerfil';
 import { lerGuardado, guardar, marcarLido, paraParametro, ONDE, type Marcadores } from './leituras';
-import { comAPessoa, conversasComNovidade, ultimasVistas, type ComAPessoa } from './amizade';
+import { comAPessoa, conversaSendoLida, conversasComNovidade, ultimasVistas, type ComAPessoa } from './amizade';
 import { TelaDeAmigos } from './components/TelaDeAmigos';
 import { ConnectScreen } from './components/ConnectScreen';
 import { ConfirmarEmail } from './components/ConfirmarEmail';
@@ -72,6 +72,7 @@ import { acharPessoa, contaDaIdentidade, identidadeDe, lembrarDasSalas, vistosEm
 import { podeApagarMensagem } from './apagar';
 import { oQueFazerAoClicar } from './navegacao';
 import { aoDespertar } from './despertar';
+import { useJanelaEmFoco } from './imagemParada';
 import { useMusica } from './useMusica';
 import { MenuDoBot } from './components/MenuDoBot';
 import { contarQueAMusicaMudou, definirContextoDoBot } from './musicaDoBot';
@@ -526,7 +527,14 @@ export function App() {
    */
   const conversasVistas = useRef<Map<number, number> | null>(null);
   const conversaAbertaRef = useRef<number | null>(null);
-  conversaAbertaRef.current = modoConversas ? conversaAberta?.id ?? null : null;
+  // Aberta e com a janela atrás de outro programa não está sendo lida: ela avisa e não se
+  // dá por lida (ver `conversaSendoLida`).
+  const janelaEmFoco = useJanelaEmFoco();
+  conversaAbertaRef.current = conversaSendoLida(modoConversas ? conversaAberta?.id ?? null : null, janelaEmFoco);
+  // O ouvido desligado, lido na hora do aviso. A busca nasce uma vez por servidor, e o
+  // `rm.deafened` dela ficava congelado no valor daquele instante.
+  const surdoRef = useRef(rm.deafened);
+  surdoRef.current = rm.deafened;
 
   /**
    * Esquece o que era da conta que saiu: as listas do servidor, as mesas, as conversas e
@@ -642,7 +650,7 @@ export function App() {
           avisarRef.current('info', `${c.com.nome} te mandou uma mensagem.`);
           // O som avisa quem está de fone com a janela noutro lugar; o recado na tela,
           // quem está olhando. Um sino curto, diferente do convite de jogo de propósito.
-          tocarAviso('mensagem', rm.deafened);
+          tocarAviso('mensagem', surdoRef.current);
         }
         conversasVistas.current = ultimasVistas(daConta);
         setPollError(null);
@@ -1392,8 +1400,10 @@ export function App() {
   }, [salaAberta?.id, salaAberta?.tipo, ultimaNaTela, modoConversas]);
 
   // O mesmo para a conversa privada aberta, no marcador dela — que é guardado à parte:
-  // juntos, a sala 3 e a conversa 3 seriam a mesma chave.
-  const conversaNaTelaId = conversaNaTela?.id ?? null;
+  // juntos, a sala 3 e a conversa 3 seriam a mesma chave. Só com a janela na frente: a que
+  // chegou enquanto você estava noutro programa fica como não lida, que é o que faz a busca
+  // tocar o sino por ela — e se dá por lida quando você volta.
+  const conversaNaTelaId = conversaSendoLida(conversaNaTela?.id ?? null, janelaEmFoco);
   useEffect(() => {
     if (conversaNaTelaId && ultimaNaTela) {
       setLidasDeConversa((m) => marcarLido(m, conversaNaTelaId, ultimaNaTela));

@@ -124,6 +124,13 @@ Mensagens, anexos, "está digitando", amigos e o modo conversas (a regra do serv
   está lendo. Quem decide é a comparação com a ÚLTIMA mensagem que cada conversa tinha, e
   não o contador de não lidas: o contador também sobe quando o marcador anda noutra
   máquina, e daria aviso sem mensagem nenhuma por trás (`amizade.ts`, puro e testado).
+  **"Aberta na tela" quer dizer aberta E com a janela na frente** (`conversaSendoLida`).
+  Até a v0.66 bastava estar aberta, e o caso mais comum de conversa ficava mudo: você
+  escreve, vai para o jogo, e a resposta chega sem som nenhum — a conversa continuava
+  "aberta", o aviso a pulava e o marcador a dava por lida no mesmo instante. O dono pediu
+  "barulho na mensagem particular" achando que não havia; havia, e calava justamente
+  quando fazia falta. Com a janela atrás, o marcador para (a mensagem fica como não lida,
+  e é isso que a busca enxerga para tocar o sino) e anda sozinho quando você volta.
 - **A barra de escrever é UMA caixa**, com o anexar dentro à esquerda e o GIF e o enviar
   dentro à direita; quem acende ao receber o cursor é a caixa (`:focus-within`), não o
   campo. Eram quatro coisas soltas na mesma linha e nada dizia que formavam um lugar de

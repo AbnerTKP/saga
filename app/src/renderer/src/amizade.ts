@@ -77,6 +77,16 @@ export function conversasComNovidade(
   ));
 }
 
+/**
+ * A conversa que está sendo LIDA — que não é o mesmo que a aberta na tela.
+ *
+ * Aberta com a janela atrás de outro programa não é lida por ninguém: era assim que a
+ * resposta de quem você estava conversando chegava muda. Você escrevia, ia para o jogo, e a
+ * conversa continuava "aberta" — o aviso a pulava, e o marcador a dava por lida na hora.
+ */
+export const conversaSendoLida = (abertaId: number | null, janelaEmFoco: boolean) =>
+  (janelaEmFoco ? abertaId : null);
+
 /** O que ficou na tela agora, para a próxima volta comparar. */
 export const ultimasVistas = (conversas: Conversa[]) =>
   new Map(conversas.map((c) => [c.id, c.ultimaId]));

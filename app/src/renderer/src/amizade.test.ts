@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { comAPessoa, conversasComNovidade, ultimasVistas, COMO_SE_LE } from './amizade.ts';
+import { comAPessoa, conversaSendoLida, conversasComNovidade, ultimasVistas, COMO_SE_LE } from './amizade.ts';
 import type { Conversa } from './api.ts';
 
 const eu = { euId: 1, amigos: [2], enviados: [3], recebidos: [4] };
@@ -66,4 +66,16 @@ test('conversa que aparece pela primeira vez com mensagem avisa', () => {
 test('conversa aberta agora, sem mensagem nenhuma, não avisa', () => {
   const antes = ultimasVistas([]);
   assert.deepEqual(conversasComNovidade(antes, [conversa(4, 0, 0)], null), []);
+});
+
+test('a conversa aberta com a janela atrás de outro programa avisa: ninguém está lendo', () => {
+  // Você escreveu, foi para o jogo, e a resposta chegou: era o caso que chegava mudo.
+  const antes = ultimasVistas([conversa(1, 5)]);
+  assert.deepEqual(conversasComNovidade(antes, [conversa(1, 7)], conversaSendoLida(1, false)).map((c) => c.id), [1]);
+  assert.deepEqual(conversasComNovidade(antes, [conversa(1, 7)], conversaSendoLida(1, true)), []);
+});
+
+test('sem conversa aberta, o foco não inventa uma', () => {
+  assert.equal(conversaSendoLida(null, true), null);
+  assert.equal(conversaSendoLida(null, false), null);
 });
