@@ -10,6 +10,7 @@
  */
 import type { CSSProperties } from 'react';
 import { FACE_NO_CUBO, GIRO_PARADO, giroDoDado } from '../dadosNoCopo';
+import { htmlFixo } from '../html';
 
 /** Quanto a rolagem dura na tela: o copo chacoalha, tomba, e os dados rolam até parar. */
 export const DURACAO_DA_ROLAGEM = 1450;
@@ -69,6 +70,7 @@ const COPO = `<svg viewBox="0 0 60 72" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="30" cy="14" rx="22.5" ry="5.6" fill="#e0b552" stroke="#8a6526" stroke-width="1"/>
   <ellipse cx="30" cy="14.4" rx="18.6" ry="3.7" fill="#140a04"/>
 </svg>`;
+const COPO_HTML = htmlFixo(COPO);
 
 /** Um cubo voando do copo até o lugar dele: o voo (posição), o giro (as seis faces) e a sombra. */
 function Cubo({ n, vermelho, qual, rolagem }: { n: number; vermelho: boolean; qual: 0 | 1; rolagem: number }) {
@@ -112,7 +114,7 @@ export function DadosNoCopo({ dados, rolando, rolagem }: { dados: [number, numbe
   }
   return (
     <div key={rolagem} className="catan-dados rolando">
-      <span className="copo-de-dados" aria-hidden="true" dangerouslySetInnerHTML={{ __html: COPO }} />
+      <span className="copo-de-dados" aria-hidden="true" dangerouslySetInnerHTML={COPO_HTML} />
       <Cubo n={a} vermelho={false} qual={0} rolagem={rolagem} />
       <Cubo n={b} vermelho qual={1} rolagem={rolagem} />
     </div>

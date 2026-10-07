@@ -517,4 +517,23 @@ exemplo uma poeira, um som de construção" — com "foco em desempenho sem lag"
 - **Medido** na bancada (Chrome headless, quadros pelo CDP e rastro de desempenho): durante a corrida e
   a queda, nenhuma tarefa longa na thread principal; montar a camada quando a peça chega custa um quadro
   de ~40 ms UMA vez, numa máquina sem placa de vídeo. `prefers-reduced-motion` desliga tudo.
+- **As peças do tabuleiro são de madeira maciça** (escolha do dono entre esta e a miniatura de parede
+  creme): a peça inteira na cor do jogador, em isométrico, a mesma projeção dos botões
+  (`isometrico.ts`, usado pelos dois). Na miniatura, a do jogador branco se confundia com uma casa
+  qualquer. A estrada virou uma viga com espessura.
+- **A mesa refazia o tabuleiro inteiro a cada leitura da partida — e não era das animações.** Medido no
+  rastro do Chrome: a cada 800 ms, ~1.450 de 1.700 objetos refeitos no layout, 43–72 ms por leitura. Duas
+  causas, as duas antigas e invisíveis a olho:
+  1. **React 19 compara o `dangerouslySetInnerHTML` pelo OBJETO.** `{{ __html: x }}` escrito no JSX é
+     objeto novo a cada desenho, e o React refaz o innerHTML mesmo com o texto igual: o fundo do
+     tabuleiro (milhares de árvores, ovelhas e pedras) e o sprite das cartas eram jogados fora e
+     montados de novo a cada leitura. Agora o objeto vem de `useHtml`/`htmlFixo` (`html.ts`), e o
+     `html.test.ts` barra o objeto escrito no JSX no app inteiro.
+  2. **O SVG do tabuleiro tinha tamanho em porcentagem**, e a caixa dele era um container de consulta
+     (`cq`): cada vez que a coluna do meio era refeita, o navegador recalculava o tamanho do SVG e, por
+     precaução, refazia o layout de todo o desenho. Agora a caixa é medida por um ResizeObserver
+     (`useQuadroDoTabuleiro` + `encaixeDoTabuleiro`, pura e testada) e o SVG e a camada de animação
+     recebem pixels. As barras de tempo encolhem por `scaleX`, e não por `width`.
+  Depois: nenhum layout acima de 8 ms nas leituras, nenhum objeto do tabuleiro refeito. Ficaram só a
+  barra e o anel do relógio, que custam pintura, e não layout.
 

@@ -10,62 +10,11 @@
  * quando a mesma peça aparece no botão e na cola ao mesmo tempo.
  */
 import { escurecer } from './desenhoDoCatan.ts';
+import { Desenho, caixa, casaIsometrica, iso, type P3 } from './isometrico.ts';
 
 export type Construcao = 'estrada' | 'aldeia' | 'cidade';
 
-// --- isométrico ----------------------------------------------------------------------------
-// a vai para a direita-baixo, b para a esquerda-baixo, c para cima. Visíveis: +a, +b e o alto.
-type P3 = [number, number, number];
-const C = 0.866, S = 0.5;
-const iso = ([a, b, c]: P3): [number, number] => [(a - b) * C, (a + b) * S - c];
 const n = (v: number) => v.toFixed(2);
-
-class Desenho {
-  private pts: [number, number][] = [];
-  private s = '';
-  poly(lista: P3[], fill: string, extra = '') {
-    const p = lista.map(iso);
-    this.pts.push(...p);
-    this.s += `<polygon points="${p.map(([x, y]) => `${n(x)},${n(y)}`).join(' ')}" fill="${fill}" ${extra}/>`;
-    return this;
-  }
-  linha(a: P3, b: P3, stroke: string, w: number) {
-    const [p, q] = [iso(a), iso(b)];
-    this.pts.push(p, q);
-    this.s += `<line x1="${n(p[0])}" y1="${n(p[1])}" x2="${n(q[0])}" y2="${n(q[1])}" stroke="${stroke}" stroke-width="${w}" stroke-linecap="round"/>`;
-    return this;
-  }
-  cru(texto: string, ...pontos: [number, number][]) {
-    this.s += texto;
-    this.pts.push(...pontos);
-    return this;
-  }
-  svg(pad = 2.5) {
-    const xs = this.pts.map((p) => p[0]), ys = this.pts.map((p) => p[1]);
-    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-    const w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad;
-    return `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" xmlns="http://www.w3.org/2000/svg">${this.s}</svg>`;
-  }
-}
-
-type Tons = { alto?: string; esq: string; dir: string; contorno: string; w?: number };
-/** Uma caixa: o alto, a face +b (esquerda) e a face +a (direita). */
-function caixa(d: Desenho, [a0, a1]: [number, number], [b0, b1]: [number, number], [c0, c1]: [number, number], t: Tons) {
-  const st = `stroke="${t.contorno}" stroke-width="${t.w ?? .7}" stroke-linejoin="round"`;
-  d.poly([[a0, b1, c0], [a1, b1, c0], [a1, b1, c1], [a0, b1, c1]], t.esq, st);
-  d.poly([[a1, b0, c0], [a1, b1, c0], [a1, b1, c1], [a1, b0, c1]], t.dir, st);
-  if (t.alto) d.poly([[a0, b0, c1], [a1, b0, c1], [a1, b1, c1], [a0, b1, c1]], t.alto, st);
-}
-/** Uma casa de duas águas, cumeeira ao longo de a: as paredes creme e o telhado de outra cor. */
-function casa(d: Desenho, [a0, a1]: [number, number], [b0, b1]: [number, number], h: number, r: number,
-  t: { esq: string; dir: string; telhado: string; telhadoClaro: string; contorno: string }) {
-  const bm = (b0 + b1) / 2;
-  const st = `stroke="${t.contorno}" stroke-width=".8" stroke-linejoin="round"`;
-  d.poly([[a0, b0, h], [a1, b0, h], [a1, bm, h + r], [a0, bm, h + r]], t.telhado, st);
-  d.poly([[a0, b1, 0], [a1, b1, 0], [a1, b1, h], [a0, b1, h]], t.esq, st);
-  d.poly([[a1, b0, 0], [a1, b1, 0], [a1, b1, h], [a1, bm, h + r], [a1, b0, h]], t.dir, st);
-  d.poly([[a0, bm, h + r], [a1, bm, h + r], [a1, b1 + .6, h - .4], [a0, b1 + .6, h - .4]], t.telhadoClaro, st);
-}
 /** O pedacinho de grama, com a terra por baixo e uns tufos. */
 function chao(d: Desenho, [a0, a1]: [number, number], [b0, b1]: [number, number]) {
   caixa(d, [a0, a1], [b0, b1], [-3, 0], { alto: '#7cc04f', esq: '#5c8f37', dir: '#4a7a2b', contorno: '#36591f', w: .8 });
@@ -102,7 +51,7 @@ function aldeia(cor: string): string {
   const d = new Desenho();
   chao(d, [-3, 18], [-3, 17]);
   caixa(d, [2.5, 4.8], [3, 5.2], [10, 19], { alto: '#b7b0a3', esq: '#9e978a', dir: '#857e72', contorno: '#5c564c', w: .6 });
-  casa(d, [0, 14], [0, 13], 9, 7, { ...PAREDE, telhado: escurecer(cor, .18), telhadoClaro: cor, contorno: escurecer(cor, .6) });
+  casaIsometrica(d, [0, 14], [0, 13], 9, 7, { ...PAREDE, telhado: escurecer(cor, .18), telhadoClaro: cor, contorno: escurecer(cor, .6) });
   const [fx, fy] = iso([3.6, 4.1, 20.5]);
   d.cru(`<g fill="#eef1f4" opacity=".85"><circle cx="${n(fx + .4)}" cy="${n(fy - 1.4)}" r="1.7"/><circle cx="${n(fx + 2.2)}" cy="${n(fy - 3.6)}" r="2.2"/><circle cx="${n(fx + 4.6)}" cy="${n(fy - 6)}" r="2.6"/></g>`, [fx + 7.4, fy - 9]);
   d.poly([[14.05, 5, 0], [14.05, 8, 0], [14.05, 8, 5], [14.05, 6.5, 6.2], [14.05, 5, 5]], '#7a4f26');
@@ -114,7 +63,7 @@ function aldeia(cor: string): string {
 function cidade(cor: string): string {
   const d = new Desenho();
   chao(d, [-3, 22], [-3, 17]);
-  casa(d, [0, 15], [0, 12], 8, 5, { ...PEDRA, telhado: escurecer(cor, .18), telhadoClaro: cor, contorno: escurecer(cor, .6) });
+  casaIsometrica(d, [0, 15], [0, 12], 8, 5, { ...PEDRA, telhado: escurecer(cor, .18), telhadoClaro: cor, contorno: escurecer(cor, .6) });
   for (const a of [2.5, 6.5]) d.poly([[a, 12.05, 3], [a + 2.6, 12.05, 3], [a + 2.6, 12.05, 5.8], [a, 12.05, 5.8]], LUZ, 'stroke="#6b5a40" stroke-width=".5"');
   caixa(d, [10.5, 18], [2, 9.5], [0, 20], { ...PEDRA, contorno: '#6b5a40', w: .8 });
   for (const b of [2.6, 5.2, 7.8]) caixa(d, [16.6, 18], [b, b + 1.4], [20, 21.6], { alto: '#f6f0e2', ...PEDRA, contorno: '#6b5a40', w: .5 });

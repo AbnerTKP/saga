@@ -13,6 +13,7 @@
  */
 import type { Partida, Recurso, Terreno } from './catan.ts';
 import { COR_DO_JOGADOR, centroDoHex, chaveDaConstrucao, chaveDaEstrada, chaveDoHex, lerHex, pontoDoCruzamento, type Chegada } from './catan.ts';
+import { Desenho, caixa, casaIsometrica } from './isometrico.ts';
 
 const R3 = Math.sqrt(3);
 
@@ -201,35 +202,49 @@ function ficha(cx: number, cy: number, s: number, n: number, aceso: boolean): st
   return `<g>${aceso ? `<circle cx="${cx}" cy="${cy}" r="${f(r * 1.32)}" fill="none" stroke="#fff3b0" stroke-width="${f(s * .06)}"/>` : ''}<circle cx="${cx}" cy="${f(cy + s * .04)}" r="${f(r)}" fill="rgba(0,0,0,.35)"/><circle cx="${cx}" cy="${cy}" r="${f(r)}" fill="url(#g-ficha)" stroke="#a88a55" stroke-width="${f(s * .025)}"/><circle cx="${cx}" cy="${cy}" r="${f(r * .84)}" fill="none" stroke="#d8c290" stroke-width="${f(s * .012)}"/><text x="${cx}" y="${f(cy + r * 0.24)}" text-anchor="middle" font-family="Figtree" font-weight="800" font-size="${f(r * (vermelho ? 1.02 : .9))}" fill="${cor}">${n}</text>${dots}</g>`;
 }
 
+/**
+ * As peças na cor do jogador, em madeira maciça e em isométrico (escolha do dono, 06/10/2026, entre
+ * esta e a miniatura de parede creme): a peça INTEIRA na cor é o que diz de longe de quem ela é —
+ * na miniatura, a do jogador branco se confundia com uma casa qualquer. A aldeia tem porta; a cidade,
+ * o salão, a torre de telhado pontudo e a bandeira. O desenho é o de `isometrico.ts`, o mesmo dos
+ * botões de construir. `(x, y)` é o cruzamento: ali fica o meio da base da peça.
+ */
 export function casa(x: number, y: number, cor: string, s: number, cidade: boolean): string {
-  const k = s / 58;
-  const esc = escurecer(cor, .3), cla = clarear(cor, .25), contorno = escurecer(cor, .65);
-  let g;
+  const d = new Desenho();
+  const contorno = escurecer(cor, .62);
+  const tons = { esq: cor, dir: escurecer(cor, .3), telhado: escurecer(cor, .1), telhadoClaro: clarear(cor, .3), contorno, w: .9 };
+  const porta = escurecer(cor, .55);
+  let k: number, base: number, sombra: string;
   if (!cidade) {
-    g = `<ellipse cx="1" cy="9" rx="11" ry="3.2" fill="rgba(0,0,0,.4)"/>
-      <path d="M-8 8V-2L-3 -9L2 -2V8Z" fill="${cor}"/><path d="M2 -2L8 -5V5L2 8Z" fill="${esc}"/>
-      <path d="M-9.5 -1L-3 -10.5L3.5 -1Z" fill="${cla}"/><path d="M-3 -10.5L4 -13.5L10 -5L3.5 -1Z" fill="${escurecer(cor, .15)}"/>
-      <path d="M-8 8V-2L-9.5 -1L-3 -10.5L4 -13.5L10 -5L8 -5V5L2 8Z" fill="none" stroke="${contorno}" stroke-width="1.3" stroke-linejoin="round"/>
-      <rect x="-5" y="1" width="3.5" height="7" fill="${contorno}" opacity=".55"/>`;
+    casaIsometrica(d, [0, 12], [0, 12], 8, 6.5, tons);
+    d.poly([[12.05, 4.6, 0], [12.05, 7.4, 0], [12.05, 7.4, 4.6], [12.05, 6, 5.6], [12.05, 4.6, 4.6]], porta);
+    k = 1.42; base = 6; sombra = '<ellipse cx="2.5" cy="1.5" rx="12" ry="4.5" fill="rgba(0,0,0,.38)"/>';
   } else {
-    g = `<ellipse cx="2" cy="10" rx="15" ry="3.6" fill="rgba(0,0,0,.4)"/>
-      <path d="M-13 9V0H3V9Z" fill="${cor}"/><path d="M3 0L8 -3V6L3 9Z" fill="${esc}"/>
-      <path d="M-13 0L-8 -3H8L3 0Z" fill="${cla}"/>
-      <path d="M-3 0V-11L1 -17L5 -11V0Z" fill="${cor}"/><path d="M5 -11L9 -13V-2L5 0Z" fill="${esc}"/>
-      <path d="M-4 -10.5L1 -17.5L6 -10.5Z" fill="${cla}"/><path d="M1 -17.5L5 -19L10 -12.5L6 -10.5Z" fill="${escurecer(cor, .15)}"/>
-      <path d="M-13 9V0L-8 -3H-3V-11L-4 -10.5L1 -17.5L5 -19L10 -12.5L9 -13V-2L8 -3V6L3 9Z" fill="none" stroke="${contorno}" stroke-width="1.3" stroke-linejoin="round"/>
-      <rect x="-10" y="3" width="3" height="3" fill="${contorno}" opacity=".5"/><rect x="-5" y="3" width="3" height="3" fill="${contorno}" opacity=".5"/><rect x="0" y="-8" width="2.5" height="3.5" fill="${contorno}" opacity=".5"/>`;
+    casaIsometrica(d, [0, 14], [0, 11], 7, 4.5, tons);
+    caixa(d, [9.5, 16], [2, 8.5], [0, 17], { esq: cor, dir: escurecer(cor, .3), contorno, w: .9 });
+    const topo: [number, number, number] = [12.75, 5.25, 24];
+    const st = `stroke="${contorno}" stroke-width=".9" stroke-linejoin="round"`;
+    d.poly([[9.5, 8.5, 17], [16, 8.5, 17], topo], clarear(cor, .3), st);
+    d.poly([[16, 2, 17], [16, 8.5, 17], topo], escurecer(cor, .12), st);
+    d.poly([[16.05, 4.1, 0], [16.05, 6.4, 0], [16.05, 6.4, 4.4], [16.05, 5.25, 5.4], [16.05, 4.1, 4.4]], porta);
+    d.linha(topo, [12.75, 5.25, 29.5], contorno, .8);
+    d.poly([[12.75, 5.25, 29.5], [16.4, 5.25, 28.2], [12.75, 5.25, 26.9]], clarear(cor, .55), `stroke="${contorno}" stroke-width=".5"`);
+    k = 1.32; base = 6.75; sombra = '<ellipse cx="2.5" cy="1.5" rx="15" ry="5" fill="rgba(0,0,0,.38)"/>';
   }
-  return `<g transform="translate(${f(x)} ${f(y + s * .02)}) scale(${f(k * 1.05)})">${g}</g>`;
+  return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(k * s / 60)})">${sombra}<g transform="translate(0 ${-base})">${d.conteudo()}</g></g>`;
 }
+/** A estrada: uma viga com espessura — o alto na cor, a lateral mais escura embaixo, o brilho em cima. */
 export function estrada(a: [number, number], b: [number, number], cor: string, s: number): string {
-  const [x1, y1] = a, [x2, y2] = b;
-  const mx = x1 + (x2 - x1) * .2, my = y1 + (y2 - y1) * .2, nx = x1 + (x2 - x1) * .8, ny = y1 + (y2 - y1) * .8;
-  const w = s * .13;
-  return `<line x1="${f(mx)}" y1="${f(my + s * .04)}" x2="${f(nx)}" y2="${f(ny + s * .04)}" stroke="rgba(0,0,0,.4)" stroke-width="${f(w)}" stroke-linecap="round"/>`
-    + `<line x1="${f(mx)}" y1="${f(my)}" x2="${f(nx)}" y2="${f(ny)}" stroke="${escurecer(cor, .6)}" stroke-width="${f(w + s * .03)}" stroke-linecap="round"/>`
-    + `<line x1="${f(mx)}" y1="${f(my)}" x2="${f(nx)}" y2="${f(ny)}" stroke="${cor}" stroke-width="${f(w)}" stroke-linecap="round"/>`
-    + `<line x1="${f(mx)}" y1="${f(my - w * .22)}" x2="${f(nx)}" y2="${f(ny - w * .22)}" stroke="${clarear(cor, .4)}" stroke-width="${f(w * .25)}" stroke-linecap="round" opacity=".8"/>`;
+  const p = (t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const [x1, y1] = p(.17), [x2, y2] = p(.83);
+  const w = s * .125, lado = s * .037;
+  const linha = (dy: number, cor_: string, larg: number, extra = '') =>
+    `<line x1="${f(x1)}" y1="${f(y1 + dy)}" x2="${f(x2)}" y2="${f(y2 + dy)}" stroke="${cor_}" stroke-width="${f(larg)}" stroke-linecap="round" ${extra}/>`;
+  const contorno = escurecer(cor, .62);
+  return linha(lado + s * .037, 'rgba(0,0,0,.35)', w + s * .017)
+    + linha(lado, contorno, w + s * .04) + linha(0, contorno, w + s * .04)
+    + linha(lado, escurecer(cor, .35), w) + linha(0, cor, w)
+    + linha(-w * .24, clarear(cor, .5), w * .26, 'opacity=".9"');
 }
 function barco(x: number, y: number, k: number, virado: boolean): string {
   const d = virado ? -1 : 1;
@@ -405,8 +420,21 @@ export function desenhoDaChegada(ch: Chegada, cor: string): { caixa: [number, nu
   }
   const q = noSvg(pontoDoCruzamento(ch.v));
   const cidade = ch.tipo === 'cidade';
-  const [l, t, r, b] = cidade ? [-17, -24, 15, 13] : [-13, -18, 14, 13];
-  return { caixa: [q.x + l, q.y + t, r - l, b - t], base: { x: q.x, y: q.y + s * .12 }, svg: casa(q.x, q.y, cor, s, cidade) };
+  // A caixa da peça isométrica com a sombra e o contorno, na escala de S = 60 (ver `casa`).
+  const [l, t, r, b] = (cidade ? [-19, -38, 25, 10] : [-17, -27, 22, 10]).map((v) => v * s / 60);
+  return { caixa: [q.x + l, q.y + t, r - l, b - t], base: { x: q.x, y: q.y + s * .03 }, svg: casa(q.x, q.y, cor, s, cidade) };
+}
+
+/**
+ * Onde o desenho do tabuleiro cabe numa caixa de `largura` × `altura` px, inteiro e centrado (o
+ * "contain" do `viewBox`). A tela dá ao SVG e à camada de animação esse tamanho EM PIXELS: com
+ * largura e altura em porcentagem, cada vez que a coluna do meio da mesa era refeita (a cada leitura
+ * da partida) o navegador refazia o layout dos milhares de elementos do tabuleiro, por precaução.
+ */
+export function encaixeDoTabuleiro(largura: number, altura: number): { x: number; y: number; w: number; h: number } {
+  const k = Math.max(0, Math.min(largura / LARGURA, altura / ALTURA));
+  const w = Math.floor(LARGURA * k), h = Math.floor(ALTURA * k);
+  return { x: Math.floor((largura - w) / 2), y: Math.floor((altura - h) / 2), w, h };
 }
 
 /** Quanto o ladrão leva correndo de um terreno a outro, em ms: mais longe, mais tempo — até um teto. */

@@ -11,8 +11,9 @@ import {
   type FaixaDaVez as Faixa, type PessoaNoCatan, type Recurso,
 } from '../catan';
 import { CORES_DA_MESA, SIMBOLO, simbolosDasCartas } from '../cartasDoCatan';
-import { ALTURA, LARGURA, S, clarear, desenharFundo, desenharPecas, duracaoDaCorrida, noSvg, poli, posicaoDoLadrao } from '../desenhoDoCatan';
+import { ALTURA, LARGURA, S, clarear, desenharFundo, desenharPecas, duracaoDaCorrida, encaixeDoTabuleiro, noSvg, poli, posicaoDoLadrao } from '../desenhoDoCatan';
 import { iconeDeConstruir } from '../iconesDoCatan';
+import { htmlFixo, useHtml } from '../html';
 import { rolarOsDados } from '../somDosDados';
 import { Dado, DadosNoCopo, duracaoDaRolagem } from './DadosNoCopo';
 import { tocarNoCatan } from '../somDoCatan';
@@ -51,6 +52,31 @@ function useRestante(prazo: number | null | undefined, base: BaseDoRelogio): num
     return () => clearInterval(id);
   }, [correndo]);
   return ms;
+}
+
+type Quadro = { x: number; y: number; w: number; h: number };
+/**
+ * Onde o desenho do tabuleiro fica na caixa dele, em pixels (`encaixeDoTabuleiro`), medido por um
+ * ResizeObserver — que só avisa quando a caixa muda de tamanho de verdade (a janela). O SVG e a camada
+ * de animação recebem esse tamanho fixo: em porcentagem, cada leitura da partida fazia o navegador
+ * refazer o layout dos milhares de elementos do tabuleiro, por precaução (medido, 06/10/2026).
+ */
+function useQuadroDoTabuleiro(): [(el: HTMLDivElement | null) => void, Quadro | null] {
+  const [quadro, setQuadro] = useState<Quadro | null>(null);
+  const observador = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    observador.current?.disconnect();
+    if (!el) return;
+    const medir = (largura: number, altura: number) => {
+      const q = encaixeDoTabuleiro(Math.floor(largura), Math.floor(altura));
+      setQuadro((a) => (a && a.x === q.x && a.y === q.y && a.w === q.w && a.h === q.h ? a : q));
+    };
+    const r = el.getBoundingClientRect();
+    medir(r.width, r.height);
+    observador.current = new ResizeObserver(([e]) => medir(e.contentRect.width, e.contentRect.height));
+    observador.current.observe(el);
+  }, []);
+  return [ref, quadro];
 }
 
 /** Os últimos 5 s do prazo que corre contra você tiquetaqueiam. Não desenha nada. */
@@ -504,12 +530,13 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
   );
   const minhaCor = COR_DO_JOGADOR[p.jogadores[eu ?? 0].cor];
   const jogando = eu !== null && !p.jogadores[eu].fora && p.fase !== 'fim';
+  const [refDaCaixa, quadro] = useQuadroDoTabuleiro();
   // O sprite das cartas vai uma vez na mesa; cada carta é um `<use>` dele (ver cartasDoCatan.ts).
-  const simbolos = useMemo(() => simbolosDasCartas(), []);
+  const simbolos = useMemo(() => htmlFixo(simbolosDasCartas()), []);
 
   return (
     <div className="catan-mesa" style={CORES_DA_MESA as CSSProperties}>
-      <svg className="mesa-simbolos" aria-hidden="true" dangerouslySetInnerHTML={{ __html: simbolos }} />
+      <svg className="mesa-simbolos" aria-hidden="true" dangerouslySetInnerHTML={simbolos} />
       {prazoMeu !== null && <TiqueDoRelogio key={prazoMeu} prazo={prazoMeu} base={base} surdo={surdo} />}
       <BarraDaMesa mesa={mesa} partida={p} ocupado={ocupado} surdo={surdo} call={call} jogando={jogando} onAgir={onAgir} onSair={onSair} />
 
@@ -521,8 +548,8 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
 
       <div className="mesa-centro">
         {lugar(cima, 'cima')}
-        <div className="catan-tabuleiro-caixa">
-          <TabuleiroDoCatan partida={p} acesos={acesos} modo={modoDaVez} corMinha={eu !== null ? COR_DO_JOGADOR[p.jogadores[eu].cor] : '#fff'}
+        <div className="catan-tabuleiro-caixa" ref={refDaCaixa} style={quadro ? { '--borda-do-tabuleiro': `${quadro.x}px` } as CSSProperties : undefined}>
+          <TabuleiroDoCatan partida={p} quadro={quadro} acesos={acesos} modo={modoDaVez} corMinha={eu !== null ? COR_DO_JOGADOR[p.jogadores[eu].cor] : '#fff'}
             ocupado={ocupado} onCruzamento={clicarCruzamento} onAresta={clicarAresta} onTerreno={clicarTerreno} />
           {podeRolar && !rolando ? (
             <button type="button" className="catan-rolar" disabled={ocupado} onClick={() => onJogar({ tipo: 'rolar' })}>
@@ -624,6 +651,11 @@ function Partida_({ mesa, partida: p, ocupado, surdo, live, base, call, nome, on
 const ROTULO_DE_CONSTRUIR: Record<Construcao, string> = { estrada: 'Estrada', aldeia: 'Aldeia', cidade: 'Cidade', desenvolvimento: 'Carta' };
 
 /** O botão de construir, com a peça desenhada na sua cor (os ícones moram em iconesDoCatan.ts). */
+/** A peça desenhada do botão e da cola: o mesmo `{ __html }` enquanto o tipo e a cor não mudam (ver html.ts). */
+function IconeDaPeca({ tipo, cor }: { tipo: Exclude<Construcao, 'desenvolvimento'>; cor: string }) {
+  return <span className="mesa-peca" dangerouslySetInnerHTML={useHtml(iconeDeConstruir(tipo, cor))} />;
+}
+
 function BotaoDeConstruir({ tipo, cor, ativo, pode, ocupado, onClick }: {
   tipo: Construcao; cor: string; ativo: boolean; pode: boolean; ocupado: boolean; onClick: () => void;
 }) {
@@ -633,7 +665,7 @@ function BotaoDeConstruir({ tipo, cor, ativo, pode, ocupado, onClick }: {
       title={`${tipo === 'desenvolvimento' ? 'Carta de desenvolvimento' : ROTULO_DE_CONSTRUIR[tipo]}: ${textoDoMonte(custo.reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}`}>
       <span className="mesa-b-icone">
         {tipo === 'desenvolvimento' ? <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="no-botao" />
-          : <span className="mesa-peca" dangerouslySetInnerHTML={{ __html: iconeDeConstruir(tipo, cor) }} />}
+          : <IconeDaPeca tipo={tipo} cor={cor} />}
       </span>
       {ROTULO_DE_CONSTRUIR[tipo]}
     </button>
@@ -656,7 +688,7 @@ function PilulaDaVez({ faixa, partida: p, base }: { faixa: Faixa; partida: Parti
       <b>{faixa.titulo}</b>
       <span className="mesa-pilula-detalhe">{faixa.detalhe}</span>
       {s !== null && <b className={`mesa-pilula-tempo ${ms! <= ACABANDO ? 'acabando' : ''}`}>{Math.floor(s / 60)}:{String(s % 60).padStart(2, '0')}</b>}
-      {ms !== null && <i className="mesa-pilula-barra" style={{ width: `${Math.min(1, ms / faixa.total) * 100}%`, background: cor }} />}
+      {ms !== null && <i className="mesa-pilula-barra" style={{ transform: `scaleX(${Math.min(1, ms / faixa.total).toFixed(3)})`, background: cor }} />}
     </div>
   );
 }
@@ -682,13 +714,13 @@ function AvisoDaVez({ partida: p, j, pessoa, nome }: { partida: Partida; j: numb
 // por cima, a camada do que dá para clicar — só o que a regra oferece a você agora.
 // ---------------------------------------------------------------------------------------------
 
-function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruzamento, onAresta, onTerreno }: {
-  partida: Partida; acesos: Set<string>; modo: Modo | 'ladrao'; corMinha: string; ocupado: boolean;
+function TabuleiroDoCatan({ partida: p, quadro, acesos, modo, corMinha, ocupado, onCruzamento, onAresta, onTerreno }: {
+  partida: Partida; quadro: Quadro | null; acesos: Set<string>; modo: Modo | 'ladrao'; corMinha: string; ocupado: boolean;
   onCruzamento: (v: string) => void; onAresta: (a: string) => void; onTerreno: (hex: string) => void;
 }) {
   const chaveDoFundo = JSON.stringify([p.hexes, p.portos]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fundo = useMemo(() => desenharFundo(p), [chaveDoFundo]);
+  const fundo = useMemo(() => htmlFixo(desenharFundo(p)), [chaveDoFundo]);
 
   // O que mudou desde a leitura anterior vira animação na camada de cima (`SobreOTabuleiro`): a peça
   // nova cai do alto com poeira, e o ladrão corre até o terreno novo. Calculado DURANTE o desenho
@@ -717,7 +749,7 @@ function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruza
   // O ladrão não entra aqui: ele mora na camada de cima. Assim, ele correr não redesenha as peças.
   const chaveDasPecas = JSON.stringify([p.construcoes, p.estradas, [...acesos], p.jogadores.map((j) => j.cor), caindo]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pecas = useMemo(() => desenharPecas(p, acesos, { semLadrao: true, esconder: new Set(chegando.lista.map((c) => c.chave)) }), [chaveDasPecas]);
+  const pecas = useMemo(() => htmlFixo(desenharPecas(p, acesos, { semLadrao: true, esconder: new Set(chegando.lista.map((c) => c.chave)) })), [chaveDasPecas]);
 
   const cruzamentos = modo === 'aldeia' ? p.pode.aldeias : modo === 'cidade' ? p.pode.cidades : undefined;
   const arestas = modo === 'estrada' ? p.pode.estradas : undefined;
@@ -725,9 +757,10 @@ function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruza
 
   return (
     <>
-    <svg className={`catan-tabuleiro ${ocupado ? 'ocupado' : ''}`} viewBox={`0 0 ${LARGURA.toFixed(0)} ${ALTURA.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Tabuleiro do Catan">
-      <g dangerouslySetInnerHTML={{ __html: fundo }} />
-      <g dangerouslySetInnerHTML={{ __html: pecas }} />
+    <svg className={`catan-tabuleiro ${ocupado ? 'ocupado' : ''}`} viewBox={`0 0 ${LARGURA.toFixed(0)} ${ALTURA.toFixed(0)}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Tabuleiro do Catan"
+      style={quadro ? { width: quadro.w, height: quadro.h } : undefined}>
+      <g dangerouslySetInnerHTML={fundo} />
+      <g dangerouslySetInnerHTML={pecas} />
       {terrenos?.map((k) => {
         const { q, r } = lerHex(k);
         const c = noSvg(centroDoHex(q, r));
@@ -757,7 +790,7 @@ function TabuleiroDoCatan({ partida: p, acesos, modo, corMinha, ocupado, onCruza
         );
       })}
     </svg>
-    <SobreOTabuleiro partida={p} chegando={chegando.lista} corrida={corrida} />
+    {quadro && <SobreOTabuleiro partida={p} quadro={quadro} chegando={chegando.lista} corrida={corrida} />}
     </>
   );
 }
@@ -869,7 +902,7 @@ function Troca({ partida: p, nome, ocupado, aba, contra, base, onAba, onJogar, o
 
   return (
     <div className="catan-janela catan-troca">
-      {ms !== null && <i className="catan-oferta-barra" style={{ width: `${Math.min(1, ms / PRAZO_DA_MONTAGEM) * 100}%` }} />}
+      {ms !== null && <i className="catan-oferta-barra" style={{ transform: `scaleX(${Math.min(1, ms / PRAZO_DA_MONTAGEM).toFixed(3)})` }} />}
       <div className="catan-janela-cabeca">
         <span className="catan-janela-titulo">{contra ? `Propor outra troca a ${nome(p.vez)}` : 'Trocar'}</span>
         {ms !== null && <span className="catan-oferta-tempo">{segundosQueFaltam(ms)} s{parada ? ` · vez parada em ${parada}` : ''}</span>}
@@ -959,7 +992,7 @@ function Respostas({ partida: p, nome, ocupado, base, onJogar }: {
   const outros = p.jogadores.map((_, j) => j).filter((j) => j !== p.eu && !p.jogadores[j].fora);
   return (
     <div className="catan-janela catan-respostas">
-      {tempo && <i className="catan-oferta-barra" style={{ width: `${tempo.fracao * 100}%` }} />}
+      {tempo && <i className="catan-oferta-barra" style={{ transform: `scaleX(${tempo.fracao.toFixed(3)})` }} />}
       <div className="catan-oferta-cabeca">
         <span className="catan-janela-titulo">Você oferece</span>
         <CartasDoMonte monte={o.da} pequenas />
@@ -1005,7 +1038,7 @@ function OfertaRecebida({ partida: p, nome, ocupado, base, onJogar, onContra }: 
   const tenho = temTudo(p.mao, expandir(o.quer));
   return (
     <div className="catan-janela catan-oferta">
-      {tempo && !minha && <i className="catan-oferta-barra" style={{ width: `${tempo.fracao * 100}%` }} />}
+      {tempo && !minha && <i className="catan-oferta-barra" style={{ transform: `scaleX(${tempo.fracao.toFixed(3)})` }} />}
       <div className="catan-oferta-cabeca">
         <span className="catan-bolinha" style={{ background: COR_DO_JOGADOR[p.jogadores[p.vez].cor] }} />
         <span className="catan-janela-titulo">{nome(p.vez)} quer trocar com você</span>
@@ -1403,7 +1436,7 @@ function Cola({ partida: p, cor }: { partida: Partida; cor: string }) {
           title={`${rotulo}: ${textoDoMonte(CUSTOS[c].reduce((m, r) => ({ ...m, [r]: (m[r] ?? 0) + 1 }), {} as Partial<Monte>))}${pode?.[c] ? ' — dá para fazer' : ''}`}>
           <span className="mesa-cola-peca">
             {c === 'desenvolvimento' ? <Carta simbolo={SIMBOLO.versoDeDesenvolvimento} className="na-cola" />
-              : <span className="mesa-peca" dangerouslySetInnerHTML={{ __html: iconeDeConstruir(c, cor) }} />}
+              : <IconeDaPeca tipo={c} cor={cor} />}
           </span>
           <span className="mesa-cola-nome">{rotulo}</span>
           <span className="mesa-cola-custo">{CUSTOS[c].map((r, i) => <Carta key={i} simbolo={SIMBOLO.recursoPequeno(r)} className="na-cola" />)}</span>

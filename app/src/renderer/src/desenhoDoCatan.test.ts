@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defs, ladrao, terreno } from './desenhoDoCatan.ts';
+import { ALTURA, LARGURA, defs, encaixeDoTabuleiro, ladrao, terreno } from './desenhoDoCatan.ts';
 import { iconeDeConstruir } from './iconesDoCatan.ts';
 
 const ids = (svg: string) => new Set([...svg.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
@@ -31,4 +31,19 @@ test('os ícones de construir: um svg inteiro na cor de quem joga, sem id para c
     assert.notEqual(iconeDeConstruir(tipo, '#3f7fe0'), vermelho);
     assert.equal(iconeDeConstruir(tipo, '#d8453b'), vermelho);
   }
+});
+
+test('o tabuleiro cabe inteiro e centrado na caixa, em pixels inteiros', () => {
+  // Caixa larga: a altura manda, sobra dos lados.
+  const larga = encaixeDoTabuleiro(1000, 400);
+  assert.equal(larga.h, 400);
+  assert.ok(Math.abs(larga.w / larga.h - LARGURA / ALTURA) < 0.01);
+  assert.equal(larga.x, Math.floor((1000 - larga.w) / 2));
+  assert.equal(larga.y, 0);
+  // Caixa alta: a largura manda, sobra em cima e embaixo.
+  const alta = encaixeDoTabuleiro(300, 900);
+  assert.equal(alta.w, 300);
+  assert.ok(alta.y > 0);
+  // Caixa ainda sem tamanho (antes da primeira medida): nada, sem número negativo.
+  assert.deepEqual(encaixeDoTabuleiro(0, 0), { x: 0, y: 0, w: 0, h: 0 });
 });

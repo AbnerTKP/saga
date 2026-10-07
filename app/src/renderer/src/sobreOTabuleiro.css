@@ -2,14 +2,10 @@
    peça caindo com poeira. Tudo aqui anima SÓ transform e opacity — o que a placa de vídeo move sem
    redesenhar —, e nada anima para sempre (animacoes.test.ts). */
 
-/* Cobre exatamente o desenho do tabuleiro: a mesma proporção do viewBox (696 × 606,8), centrada na
-   caixa, que é um container (catan.css: .catan-mesa .catan-tabuleiro-caixa). */
-.catan-sobre {
-  position: absolute; left: 50%; top: 50%;
-  width: min(100cqw, 114.71cqh); height: min(100cqh, 87.18cqw);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
+/* Cobre exatamente o desenho do tabuleiro: posição e tamanho em pixels, no style, medidos pela tela
+   (`useQuadroDoTabuleiro`). Sem unidade `cq`: com elas, cada leitura da partida recalculava o estilo
+   desta camada e refazia o layout do tabuleiro inteiro. */
+.catan-sobre { position: absolute; pointer-events: none; contain: layout; }
 .catan-sobre > * { position: absolute; }
 
 /* --- o ladrão -------------------------------------------------------------------------- */

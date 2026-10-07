@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { casa, defs, poli, terreno } from '../desenhoDoCatan';
+import { htmlFixo } from '../html';
 
 /**
  * A capa do Catan no menu de jogos e no cartão de convite: três terrenos do próprio tabuleiro
@@ -17,11 +18,11 @@ export function CapaDoCatan({ className }: { className?: string }) {
       out += `<polygon points="${poli(x, y, s * 0.985)}" fill="none" stroke="#f3e6c4" stroke-width="2"/>`;
     });
     out += casa((s * r3) / 2, s * 0.5, '#d8453b', s * 1.4, false);
-    return out;
+    return htmlFixo(out);
   }, []);
   const s = 30, r3 = Math.sqrt(3);
   return (
     <svg className={className} viewBox={`${-s * 0.95} ${-s * 1.05} ${s * r3 * 2 + s * 0.2} ${s * 3.6}`} aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: html }} />
+      dangerouslySetInnerHTML={html} />
   );
 }

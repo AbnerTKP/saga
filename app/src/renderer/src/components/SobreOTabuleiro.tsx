@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { COR_DO_JOGADOR, type Chegada, type Partida } from '../catan';
 import { ALTURA, FIGURA_DO_LADRAO, LARGURA, S, desenhoDaChegada, duracaoDaCorrida, posicaoDoLadrao } from '../desenhoDoCatan';
+import { htmlFixo, useHtml } from '../html';
 
 /**
  * A camada de cima do tabuleiro: o ladrão, e o que acabou de ser construído caindo com poeira
@@ -11,8 +12,8 @@ import { ALTURA, FIGURA_DO_LADRAO, LARGURA, S, desenhoDaChegada, duracaoDaCorrid
  * mexer nele a cada quadro faria o navegador redesenhá-lo inteiro — o lag. Aqui cada coisa que se
  * mexe é uma caixa HTML pequena, animada só em `transform` e `opacity`, que a placa de vídeo move
  * sem redesenhar nada: o desenho de cada uma é feito uma vez e deslizado pronto. A camada cobre
- * exatamente o desenho do tabuleiro (mesma proporção, centrada, pelas unidades `cq` da caixa), e
- * as posições saem das coordenadas do próprio tabuleiro, em porcentagem.
+ * exatamente o desenho do tabuleiro (o `quadro`, em pixels, medido pela tela), e as posições saem
+ * das coordenadas do próprio tabuleiro, em porcentagem.
  */
 
 /** Quanto a peça leva caindo, e em que ponto dessa queda ela bate no chão (onde sobe a poeira e soa a construção). */
@@ -29,6 +30,8 @@ const K = S / 58;
 const LADRAO = { x: -20 * K, y: -30 * K, w: 40 * K, h: 52 * K };
 
 export type Corrida = { de: string; para: string; n: number };
+
+const FIGURA = htmlFixo(FIGURA_DO_LADRAO);
 
 /** As partículas da poeira: em volta da base, e mais achatadas na vertical, como no chão visto de cima. */
 const POEIRA = Array.from({ length: 12 }, (_, i) => {
@@ -63,14 +66,16 @@ function PecaCaindo({ ch, cor }: { ch: Chegada; cor: string }) {
   return (
     <>
       <div className="catan-caindo" style={{ left: px(x), top: py(y), width: px(w), height: py(h) }}>
-        <svg viewBox={`${x} ${y} ${w} ${h}`} preserveAspectRatio="none" dangerouslySetInnerHTML={{ __html: svg }} />
+        <svg viewBox={`${x} ${y} ${w} ${h}`} preserveAspectRatio="none" dangerouslySetInnerHTML={useHtml(svg)} />
       </div>
       <Marca x={base.x} y={base.y} r={S * (ch.tipo === 'estrada' ? 0.62 : ch.tipo === 'cidade' ? 0.8 : 0.7)} cor={cor} atraso={POUSO_MS} sombra />
     </>
   );
 }
 
-export function SobreOTabuleiro({ partida: p, chegando, corrida }: { partida: Partida; chegando: Chegada[]; corrida: Corrida | null }) {
+export function SobreOTabuleiro({ partida: p, quadro, chegando, corrida }: {
+  partida: Partida; quadro: { x: number; y: number; w: number; h: number }; chegando: Chegada[]; corrida: Corrida | null;
+}) {
   const aqui = posicaoDoLadrao(p);
   // O ladrão corre do terreno de antes até este: a caixa já está no lugar novo, e a animação a traz
   // de onde ela estava (o deslocamento em % do tamanho dela, que é como o `translate` mede).
@@ -88,10 +93,10 @@ export function SobreOTabuleiro({ partida: p, chegando, corrida }: { partida: Pa
     } as CSSProperties;
   }
   return (
-    <div className="catan-sobre" aria-hidden="true">
+    <div className="catan-sobre" aria-hidden="true" style={{ left: quadro.x, top: quadro.y, width: quadro.w, height: quadro.h }}>
       <div className="catan-sobre-ladrao" style={{ left: px(aqui.x + LADRAO.x), top: py(aqui.y + LADRAO.y), width: px(LADRAO.w), height: py(LADRAO.h) }}>
         <div key={corrida?.n ?? 0} className={correndo ? 'corre' : undefined} style={estilo}>
-          <div className="pula"><svg viewBox="-20 -30 40 52" dangerouslySetInnerHTML={{ __html: FIGURA_DO_LADRAO }} /></div>
+          <div className="pula"><svg viewBox="-20 -30 40 52" dangerouslySetInnerHTML={FIGURA} /></div>
         </div>
       </div>
       {correndo && <Marca key={`chegou-${corrida.n}`} x={aqui.x} y={aqui.y + 18 * K} r={S * 0.36} cor="#d9c9a2" atraso={duracao - 60} />}
