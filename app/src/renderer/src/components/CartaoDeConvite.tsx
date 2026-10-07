@@ -9,11 +9,11 @@ import { Icon } from './Icon';
  * botões de verdade. Era uma linha de aviso com um link "agora não", e passava batido.
  *
  * Não some sozinho: quem chamou está esperando. Sai com a resposta, com quem chamou desistindo,
- * ou com o jogo começando sem você. O mesmo cartão serve ao xadrez e à Fórmula 1.
+ * ou com o jogo começando sem você. O mesmo cartão serve a todos os jogos.
  */
 export function CartaoDeConvite({ jogo, capa, de, titulo, detalhe, junto, aceitar, ocupado, onAceitar, onRecusar }: {
   jogo: string;
-  /** O desenho do alto: a pista, ou o tabuleiro. */
+  /** O desenho do alto: a capa do jogo. */
   capa: ReactNode;
   de: PessoaDaMesa;
   titulo: string;

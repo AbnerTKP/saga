@@ -7,26 +7,22 @@ import { CapaDoCatan } from './CapaDoCatan';
 import { retratoPronto } from '../dragao/desenho';
 import { criarQuadro } from '../dragao/quadro';
 import { desenharCapa } from '../urna/cabine';
-import interlagos from '../pistas/miniaturas/interlagos.webp';
 
 /**
  * Os jogos, abertos pelo controle do painel de voz, numa GRADE DE CAPAS de duas colunas — a opção A
  * que o dono escolheu quando chegou o quarto jogo, para não virar uma lista enorme. Cada capa diz
- * embaixo o que acontece ali; com uma partida, grid ou arena de pé, a frase fica azul e a capa ganha
+ * embaixo o que acontece ali; com uma partida, mesa ou arena de pé, a frase fica azul e a capa ganha
  * o ponto, e clicar leva de volta a ela em vez de abrir outra.
  */
-export function MenuDeJogos({ em, minha, corrida, luta, catan, onXadrez, onCorrida, onLuta, onCatan, onUrna, onClose }: {
+export function MenuDeJogos({ em, minha, luta, catan, onXadrez, onLuta, onCatan, onUrna, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
   minha: 'lobby' | 'jogando' | 'fim' | null;
-  /** O que a capa da Fórmula 1 diz embaixo do nome: abrir, voltar ao seu grid, ou assistir. */
-  corrida: string;
-  /** O mesmo para o Dragão Quadrado: abrir uma arena, voltar à sua, ou assistir. */
+  /** O que a capa do Dragão Quadrado diz embaixo do nome: abrir uma arena, voltar à sua, ou assistir. */
   luta: string;
   /** O mesmo para o Catan: abrir uma mesa, voltar à sua, ou assistir. */
   catan: string;
   onXadrez: () => void;
-  onCorrida: () => void;
   onLuta: () => void;
   onCatan: () => void;
   onUrna: () => void;
@@ -62,7 +58,6 @@ export function MenuDeJogos({ em, minha, corrida, luta, catan, onXadrez, onCorri
       fundo: '#eed8b4',
       abrir: onXadrez,
     },
-    { nome: 'Fórmula 1', sub: corrida, capa: <img src={interlagos} alt="" className="capa-de-pista" />, fundo: '#2d5a2b', abrir: onCorrida },
     {
       nome: 'Dragão Quadrado', sub: luta, fundo: '#6fa8dc', abrir: onLuta,
       capa: <QuadroNaTela chave="icone" className="capa-de-luta" quadro={() => retratoPronto('goiaba')} />,

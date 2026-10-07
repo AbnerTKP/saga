@@ -1,5 +1,5 @@
 /**
- * O som dos dados rolando no copo, sintetizado na hora como o motor da Fórmula 1 (`motor.ts`) —
+ * O som dos dados rolando no copo, sintetizado na hora —
  * nenhum arquivo a mais no pacote, e cada rolagem soa um pouco diferente, como à mesa. Vai no tempo
  * da animação de `DadosNoCopo` (1,45 s):
  *

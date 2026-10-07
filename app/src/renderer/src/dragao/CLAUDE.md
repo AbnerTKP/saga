@@ -13,7 +13,7 @@ Vegetal da Super Feira, a Goteira, o Gotinha e o Tronco —, vida e ki, quatro c
   lutadores e três placares renderizados pelo código de verdade, escolheu o **placar A**
   (vida larga no alto, ki em três barras nos cantos de baixo), disse que é **só jogador
   contra jogador** — "esqueça a IA do computador" — e mandou terminar e publicar sem depender
-  dele. Controles simples, a arena no molde do grid da Fórmula 1 e o convite no mesmo cartão
+  dele. Controles simples, a arena no molde do grid da Fórmula 1 (que saiu em 07/10/2026) e o convite no mesmo cartão
   foram decisões tomadas por padrão da casa, não escolhidas por ele.
 - **Os lutadores são o sprite do zip, pixel a pixel** (`dragao/pixel/`). O dono mandou um Goku
   32x32 feito numa ferramenta de pixel art e, depois de ver o estilo imitado, corrigiu: *"eu
@@ -60,7 +60,7 @@ Vegetal da Super Feira, a Goteira, o Gotinha e o Tronco —, vida e ki, quatro c
   ainda não confirmou — e os dois trocam a impressão digital do estado de 2 em 2 s; divergir
   vai para o registro. O servidor só arbitra o que muda devagar: arena, lados, convites,
   semente, a hora do início e o resultado (dos dois; discordando, vale o primeiro e ele anota).
-  Como as corridas, **reiniciar o servidor encerra as lutas**.
+  Como as mesas do xadrez, **reiniciar o servidor encerra as lutas**.
 - **Medido com uma rede de mentira e com uma de verdade.** Nos testes, com 0, 40, 120 e
   250 ms e até 20% de perda, os dois lados terminam idênticos à luta de referência sem rede.
   Pelo LiveKit local e o servidor local, dois robôs do `@livekit/rtc-node` com a mesma

@@ -3,7 +3,7 @@
 // A regra do jogo é do `catan.mjs`; isto aqui é a MESA em volta dela, como `jogos.mjs` é a do
 // xadrez. Puro como as outras: sem SQL e sem HTTP, e quem é cada pessoa chega pronto de quem chama.
 //
-// Mora na memória do processo, como as mesas do xadrez e os grids da Fórmula 1: REINICIAR O
+// Mora na memória do processo, como as mesas do xadrez e as arenas do Dragão: REINICIAR O
 // SERVIDOR ENCERRA AS PARTIDAS. Uma partida de Catan dura uma hora, bem mais que uma de xadrez —
 // publicar o servidor com gente jogando apaga a partida dela, e a tela de todos passa a ouvir
 // "essa mesa não existe mais".

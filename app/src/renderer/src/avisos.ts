@@ -8,9 +8,7 @@ export type Aviso =
   // acontecimentos da call e da Saga
   | 'entrou' | 'saiu' | 'live' | 'convite' | 'mensagem' | 'lance' | 'fimDaPartida'
   // o que você acabou de fazer: confirmação, não notícia
-  | 'liveEntrou' | 'liveSaiu' | 'micLigou' | 'micMutou'
-  // a corrida de Fórmula 1
-  | 'luz' | 'largada' | 'batida' | 'vitoria';
+  | 'liveEntrou' | 'liveSaiu' | 'micLigou' | 'micMutou';
 
 /** Baixo de propósito: aviso que assusta é aviso que a pessoa desliga. */
 export const VOLUME_DO_AVISO = 0.45;

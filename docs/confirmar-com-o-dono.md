@@ -214,22 +214,6 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   chat, o controle na barra e na lista, a desistência e a revanche — tudo conferido também
   em imagem. **Não foram exercidos**: duas pessoas em dois computadores, o som do convite
   tocando, e uma partida inteira até o mate ou até o tempo acabar.
-- **A Fórmula 1 entre pessoas de verdade.** O que está medido, na janela escondida e MUDA contra
-  servidor e LiveKit locais, com dois pilotos automáticos pelo `@livekit/rtc-node` usando a
-  mesma física: a escolha da pista pela tela, a largada, corridas inteiras de 3 voltas
-  assistindo (Mônaco, Las Vegas e Interlagos) e pilotando (Monza e Bahrein, com o meu carro
-  guiado por teclas que um terceiro piloto automático mandava), a bandeira verde, a amarela com
-  um carro parado, a preta e branca e os +3 s ao cortar a T1 do Bahrein, a punição somada no
-  pódio, a torre, o mapinha, a velocidade e o tempo da volta — conferido em imagem, a 60
-  quadros. **Não foram exercidos**: gente pilotando no teclado (o volante de verdade, a
-  sensação de freada e de curva), dois computadores, a bandeira azul numa corrida (só no teste
-  da regra), os sons de ouvido, uma corrida com oito carros e máquina fraca ou Windows. **Da
-  segunda rodada**: o cartão de convite foi visto no app escondido (a F1 de outro servidor e o
-  xadrez do aberto juntos no canto, o "Agora não" recusando no servidor e o "Correr" trocando
-  de servidor); a volta da sala da corrida, medida com o participante tirado pelo LiveKit e com
-  os outros calados. **Não foram exercidos**: o motor novo de ouvido, o som do convite, o
-  cartão com uma foto de perfil de verdade, a queda do Tava1 como ela aconteceu (canal de dados
-  indisponível numa rede ruim) e a corrida com ele de novo.
 - **A administração da Saga com gente de verdade em call, e contra a produção.** O que está
   medido, na janela escondida contra um servidor local num cenário parecido com a produção
   (CORNUME e CARDUME, banido, sala privada com e sem cargo, sala de notas), é a tela

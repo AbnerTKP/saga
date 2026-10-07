@@ -4,7 +4,7 @@ import { CartaoDeConvite } from './CartaoDeConvite';
 import { Peca } from './Tabuleiro';
 
 /**
- * O convite para jogar xadrez, no mesmo cartão da Fórmula 1: onde a pessoa estiver — lendo o
+ * O convite para jogar xadrez, no mesmo cartão dos outros jogos: onde a pessoa estiver — lendo o
  * chat, na call ou olhando outro servidor —, até um "Jogar", um "Agora não" ou quem chamou
  * desistir. A capa é um pedaço de tabuleiro com um cavalo.
  */

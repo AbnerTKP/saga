@@ -382,7 +382,7 @@ export function criarMesas({
      * O que vai de carona no `/rooms`: as mesas DESTE servidor, para a tela marcar quem está
      * jogando, e os convites de quem perguntou.
      */
-    /** Como o dos grids: as mesas daqui e os convites de todos os servidores de quem perguntou. */
+    /** As mesas daqui e os convites de todos os servidores de quem perguntou. */
     resumo(ctx, fora = {}) {
       const agora = relogio();
       faxina(agora);

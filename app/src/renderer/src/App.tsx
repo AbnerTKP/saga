@@ -9,7 +9,7 @@ import {
   verServidor,
   type Cargo, type Categoria, type RoomInfo, type Sessao, type EstadoDoEmail, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
-  abrirGrid, agirNoGrid, abrirCatan, agirNaMesaDoCatan, type ConviteDeCorrida as ConviteParaCorrer, type ResumoDoGrid,
+  abrirCatan, agirNaMesaDoCatan,
   agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde, moverPessoa, acaoNoBot, podeSobre, conferirMovimento } from './api';
 import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
@@ -19,15 +19,12 @@ import { ARQUIVOS } from './sons';
 import { TelaDoXadrez } from './components/TelaDoXadrez';
 import { ConviteDeXadrez } from './components/ConviteDeXadrez';
 import { FaixaDaPartida } from './components/FaixaDaPartida';
-import { TelaDaCorrida } from './components/TelaDaCorrida';
 import { TelaDoCatan } from './components/TelaDoCatan';
 import { ConviteDeCatan } from './components/ConviteDeCatan';
 import { minhaMesaDoCatan, oQueTocarNoCatan, type ConviteDeCatan as ConviteParaOCatan, type ResumoDaMesaDoCatan } from './catan';
-import { ConviteDeCorrida } from './components/ConviteDeCorrida';
 import { TelaDaLuta } from './components/TelaDaLuta';
 import { TelaDaUrna } from './components/TelaDaUrna';
 import { ConviteDeLuta } from './components/ConviteDeLuta';
-import type { Aviso } from './avisos';
 import { BotaoDeRelatar, EVENTO_DO_AVISO } from './components/Relatar';
 import { anotarOnde, descreverTela } from './relato';
 import { useRoom, type SalaDaVoz } from './useRoom';
@@ -94,7 +91,6 @@ const SEM_CATEGORIAS: Categoria[] = [];
 const SEM_CARGOS: Cargo[] = [];
 const SEM_MEMBROS: Membro[] = [];
 const SEM_MESAS: ResumoDaMesa[] = [];
-const SEM_GRIDS: ResumoDoGrid[] = [];
 const SEM_ARENAS: ResumoDaArena[] = [];
 const SEM_MESAS_DO_CATAN: ResumoDaMesaDoCatan[] = [];
 
@@ -165,11 +161,6 @@ export function App() {
    * servidor não vale no vizinho.
    */
   const [jogos, setJogos] = useState<{ servidorId: number; mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] } | null>(null);
-  /**
-   * Os grids de Fórmula 1 do servidor aberto e os convites para correr, pela mesma carona e
-   * com a mesma etiqueta de servidor das mesas.
-   */
-  const [corridas, setCorridas] = useState<{ servidorId: number; grids: ResumoDoGrid[]; convites: ConviteParaCorrer[] } | null>(null);
   /** As arenas do Dragão Quadrado e os convites para lutar, pela mesma carona e com a mesma etiqueta. */
   const [lutas, setLutas] = useState<{ servidorId: number; arenas: ResumoDaArena[]; convites: ConviteParaLutar[] } | null>(null);
   const [conviteDeLutaRespondido, setConviteDeLutaRespondido] = useState<number | null>(null);
@@ -178,19 +169,17 @@ export function App() {
   const [conviteDeCatanRespondido, setConviteDeCatanRespondido] = useState<number | null>(null);
   const [respondendoCatan, setRespondendoCatan] = useState(false);
   /**
-   * O jogo aberta na tela — a partida de xadrez ou o grid da corrida —, com o servidor DELE: é
-   * a ele que a tela do jogo pergunta. Um só por vez, porque os dois tomam o palco inteiro.
+   * O jogo aberto na tela — a partida de xadrez, a arena, a urna ou a mesa do Catan —, com o
+   * servidor DELE: é a ele que a tela do jogo pergunta. Um só por vez, porque todos tomam o palco inteiro.
    */
   const [jogoAberto, setJogoAberto] = useState<
     | { tipo: 'xadrez'; mesaId: number; servidorId: number }
-    | { tipo: 'corrida'; gridId: number; servidorId: number }
     // sem arena é o título do Dragão Quadrado, que oferece abrir uma ou entrar na de alguém
     | { tipo: 'luta'; arenaId: number | null; servidorId: number }
     | { tipo: 'urna'; servidorId: number }
     | { tipo: 'catan'; mesaId: number; servidorId: number }
     | null
   >(null);
-  const [conviteDeCorridaRespondido, setConviteDeCorridaRespondido] = useState<number | null>(null);
   /** Convite já respondido: sai da tela na hora, sem esperar a busca seguinte confirmar. */
   const [conviteRespondido, setConviteRespondido] = useState<number | null>(null);
   const [respondendoConvite, setRespondendoConvite] = useState(false);
@@ -567,8 +556,6 @@ export function App() {
     setSalasDoServidor(null);
     setDadosDoServidor(null);
     setJogos(null);
-    setCorridas(null);
-    setConviteDeCorridaRespondido(null);
     setLutas(null);
     setConviteDeLutaRespondido(null);
     setCatan(null);
@@ -633,8 +620,6 @@ export function App() {
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
         setJogos((a) => mesmoSeIgual(a, { servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] }));
-        // Os grids de Fórmula 1, pelo mesmo caminho. Servidor antigo não manda: não há corrida.
-        setCorridas((a) => mesmoSeIgual(a, { servidorId, grids: lista.corridas?.grids ?? [], convites: lista.corridas?.convites ?? [] }));
         // As arenas do Dragão Quadrado, idem. Servidor antigo não manda: não há luta.
         setLutas((a) => mesmoSeIgual(a, { servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] }));
         // As mesas do Catan, idem. Servidor antigo não manda: não há Catan.
@@ -959,7 +944,7 @@ export function App() {
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
   /** O palco está mostrando a call (e não um chat, um jogo ou as conversas). */
   const palcoNaCall = !modoConversas && !jogoAberto && salaAberta?.tipo !== 'texto' && !!rm.salaDaVoz;
-  const semPessoas = modoConversas || jogoAberto?.tipo === 'corrida' || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
+  const semPessoas = modoConversas || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
   const alternarPessoasNaCall = useCallback(() => setPessoasNaCall((v) => {
     try { localStorage.setItem('cantinho.pessoasNaCall', v ? '0' : '1'); } catch { /* vale até fechar */ }
     return !v;
@@ -1211,60 +1196,10 @@ export function App() {
     }
   }, [jogos?.servidorId, notas, irAoServidorDoJogo]);
 
-  /**
-   * A Fórmula 1 vista da busca de salas. "O seu grid" é o que você abriu ou em que está
-   * sentado — preferindo a corrida andando; é o que a faixa mostra e o menu reabre. Sem um
-   * seu, o menu leva ao grid que houver no servidor: é assim que se entra para correr ou
-   * para assistir sem ter sido chamado.
-   */
-  const corridasDaqui = corridas?.servidorId === servidorAberto ? corridas : null;
-  const grids = corridasDaqui?.grids ?? SEM_GRIDS;
   const euIdAgora = sessao?.eu?.id ?? null;
-  const meuGrid = euIdAgora === null ? null
-    : [...grids].sort((a, b) => Number(b.estado === 'correndo') - Number(a.estado === 'correndo'))
-      .find((g) => g.anfitriao === euIdAgora || g.pilotos.includes(euIdAgora)) ?? null;
-  const gridDoServidor = meuGrid ?? grids[0] ?? null;
-  const conviteDeCorrida = corridas?.convites.find((c) => c.grid !== conviteDeCorridaRespondido) ?? null;
-  const textoDaCorrida = meuGrid
-    ? (meuGrid.estado === 'correndo' ? 'voltar à sua corrida' : 'voltar ao seu grid')
-    : gridDoServidor
-      ? (gridDoServidor.estado === 'correndo' ? `assistir a corrida de ${nomeDoJogador(gridDoServidor.anfitriao)}` : `entrar no grid de ${nomeDoJogador(gridDoServidor.anfitriao)}`)
-      : 'abrir um grid';
-
-  const abrirCorrida = useCallback(async () => {
-    const servidorId = sessao?.servidor?.id;
-    if (!servidorId) return;
-    if (gridDoServidor) { setJogoAberto({ tipo: 'corrida', gridId: gridDoServidor.id, servidorId }); return; }
-    try {
-      // Cinco voltas, o padrão do desenho; quem abriu troca no grid.
-      const grid = await abrirGrid(5, servidorId);
-      setJogoAberto({ tipo: 'corrida', gridId: grid.id, servidorId });
-    } catch (e) { notas.mostrarFalha(e, 'Fórmula 1'); }
-  }, [sessao?.servidor?.id, gridDoServidor, notas]);
-
-  const responderConviteDeCorrida = useCallback(async (c: ConviteParaCorrer, correr: boolean) => {
-    const servidorId = c.servidor ?? corridas?.servidorId;
-    if (!servidorId) return;
-    setConviteDeCorridaRespondido(c.grid);
-    // Correr não responde nada ao servidor: abre o grid, e sentar num carro é a resposta.
-    if (correr) {
-      await irAoServidorDoJogo(servidorId);
-      setJogoAberto({ tipo: 'corrida', gridId: c.grid, servidorId });
-      return;
-    }
-    try { await agirNoGrid(c.grid, { acao: 'recusar' }, servidorId); } catch (e) { notas.mostrarFalha(e, 'Fórmula 1'); }
-  }, [corridas?.servidorId, notas, irAoServidorDoJogo]);
-
-  const conviteDeCorridaTocado = useRef<number | null>(null);
-  useEffect(() => {
-    if (!conviteDeCorrida) { conviteDeCorridaTocado.current = null; return; }
-    if (conviteDeCorridaTocado.current === conviteDeCorrida.grid) return;
-    conviteDeCorridaTocado.current = conviteDeCorrida.grid;
-    tocarAviso('convite', rm.deafened);
-  }, [conviteDeCorrida?.grid, rm.deafened, tocarAviso]);
 
   /**
-   * O Dragão Quadrado visto da busca de salas, no molde da Fórmula 1: "a sua arena" é a que você
+   * O Dragão Quadrado visto da busca de salas: "a sua arena" é a que você
    * abriu ou em que está lutando — preferindo a luta andando. Sem uma sua, o menu leva à arena
    * que houver no servidor: é assim que se entra no lugar livre ou se assiste.
    */
@@ -1389,10 +1324,6 @@ export function App() {
     if (aviso === 'vez') { if (!rm.deafened) tocarNoCatan('suaVez'); }
     else if (aviso) tocarAviso('fimDaPartida', rm.deafened);
   }, [minhaMesaCatan, euIdAgora, catanNaTela, rm.deafened, tocarAviso]);
-
-  // Os sons da corrida saem pela mesma regra dos avisos — o mesmo som não empilha —, e o fone
-  // desligado cala todos.
-  const tocarNaCorrida = useCallback((qual: Aviso) => { tocarAviso(qual, rm.deafened); }, [tocarAviso, rm.deafened]);
 
   // A sala que está aberta na tela está sendo lida: o aviso dela zera sozinho, tanto ao
   // abrir quanto quando chega mensagem com ela já aberta.
@@ -1586,8 +1517,6 @@ export function App() {
       )}
     {/* Sem a lista de pessoas, a coluna dela sai da grade: no modo conversas não há
         servidor aberto para ter gente. */}
-    {/* A corrida também tira a lista de pessoas: a pista precisa da largura, e foi a escolha do
-        dono no desenho — o placar por cima da pista já diz quem está correndo. */}
     <div className={`app ${semPessoas ? 'sem-pessoas' : ''}`}>
       <Sidebar
         rooms={rooms}
@@ -1610,8 +1539,6 @@ export function App() {
         minhaPartida={minhaMesaAgora?.estado ?? null}
         onPartida={abrirPartida}
         onXadrez={abrirXadrez}
-        textoDaCorrida={textoDaCorrida}
-        onCorrida={abrirCorrida}
         textoDaLuta={textoDaLuta}
         onLuta={abrirLuta}
         textoDoCatan={textoDoCatan}
@@ -1744,20 +1671,6 @@ export function App() {
             onArena={(id) => setJogoAberto((j) => (j?.tipo === 'luta' ? { ...j, arenaId: id } : j))}
             onFechar={() => setJogoAberto(null)}
           />
-        ) : jogoAberto?.tipo === 'corrida' ? (live) => (
-          <TelaDaCorrida
-            key={`corrida-${jogoAberto.gridId}`}
-            gridId={jogoAberto.gridId}
-            servidorId={jogoAberto.servidorId}
-            euId={eu.id}
-            membros={membrosDoServidor}
-            naCall={naMinhaCall}
-            surdo={rm.deafened}
-            tocar={tocarNaCorrida}
-            live={live}
-            onFechar={() => setJogoAberto(null)}
-            onAviso={notas.mostrar}
-          />
         ) : jogoAberto?.tipo === 'xadrez' ? (live) => (
           <TelaDoXadrez
             key={jogoAberto.mesaId}
@@ -1790,16 +1703,6 @@ export function App() {
             outroNome={null}
             rotulo={minhaArena.estado === 'lutando' ? 'Voltar à luta' : 'Voltar à arena'}
             onVoltar={() => setJogoAberto({ tipo: 'luta', arenaId: minhaArena.id, servidorId: servidor.id })}
-          />
-        ) : meuGrid && !jogoAberto ? (
-          <FaixaDaPartida
-            jogo="Fórmula 1"
-            estado={meuGrid.estado === 'grid' ? 'lobby' : meuGrid.estado === 'correndo' ? 'jogando' : 'fim'}
-            titulo={meuGrid.estado === 'grid' ? `grid de ${nomeDoJogador(meuGrid.anfitriao)}` : meuGrid.estado === 'correndo' ? 'corrida andando' : 'bandeirada'}
-            minhaVez={false}
-            outroNome={null}
-            rotulo={meuGrid.estado === 'correndo' ? 'Voltar à pista' : 'Voltar ao grid'}
-            onVoltar={() => setJogoAberto({ tipo: 'corrida', gridId: meuGrid.id, servidorId: servidor.id })}
           />
         ) : minhaMesaAgora && !jogoAberto ? (
           <FaixaDaPartida
@@ -2041,7 +1944,7 @@ export function App() {
         avisos={notas.avisos}
         // O convite para jogar fica na mesma pilha, num cartão grande (a opção C do dono), e não
         // some sozinho: quem chamou está esperando a resposta.
-        extra={(convite || conviteDeCorrida || conviteDeLuta || conviteDeCatan) && (
+        extra={(convite || conviteDeLuta || conviteDeCatan) && (
           <>
             {conviteDeCatan && (
               <ConviteDeCatan
@@ -2067,15 +1970,6 @@ export function App() {
                 ocupado={respondendoConvite}
                 onJogar={() => responderConvite(convite, true)}
                 onRecusar={() => responderConvite(convite, false)}
-              />
-            )}
-            {conviteDeCorrida && (
-              <ConviteDeCorrida
-                convite={conviteDeCorrida}
-                servidorAberto={servidorAberto}
-                ocupado={false}
-                onCorrer={() => responderConviteDeCorrida(conviteDeCorrida, true)}
-                onRecusar={() => responderConviteDeCorrida(conviteDeCorrida, false)}
               />
             )}
           </>

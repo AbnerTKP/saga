@@ -170,7 +170,7 @@ errado":
 | Voz, call, live, palco, quadro flutuante, quem está falando, bot de música (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`, `useMusica`, `musica.mjs`, `main/musica.ts`) | `docs/decisoes/voz-e-live.md` | não — leia |
 | Microfone, supressão de ruído, soundboard, sons de aviso (`useMicrofone`, `sensibilidade`, `embutir`, `sons/`) | `docs/decisoes/som-e-microfone.md` | não — leia |
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
-| Xadrez, Fórmula 1, Urna, Catan e o menu de jogos, app e servidor (`xadrez`, `corrida`, `pista`, `motor`, `urna/`, `catan`, `desenhoDoCatan`, `jogos.mjs`, `corridas.mjs`, `urnas.mjs`, `catan.mjs`, `catans.mjs`) | `docs/decisoes/jogos.md` | não — leia |
+| Xadrez, Urna, Catan e o menu de jogos, app e servidor (`xadrez`, `urna/`, `catan`, `desenhoDoCatan`, `jogos.mjs`, `urnas.mjs`, `catan.mjs`, `catans.mjs`); a Fórmula 1, que saiu em 07/10/2026 | `docs/decisoes/jogos.md` | não — leia |
 | Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`) | `docs/decisoes/telas-e-visual.md` | não — leia |
 | O que foi medido e o que falta o dono confirmar | `docs/confirmar-com-o-dono.md` | não — leia antes de dizer "pronto" |
 | A reestruturação da interface (set/2026): o levantamento, as decisões do dono, o design system e o que falta (hub de comunidades, selo de verificado) | `docs/reestruturacao-da-interface.md` | não — leia antes de mexer em tela |
@@ -261,7 +261,7 @@ para o arquivo da área, não para cá — aqui só entra o que vale em qualquer
 ## Testes
 
 ```bash
-pnpm test        # servidor (598) + app (501), segundos, sem nada externo
+pnpm test        # servidor (594) + app (495), segundos, sem nada externo
 pnpm test:sala   # 3 participantes WebRTC reais numa sala; precisa de servidor no ar
 ```
 

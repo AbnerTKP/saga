@@ -560,7 +560,7 @@ function Luta({ arena, servidorId, diferenca, surdo, volume, canvas, pergunta, r
     preaquecer(inicial.lutadores[0].id, inicial.lutadores[0].cor);
     preaquecer(inicial.lutadores[1].id, inicial.lutadores[1].cor);
 
-    // ---- a sala da luta no LiveKit: só dados, e volta sozinha se cair (como a da corrida)
+    // ---- a sala da luta no LiveKit: só dados, e volta sozinha se cair
     const ouvintes = new Set<(d: Uint8Array) => void>();
     let sala: Room | null = null;
     let tentativa = 0;

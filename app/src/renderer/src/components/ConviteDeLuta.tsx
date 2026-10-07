@@ -8,7 +8,7 @@ import { criarQuadro, type Quadro } from '../dragao/quadro';
 /**
  * O convite para lutar, em pixel: o dono pediu o Dragão Quadrado inteiro na direção de arte do jogo,
  * e o cartão que aparece para o amigo em qualquer tela da Saga também. Fica na mesma pilha dos
- * convites do xadrez e da Fórmula 1, com o som de sempre. "Lutar" abre o jogo direto na escolha de
+ * convites do xadrez e do Catan, com o som de sempre. "Lutar" abre o jogo direto na escolha de
  * lutador daquela arena — escolher o lutador é a resposta. O lutador de quem chamou vai no detalhe
  * (um nome que este app não conhece fica de fora, em vez de derrubar a tela).
  */

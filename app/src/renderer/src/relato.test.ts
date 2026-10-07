@@ -23,7 +23,6 @@ test('a tela em palavras', () => {
   const t = { logado: true, semServidor: false, jogo: null, conversas: false, sala: 'Geral' } as const;
   assert.equal(descreverTela({ ...t, logado: false }), 'entrada');
   assert.equal(descreverTela({ ...t, semServidor: true }), 'tela inicial');
-  assert.equal(descreverTela({ ...t, jogo: 'corrida' }), 'Fórmula 1');
   assert.equal(descreverTela({ ...t, conversas: true }), 'conversas');
   assert.equal(descreverTela(t), 'sala Geral');
   assert.equal(descreverTela({ ...t, sala: null }), 'servidor');

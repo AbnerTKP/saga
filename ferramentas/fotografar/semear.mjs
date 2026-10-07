@@ -141,7 +141,7 @@ export async function semear(BASE, { log = console.log } = {}) {
     ['Duda', 'atualizei aqui, o compartilhamento de tela ficou bem mais liso'],
     ['Marina', 'a régua de volume do soundboard sumiu pra mim, é normal?'],
     ['TKP', 'é sim, agora ela fica só comigo'],
-    ['Rafa', 'bora de F1 mais tarde? quero revanche de Interlagos'],
+    ['Rafa', 'bora de Catan mais tarde? quero revanche'],
     ['Bia', 'revanche nada, você bateu na primeira curva kkkk'],
     ['Leo', 'gente, alguém tem o link daquele vídeo de ontem?'],
     ['Marina', 'manda no #clipes-e-prints que fica mais fácil de achar depois'],

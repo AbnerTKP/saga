@@ -10,7 +10,6 @@ import type { AcaoNaMesaDoCatan, CatanNoServidor, MesaDoCatan } from './catan';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { ResumoDaMesa } from './jogos';
-import type { CodigoDoCarro } from './corrida';
 import type { IdDoCenario, IdDoLutador } from './dragao/tipos';
 import { PROTOCOLO_DA_LUTA } from './dragao/protocolo';
 import type { CorpoDoRelato } from './relato';
@@ -581,7 +580,6 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
     servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
     /** A hora do servidor na resposta. Servidor antigo não manda. */
     agora?: number;
-    corridas?: CorridasNoServidor;
     lutas?: LutasNoServidor;
     catan?: CatanNoServidor;
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
@@ -667,67 +665,6 @@ export const agirNaMesa = async (id: number, a: AcaoNaMesa, servidorId: number) 
  */
 export const enviarRelato = (corpo: CorpoDoRelato) =>
   pedir<{ relato: { id: number } }>('POST', '/relatos', corpo);
-
-// --- Fórmula 1 ------------------------------------------------------------------
-
-/** Um grid visto da busca de salas: quem abriu e quem está sentado. */
-/** `pista` só vem de servidor que já conhece as pistas; sem ela, é Interlagos. */
-export type ResumoDoGrid = { id: number; estado: EstadoDoGrid; anfitriao: number; pilotos: number[]; voltas: number; pista?: string };
-export type EstadoDoGrid = 'grid' | 'correndo' | 'fim';
-export type ConviteDeCorrida = {
-  grid: number; servidor?: number; servidorNome?: string | null; de: PessoaDaMesa; voltas: number; pista?: string; pilotos: number;
-  /** Quem já sentou, e em que carro; servidor antigo não manda. */
-  sentados?: { carro: CodigoDoCarro; pessoa: PessoaDaMesa }[];
-};
-export type CorridasNoServidor = { grids: ResumoDoGrid[]; convites: ConviteDeCorrida[] };
-
-export type Grid = {
-  id: number;
-  estado: EstadoDoGrid;
-  anfitriao: PessoaDaMesa;
-  voltas: number;
-  /** Uma das pistas de `pista.ts`; servidor antigo não manda, e aí é Interlagos. */
-  pista?: string;
-  /** Os oito, sempre na ordem de `CARROS`. */
-  assentos: { carro: CodigoDoCarro; pessoa: PessoaDaMesa | null }[];
-  chamados: PessoaDaMesa[];
-  recusaram: number[];
-  /** A ordem de largada, sorteada ao largar: o primeiro é a pole. */
-  ordem: CodigoDoCarro[];
-  /** Quando as luzes apagam, no relógio do servidor. */
-  largadaEm: number | null;
-  /** `tempo` já vem com a punição somada; `punicao` diz quanto dela é punição. */
-  chegadas: { pessoa: PessoaDaMesa; carro: CodigoDoCarro; tempo: number; punicao?: number; melhorVolta: number | null }[];
-  abandonos: number[];
-  plateia: PessoaDaMesa[];
-  meuCarro: CodigoDoCarro | null;
-  souAnfitriao: boolean;
-  rodada: number;
-  /** A hora do servidor na resposta: é por ela que o app acerta o relógio da corrida. */
-  agora: number;
-};
-
-export type AcaoNoGrid =
-  | { acao: 'sentar'; carro: CodigoDoCarro; protocolo: number }
-  | { acao: 'configurar'; voltas?: number; pista?: string }
-  | { acao: 'chamar' | 'cancelarConvite'; alvo: number }
-  | { acao: 'chegada'; tempo: number; melhorVolta: number | null; punicao: number }
-  | { acao: 'levantar' | 'recusar' | 'largar' | 'abandonar' | 'correrDeNovo' | 'fechar' };
-
-/** Como a mesa: o pedido vai ao servidor DO GRID, nunca ao aberto. */
-export const abrirGrid = async (voltas: number, servidorId: number) =>
-  (await pedir<{ grid: Grid }>('POST', '/corridas/abrir', { voltas }, servidorId)).grid;
-
-export const verGrid = async (id: number, servidorId: number) =>
-  (await pedir<{ grid: Grid }>('GET', `/corridas/grid?id=${id}`, undefined, servidorId)).grid;
-
-/** Fechar não devolve grid nenhum: ele deixou de existir. */
-export const agirNoGrid = async (id: number, a: AcaoNoGrid, servidorId: number) =>
-  (await pedir<{ grid?: Grid; ok?: true }>('POST', '/corridas/grid', { id, ...a }, servidorId)).grid ?? null;
-
-/** O passe da sala da corrida no LiveKit: só dados, e publicar só se você está sentado. */
-export const pedirTokenDaCorrida = (id: number, servidorId: number) =>
-  pedir<{ url: string; token: string; identity: string }>('POST', '/corridas/token', { id }, servidorId);
 
 // --- Catan ----------------------------------------------------------------------
 // Como o xadrez: a mesa é do servidor, e a regra também — ver `catan.ts`.

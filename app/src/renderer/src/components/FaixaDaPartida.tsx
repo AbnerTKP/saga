@@ -7,7 +7,7 @@ import { Icon } from './Icon';
  * continua correndo.
  */
 export function FaixaDaPartida({ jogo = 'Xadrez', estado, titulo, minhaVez, outroNome, rotulo, onVoltar }: {
-  /** A Fórmula 1 usa a mesma faixa: o nome do jogo e o texto do botão mudam. */
+  /** Os outros jogos usam a mesma faixa: o nome do jogo e o texto do botão mudam. */
   jogo?: string;
   estado: 'lobby' | 'jogando' | 'fim';
   /** "TKP × Juninho", ou "mesa aberta" antes de começar. */

@@ -18,13 +18,12 @@ export function anotarOnde(tela: string, servidor: string | null) {
 }
 export const ondeEstou = () => onde;
 
-/** A tela em palavras, para quem vai ler o relato: "sala Geral", "Fórmula 1", "conversas". */
+/** A tela em palavras, para quem vai ler o relato: "sala Geral", "Catan", "conversas". */
 export function descreverTela(o: {
-  logado: boolean; semServidor: boolean; jogo: 'xadrez' | 'corrida' | 'luta' | 'urna' | 'catan' | null; conversas: boolean; sala: string | null;
+  logado: boolean; semServidor: boolean; jogo: 'xadrez' | 'luta' | 'urna' | 'catan' | null; conversas: boolean; sala: string | null;
 }): string {
   if (!o.logado) return 'entrada';
   if (o.semServidor) return 'tela inicial';
-  if (o.jogo === 'corrida') return 'Fórmula 1';
   if (o.jogo === 'luta') return 'Dragão Quadrado';
   if (o.jogo === 'urna') return 'Urna';
   if (o.jogo === 'catan') return 'Catan';

@@ -1633,14 +1633,13 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
   background: var(--accent-claro); box-shadow: 0 0 0 2px var(--bg2); }
 .capa-de-xadrez { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px;
   background: repeating-conic-gradient(#b58863 0 25%, #f0d9b5 0 50%) 0 0 / 28px 28px; }
-.capa-de-pista { width: 100%; height: 100%; object-fit: cover; }
 .capa-de-luta { width: 48px; height: 48px; }
 .capa-de-urna { width: 96px; height: 64px; }
 .tela-da-urna { display: flex; flex: 1; min-height: 0; gap: var(--e3); padding: var(--e3); background: #000; }
 .tela-da-urna .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
 
 /* O convite para jogar, na pilha dos avisos — mas ele não some sozinho: quem chamou espera. */
-/* O convite para jogar: o cartão grande no canto (a opção C do dono), para o xadrez e a Fórmula 1.
+/* O convite para jogar: o cartão grande no canto (a opção C do dono), o mesmo para todos os jogos.
    Ele mora na pilha dos avisos, que não recebe clique — por isso o `pointer-events` volta aqui. */
 .cartao-de-convite { pointer-events: auto; width: 340px; border-radius: 12px; overflow: hidden; background: var(--bg1);
   box-shadow: inset 0 0 0 1px rgba(63,127,224,.55), 0 12px 32px rgba(0,0,0,.55); animation: aviso-entra .18s ease-out; }
@@ -1860,188 +1859,8 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 .user-actions button[aria-disabled="true"] { opacity: .45; cursor: default; }
 .user-actions button[aria-disabled="true"]:hover { background: none; }
 
-/* ---- Fórmula 1 ----
-   O redesenho escolhido pelo dono (tela 2): a pista toma o palco inteiro, com a câmera seguindo o
-   carro SEM girar, e o placar vai por cima dela — torre de posições, tempo da volta, velocidade e
-   mapinha. A lista de pessoas sai enquanto a corrida está aberta. O grid de largada continua com
-   a coluna da casa, a mesma da partida de xadrez. */
-.corrida-area { flex: 1; min-height: 0; margin: var(--e3); padding: var(--e3); background: var(--bg0);
-  border-radius: 8px; display: flex; gap: 20px; }
-.corrida-lateral { height: auto; align-self: stretch; }
+/* Os botões pequenos no cabeçalho do palco de um jogo. */
 .stage-head .perigo.sm, .stage-head .secundario.sm, .stage-head .primary.sm { padding: 6px 12px; font-size: 13px; }
-
-/* O grid de largada: as quatro equipes, dois carros cada. */
-.corrida-equipes { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between;
-  gap: var(--e3); overflow-y: auto; }
-.corrida-equipe { display: flex; flex-direction: column; gap: 6px; }
-.corrida-equipe-nome { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: .07em; color: var(--text2); }
-.corrida-equipe-cor { width: 10px; height: 10px; border-radius: 3px; }
-.corrida-equipe-carros { display: flex; gap: 10px; }
-.corrida-assento { flex: 1; min-width: 0; min-height: 88px; display: flex; align-items: center; gap: 12px;
-  padding: 8px 12px 8px 6px; border-radius: 10px; text-align: left;
-  background: var(--bg1); box-shadow: inset 0 0 0 1px var(--line); }
-/* Carro com gente não é botão apagado: é o lugar de alguém. O `:disabled` global o deixaria
-   com cara de indisponível por defeito. */
-.corrida-assento:disabled { opacity: 1; cursor: default; }
-.corrida-assento.livre:not(:disabled):hover { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--bg4); }
-.corrida-assento.meu { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
-.corrida-assento-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.corrida-piloto { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.corrida-piloto-nome { font-size: 14px; font-weight: 650; color: var(--white);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.corrida-piloto-codigo { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; color: var(--text2); }
-.corrida-quem { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px;
-  font-weight: 600; color: var(--white); }
-.corrida-quem-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.corrida-quem .muted { font-weight: 500; }
-.corrida-quem.vazio { color: var(--text3); }
-.corrida-quem .spacer { flex: 1; }
-.corrida-lugar-vazio { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px dashed var(--bg4); }
-.corrida-espera { margin-top: 2px; }
-.corrida-contagem { margin-top: auto; font-size: 12px; color: var(--text2); text-align: center; }
-
-/* A escolha da pista: o traçado de verdade, na cor do chão dela. */
-.corrida-pistas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.corrida-pista-opcao { display: flex; flex-direction: column; gap: 5px; padding: 5px; border-radius: 8px;
-  background: var(--bg3); text-align: left; }
-.corrida-pista-opcao:hover:not(:disabled) { background: var(--bg4); }
-.corrida-pista-opcao:disabled { opacity: 1; cursor: default; }
-.corrida-pista-opcao.escolhida { background: var(--accent-tenue); box-shadow: inset 0 0 0 1px var(--accent); }
-.corrida-pista-miniatura { height: 44px; border-radius: 5px; display: grid; place-items: center; overflow: hidden; }
-.corrida-pista-nome { font-size: 12px; font-weight: 600; color: var(--text); padding: 0 2px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.corrida-pista-opcao.escolhida .corrida-pista-nome { color: var(--white); }
-
-/* A pista: um canvas do tamanho do palco, com o placar por cima. */
-.corrida-quadro { position: relative; flex: 1; min-height: 0; margin: var(--e3); border-radius: 8px;
-  overflow: hidden; background: var(--bg0); box-shadow: 0 10px 30px rgba(0,0,0,.45); container-type: inline-size; }
-.corrida-quadro canvas { position: absolute; inset: 0; display: block; }
-.corrida-painel { position: absolute; background: rgba(20,22,27,.84); border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.35); color: var(--text); }
-
-.corrida-torre { left: 12px; top: 12px; width: 200px; padding: 8px 6px 6px; display: flex; flex-direction: column; }
-.corrida-torre-titulo { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--text2); padding: 0 6px 6px; }
-.corrida-torre-linha { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 6px;
-  border-radius: 5px; width: 100%; text-align: left; }
-button.corrida-torre-linha:hover { background: rgba(255,255,255,.06); }
-.corrida-torre-linha.voce { background: rgba(63,127,224,.34); }
-.corrida-torre-linha.seguido { box-shadow: inset 0 0 0 1px var(--accent-claro); }
-.corrida-torre-linha.fora { opacity: .5; }
-.corrida-torre-pos { width: 14px; flex: none; text-align: right; font-size: 12.5px; font-weight: 700;
-  color: var(--text2); font-variant-numeric: tabular-nums; }
-.corrida-torre-linha.voce .corrida-torre-pos { color: var(--white); }
-.corrida-torre-cor { width: 3px; height: 15px; flex: none; border-radius: 2px; }
-.corrida-torre-nome { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--white);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.corrida-torre-dif { flex: none; font-size: 12px; font-weight: 600; color: var(--text2);
-  font-variant-numeric: tabular-nums; white-space: nowrap; }
-.corrida-torre-punicao { flex: none; padding: 0 5px; border-radius: 4px; background: rgba(224,72,82,.22);
-  color: #ff8a90; font-size: 11px; font-weight: 700; margin-left: 4px; }
-
-.corrida-tempos { right: 12px; top: 12px; width: 168px; padding: 9px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
-.corrida-tempos-linha { display: flex; align-items: baseline; justify-content: space-between; }
-.corrida-rotulo { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text2); }
-.corrida-tempo-grande { font-size: 17px; font-weight: 700; color: var(--white); font-variant-numeric: tabular-nums; }
-.corrida-tempo-pequeno { font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-.corrida-setores { display: flex; gap: 4px; }
-.corrida-setor { flex: 1; height: 4px; border-radius: 2px; background: var(--bg4); }
-.corrida-setor.melhor { background: var(--ok); }
-.corrida-setor.pior { background: var(--warn); }
-.corrida-setor.andando { background: rgba(244,247,251,.35); }
-
-.corrida-velocidade { left: 50%; bottom: 14px; transform: translateX(-50%); padding: 7px 14px 9px;
-  display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 128px; }
-.corrida-velocidade-numero { display: flex; align-items: baseline; gap: 5px; }
-.corrida-velocidade-numero span { font-size: 28px; font-weight: 750; line-height: 1; color: var(--white);
-  font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.corrida-velocidade-numero small { font-size: 11px; font-weight: 700; color: var(--text2); }
-.corrida-velocidade-barra { width: 100px; height: 4px; border-radius: 2px; background: var(--bg4); overflow: hidden; }
-.corrida-velocidade-barra span { display: block; height: 100%; background: var(--accent-claro); }
-
-.corrida-mapinha { right: 12px; bottom: 12px; padding: 10px; }
-.corrida-mapinha svg { display: block; }
-
-/* A faixa da bandeira, no alto, com a cor da bandeira na borda. */
-.corrida-faixa { left: 50%; top: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 11px;
-  padding: 8px 16px 8px 10px; white-space: nowrap; }
-.corrida-bandeira { display: block; flex: none; border-radius: 2px; }
-.corrida-faixa-textos { display: flex; flex-direction: column; line-height: 1.25; }
-.corrida-faixa-titulo { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--white); }
-.corrida-faixa-texto { font-size: 13.5px; font-weight: 600; color: var(--white); }
-.corrida-faixa.verde { background: rgba(8,48,26,.92); box-shadow: inset 0 0 0 1px #1faa4a, 0 6px 20px rgba(0,0,0,.35); }
-.corrida-faixa.verde .corrida-faixa-titulo { color: #3fd06f; }
-.corrida-faixa.amarela { background: rgba(58,47,6,.92); box-shadow: inset 0 0 0 1px #ffd400, 0 6px 20px rgba(0,0,0,.35); }
-.corrida-faixa.amarela .corrida-faixa-titulo { color: #ffd400; }
-.corrida-faixa.azul { background: rgba(12,34,74,.92); box-shadow: inset 0 0 0 1px #2f7bf5, 0 6px 20px rgba(0,0,0,.35); }
-.corrida-faixa.azul .corrida-faixa-titulo { color: #6ba3f5; }
-.corrida-faixa.pretaebranca, .corrida-faixa.quadriculada { background: rgba(20,22,27,.92);
-  box-shadow: inset 0 0 0 1px rgba(244,247,251,.6), 0 6px 20px rgba(0,0,0,.35); }
-
-.corrida-live { position: absolute; left: 12px; bottom: 12px; width: 240px; }
-.corrida-live .mini-live { position: static; right: auto; bottom: auto; width: 100%; }
-
-/* Palco estreito: a faixa desce para baixo da torre, e a velocidade encosta no mapinha para não
-   cair em cima da live. */
-@container (max-width: 760px) {
-  .corrida-faixa { top: auto; bottom: 186px; left: auto; right: 12px; transform: none; }
-  .corrida-velocidade { left: auto; right: 220px; transform: none; }
-}
-
-.corrida-camada { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20,22,27,.42); }
-.corrida-camada.escura { background: rgba(20,22,27,.55); }
-.corrida-cartao { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 26px;
-  background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.5); text-align: center; }
-.corrida-cartao-titulo { font-size: 20px; font-weight: 700; color: var(--white); }
-.corrida-largada { gap: 16px; }
-.corrida-luzes { display: flex; gap: 10px; }
-.corrida-luz { width: 34px; height: 82px; border-radius: 9px; background: #0d0f12; border: 2px solid var(--line);
-  display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; }
-.corrida-luz > span { width: 20px; height: 20px; border-radius: 50%; background: var(--bg2); }
-.corrida-luz > span:last-child { background: #2a1518; transition: background .08s, box-shadow .08s; }
-.corrida-luz > span.acesa { background: #ff2b36; box-shadow: 0 0 16px 3px rgba(255,43,54,.75); }
-.corrida-teclas { display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--text2); }
-.corrida-teclas > span { display: flex; align-items: center; gap: 6px; }
-.corrida-teclas kbd { min-width: 26px; text-align: center; padding: 3px 7px; border-radius: 6px;
-  background: var(--bg3); box-shadow: inset 0 -2px 0 var(--bg0); border: 1px solid var(--bg4);
-  font: 700 12.5px/1.4 inherit; color: var(--white); }
-.corrida-apagado { color: var(--text3); }
-.corrida-aviso-de-chegada { position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
-  padding: 7px 14px; border-radius: 999px; background: rgba(20,22,27,.88); color: var(--white);
-  font-size: 13px; font-weight: 600; white-space: nowrap; }
-.corrida-aviso-de-chegada.erro { color: #ff8a90; top: auto; bottom: 70px; }
-
-/* O fim: o pódio por cima da pista, como o fim da partida fica por cima do tabuleiro. */
-.corrida-fim { width: 360px; padding: 20px 20px; }
-.corrida-podio { display: flex; align-items: flex-end; gap: 8px; margin-top: 8px; }
-.corrida-degrau { width: 100px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.corrida-degrau-nome { font-size: 13.5px; font-weight: 600; color: var(--white); max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.corrida-degrau-tempo { display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--text2);
-  font-variant-numeric: tabular-nums; }
-.corrida-degrau-bloco { width: 100%; border-radius: 6px 6px 0 0; background: var(--bg3); border-top: 3px solid;
-  display: grid; place-items: center; font-size: 20px; font-weight: 800; color: var(--text2); }
-.corrida-degrau.pos-1 .corrida-degrau-bloco { height: 78px; font-size: 26px; color: var(--white); }
-.corrida-degrau.pos-2 .corrida-degrau-bloco { height: 54px; }
-.corrida-degrau.pos-3 .corrida-degrau-bloco { height: 40px; }
-.corrida-degrau .avatar.huge { width: 40px; height: 40px; font-size: 16px; }
-.corrida-degrau .avatar.big { width: 32px; height: 32px; font-size: 13px; }
-
-/* O carro no menu de jogos, num quadrado de asfalto. */
-.carro-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: var(--bg4);
-  display: grid; place-items: center; overflow: hidden; }
-/* Janela estreita: o carro sobe para a linha do código e o nome do piloto ganha a largura
-   inteira do cartão. Deitado, numa janela de 1200 px, "Max Verstappen" virava "M…" — o nome
-   é o que se escolhe, e o desenho do carro é o que pode encolher. */
-.corrida-equipes { container-type: inline-size; }
-@container (max-width: 680px) {
-  .corrida-assento { flex-direction: column; align-items: stretch; gap: 6px; min-height: 0; padding: 8px 10px 10px; }
-  .corrida-assento > svg { width: 64px; height: 32px; }
-  .corrida-assento-textos { gap: 6px; }
-  .corrida-piloto-nome { font-size: 14px; }
-}
 
 /* ---- Relatar ----
    O botão mora na faixa do alto da janela, a opção B escolhida pelo dono: cinza apagado, do

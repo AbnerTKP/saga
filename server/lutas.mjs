@@ -7,7 +7,7 @@
 // que sofreu com a busca de salas pedindo o LiveKit uma vez por sala. O que mora aqui é o que muda
 // devagar e precisa de árbitro: os lados, o sorteio da luta, a hora de começar e o resultado.
 //
-// Puro como as mesas do xadrez e os grids da Fórmula 1: sem SQL e sem HTTP. Quem é cada pessoa
+// Puro como as mesas do xadrez: sem SQL e sem HTTP. Quem é cada pessoa
 // chega pronto de quem chama. E mora na memória do processo pelo mesmo motivo deles: REINICIAR O
 // SERVIDOR ENCERRA AS ARENAS E AS LUTAS — publicar o servidor no meio de uma luta a apaga, e as
 // duas telas passam a ouvir "essa arena não existe mais".
@@ -112,7 +112,7 @@ function lerImpressao(impressao) {
 }
 
 /**
- * Um registro por processo, fábrica como o das mesas e o dos grids: o teste cria o seu com relógio
+ * Um registro por processo, fábrica como o das mesas: o teste cria o seu com relógio
  * e sorteio próprios. `ctx` é o mesmo deles — `sid`, `eu`, `pessoa(id)` e `membroAtivo(id)`.
  *
  * `avisar` é por onde sai a dessincronia (os dois lados discordando do fim da luta). É o
@@ -187,7 +187,7 @@ export function criarArenas({
 
   function acharArena(ctx, id) {
     const arena = arenas.get(Number(id));
-    // Arena de outro servidor responde igual a arena que não existe, como a mesa e o grid: saber o
+    // Arena de outro servidor responde igual a arena que não existe, como a mesa: saber o
     // número de uma arena alheia não abre porta.
     if (!arena || arena.sid !== ctx.sid) throw naoExiste();
     return arena;
@@ -254,7 +254,7 @@ export function criarArenas({
       if (!id || !ctx.membroAtivo(id)) throw new ErroDeConta('Essa pessoa não faz parte do servidor.', 404);
       if (ladoDe(arena, id) !== null) throw new ErroDeConta(`${ctx.pessoa(id).nome} já está na arena.`, 409);
       if (cheia(arena)) throw new ErroDeConta('Os dois lados da arena já estão ocupados.', 409);
-      // Vários convites de uma vez, como no grid: o primeiro que sentar leva a vaga, e o anfitrião
+      // Vários convites de uma vez: o primeiro que sentar leva a vaga, e o anfitrião
       // não precisa esperar um "agora não" para chamar o próximo. Quem está lutando noutro lugar
       // pode ser chamado — o convite espera a luta dele acabar (ver `resumo`).
       arena.chamados.add(id);
@@ -401,7 +401,7 @@ export function criarArenas({
   return {
     /**
      * O que vai de carona no `/rooms`: as arenas DESTE servidor e os convites de quem perguntou —
-     * de TODOS os servidores dele, como os do grid: quem foi chamado pode estar olhando outro
+     * de TODOS os servidores dele, como os das mesas: quem foi chamado pode estar olhando outro
      * servidor ou uma conversa. `fora` sabe quem é quem nos outros servidores; sem ele, só o do pedido.
      */
     resumo(ctx, fora = {}) {

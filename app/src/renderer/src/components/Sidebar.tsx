@@ -31,7 +31,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaCorrida, onCorrida, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -62,9 +62,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   onPartida: (mesaId: number) => void;
   /** O item Xadrez do menu de jogos: abre uma mesa, ou volta para a sua. */
   onXadrez: () => void;
-  /** O subtítulo do item Fórmula 1 no menu de jogos, e o que ele faz. */
-  textoDaCorrida: string;
-  onCorrida: () => void;
+  /** O subtítulo de cada jogo no menu de jogos, e o que ele faz. */
   textoDaLuta: string;
   onLuta: () => void;
   textoDoCatan: string;
@@ -398,12 +396,10 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
     <MenuDeJogos
       em={menuDeJogos}
       minha={minhaPartida}
-      corrida={textoDaCorrida}
       luta={textoDaLuta}
       catan={textoDoCatan}
       onCatan={onCatan}
       onXadrez={onXadrez}
-      onCorrida={onCorrida}
       onLuta={onLuta}
       onUrna={onUrna}
       onClose={() => setMenuDeJogos(null)}
