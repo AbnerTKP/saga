@@ -311,23 +311,30 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 .mesa-acontecendo.aberto .mesa-historico > div { white-space: normal; }
 .catan-evento.rolou, .catan-evento.venceu, .catan-evento.maiorEstrada, .catan-evento.maiorExercito { color: var(--texto-forte); font-weight: var(--peso-semi); }
 
-/* A cola de custos: papel creme com borda dourada, como a carta do jogo de tabuleiro. */
+/* A cola de custos: papel creme com borda dourada, como a carta do jogo de tabuleiro. Desde
+   07/10/2026 é também ONDE se constrói: na sua vez, a linha que dá acende e é um botão. */
 .mesa-cola {
   flex: none; padding: var(--e3) var(--e3) var(--e2); border-radius: var(--raio-4); color: var(--mesa-tinta);
   background: var(--mesa-papel); box-shadow: 0 10px 24px var(--preto-45), inset 0 0 0 2px var(--mesa-papel-borda), inset 0 0 0 5px var(--mesa-papel-claro), inset 0 0 0 6px var(--mesa-papel-borda);
 }
 .mesa-cola-titulo { text-align: center; font-size: var(--letra-legenda); font-weight: var(--peso-versalete); letter-spacing: .06em; text-transform: uppercase; color: var(--mesa-tinta-2); margin-bottom: var(--e1); }
 .mesa-cola-linha {
-  display: grid; grid-template-columns: 34px 52px minmax(0, 1fr) 24px; align-items: center; gap: var(--e1m);
+  display: grid; grid-template-columns: 38px 52px minmax(0, 1fr) 26px; align-items: center; gap: var(--e1m);
   padding: var(--e1) var(--e1m); border-radius: var(--raio-3); border: 1.5px solid transparent;
 }
+button.mesa-cola-linha { width: 100%; height: auto; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.mesa-cola-linha:disabled { cursor: default; }
+button.mesa-cola-linha.pode:hover:not(:disabled) { border-color: var(--mesa-pode-borda); box-shadow: 0 0 0 2px var(--mesa-pode-borda); transform: translateY(-1px); }
+.mesa-cola-linha.ativo, button.mesa-cola-linha.ativo { background: var(--acento-tenue-forte); border-color: var(--acento); opacity: 1; filter: none; }
 .mesa-cola-linha.pode { background: var(--mesa-pode); border-color: var(--mesa-pode-borda); }
 .mesa-cola-linha.falta { opacity: .45; filter: saturate(.5); }
-.mesa-cola-peca { height: 30px; display: grid; place-items: center; }
-.mesa-cola-nome { font-size: var(--letra-menu); font-weight: var(--peso-versalete); }
-.mesa-cola-custo { display: flex; gap: 3px; }
-.mesa-carta.na-cola { width: 19px; height: 27px; filter: none; }
-.mesa-cola-peca > .mesa-carta.na-cola { width: 20px; height: 28px; }
+.mesa-cola-peca { height: 36px; display: grid; place-items: center; }
+.mesa-cola-peca .mesa-peca { width: 36px; height: 34px; }
+.mesa-cola-nome { font-size: var(--letra-painel); font-weight: var(--peso-versalete); }
+/* Cinco cartas da cidade num lado estreito: elas encolhem juntas antes de passar do disco. */
+.mesa-cola-custo { display: flex; gap: 2px; min-width: 0; }
+.mesa-carta.na-cola { flex: 0 1 23px; min-width: 15px; width: 23px; height: auto; aspect-ratio: 100 / 140; filter: none; }
+.mesa-cola-peca > .mesa-carta.na-cola { flex: none; width: 24px; }
 .mesa-peca { display: grid; place-items: center; width: 30px; height: 28px; }
 .mesa-peca svg { width: 100%; height: 100%; }
 
@@ -349,11 +356,14 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 
 /* A sua mão: a foto, os pontos e quantas cartas; as de recurso; e, à parte, as de desenvolvimento. */
 .mesa-eu {
-  /* A carta da mão acompanha a largura do meio da mesa (10cqw) e a altura da janela: com cinco
-     recursos e as de desenvolvimento ao lado, ela tem de caber sem empurrar os lados. */
-  --mao-l: max(34px, min(62px, 10cqw, 8.4vh)); --mao-a: calc(var(--mao-l) * 1.4);
-  display: flex; align-items: flex-end; gap: var(--e4); max-width: 100%; box-sizing: border-box;
-  padding: var(--e3) var(--e4) var(--e3); border-radius: var(--raio-5);
+  /* A carta da mão acompanha o que SOBRA no meio da mesa e a altura da janela: com cinco recursos e
+     as de desenvolvimento ao lado, ela tem de caber sem empurrar os lados. 170 px são a foto, os vãos
+     e as bordas, e 6,72 cartas cabem na conta (as cinco de recurso e duas de desenvolvimento, a 86%).
+     Maior desde 07/10/2026 ("as cartas precisam ser mais evidentes"): o teto de 62 px deixava a carta
+     do mesmo tamanho numa tela de 1920 e numa de 1280. */
+  --mao-l: max(34px, min(92px, calc((100cqw - 170px) / 6.72), 10.4vh)); --mao-a: calc(var(--mao-l) * 1.4);
+  display: flex; align-items: flex-end; gap: var(--e3); max-width: 100%; box-sizing: border-box;
+  padding: var(--e3); border-radius: var(--raio-5);
   background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda);
 }
 .mesa-eu.acesa { border-color: var(--azul-300); box-shadow: 0 0 0 3px var(--acento-tenue), 0 0 36px var(--acento-tenue-forte); }
@@ -367,9 +377,9 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 .mesa-carta-mao.zerada .mesa-carta { opacity: .32; filter: saturate(.3); }
 .mesa-carta-mao.chegou .mesa-carta { transform: translateY(-10px); filter: drop-shadow(0 0 6px var(--aviso)); }
 .mesa-carta-qtd {
-  position: absolute; right: -6px; top: -8px; min-width: 24px; height: 24px; padding: 0 5px; box-sizing: border-box;
+  position: absolute; right: -7px; top: -9px; min-width: 28px; height: 28px; padding: 0 6px; box-sizing: border-box;
   border-radius: var(--raio-cheio); background: var(--cinza-1000); color: var(--branco); border: 2px solid var(--texto-forte);
-  font-size: var(--letra-menu); font-weight: var(--peso-versalete); line-height: 20px; text-align: center;
+  font-size: var(--letra-painel); font-weight: var(--peso-versalete); line-height: 24px; text-align: center;
 }
 .mesa-carta-mao.zerada .mesa-carta-qtd { opacity: .45; }
 .catan-chegou {
@@ -377,8 +387,11 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
   padding: 2px var(--e2); border-radius: var(--raio-cheio); background: var(--aviso); color: var(--cinza-1000);
   font-size: var(--letra-legenda); font-weight: var(--peso-versalete); white-space: nowrap;
 }
-.mesa-eu-dev { display: flex; flex-direction: column; gap: var(--e1m); padding-left: var(--e4); border-left: 1px solid var(--branco-07); }
+.mesa-eu-dev { display: flex; flex-direction: column; gap: var(--e1m); padding-left: var(--e3); border-left: 1px solid var(--branco-07); }
 .mesa-eu-dev-cartas { display: flex; gap: var(--e2); }
+/* O rótulo tem a largura de duas cartas: cabe inteiro na mesa normal, e na janela estreita encurta
+   em vez de empurrar a mão para fora da caixa. */
+.mesa-eu-dev > .mesa-rotulo { width: calc(var(--mao-l) * 1.72 + var(--e2)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mesa-eu-dev-cartas.apertadas > .mesa-dev + .mesa-dev { margin-left: calc(var(--mao-l) * -.45); }
 .mesa-dev { position: relative; flex: none; padding: 0; background: none; border-radius: var(--raio-2); }
 .mesa-dev .mesa-carta.na-mao { width: calc(var(--mao-l) * .86); height: calc(var(--mao-a) * .86); }
@@ -393,11 +406,11 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 }
 .mesa-dev-jogar { color: var(--branco); background: var(--roxo-600); }
 
-/* Os botões da vez, embaixo à direita, com a peça desenhada ao lado do nome. */
-.mesa-acoes { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+/* Trocar e passar a vez, embaixo da cola: construir é na cola, e o que se faz na vez fica num canto só. */
+.mesa-acoes { flex: none; display: grid; grid-template-columns: 1fr 1.35fr; gap: var(--e2); }
 .mesa-acoes-dica { grid-column: 1 / -1; padding: var(--e3); border-radius: var(--raio-4); background: var(--mesa-placa); font-size: var(--letra-menu); color: var(--texto-2); line-height: 1.4; }
 .mesa-b {
-  display: flex; align-items: center; gap: var(--e2); height: 40px; padding: 0 var(--e3); box-sizing: border-box;
+  display: flex; align-items: center; gap: var(--e2); height: 40px; padding: 0 var(--e3); box-sizing: border-box; white-space: nowrap;
   border-radius: var(--raio-3); background: var(--mesa-placa); border: 1px solid var(--branco-14);
   color: var(--texto-forte); font-size: var(--letra-menu); font-weight: var(--peso-forte);
 }
@@ -405,13 +418,12 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 .mesa-b.ativo { background: var(--acento-tenue-forte); border-color: var(--acento); color: var(--acento-texto); }
 .mesa-b:disabled { opacity: .4; }
 .mesa-b.primario {
-  grid-column: 1 / -1; justify-content: center; height: 44px; font-size: var(--letra-painel);
+  justify-content: center; font-size: var(--letra-painel);
   background: var(--acento-cheio); border-color: var(--acento-cheio); color: var(--sobre-acento); box-shadow: var(--sombra-2);
 }
 .mesa-b.primario:hover:not(:disabled) { background: var(--acento-cheio-hover); }
 .mesa-b-icone { flex: none; width: 26px; height: 24px; display: grid; place-items: center; }
 .mesa-b-icone .mesa-peca { width: 26px; height: 24px; }
-.mesa-carta.no-botao { width: 16px; height: 22px; filter: none; }
 
 /* No meio da mesa, o tabuleiro sem caixa: o feltro é o fundo. O véu das janelas, arredondado.
    A caixa é mais larga que o tabuleiro (ele cabe pela altura); os dados e o botão de rolar ficam
@@ -424,12 +436,117 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 .catan-mesa .catan-veu { border-radius: var(--raio-5); }
 .catan-mesa .catan-dados, .catan-mesa .catan-rolar { right: max(var(--e2), calc(var(--borda-do-tabuleiro, 0px) - 150px)); }
 
+/* O placar (07/10/2026): quem está na frente, a quanto cada um está dos 10. A barra anda por
+   escala, como as do relógio. */
+.mesa-placar { flex: none; display: flex; flex-direction: column; gap: 2px; padding: var(--e2) var(--e3) var(--e3); }
+.mesa-placar-cabeca { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--e1); }
+.mesa-placar-meta { font-size: var(--letra-rotulo); color: var(--texto-3); }
+.mesa-placar-linha {
+  position: relative; display: grid; grid-template-columns: 22px 26px minmax(0, 1fr) auto 28px; align-items: center; gap: var(--e2);
+  padding: var(--e1) var(--e1m) var(--e1m); border-radius: var(--raio-3);
+}
+.mesa-placar-linha.eu { background: var(--branco-07); }
+.mesa-placar-linha.vez { box-shadow: inset 3px 0 0 var(--cor-do-jogador); }
+.mesa-placar-linha.fora { opacity: .5; }
+.mesa-placar-pos { font-size: var(--letra-legenda); font-weight: var(--peso-versalete); color: var(--texto-3); text-align: right; font-variant-numeric: tabular-nums; }
+.mesa-placar-linha:first-of-type .mesa-placar-pos { color: var(--mesa-fita); }
+.mesa-placar-foto { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--cor-do-jogador); }
+.mesa-placar-foto .avatar { width: 100%; height: 100%; font-size: var(--letra-rotulo); }
+.mesa-placar-nome { min-width: 0; font-size: var(--letra-menu); font-weight: var(--peso-semi); color: var(--texto-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-placar-vez {
+  font-size: var(--letra-selo); font-weight: var(--peso-versalete); letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+  color: var(--cinza-1000); background: var(--cor-do-jogador); border-radius: var(--raio-1); padding: 1px var(--e1);
+}
+.mesa-placar-linha:not(.vez):not(.fora) .mesa-placar-vez { display: none; }
+.mesa-placar-barra { position: absolute; left: calc(22px + 26px + var(--e2) * 2 + var(--e1m)); right: calc(28px + var(--e2) + var(--e1m)); bottom: 3px; height: 3px; border-radius: var(--raio-cheio); background: var(--branco-07); overflow: hidden; }
+.mesa-placar-barra i { display: block; height: 100%; background: var(--cor-do-jogador); transform: scaleX(var(--fracao)); transform-origin: left center; }
+.mesa-placar-pontos {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--mesa-disco); color: var(--mesa-disco-tinta); font-size: var(--letra-painel); font-weight: var(--peso-versalete); box-shadow: 0 2px 6px var(--preto-45);
+}
+
+/* A troca no meio da MESA (07/10/2026): o que sai da sua mão à esquerda, em vermelho; o que entra,
+   à direita, em verde; a seta dupla entre os dois; e o enviar avermelhado, como o dono pediu. */
+.catan-veu.mesa-veu { z-index: 5; }
+.catan-janela.mesa-troca { z-index: 6; width: min(820px, calc(100% - 32px)); gap: var(--e4); }
+.catan-janela.mesa-troca.para-voce { border-color: var(--acento); box-shadow: 0 0 0 4px var(--acento-tenue-forte), var(--sombra-3); }
+.mesa-troca-lados { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: var(--e3); }
+.mesa-troca-lado { min-width: 0; display: flex; flex-direction: column; gap: var(--e3); padding: var(--e3); border-radius: var(--raio-4); border: 1.5px solid; }
+.mesa-troca-lado.sai { background: var(--perigo-tenue); border-color: var(--perigo-borda); }
+.mesa-troca-lado.entra { background: var(--mesa-pode); border-color: var(--mesa-pode-borda); }
+.mesa-troca-lado-cabeca { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.mesa-troca-lado-cabeca > b { font-size: var(--letra-menu); font-weight: var(--peso-versalete); letter-spacing: .06em; text-transform: uppercase; }
+.mesa-troca-lado.sai .mesa-troca-lado-cabeca > b { color: var(--perigo-texto); }
+.mesa-troca-lado.entra .mesa-troca-lado-cabeca > b { color: var(--ok-texto); }
+.mesa-troca-quem { margin-left: auto; display: inline-flex; align-items: center; gap: var(--e1m); font-size: var(--letra-legenda); color: var(--texto-2); }
+.mesa-troca-para { color: var(--texto-3); }
+.mesa-troca-quem-pessoa { display: inline-flex; align-items: center; gap: var(--e1); color: var(--texto-forte); font-weight: var(--peso-semi); }
+.mesa-troca-quem-foto { width: 20px; height: 20px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--cor-do-jogador); }
+.mesa-troca-quem-foto .avatar { width: 100%; height: 100%; font-size: var(--letra-selo); }
+.mesa-troca-quem-outro { color: var(--texto-forte); font-weight: var(--peso-semi); }
+.mesa-troca-meio {
+  align-self: center; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--superficie-3); border: 1px solid var(--borda); color: var(--texto-forte); box-shadow: var(--sombra-1);
+}
+.mesa-troca .catan-escolher { flex-wrap: nowrap; justify-content: space-between; gap: var(--e1m); margin-top: 0; }
+.mesa-troca .catan-oferta-cartas { min-height: 62px; }
+.mesa-troca-resumo { margin-right: auto; font-size: var(--letra-menu); color: var(--texto-2); }
+.mesa-troca-respostas { display: flex; flex-direction: column; gap: var(--e1m); }
+.mesa-troca-respostas .catan-resposta { padding: var(--e1m) var(--e2); border-radius: var(--raio-3); background: var(--superficie-1); }
+.catan-escolher-carta { position: relative; padding: 0; background: none; border: 0; border-radius: var(--raio-2); cursor: pointer; }
+.catan-escolher-carta:disabled { cursor: default; opacity: 1; }
+/* Apagada só a carta que você não tem; a que chegou no limite continua acesa, escolhida. */
+.catan-escolher-item.sem .mesa-carta { opacity: .35; filter: saturate(.4); }
+.catan-escolher-carta .mesa-carta { transition: transform .15s ease-out; }
+.catan-escolher-item.marcado .mesa-carta { transform: translateY(-4px); }
+.mesa-troca-lado.sai .catan-escolher-item.marcado .mesa-carta { filter: drop-shadow(0 0 6px var(--perigo)); }
+.mesa-troca-lado.entra .catan-escolher-item.marcado .mesa-carta { filter: drop-shadow(0 0 6px var(--ok)); }
+.catan-escolher-tem {
+  position: absolute; right: -6px; top: -7px; min-width: 20px; height: 20px; padding: 0 4px; box-sizing: border-box;
+  border-radius: var(--raio-cheio); background: var(--cinza-1000); color: var(--branco); border: 2px solid var(--texto-forte);
+  font-size: var(--letra-rotulo); font-weight: var(--peso-versalete); line-height: 16px; text-align: center;
+}
+.mesa-troca .catan-contador { gap: 2px; }
+.mesa-troca .catan-mais-menos { width: 20px; height: 20px; }
+.mesa-enviar {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--e1m); height: 38px; padding: 0 var(--e4);
+  border: 0; border-radius: var(--raio-3); background: var(--perigo-cheio); color: var(--branco);
+  font-size: var(--letra-painel); font-weight: var(--peso-forte); box-shadow: var(--sombra-1); cursor: pointer;
+}
+.mesa-enviar:hover:not(:disabled) { background: var(--perigo-cheio-hover); }
+.mesa-enviar:disabled { opacity: .4; cursor: default; }
+.mesa-enviar.sm { height: 30px; padding: 0 var(--e3); font-size: var(--letra-menu); }
+
+/* A dica do mouse da mesa, com a cara do jogo (07/10/2026): o papel da cola no lugar da do
+   sistema. Ela não pega o mouse, e a tela a põe em cima do que se apontou (ou embaixo, sem lugar). */
+.mesa-dica {
+  position: absolute; left: 0; top: 0; z-index: 8; pointer-events: none; max-width: 260px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: var(--e1); padding: var(--e2) var(--e3);
+  background: var(--mesa-papel-claro); color: var(--mesa-tinta); border: 1.5px solid var(--mesa-papel-borda); border-radius: var(--raio-3);
+  box-shadow: 0 8px 22px var(--preto-45); font-size: var(--letra-legenda); line-height: 1.35;
+  animation: mesa-dica-entra .12s ease-out;
+}
+.mesa-dica b { font-size: var(--letra-menu); font-weight: var(--peso-versalete); }
+.mesa-dica::after {
+  content: ''; position: absolute; left: var(--seta, 50%); top: 100%; width: 9px; height: 9px; box-sizing: border-box;
+  background: var(--mesa-papel-claro); border-right: 1.5px solid var(--mesa-papel-borda); border-bottom: 1.5px solid var(--mesa-papel-borda);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.mesa-dica.embaixo::after { top: 0; border: 0; border-left: 1.5px solid var(--mesa-papel-borda); border-top: 1.5px solid var(--mesa-papel-borda); }
+.mesa-dica-cartas { display: flex; gap: 3px; }
+.mesa-carta.na-dica { width: 22px; height: 31px; filter: none; }
+@keyframes mesa-dica-entra { from { opacity: 0; } }
+
 /* Lado estreito (janela pequena): a cola perde a coluna do nome — a peça já diz o que é —, e o
    banco aperta os montes. */
-@container (max-width: 250px) {
-  .mesa-cola-linha { grid-template-columns: 30px minmax(0, 1fr) 22px; }
+@container (max-width: 270px) {
+  .mesa-cola-linha { grid-template-columns: 34px minmax(0, 1fr) 24px; }
   .mesa-cola-nome { display: none; }
-  .mesa-banco-montes { gap: var(--e1m); }
+  /* Os seis montes do banco numa linha só: em duas, o lado esquerdo não cabia na janela baixa. */
+  .mesa-banco { --carta-l: 24px; --carta-a: 34px; padding-left: var(--e2); padding-right: var(--e2); }
+  .mesa-banco-montes { gap: var(--e1); flex-wrap: nowrap; }
+  .mesa-placar-vez { display: none; }
+  .mesa-b { padding: 0 var(--e2); }
   .mesa-lugar-cartas { gap: var(--e3); }
 }
 
@@ -439,11 +556,16 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
   .mesa-lugar { padding: var(--e2); gap: var(--e1m); }
   .mesa-acontecendo-lugar { height: 92px; }
   .mesa-cola { padding: var(--e2) var(--e2) var(--e1); }
-  .mesa-cola-linha { padding: 2px var(--e1); }
-  .mesa-cola-peca { height: 24px; }
+  .mesa-cola-titulo { margin-bottom: 0; }
+  .mesa-cola-linha { padding: 1px var(--e1); }
+  .mesa-cola-peca { height: 26px; }
+  .mesa-cola-peca .mesa-peca { width: 28px; height: 26px; }
+  .mesa-carta.na-cola { flex-basis: 20px; width: 20px; }
+  .mesa-cola-peca > .mesa-carta.na-cola { width: 18px; }
   .mesa-banco { padding: var(--e1m) var(--e2) var(--e2); }
   .mesa-b { height: 34px; }
-  .mesa-b.primario { height: 38px; }
+  .mesa-placar { padding: var(--e1m) var(--e2) var(--e2); }
+  .mesa-placar-linha { padding-top: 2px; padding-bottom: var(--e1); }
   .catan-rolar { padding: var(--e1m) var(--e4) var(--e1m) var(--e2); font-size: var(--letra-texto); box-shadow: 0 0 0 4px var(--acento-tenue-forte), var(--sombra-2); }
   .catan-rolar .catan-dado { width: 30px; height: 30px; }
   .catan-dado { width: 38px; height: 38px; }

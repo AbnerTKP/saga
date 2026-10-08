@@ -4,7 +4,7 @@ import {
   centroDoHex, pontoDoCruzamento, pontasDaAresta, textoDoEvento, textoDoMonte, oQueTocarNoCatan, minhaMesaDoCatan,
   temTudo, CUSTOS, monteVazio, type ResumoDaMesaDoCatan,
   tempoRestante, segundosQueFaltam, deveTicar, meuPrazo, eventosNovos, oQueTocarNaPartida,
-  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, lugaresEmVolta, oQueDaParaConstruir, pecasQueChegaram,
+  faixaDaVez, vezQueComecou, cartasQueChegaram, vezParada, PRAZO_DA_MONTAGEM, PRAZO_DA_TROCA, lugaresEmVolta, oQueDaParaConstruir, pecasQueChegaram, placar, textoDosPontos,
   type Evento, type Partida, type JogadorNaPartida,
 } from './catan.ts';
 
@@ -260,6 +260,31 @@ test('a cola acende o que as suas cartas já pagam, com peça sobrando; para a p
   assert.deepEqual(oQueDaParaConstruir(naVez), { estrada: false, aldeia: false, cidade: false, desenvolvimento: true });
   // Antes de rolar ainda não há botão: vale o que as cartas pagam.
   assert.deepEqual(oQueDaParaConstruir({ ...naVez, fase: 'rolar' as const })?.aldeia, true);
+});
+
+test('o placar: mais pontos em cima, empate na mesma posição, e de onde vem cada ponto', () => {
+  const p = {
+    eu: 1,
+    jogadores: [jogador({ pontos: 4 }), jogador({ pontos: 7 }), jogador({ pontos: 4 }), jogador({ pontos: 2 })],
+    construcoes: [
+      { v: '1', j: 0, tipo: 'aldeia' as const }, { v: '2', j: 0, tipo: 'cidade' as const },
+      { v: '3', j: 1, tipo: 'cidade' as const }, { v: '4', j: 1, tipo: 'aldeia' as const }, { v: '5', j: 1, tipo: 'aldeia' as const },
+      { v: '6', j: 2, tipo: 'aldeia' as const }, { v: '7', j: 2, tipo: 'aldeia' as const },
+      { v: '8', j: 3, tipo: 'aldeia' as const }, { v: '9', j: 3, tipo: 'aldeia' as const },
+    ],
+    maiorEstrada: { j: 2, tamanho: 6 }, maiorExercito: null,
+    // As suas cartas: a de ponto conta no seu número e aparece de onde veio.
+    cartas: [{ tipo: 'ponto' as const, nova: false }, { tipo: 'cavaleiro' as const, nova: false }],
+  };
+  const l = placar(p);
+  assert.deepEqual(l.map((x) => [x.j, x.posicao]), [[1, 1], [0, 2], [2, 2], [3, 4]]);
+  assert.equal(textoDosPontos(l[0]), '2 aldeias, 1 cidade e 1 carta de ponto');
+  assert.equal(textoDosPontos(l[2]), '2 aldeias e a maior estrada');
+  assert.equal(textoDosPontos({ ...l[3], aldeias: 0 }), 'Nenhum ponto ainda');
+  // As cartas dos outros só aparecem no fim, quando a vista as manda.
+  assert.equal(l[1].cartasDePonto, 0);
+  assert.equal(placar({ ...p, eu: null, jogadores: p.jogadores.map((j, k) => k === 0 ? { ...j, cartasDeDesenvolvimento: ['ponto', 'ponto'] } : j) })
+    .find((x) => x.j === 0)?.cartasDePonto, 2);
 });
 
 test('o que caiu no tabuleiro: só o que é novo, e a aldeia que vira cidade cai de novo', () => {

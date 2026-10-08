@@ -656,3 +656,46 @@ export function oQueDaParaConstruir(p: Pick<Partida, 'eu' | 'mao' | 'jogadores' 
 
 /** Os pontos que cada coisa da cola vale, como na carta do jogo de tabuleiro. */
 export const PONTOS_DA_CONSTRUCAO: Record<Construcao, string> = { estrada: '0', aldeia: '1', cidade: '2', desenvolvimento: '?' };
+
+/** Uma linha do placar: a posição, os pontos e de onde eles vêm. */
+export type LinhaDoPlacar = {
+  j: number; posicao: number; pontos: number;
+  aldeias: number; cidades: number; maiorEstrada: boolean; maiorExercito: boolean;
+  /** As cartas de ponto que QUEM PERGUNTA pode ver: as suas, ou as de todo mundo no fim. */
+  cartasDePonto: number;
+};
+
+/**
+ * O placar da mesa (pedido do dono, 07/10/2026: "o ranking separado, com a pontuação de cada um"):
+ * do mais pontos ao menos, empatados na mesma posição e na ordem da vez, e cada pontuação aberta
+ * no que a compõe. Os pontos são os da `vista`: os dos outros sem as cartas de ponto escondidas,
+ * os seus com elas — o mesmo número do disco de cada lugar.
+ */
+export function placar(p: Pick<Partida, 'jogadores' | 'construcoes' | 'maiorEstrada' | 'maiorExercito' | 'eu' | 'cartas'>): LinhaDoPlacar[] {
+  const linhas = p.jogadores.map((jogador, j) => {
+    const minhas = j === p.eu ? (p.cartas ?? []).map((c) => c.tipo) : (jogador.cartasDeDesenvolvimento ?? []);
+    return {
+      j, posicao: 0, pontos: jogador.pontos,
+      aldeias: p.construcoes.filter((c) => c.j === j && c.tipo === 'aldeia').length,
+      cidades: p.construcoes.filter((c) => c.j === j && c.tipo === 'cidade').length,
+      maiorEstrada: p.maiorEstrada?.j === j, maiorExercito: p.maiorExercito?.j === j,
+      cartasDePonto: minhas.filter((c) => c === 'ponto').length,
+    };
+  });
+  const ordem = [...linhas].sort((a, b) => b.pontos - a.pontos || a.j - b.j);
+  ordem.forEach((l, i) => { l.posicao = i > 0 && ordem[i - 1].pontos === l.pontos ? ordem[i - 1].posicao : i + 1; });
+  return ordem;
+}
+
+/** De onde vêm os pontos, em português: "2 aldeias, 1 cidade e a maior estrada". */
+export function textoDosPontos(l: LinhaDoPlacar): string {
+  const partes = [
+    l.aldeias ? `${l.aldeias} ${l.aldeias === 1 ? 'aldeia' : 'aldeias'}` : '',
+    l.cidades ? `${l.cidades} ${l.cidades === 1 ? 'cidade' : 'cidades'}` : '',
+    l.maiorEstrada ? 'a maior estrada' : '',
+    l.maiorExercito ? 'o maior exército' : '',
+    l.cartasDePonto ? `${l.cartasDePonto} ${l.cartasDePonto === 1 ? 'carta de ponto' : 'cartas de ponto'}` : '',
+  ].filter(Boolean);
+  if (!partes.length) return 'Nenhum ponto ainda';
+  return partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`;
+}

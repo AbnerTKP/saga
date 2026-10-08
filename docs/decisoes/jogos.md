@@ -356,7 +356,8 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
 - **O "Acontecendo" ficou pequeno no alto à direita**, com as linhas mais novas embaixo e a de cima
   se apagando (máscara, em vez de cortar a linha ao meio); "abrir" mostra a partida inteira por cima
   do lugar da direita. A coluna de antes não cabe na mesa em volta.
-- **A cola de custos é a carta do jogo de tabuleiro**: papel creme com borda dourada, a peça na sua
+- **A cola de custos é a carta do jogo de tabuleiro** (desde 07/10/2026 é também onde se constrói —
+  ver "Cartas de verdade, a cola que constrói…", abaixo): papel creme com borda dourada, a peça na sua
   cor (`iconeDeConstruir`, de `iconesDoCatan.ts`), as cartas que ela custa e o disco de pontos (a
   carta de desenvolvimento leva "?": algumas valem ponto). **Na sua vez, nas ações, acende exatamente
   o que os botões deixam fazer** (`pode`); fora dela, o que as SUAS cartas já pagam, com peça
@@ -364,8 +365,8 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
   acendia pelas cartas sempre, e a foto da sua vez mostrou a linha da Cidade acesa com o botão Cidade
   apagado — cartas na mão, nenhuma aldeia para virar cidade: parecia defeito. Para quem assiste, e
   no fim, ela fica inteira.
-- **A arte das cartas é um sprite** (`cartasDoCatan.ts`): as de recurso trazem o terreno do PRÓPRIO
-  tabuleiro num medalhão (`defs()` + `terreno()`), as cinco de desenvolvimento têm ilustração e o
+- **A arte das cartas é um sprite** (`cartasDoCatan.ts`): as de recurso traziam o terreno do PRÓPRIO
+  tabuleiro num medalhão — desde 07/10/2026 trazem o objeto (ver abaixo) —, as cinco de desenvolvimento têm ilustração e o
   que fazem escrito, o verso de recurso é o mar com os seis terrenos e o de desenvolvimento é vinho
   com a coroa. Tudo vira `<symbol>`s montados UMA vez, escondidos na mesa, e cada carta é um `<svg>`
   com `<use>`: a tela redesenha a cada leitura (800 ms) e tem dezenas de cartas — repetir o SVG
@@ -418,8 +419,8 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
   referência solta não dá erro, o desenho só some.
 - **Os ícones de construir são as miniaturas** (opção 2 da mesma página; a 1 eram peças de madeira
   maciças): cada peça num pedacinho de grama, em isométrico, com parede creme e telhado ou bandeirola
-  na cor de quem joga (`iconesDoCatan.ts`). Sem `<defs>` nem id, porque a mesma peça aparece no botão e
-  na cola ao mesmo tempo. As peças NO tabuleiro continuam as de antes — ele não pediu para mudar.
+  na cor de quem joga (`iconesDoCatan.ts`). Sem `<defs>` nem id, porque a mesma peça aparecia no botão e
+  na cola ao mesmo tempo (o botão saiu em 07/10/2026; hoje é só a cola). As peças NO tabuleiro continuam as de antes — ele não pediu para mudar.
 - **Os dados rolam num copo** (pedido do dono depois da v0.68.0: "girando também em uma espécie de
   copo, foco em desempenho sem lag"). Numa rolagem nova, de qualquer um, o copo de couro aparece
   acima e à esquerda dos dados — sobre o canto do tabuleiro; à direita a caixa acaba logo depois
@@ -488,3 +489,51 @@ exemplo uma poeira, um som de construção" — com "foco em desempenho sem lag"
   Depois: nenhum layout acima de 8 ms nas leituras, nenhum objeto do tabuleiro refeito. Ficaram só a
   barra e o anel do relógio, que custam pintura, e não layout.
 
+### Cartas de verdade, a cola que constrói, a troca no meio, o placar e a dica (07/10/2026)
+
+Pedidos do dono, jogando, no mesmo dia: "os ícones das cartas viraram o do tabuleiro, poderia ser o
+ícone de verdade de um tronco, tijolo — as cartas precisam ser mais evidentes, maiores" (e "isso se
+aplica nos custos"); "ao passar o mouse, a notificaçãozinha não deveria ser do sistema, e sim do
+Catan"; "o ranking deveria ter separado, com a pontuação de cada um"; "as informações estão muito
+espalhadas — clicando no próprio custo eu poderia construir, poderia ser somente no custo essa
+interação, deixava o custo maior"; e "a troca tá meio confusa: pra saber quem tá dando ou recebendo,
+um modal mais central, com o enviar meio vermelho e seta dupla mostrando quem dá o quê".
+
+- **As cartas de recurso mostram o OBJETO**: toras com os anéis, tijolos empilhados, a ovelha, o
+  feixe de trigo, pedras facetadas com cristais — num disco claro, na moldura da cor do recurso (a
+  cor é o que se reconhece de longe; o objeto, de perto). O terreno no medalhão repetia o tabuleiro e
+  não dizia o recurso. Cada objeto é um `<symbol>` próprio (`SIMBOLO.objeto`), usado por `<use>` nas
+  duas cartas, e a carta pequena (banco, janelas, cola) leva o objeto maior, sem a faixa do nome: ela
+  chega a 20 px e ainda se lê.
+- **A carta da mão cresce com o que SOBRA no meio da mesa**: `(100cqw − 170px) / 6,72`, com teto de
+  92 px e piso de 34. O teto antigo de 62 px deixava a carta do mesmo tamanho numa tela de 1920 e numa
+  de 1280; agora é ~88 px na de 1920, ~66 na de 1280 e ~39 na mínima (900×560), onde a mão com duas
+  de desenvolvimento passava 70 px da caixa — defeito que já existia e a foto pegou.
+- **Construir é na cola, e só nela.** Os quatro botões de construir saíram; na sua vez, nas ações,
+  a linha que dá (`pode`, a mesma regra dos botões) acende em verde e é um botão: estrada, aldeia e
+  cidade pedem o lugar no tabuleiro (clicar de novo desiste), a carta compra na hora. "Trocar" e
+  "Passar a vez" foram para baixo da cola — o que se faz na vez fica num canto só. Para quem assiste,
+  a cola continua "Custos de construção", sem botão.
+- **O placar mora embaixo à direita, onde ficavam os botões**: posição (empate na mesma), foto, nome,
+  uma barra até os 10 e os pontos no disco dourado; a linha da vez ganha a faixa da cor. A conta é
+  `placar()`/`textoDosPontos()` (`catan.ts`, puras e testadas), com os pontos da `vista`: os seus
+  contam as suas cartas de ponto, os dos outros não — o mesmo número do disco de cada lugar. A dica
+  diz de onde vem cada ponto ("1 aldeia, 2 cidades e a maior estrada").
+- **A troca é uma janela no meio da MESA**, não do tabuleiro, com véu sobre tudo: o que SAI da sua mão
+  à esquerda, em vermelho, o que ENTRA à direita, em verde, quem dá para quem no alto de cada lado
+  (foto no anel, "todos", "o banco") e a seta dupla no meio — igual em toda janela de troca: montar,
+  com o banco, a oferta que chega e a sua oferta esperando respostas. O botão de mandar é vermelho,
+  como ele pediu ("Enviar a todos", "Aceitar a troca", "Trocar com o banco"). A carta escolhida sobe e
+  acende na cor do lado, a que você não tem fica apagada, e o quanto você tem aparece no canto, como na
+  mão. Quem só assiste continua vendo a oferta na linha do alto do tabuleiro.
+- **A dica do mouse é do jogo** (`DicaDaMesa`): uma só para a mesa inteira, por delegação — quem quer
+  dica leva `data-dica` (e, se quiser, `data-dica-titulo` e `data-dica-cartas`, que desenha o custo em
+  cartas). Papel claro com borda dourada e a setinha, em cima do que se apontou ou embaixo sem lugar,
+  sempre dentro da mesa; não pega o mouse. Ela aparece depois de 250 ms parado e passa de uma para a
+  vizinha na hora. Nenhum `title` sobrou na mesa — o `<title>` dos terrenos do ladrão também virou dica.
+- **Visto** na bancada (Chrome headless e mudo, a TelaDoCatan de verdade e o motor do servidor jogado
+  por robôs), fotografado por CDP: construir com a dica, a troca montando, com o banco, a oferta que
+  chega, a sua oferta com aceite e contraproposta, o placar com a dica, plateia, fim, e 900×560,
+  1280×800 e 1920×1080. A bancada antiga não carregava o `sobreOTabuleiro.css` — o tabuleiro saía
+  encolhido nas fotos, e no app não. **Não foi visto**: o Electron, o Windows de verdade, nem jogado
+  por gente.
