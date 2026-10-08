@@ -295,6 +295,21 @@ ao vivo, com o Blankito transmitindo para o Bagre (diagnóstico em `/root/diagno
   tela do dono. Eles passaram em typecheck e nos testes, e a conferência é o registro de
   quem transmite e de quem assiste na próxima live.
 
+- **O ping é o da VOZ, e mora num cartão ao passar o mouse nas barrinhas** (08/10/2026). Antes
+  ele era o tempo de um pedido ao site (`medirPing`), num `title` do sistema que demorava ~1 s
+  e tinha a cara do Windows. O dono pediu "na hora ao passar o mouse, com a interface própria,
+  como o Discord", e escolheu a opção B entre três, desenhadas com o `styles.css` de verdade
+  (A: balão só com o número; B: este cartão; C: balão, com o cartão no clique). O ping sai do
+  `currentRoundTripTime` do par de candidatos em uso (`conexao.ts`, puro e testado). Vem nas
+  estatísticas da conexão de voz sem mandar nada pela rede, então é lido de 2 em 2 s e
+  desenhado no último minuto. A perda é a dos SEUS pacotes até o servidor, só dentro da janela.
+  O tempo do servidor continua no cartão, como "Servidor": os dois juntos separam "a minha
+  internet" de "o servidor apertado", e a dica só fala quando dá para dizer de que lado está
+  o problema. A cor das barrinhas passou a seguir o ping da voz. **Medido** na ferramenta de
+  fotos, numa call de verdade com um LiveKit local (microfone sintético e mudo, sem aparelho):
+  ping, média, pior, perda 0,0% e servidor saem, a mira mostra o valor e o cartão some ao
+  sair. **Não medido numa call real pela internet**, com ping de verdade e perda.
+
 ## Quem está falando
 
 - **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas

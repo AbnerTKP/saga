@@ -801,9 +801,10 @@ export const fotoDoServidor = (a: File | null) => enviarImagem<{ servidor: Servi
 export const bannerDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/banner', a);
 
 /**
- * Tempo de ida e volta até o servidor, em milissegundos. Não é o ping da mídia — para
- * esse o LiveKit não expõe nada público — mas o LiveKit roda na mesma máquina, então
- * serve como medida honesta de "quão longe estou do servidor".
+ * Quanto o servidor da Saga leva para responder um pedido, em milissegundos. NÃO é o ping
+ * da voz: esse sai das estatísticas do WebRTC (`conexao.ts`). Este passa pelo Caddy e pelo
+ * Node, então sobe quando o servidor está apertado mesmo com a internet boa — e é por
+ * isso que o cartão da conexão mostra os dois, com nomes diferentes.
  */
 export async function medirPing(): Promise<number | null> {
   const inicio = performance.now();

@@ -2,6 +2,21 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A rede, o mudo sozinho e o cartão do ping (08/10/2026).** O que está medido:
+  - os buffers UDP de 5 MB valendo nas conexões novas da produção;
+  - o servidor de voz parando o envio de quem transmite para ninguém (LiveKit 1.9.12 e 1.13.9, numa cópia isolada na VPS);
+  - o corte automático cortando a fala (na conta, `sensibilidade.test.ts`);
+  - o cartão do ping numa call com LiveKit local (`ferramentas/fotografar`, microfone sintético e mudo).
+
+  **Não foi exercido**:
+  - o som da tela recolhido quando a captura acaba sozinha;
+  - a volta de 3 s cortando live inscrita sem escolha;
+  - o microfone que cai voltando sozinho (os microfones falsos do Chromium não desconectam);
+  - o cartão com ping e perda de verdade, pela internet.
+
+  Subir Electron com WebRTC nesta máquina abriria o aviso do firewall na tela do dono. A prova é a
+  próxima noite de live do Blankito: registro dele (`saga.log`) e diagnóstico da VPS.
+
 - **A Dama (07/10/2026), madeira e regras brasileiras.** O que está medido: a regra (`dama.test.mjs`:
   captura obrigatória, lei da maioria, pedra capturando para trás, dama voadora, tomada que bloqueia,
   pedra que passa pela última fileira capturando, dois caminhos para a mesma casa, empates, e 120

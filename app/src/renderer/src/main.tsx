@@ -10,6 +10,7 @@ import './catan.css';
 import './dama.css';
 import './dadosNoCopo.css';
 import './sobreOTabuleiro.css';
+import './conexao.css';
 import { capturarErrosGlobais } from './registro';
 
 capturarErrosGlobais();

@@ -1,0 +1,41 @@
+/* O cartão da conexão (`CartaoDaConexao`), ao passar o mouse nas barrinhas da voz. Medidas do
+   cartão da live: 264 px, a mesma superfície, borda e raio — os dois moram no mesmo canto. */
+
+.cx-cartao { -webkit-app-region: no-drag; position: fixed; z-index: var(--z-menu); width: 264px;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px; cursor: default;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--sombra-3); }
+
+.cx-topo { display: flex; align-items: center; justify-content: space-between; }
+.cx-titulo { font-size: 13px; font-weight: 650; color: var(--white); }
+/* O estado é palavra E bolinha: a cor sozinha não diz nada a quem não a distingue. */
+.cx-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.cx-estado::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+.cx-estado.bom::before { background: var(--ok); }
+.cx-estado.medio::before { background: var(--warn); }
+.cx-estado.ruim::before { background: var(--danger); }
+
+.cx-agora { display: flex; align-items: baseline; gap: 8px; }
+.cx-numero { font-size: 30px; line-height: 1; font-weight: 700; color: var(--white); font-variant-numeric: tabular-nums; }
+.cx-legenda { font-size: 12px; color: var(--text3); }
+
+.cx-grafico { display: flex; flex-direction: column; gap: 4px; }
+.cx-grafico svg { display: block; overflow: visible; }
+.cx-grafico-vazio { height: 56px; display: grid; place-items: center; font-size: 12px; color: var(--text3);
+  border-bottom: 1px solid var(--line); }
+.cx-linha { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cx-guia { stroke: var(--text3); stroke-width: 1; stroke-dasharray: 3 3; opacity: .5; }
+.cx-guia-texto { font-size: 10px; fill: var(--text3); }
+.cx-base { stroke: var(--line); stroke-width: 1; }
+.cx-ponto { fill: var(--accent); stroke: var(--bg2); stroke-width: 2; }
+.cx-mira { stroke: var(--text3); stroke-width: 1; }
+.cx-mira-texto { font-size: 10px; font-weight: 600; fill: var(--text); }
+.cx-eixo { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); }
+
+.cx-numeros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 0; font-size: 12px; }
+.cx-numeros div { display: flex; flex-direction: column; gap: 1px; }
+.cx-numeros dt { color: var(--text3); }
+.cx-numeros dd { margin: 0; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.cx-dica { display: flex; align-items: flex-start; gap: 7px; padding: 8px 9px; border-radius: 7px;
+  background: var(--bg3); font-size: 12px; line-height: 1.35; color: var(--text2); }
+.cx-dica svg { flex: none; margin-top: 1px; stroke: var(--warn); }

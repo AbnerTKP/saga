@@ -841,7 +841,8 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 /* ---- sinal de conexão ---- */
 
 .voice-status .voice-texto { flex: 1; min-width: 0; }
-.sinal { display: flex; align-items: center; flex: none; cursor: default; }
+/* A área de passar o mouse é maior que as barrinhas (14 px): o cartão da conexão abre daqui. */
+.sinal { display: flex; align-items: center; flex: none; cursor: default; padding: 6px 5px; margin: -6px -5px; }
 .sinal svg { fill: currentColor; display: block; }
 .sinal.bom { color: var(--ok); }
 .sinal.medio { color: var(--warn); }

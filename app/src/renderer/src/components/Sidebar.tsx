@@ -313,7 +313,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
             {rm.salaDaVoz && rm.salaDaVoz.servidorId !== servidor.id && ` · em ${rm.salaDaVoz.servidorNome}`}
           </div>
         </div>
-        {rm.status === 'connected' && <Sinal qualidade={rm.room.localParticipant.connectionQuality} />}
+        {rm.status === 'connected' && <Sinal room={rm.room} qualidade={rm.room.localParticipant.connectionQuality} />}
       </button>
       <div className="voice-actions">
         <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
