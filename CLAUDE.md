@@ -121,7 +121,12 @@ O que se fez, que vale independente da causa:
 - **2 GB de swap** (`/swapfile`, no `fstab`, `vm.swappiness=10`). Sem ele, qualquer pico
   vira máquina inacessível em vez de máquina lenta.
 - **Teto de memória por contêiner** (`mem_limit`): quem estourar morre sozinho e volta
-  pelo `restart`, em vez de levar o resto junto.
+  pelo `restart`, em vez de levar o resto junto. **No LiveKit ele NÃO vale** (conferido em
+  08/10/2026: `docker inspect` → `Memory=0`): o contêiner é de 07/09 e nunca foi recriado
+  depois que o teto entrou no compose. Vale no `token` (512 MB) e no `caddy` (128 MB).
+- **Buffers UDP de 5 MB** (`/etc/sysctl.d/60-saga-udp.conf`, 08/10/2026). O padrão do
+  Ubuntu, 208 KB, descartava pacote da call sempre que o hipervisor tirava CPU da máquina
+  — o que foi medido e por quê está em `docs/decisoes/voz-e-live.md`, "A rede e a VPS".
 
 E a lição que interessa: **numa máquina de um núcleo sem swap, "sem memória" não vira
 erro — vira uma máquina que responde ping e mais nada.** Não há log a consultar depois,

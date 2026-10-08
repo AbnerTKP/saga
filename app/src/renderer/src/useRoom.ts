@@ -343,6 +343,28 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return r;
   }, []);
 
+  /**
+   * Som da tela que ficou no ar sem a imagem. Sem imagem no ar, todo som de tela é sobra.
+   *
+   * Quando a CAPTURA acaba sozinha — a janela transmitida fechou, o "Parar de compartilhar"
+   * do sistema —, o livekit-client tira só a faixa que acabou (`handleTrackEnded` trata cada
+   * uma por si), e o som continua publicado, capturando o computador. Na live seguinte saía
+   * um segundo: visto na produção em 08/10/2026, `tela-som:opus tela-som:opus` no mesmo
+   * participante, e quem assistia ouvia o computador dele dobrado. O
+   * `setScreenShareEnabled(false)` recolhe UM som só, então o que sobrava ficava até sair
+   * da sala.
+   */
+  const recolherSomDaTela = useCallback(async (quando: string) => {
+    const lp = room.localParticipant;
+    if (lp.isScreenShareEnabled) return;
+    const sobras = [...lp.trackPublications.values()]
+      .filter((p) => p.source === Track.Source.ScreenShareAudio && p.track);
+    faixaDeMixagem.current = null;
+    if (!sobras.length) return;
+    anotar('aviso', 'tela', `som da tela no ar sem a imagem (${quando}): recolhendo ${sobras.length}`);
+    for (const p of sobras) await lp.unpublishTrack(p.track!, true).catch(() => undefined);
+  }, [room]);
+
   // Supressão de ruído e sensibilidade. Os eventos da sala que ele precisa chegam pelo
   // efeito de baixo, pela referência — ver o comentário de `aoPublicar` em useMicrofone.
   const microfone = useMicrofone(room);
@@ -562,7 +584,16 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         if (pub.source === Track.Source.Microphone) conferirMicrofone();
         bump();
       })
-      .on(RoomEvent.LocalTrackUnpublished, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
+      .on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
+        microfoneRef.current.eventos.reavaliar();
+        // A imagem saiu e o som dela não pode ficar. Um segundo depois, para não disputar
+        // com o `setScreenShareEnabled(false)`, que recolhe o primeiro som por conta própria
+        // — quando foi ele, não sobra nada e nada se anota.
+        if (pub.source === Track.Source.ScreenShare) {
+          setTimeout(() => { recolherSomDaTela('a imagem acabou'); }, 1000);
+        }
+        bump();
+      })
       .on(RoomEvent.ConnectionQualityChanged, bump)
       // Só o gatilho: o que vale é o que o servidor responde (ver OrdemDoServidor).
       .on(RoomEvent.DataReceived, (_dados: Uint8Array, _quem?: Participant, _tipo?: unknown, topico?: string) => {
@@ -580,7 +611,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     return () => {
       room.removeAllListeners();
     };
-  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar, conferirMicrofone, conferirSaidaECamera]);
+  }, [room, aplicarAudio, tocarAviso, aoChegarAlguem, anunciar, conferirMicrofone, conferirSaidaECamera, recolherSomDaTela]);
 
   const join = useCallback(async (url: string, token: string, sala: SalaDaVoz, comMicrofone = true) => {
     setError(null);
@@ -737,6 +768,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    */
   const startScreen = useCallback(async (sourceId: string | null, audio: boolean) => {
     setError(null);
+    await recolherSomDaTela('antes de começar outra');
     const qualidade = qualidadeValida(lerQualidadeGuardada(), souBerserk);
     const preset = QUALIDADES[qualidade];
 
@@ -876,7 +908,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     // Nem sem áudio funcionou: aí o problema não era o áudio.
     setError(`Não consegui compartilhar: ${ultimoMotivo}`);
     throw new Error(ultimoMotivo);
-  }, [room, souBerserk, avisar, anotarComoEstaSaindo, pararMedicoes, tocarAviso]);
+  }, [room, souBerserk, avisar, anotarComoEstaSaindo, pararMedicoes, tocarAviso, recolherSomDaTela]);
 
   const stopScreen = useCallback(async () => {
     pararMedicoes();
@@ -886,8 +918,10 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       faixaDeMixagem.current = null;
     }
     await lp().setScreenShareEnabled(false);
+    // Ele recolhe um som só; o que tiver sobrado de uma captura que acabou sozinha vai aqui.
+    await recolherSomDaTela('ao parar');
     bump();
-  }, [room, pararMedicoes]);
+  }, [room, pararMedicoes, recolherSomDaTela]);
 
   // O dono tirou a permissão com a tela no ar: o LiveKit já derrubou a transmissão, mas a
   // captura continua ligada aqui (e o aviso de gravação do sistema também) até alguém
@@ -1105,6 +1139,36 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       comoEstavamOsEspectadores.current = agora;
       bump();
     }, 1500);
+    return () => clearInterval(id);
+  }, [room, status]);
+
+  /**
+   * Live que não foi escolhida não chega — e isso também se confere a cada volta.
+   *
+   * Em 07/10/2026, das 22:31 às 22:53, a produção recebeu 9–11 Mbit/s da tela do Blankito,
+   * com o único outro na sala sem assisti-la (sem `assistindo`) e quase nada descendo
+   * dela. O servidor sabe parar quem transmite para ninguém: medido no LiveKit da produção
+   * (1.9.12) e no 1.13.9, quem transmite sozinho, quem chega e corta na hora e quem
+   * republica com o outro na sala caem todos a 0 kbps em ~10 s. Então alguém continuava
+   * INSCRITO sem ter escolhido, e quem transmite gastou 20 minutos da própria internet —
+   * a voz e o ping dele junto. Qual evento faltou não se descobriu; a volta conserta
+   * qualquer um, e o registro diz quando precisou.
+   */
+  const inscricoesCorrigidas = useRef(new Set<string>());
+  useEffect(() => {
+    if (status === 'idle') return;
+    const id = setInterval(() => {
+      for (const p of room.remoteParticipants.values()) {
+        if (p.identity === assistindoRef.current) continue;
+        for (const pub of p.trackPublications.values()) {
+          if (!ehDaLive(pub.source) || !(pub.isDesired || pub.isSubscribed)) continue;
+          pub.setSubscribed(false);
+          if (inscricoesCorrigidas.current.has(pub.trackSid)) continue;
+          inscricoesCorrigidas.current.add(pub.trackSid);
+          anotar('aviso', 'live', `recebendo ${pub.source} de ${p.identity} sem ter escolhido: cortei`);
+        }
+      }
+    }, 3000);
     return () => clearInterval(id);
   }, [room, status]);
 

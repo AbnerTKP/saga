@@ -257,6 +257,44 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
   e cada "não assistir / assistir de novo" deixava mais um para trás. Por isso o elemento
   carrega o `sid` da faixa: é por ele que se acha o dono na hora de tirar.
 
+## A rede e a VPS (08/10/2026)
+
+Queixa do dono: "o ping continua, travando lives e vozes, tráfego de rede pesado". Medido
+ao vivo, com o Blankito transmitindo para o Bagre (diagnóstico em `/root/diagnostico`):
+
+- **O tráfego em si não é o teto.** A live passava 9–11 Mbit/s, e o mês tinha usado 0,27
+  de 4 TB. "Pesado" era o que a máquina conseguia processar, não o tamanho do cano.
+- **A Hostinger tira CPU da máquina: steal de 25 a 54% durante a live**, com o LiveKit
+  pedindo só 10–18%. Num núcleo só, tempo roubado é tempo em que ninguém lê pacote nem
+  responde o ping (o "ping" da Saga é o `/health`, ver `medirPing` em `api.ts`). Não é
+  código: é chamado na Hostinger ou plano maior.
+- **Os buffers UDP estavam no padrão do kernel, 208 KB.** Com a CPU presa, a fila de
+  recepção chegou a 482 KB e a de envio a 216 KB, um soquete do LiveKit contava 2742
+  pacotes descartados (`ss -uanpm`, campo `d`) e o LiveKit registrava "large sequence
+  number gap". A tela caiu de 9,4 para 1,8 Mbit/s naquele minuto. **O LiveKit não pede
+  buffer no modo `port_range`, que é o da produção** — ele herda o `rmem_default`. Só o
+  modo `udp_port` (um soquete para todos) pede o seu (`mediatransportutil`,
+  `webrtc_config.go`). Por isso o conserto subiu `rmem_default`/`wmem_default` junto com os
+  `_max`: 5 MB, em `/etc/sysctl.d/60-saga-udp.conf`. Cada conexão nova já nasce com isso,
+  sem reiniciar nada.
+- **Uma live subiu 8–10 Mbit/s por 20 minutos sem ninguém assistindo** (07/10, 22:31–22:53,
+  entrada ~10, saída ~1). O servidor sabe parar o envio, e isso foi medido no LiveKit da
+  produção (1.9.12) e no 1.13.9, numa cópia isolada na VPS (127.0.0.1, porta fora do
+  `ufw`), com robôs `rtc-node`. Nos três cenários do app (quem transmite sozinho, quem chega
+  e corta na hora, quem republica com o outro na sala) a entrada cai a **0 kbps em ~10 s**.
+  Então, ali, alguém continuava inscrito sem ter escolhido. Qual evento faltou não se
+  descobriu (o servidor não guarda a versão do app de cada um). Hoje uma volta de 3 s em
+  `useRoom` corta toda live inscrita que não é a escolhida, e anota quando precisou. Quem
+  transmitia para ninguém gastava a internet de casa, e a voz e o ping dele iam junto.
+- **O som da tela ficava no ar quando a imagem acabava sozinha.** O `handleTrackEnded`
+  do livekit-client tira só a faixa que acabou, e o `setScreenShareEnabled(false)` recolhe
+  um som só. A produção mostrou `tela-som:opus tela-som:opus` no mesmo participante.
+  `recolherSomDaTela` tira toda sobra quando a imagem sai, ao parar e antes de começar.
+- **Os dois consertos do app NÃO foram exercidos numa live de verdade**: subir Electron com
+  WebRTC nesta máquina (Windows, rede "Pública", sem admin) abriria o aviso do firewall na
+  tela do dono. Eles passaram em typecheck e nos testes, e a conferência é o registro de
+  quem transmite e de quem assiste na próxima live.
+
 ## Quem está falando
 
 - **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas
