@@ -531,6 +531,14 @@ um modal mais central, com o enviar meio vermelho e seta dupla mostrando quem d�
   cartas). Papel claro com borda dourada e a setinha, em cima do que se apontou ou embaixo sem lugar,
   sempre dentro da mesa; não pega o mouse. Ela aparece depois de 250 ms parado e passa de uma para a
   vizinha na hora. Nenhum `title` sobrou na mesa — o `<title>` dos terrenos do ladrão também virou dica.
+- **Quem é quem pela cor** (pedido de um amigo do dono, no mesmo dia: "mais destaque na cor, por
+  exemplo a cor das cartas"): o verso de recurso tem a cor de quem segura a carta — o leque de cada
+  lugar é vermelho, azul, laranja ou branco, como as peças dele no tabuleiro. A cor chega pela
+  `--cor-do-jogador` do lugar, que o `<use>` herda, então o símbolo continua um só (sem ela, o azul
+  de antes). O lugar inteiro, a sua mão, a linha do placar e a pílula da vez de outro ficam tingidos
+  com a cor; os nomes saem na cor clareada até ler no escuro; e a inicial de quem não tem foto vem na
+  cor do jogador — com todo mundo no azul da casa, o laranja sentava com um disco azul. O de
+  desenvolvimento continua vinho: ele diz que carta é, não de quem.
 - **Visto** na bancada (Chrome headless e mudo, a TelaDoCatan de verdade e o motor do servidor jogado
   por robôs), fotografado por CDP: construir com a dica, a troca montando, com o banco, a oferta que
   chega, a sua oferta com aceite e contraproposta, o placar com a dica, plateia, fim, e 900×560,

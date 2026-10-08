@@ -232,9 +232,19 @@ function faceDeRecurso(r: Recurso, comNome: boolean): string {
     <text x="50" y="116.3" text-anchor="middle" font-family="Figtree" font-weight="900" font-size="10.5" letter-spacing=".8" fill="#4a3516">${NOME[r].toUpperCase()}</text>` : ''}`;
 }
 
+/**
+ * O verso de recurso tem a COR DE QUEM SEGURA a carta (pedido do dono, 07/10/2026: "saber quem é
+ * quem de forma mais fácil pela cor"): o leque de cada lugar é vermelho, azul, laranja ou branco, a
+ * mesma cor das peças dele no tabuleiro. A cor chega pela variável `--cor-do-jogador` do lugar — o
+ * `<use>` herda as variáveis de quem o contém, então o símbolo continua um só. Sem ela (fora de um
+ * lugar), o azul do mar de antes.
+ */
 function versoDeRecurso(): string {
   const cores = ['#4f8c45', '#e0915f', '#b3e07a', '#f8dc78', '#b3bac6', '#e7cf92'];
-  return `${moldura('catan-g-verso')}
+  return `<rect x="1" y="1" width="98" height="138" rx="9" fill="${PAPEL}"/>
+    <rect x="4.5" y="4.5" width="91" height="131" rx="6.5" style="fill: var(--cor-do-jogador, #2f63ad)"/>
+    <rect x="4.5" y="4.5" width="91" height="131" rx="6.5" fill="url(#catan-g-verso-luz)"/>
+    <rect x="7" y="7" width="86" height="126" rx="5" fill="none" stroke="${OURO_CLARO}" stroke-width=".9" opacity=".75"/>
     <rect x="7" y="7" width="86" height="126" rx="5" fill="url(#catan-p-hex)"/>
     <polygon points="${hex(50, 70, 27)}" fill="${OURO}"/>
     <polygon points="${hex(50, 70, 24)}" fill="${PAPEL}"/>
@@ -340,13 +350,15 @@ export function simbolosDasCartas(): string {
     s += `<radialGradient id="catan-g-disco-${r}" cx="42%" cy="36%" r="70%"><stop offset="0" stop-color="#fffaf0"/><stop offset=".6" stop-color="${clarear(COR[r][0], .72)}"/><stop offset="1" stop-color="${clarear(COR[r][0], .38)}"/></radialGradient>`;
     s += `<symbol id="${SIMBOLO.objeto(r)}" viewBox="-40 -40 80 80" overflow="visible">${OBJETO[r]()}</symbol>`;
   }
-  s += gradiente('catan-g-verso', '#2f63ad', '#10285a') + gradiente('catan-g-verso-dev', '#7d3f93', '#2f1240') + gradiente('catan-g-dev', '#6b3482', '#2a0f3a');
+  // A luz por cima da cor do jogador no verso: clareia em cima e escurece embaixo, como os outros fundos.
+  s += '<linearGradient id="catan-g-verso-luz" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></linearGradient>';
+  s += gradiente('catan-g-verso-dev', '#7d3f93', '#2f1240') + gradiente('catan-g-dev', '#6b3482', '#2a0f3a');
   for (const t of TIPOS_DE_DESENVOLVIMENTO) {
     s += `<linearGradient id="catan-cena-${t}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${CENA[t][0]}"/><stop offset="1" stop-color="${CENA[t][1]}"/></linearGradient>`;
   }
   s += '<clipPath id="catan-clip-cena-74"><rect x="11" y="24" width="78" height="74" rx="4"/></clipPath>';
   s += '<clipPath id="catan-clip-cena-100"><rect x="11" y="24" width="78" height="100" rx="4"/></clipPath>';
-  s += `<pattern id="catan-p-hex" width="12" height="20.8" patternUnits="userSpaceOnUse">${[[6, 5.2], [0, 15.6], [12, 15.6]].map(([x, y]) => `<polygon points="${hex(x, y, 5)}" fill="none" stroke="#9cc3f2" stroke-width=".5" opacity=".22"/>`).join('')}</pattern>`;
+  s += `<pattern id="catan-p-hex" width="12" height="20.8" patternUnits="userSpaceOnUse">${[[6, 5.2], [0, 15.6], [12, 15.6]].map(([x, y]) => `<polygon points="${hex(x, y, 5)}" fill="none" stroke="#fff" stroke-width=".5" opacity=".28"/>`).join('')}</pattern>`;
   s += `<pattern id="catan-p-riscas" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 5h10" stroke="${OURO_CLARO}" stroke-width=".5" opacity=".14"/></pattern>`;
   for (const r of RECURSOS) {
     s += simbolo(SIMBOLO.recurso(r), faceDeRecurso(r, true));

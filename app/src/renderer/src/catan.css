@@ -251,24 +251,31 @@ button.mesa-hud:hover:not([aria-disabled="true"]) { background: var(--superficie
 }
 .mesa-anel-foto { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; }
 .mesa-anel-foto .avatar { width: 100%; height: 100%; font-size: 18px; }
+/* Quem não tem foto aparece com a inicial na cor do jogador, e não no azul da casa: com todo mundo
+   azul, o laranja sentava com um disco azul. A letra escura lê em todas as quatro cores. */
+.catan-mesa .avatar:not(.com-foto) { background: var(--cor-do-jogador, var(--accent)); color: var(--cinza-1000); }
 .mesa-anel-tempo {
   position: absolute; inset: -7px; border-radius: 50%; color: var(--cor-do-jogador);
   -webkit-mask: radial-gradient(circle, transparent 63%, black 64%); mask: radial-gradient(circle, transparent 63%, black 64%);
 }
 .mesa-anel-tempo.acabando { color: var(--perigo-texto); }
 
-/* Um lugar na mesa: a cabeça (foto, nome, pontos) e as cartas dele (o leque e o montinho). */
+/* Um lugar na mesa: a cabeça (foto, nome, pontos) e as cartas dele (o leque e o montinho). Desde
+   07/10/2026 o lugar inteiro é da cor de quem senta ali — o fundo tingido, a borda, o nome e o verso
+   das cartas (cartasDoCatan.ts) —, para saber quem é quem de relance, como as peças no tabuleiro. */
 .mesa-lugar {
   position: relative; display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3);
-  background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda); border-radius: var(--raio-5); min-width: 0;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cor-do-jogador) 24%, transparent), color-mix(in srgb, var(--cor-do-jogador) 6%, transparent) 75%), var(--mesa-placa);
+  border: 1.5px solid color-mix(in srgb, var(--cor-do-jogador) 50%, transparent); border-radius: var(--raio-5); min-width: 0;
 }
-.mesa-lugar::before { content: ""; position: absolute; left: var(--e4); right: var(--e4); top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--cor-do-jogador); }
+.mesa-lugar::before { content: ""; position: absolute; left: var(--e3); right: var(--e3); top: -1.5px; height: 4px; border-radius: 0 0 4px 4px; background: var(--cor-do-jogador); }
 .mesa-lugar.vez { border-color: var(--cor-do-jogador); box-shadow: 0 0 26px color-mix(in srgb, var(--cor-do-jogador) 40%, transparent); }
 .mesa-lugar.fora { opacity: .5; }
 .mesa-lugar.cima, .mesa-lugar.baixo { flex-direction: row; align-items: center; gap: var(--e5); padding: var(--e2) var(--e4); }
 .mesa-lugar-cabeca { display: flex; align-items: center; gap: var(--e2); min-width: 0; }
 .mesa-lugar-nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.mesa-lugar-nome b { font-size: var(--letra-texto); color: var(--texto-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* O nome na cor do jogador, clareada até ler bem no escuro (o branco continua branco). */
+.mesa-lugar-nome b { font-size: var(--letra-texto); color: color-mix(in srgb, var(--cor-do-jogador) 55%, var(--branco)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mesa-lugar-nota { font-size: var(--letra-legenda); color: var(--texto-3); }
 .mesa-lugar-cartas { display: flex; align-items: flex-end; gap: var(--e4); padding-left: var(--e1); }
 .mesa-selos { display: flex; align-items: center; gap: var(--e1m); flex-wrap: wrap; }
@@ -344,6 +351,9 @@ button.mesa-cola-linha.pode:hover:not(:disabled) { border-color: var(--mesa-pode
   padding: var(--e2) var(--e4) 10px; border-radius: var(--raio-4); overflow: hidden;
   background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda); color: var(--texto-2);
 }
+/* A vez de outro: a pílula pega a cor de quem joga. */
+.mesa-pilula:not(.minha) { border-color: color-mix(in srgb, var(--cor-do-jogador) 55%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--cor-do-jogador) 22%, transparent), transparent 70%), var(--mesa-placa); }
+.mesa-pilula:not(.minha) b:not(.mesa-pilula-tempo) { color: color-mix(in srgb, var(--cor-do-jogador) 55%, var(--branco)); }
 .mesa-pilula.minha { background: var(--marinho); border-color: var(--azul-300); color: var(--azul-ceu); box-shadow: 0 6px 18px var(--preto-45); }
 .mesa-pilula b { color: var(--texto-forte); font-size: var(--letra-texto); white-space: nowrap; }
 .mesa-pilula-detalhe { font-size: var(--letra-menu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -364,12 +374,13 @@ button.mesa-cola-linha.pode:hover:not(:disabled) { border-color: var(--mesa-pode
   --mao-l: max(34px, min(92px, calc((100cqw - 170px) / 6.72), 10.4vh)); --mao-a: calc(var(--mao-l) * 1.4);
   display: flex; align-items: flex-end; gap: var(--e3); max-width: 100%; box-sizing: border-box;
   padding: var(--e3); border-radius: var(--raio-5);
-  background: var(--mesa-placa); border: 1px solid var(--mesa-placa-borda);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cor-do-jogador) 20%, transparent), color-mix(in srgb, var(--cor-do-jogador) 5%, transparent) 75%), var(--mesa-placa);
+  border: 1.5px solid color-mix(in srgb, var(--cor-do-jogador) 45%, transparent);
 }
 .mesa-eu.acesa { border-color: var(--azul-300); box-shadow: 0 0 0 3px var(--acento-tenue), 0 0 36px var(--acento-tenue-forte); }
 .mesa-eu-quem { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
 .mesa-eu-quem > .mesa-disco { position: absolute; right: -4px; top: -6px; width: 26px; height: 26px; font-size: var(--letra-menu); }
-.mesa-eu-quem b { font-size: var(--letra-menu); color: var(--texto-forte); margin-top: var(--e1); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-eu-quem b { font-size: var(--letra-menu); color: color-mix(in srgb, var(--cor-do-jogador) 55%, var(--branco)); margin-top: var(--e1); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mesa-eu-quem > span:last-child { font-size: var(--letra-rotulo); color: var(--texto-3); white-space: nowrap; }
 .mesa-eu-cartas { display: flex; gap: var(--e2); align-items: flex-end; }
 .mesa-carta-mao { position: relative; flex: none; }
@@ -445,14 +456,15 @@ button.mesa-cola-linha.pode:hover:not(:disabled) { border-color: var(--mesa-pode
   position: relative; display: grid; grid-template-columns: 22px 26px minmax(0, 1fr) auto 28px; align-items: center; gap: var(--e2);
   padding: var(--e1) var(--e1m) var(--e1m); border-radius: var(--raio-3);
 }
-.mesa-placar-linha.eu { background: var(--branco-07); }
+.mesa-placar-linha { background: color-mix(in srgb, var(--cor-do-jogador) 10%, transparent); }
+.mesa-placar-linha.eu { background: color-mix(in srgb, var(--cor-do-jogador) 20%, transparent); }
 .mesa-placar-linha.vez { box-shadow: inset 3px 0 0 var(--cor-do-jogador); }
 .mesa-placar-linha.fora { opacity: .5; }
 .mesa-placar-pos { font-size: var(--letra-legenda); font-weight: var(--peso-versalete); color: var(--texto-3); text-align: right; font-variant-numeric: tabular-nums; }
 .mesa-placar-linha:first-of-type .mesa-placar-pos { color: var(--mesa-fita); }
 .mesa-placar-foto { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--cor-do-jogador); }
 .mesa-placar-foto .avatar { width: 100%; height: 100%; font-size: var(--letra-rotulo); }
-.mesa-placar-nome { min-width: 0; font-size: var(--letra-menu); font-weight: var(--peso-semi); color: var(--texto-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesa-placar-nome { min-width: 0; font-size: var(--letra-menu); font-weight: var(--peso-semi); color: color-mix(in srgb, var(--cor-do-jogador) 55%, var(--branco)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mesa-placar-vez {
   font-size: var(--letra-selo); font-weight: var(--peso-versalete); letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
   color: var(--cinza-1000); background: var(--cor-do-jogador); border-radius: var(--raio-1); padding: 1px var(--e1);
@@ -480,7 +492,7 @@ button.mesa-cola-linha.pode:hover:not(:disabled) { border-color: var(--mesa-pode
 .mesa-troca-lado.entra .mesa-troca-lado-cabeca > b { color: var(--ok-texto); }
 .mesa-troca-quem { margin-left: auto; display: inline-flex; align-items: center; gap: var(--e1m); font-size: var(--letra-legenda); color: var(--texto-2); }
 .mesa-troca-para { color: var(--texto-3); }
-.mesa-troca-quem-pessoa { display: inline-flex; align-items: center; gap: var(--e1); color: var(--texto-forte); font-weight: var(--peso-semi); }
+.mesa-troca-quem-pessoa { display: inline-flex; align-items: center; gap: var(--e1); color: color-mix(in srgb, var(--cor-do-jogador) 55%, var(--branco)); font-weight: var(--peso-semi); }
 .mesa-troca-quem-foto { width: 20px; height: 20px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--cor-do-jogador); }
 .mesa-troca-quem-foto .avatar { width: 100%; height: 100%; font-size: var(--letra-selo); }
 .mesa-troca-quem-outro { color: var(--texto-forte); font-weight: var(--peso-semi); }

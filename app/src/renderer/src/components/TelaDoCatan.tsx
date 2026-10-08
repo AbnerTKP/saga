@@ -677,7 +677,7 @@ function PilulaDaVez({ faixa, partida: p, base }: { faixa: Faixa; partida: Parti
   const cor = COR_DO_JOGADOR[p.jogadores[faixa.j].cor];
   const s = ms === null ? null : segundosQueFaltam(ms);
   return (
-    <div className={`mesa-pilula ${faixa.minha ? 'minha' : ''}`}>
+    <div className={`mesa-pilula ${faixa.minha ? 'minha' : ''}`} style={{ '--cor-do-jogador': cor } as CSSProperties}>
       <Icon name="relogio" size={16} />
       <b>{faixa.titulo}</b>
       <span className="mesa-pilula-detalhe">{faixa.detalhe}</span>
