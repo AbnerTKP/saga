@@ -919,9 +919,30 @@ async function roteiro(dados) {
     await clicar({ sel: '.casa[data-casa="a7"]' });
     await esperar('.rota-da-dama');
     await foto('20e-dama-rota', 'Dama, a peça escolhida: a rota tracejada, a parada numerada e o X na peça que sai.');
+    // O voo: quadros tirados NA HORA, sem esperar a tela parar — parada, a animação já acabou.
+    const quadrosDoVoo = async (prefixo, descricao, n = 7, intervalo = 110) => {
+      await esperar('.voo-da-dama', 5000);
+      for (let k = 0; k < n; k++) {
+        const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' });
+        const arquivo = join(pasta, `${prefixo}-${k}.png`);
+        writeFileSync(arquivo, Buffer.from(data, 'base64'));
+        manifesto.push({ arquivo, descricao: `${descricao} (quadro ${k + 1} de ${n})`, tamanho: tamanhoAtual.join('x') });
+        await esperarAte(intervalo);
+      }
+      await esperarQue(`!document.querySelector('.voo-da-dama')`, { teto: 5000, oque: 'o voo acabar' });
+    };
     await clicar({ sel: '.casa[data-casa="c5"]' });
+    await quadrosDoVoo('20f-dama-voo-meu', 'Dama, o SEU lance voando: a7 salta b6 e pousa em c5', 5);
     await esperarQue(`!document.querySelector('.dama-aviso')`, { oque: 'a captura feita' });
     await foto('20f-dama-depois', 'Dama, depois da captura: a lista de lances com ×, e a peça tomada ao lado do nome.');
+    // A captura DUPLA do outro, vista de cá: chega pela busca e voa do mesmo jeito.
+    await naMesa('TKP', { acao: 'lance', de: 'e3', para: 'f4' });
+    await esperar('.casa.clicavel[data-casa="d6"]', 10000);
+    await naMesa('Marina', { acao: 'lance', de: 'd6', para: 'e5' });
+    await esperarQue(`!!document.querySelector('.casa[data-casa="e5"] .peca-de-dama.preta')`, { oque: 'd6–e5 na tela' });
+    await naMesa('TKP', { acao: 'lance', de: 'f4', para: 'b4' });
+    await quadrosDoVoo('20h-dama-voo-dele', 'Dama, a captura dupla do TKP voando na tela da Marina: f4 salta e5, pousa em d6, salta c5 e pousa em b4');
+    await foto('20i-dama-depois-da-dupla', 'Dama, depois da captura dupla: as duas peças fora.');
 
     await naMesa('TKP', { acao: 'desistir' });
     await esperar('.xadrez-fim', 10000);

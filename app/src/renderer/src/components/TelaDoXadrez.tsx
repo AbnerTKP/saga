@@ -245,6 +245,8 @@ function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, n
               embaixo={embaixo}
               legais={mesa.estado === 'jogando' ? mesa.legais as LanceDaDama[] : []}
               ultimo={mesa.ultimo}
+              ultimoSan={mesa.lances.at(-1)?.san ?? null}
+              numeroDeLances={mesa.lances.length}
               pendente={pendente ? { san: '', caminho: [pendente.para], capturadas: [], ...pendente } : null}
               casa={casa}
               onLance={mesa.estado === 'jogando' && souJogador

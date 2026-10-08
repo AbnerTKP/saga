@@ -74,3 +74,46 @@ export const capturaObrigatoria = (legais: LanceDaDama[]) => legais.some((l) => 
 
 /** O lance anotado para ler: "c3–d4", "d4×f6×h8". */
 export const anotar = (san: string) => san.replace(/-/g, '–').replace(/x/g, '×');
+
+/**
+ * A animação de um lance: a peça que anda, as casas onde ela pousa (a primeira é a saída) e as
+ * peças que ela salta, na ordem em que salta — cada uma some no meio do pulo sobre ela.
+ *
+ * Sai do lance ANOTADO ("d4xf6xh8") e do tabuleiro de ANTES dele, e não da lista de capturas:
+ * o lance do outro chega pela busca só com a anotação. Entre duas paradas da captura há uma peça
+ * só na diagonal; a dama pode tê-la longe, então ela é procurada no tabuleiro, e não no meio.
+ */
+export type Voo = {
+  letra: string;
+  /** A peça ao pousar: a pedra que termina na última fileira chega dama. */
+  final: string;
+  pontos: string[];
+  tomadas: { casa: string; letra: string }[];
+  captura: boolean;
+};
+
+const ARQUIVOS = 'abcdefgh';
+const indice = (nome: string) => (8 - Number(nome[1])) * 8 + ARQUIVOS.indexOf(nome[0]);
+const nome = (i: number) => `${ARQUIVOS[i % 8]}${8 - Math.floor(i / 8)}`;
+
+export function montarVoo(antes: (string | null)[], san: string): Voo | null {
+  const captura = san.includes('x');
+  const pontos = san.split(/[x-]/);
+  if (pontos.length < 2 || pontos.some((p) => !/^[a-h][1-8]$/.test(p))) return null;
+  const letra = antes[indice(pontos[0])];
+  if (!letra) return null;
+  const tomadas: Voo['tomadas'] = [];
+  if (captura) {
+    for (let k = 0; k + 1 < pontos.length; k++) {
+      const a = indice(pontos[k]), b = indice(pontos[k + 1]);
+      const dl = Math.sign(Math.floor(b / 8) - Math.floor(a / 8)), dc = Math.sign((b % 8) - (a % 8));
+      for (let i = a + dl * 8 + dc; i !== b && i >= 0 && i < 64; i += dl * 8 + dc) {
+        const p = antes[i];
+        if (p && !tomadas.some((t) => t.casa === nome(i))) { tomadas.push({ casa: nome(i), letra: p }); break; }
+      }
+    }
+  }
+  const fim = pontos.at(-1)!;
+  const final = letra === 'P' && fim[1] === '8' ? 'D' : letra === 'p' && fim[1] === '1' ? 'd' : letra;
+  return { letra, final, pontos, tomadas, captura };
+}

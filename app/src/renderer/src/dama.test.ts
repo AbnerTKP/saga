@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alvos, anotar, candidatos, capturaObrigatoria, clicar, tomadasNaDama, type LanceDaDama } from './dama.ts';
+import { alvos, anotar, candidatos, capturaObrigatoria, clicar, montarVoo, tomadasNaDama, type LanceDaDama } from './dama.ts';
 import { lerCasas } from './xadrez.ts';
 
 const lance = (de: string, caminho: string[], capturadas: string[] = []): LanceDaDama => ({
@@ -43,4 +43,24 @@ test('o que cada lado tomou sai do tabuleiro', () => {
 test('a anotação usa o traço e o sinal de vezes', () => {
   assert.equal(anotar('c3-d4'), 'c3–d4');
   assert.equal(anotar('d4xf6xh8'), 'd4×f6×h8');
+});
+
+test('a animação de uma captura dupla: a peça, as paradas e as tomadas na ordem do pulo', () => {
+  const antes = lerCasas('8/6p1/8/4p3/3P4/8/8/8 w 0');
+  assert.deepEqual(montarVoo(antes, 'd4xf6xh8'), {
+    letra: 'P', final: 'D', pontos: ['d4', 'f6', 'h8'],
+    tomadas: [{ casa: 'e5', letra: 'p' }, { casa: 'g7', letra: 'p' }], captura: true,
+  });
+});
+
+test('a dama que captura de longe: a tomada é achada no tabuleiro, não no meio do caminho', () => {
+  const antes = lerCasas('8/8/8/8/3p4/8/8/D7 w 0');
+  assert.deepEqual(montarVoo(antes, 'a1xg7')?.tomadas, [{ casa: 'd4', letra: 'p' }]);
+});
+
+test('lance simples anda sem tomar nada; anotação estranha não anima', () => {
+  const antes = lerCasas('1p1p1p1p/p1p1p1p1/1p1p1p1p/8/8/P1P1P1P1/1P1P1P1P/P1P1P1P1 w 0');
+  assert.deepEqual(montarVoo(antes, 'c3-d4'), { letra: 'P', final: 'P', pontos: ['c3', 'd4'], tomadas: [], captura: false });
+  assert.equal(montarVoo(antes, 'c4-d5'), null);
+  assert.equal(montarVoo(antes, 'e4'), null);
 });

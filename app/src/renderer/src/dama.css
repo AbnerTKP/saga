@@ -42,6 +42,12 @@
   border: 1px solid var(--dama-aviso-borda); font-size: 12.5px; line-height: 1.4; color: var(--text); }
 .dama-aviso strong { color: var(--dama-aviso); }
 
+/* O voo do lance: a peça que anda e as que ela salta, por cima de tudo e sem pegar clique.
+   Quem as move é a Web Animations (TabuleiroDaDama), só em transform e opacity. */
+.voo-da-dama { position: absolute; left: 0; top: 0; z-index: 2; display: grid; place-items: center;
+  pointer-events: none; will-change: transform; }
+.voo-da-dama.saltada { z-index: 1; will-change: transform, opacity; }
+
 /* A capa do menu e do convite: fileiras de tabuleiro e duas peças, uma delas dama. */
 .capa-da-dama { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr);
   grid-template-rows: repeat(3, 1fr); background: var(--madeira-clara); }

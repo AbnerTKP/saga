@@ -110,6 +110,16 @@ boteco. Ele escolheu **a A** e as **regras brasileiras** (contra a americana).
   acende um anel dourado nas peças que capturam** e a coluna diz por quê. Na primeira versão o anel
   só aparecia depois de clicar numa peça que não podia; visto na foto, quem não conhece a regra
   brasileira não entenderia por que as outras não respondem.
+- **Todo lance VOA pela rota** (pedido do dono depois da v0.70.0: *"animação de captura tá horrível, não tem
+  animação das peças, se eu capturo 2 a peça só teleporta"*). A peça anda de casa em casa; em cada
+  pulo ela sobe e cresce, e a peça saltada some no meio do pulo sobre ela. Vale para o seu lance, o do
+  outro (que chega pela busca só com a anotação) e para quem assiste. `montarVoo` (puro e testado)
+  tira a rota da anotação e as tomadas do tabuleiro de ANTES — a dama pode ter capturado longe, então
+  a tomada é procurada na diagonal, não no meio. O voo é calculado durante o desenho, como a peça que
+  cai no Catan, e anda pela Web Animations só em `transform` e `opacity`, numa camada por cima; o seu
+  lance ganha a chave que terá ao voltar do servidor, para não voar duas vezes. 360 ms por pulo,
+  240 ms no lance simples; "reduzir movimento" desliga. Visto em quadros no passo `20-dama`, inclusive
+  a captura dupla do adversário na tela de quem esperava. Sem som novo.
 - **As cores da dama moram no `tokens.css`** (`--madeira-*`, `--dama-*`), porque o `design.test.ts`
   não deixa cor crua em `.css` novo. O tabuleiro reaproveita `.tabuleiro`/`.casa` do xadrez.
 - **Visto** pela `ferramentas/fotografar`, passo `20-dama`, no renderer de verdade contra servidor
