@@ -1,6 +1,8 @@
-// As mesas de xadrez: quem abriu, quem foi chamado, quem joga, quem assiste e o relógio.
+// As mesas de xadrez e de dama: quem abriu, quem foi chamado, quem joga, quem assiste e o relógio.
 //
-// As regras do jogo são do `xadrez.mjs`; isto aqui é a MESA em volta dele. Puro como as outras
+// As regras de cada jogo são do `xadrez.mjs` e do `dama.mjs`; isto aqui é a MESA em volta deles,
+// e ela é a mesma para os dois — o convite, o relógio, a plateia, o empate e a revanche não
+// sabem que jogo está no tabuleiro. Cada mesa diz o seu (`jogo`) e o motor sai de `MOTORES`. Puro como as outras
 // regras: sem SQL e sem HTTP. Quem é cada pessoa — o nome neste servidor, a foto, o
 // identificador — chega pronto de quem chama, porque perguntar isso ao banco não é daqui.
 //
@@ -15,7 +17,28 @@
 // conferido a cada pergunta e a cada ação: um relógio de fundo só descobriria antes o que
 // ninguém está olhando.
 import { ErroDeConta } from './contas.mjs';
-import { POSICAO_INICIAL, ErroDeLance, lerFen, escreverFen, lancesLegais, jogar, chaveDeRepeticao, situacao } from './xadrez.mjs';
+import * as xadrez from './xadrez.mjs';
+import * as dama from './dama.mjs';
+
+/**
+ * O que a mesa pergunta a cada jogo. `legais` já sai no formato da resposta, e `jogar` recebe o
+ * corpo do pedido e tira dele só o que o jogo entende: a promoção no xadrez, o caminho na dama.
+ */
+const MOTORES = {
+  xadrez: {
+    inicial: xadrez.POSICAO_INICIAL,
+    ...xadrez,
+    legais: (p) => xadrez.lancesLegais(p).map(({ de, para, promocao, san }) => ({ de, para, promocao, san })),
+    jogar: (p, { de, para, promocao }) => xadrez.jogar(p, { de, para, promocao }),
+  },
+  dama: {
+    inicial: dama.POSICAO_INICIAL,
+    ...dama,
+    legais: (p) => dama.lancesLegais(p),
+    jogar: (p, { de, para, caminho }) => dama.jogar(p, { de, para, caminho }),
+  },
+};
+export const JOGOS = Object.keys(MOTORES);
 
 /** Os relógios que se escolhe, em segundos POR JOGADOR. `null` é sem relógio. */
 export const TEMPOS = [180, 300, 600, 1800];
@@ -41,7 +64,8 @@ const corDe = (mesa, id) => (mesa.brancas === id ? 'w' : mesa.pretas === id ? 'b
 const idDaCor = (mesa, cor) => (cor === 'w' ? mesa.brancas : mesa.pretas);
 const jogandoNela = (mesa, id) => mesa.estado === 'jogando' && corDe(mesa, id) !== null;
 
-function validarEscolha({ tempo, cor }) {
+function validarEscolha({ tempo, cor, jogo = 'xadrez' }) {
+  if (!JOGOS.includes(jogo)) throw new ErroDeConta('Esse jogo não existe.', 400);
   if (tempo !== null && !TEMPOS.includes(tempo)) {
     throw new ErroDeConta('O relógio é sem tempo, ou de 3, 5, 10 ou 30 minutos.', 400);
   }
@@ -159,7 +183,8 @@ export function criarMesas({
     for (const [id, outra] of mesas) {
       if (outra !== mesa && outra.estado === 'lobby' && [brancas, pretas].includes(outra.anfitriao)) mesas.delete(id);
     }
-    const posicao = lerFen(POSICAO_INICIAL);
+    const motor = MOTORES[mesa.jogo];
+    const posicao = motor.lerFen(motor.inicial);
     Object.assign(mesa, {
       estado: 'jogando',
       brancas,
@@ -167,7 +192,7 @@ export function criarMesas({
       convidado: null,
       recusou: null,
       posicao,
-      chaves: [chaveDeRepeticao(posicao)],
+      chaves: [motor.chaveDeRepeticao(posicao)],
       lances: [],
       xeque: false,
       // O relógio das brancas corre desde o aceite: quem chamou já está de frente para o
@@ -243,7 +268,7 @@ export function criarMesas({
       mesa.convidado = null;
     },
 
-    lance(mesa, ctx, { de, para, promocao }, agora) {
+    lance(mesa, ctx, dados, agora) {
       if (mesa.estado === 'lobby') throw new ErroDeConta('A partida ainda não começou.', 409);
       const cor = corDe(mesa, ctx.eu);
       if (!cor) throw new ErroDeConta('Você não está jogando esta partida.', 403);
@@ -253,11 +278,12 @@ export function criarMesas({
       if (mesa.estado === 'fim') return;
       if (mesa.posicao.vez !== cor) throw new ErroDeConta('Não é a sua vez.', 409);
 
+      const motor = MOTORES[mesa.jogo];
       let feito;
       try {
-        feito = jogar(mesa.posicao, { de, para, promocao });
+        feito = motor.jogar(mesa.posicao, dados);
       } catch (e) {
-        if (e instanceof ErroDeLance) throw new ErroDeConta(e.message, 400);
+        if (e instanceof motor.ErroDeLance) throw new ErroDeConta(e.message, 400);
         throw e;
       }
       // Desconta DEPOIS de saber que o lance vale: lance recusado não gasta o tempo de ninguém.
@@ -267,13 +293,13 @@ export function criarMesas({
         mesa.relogio.desde = agora;
       }
       mesa.posicao = feito.posicao;
-      mesa.chaves.push(chaveDeRepeticao(feito.posicao));
+      mesa.chaves.push(motor.chaveDeRepeticao(feito.posicao));
       mesa.lances.push({ san: feito.lance.san, de: feito.lance.de, para: feito.lance.para });
       // Jogar em vez de responder à oferta de empate é recusá-la. Quem OFERECEU pode oferecer
       // na própria vez e jogar em seguida: a oferta continua de pé para o outro responder.
       if (mesa.empateOferecidoPor !== null && mesa.empateOferecidoPor !== ctx.eu) mesa.empateOferecidoPor = null;
 
-      const agoraNoTabuleiro = situacao(feito.posicao, mesa.chaves);
+      const agoraNoTabuleiro = motor.situacao(feito.posicao, mesa.chaves);
       mesa.xeque = agoraNoTabuleiro.xeque;
       const { fim } = agoraNoTabuleiro;
       if (fim) encerrar(mesa, { motivo: fim.motivo, vencedor: fim.vencedor ? idDaCor(mesa, fim.vencedor) : null }, agora);
@@ -344,11 +370,13 @@ export function criarMesas({
 
   function verMesa(mesa, ctx, agora) {
     const quem = (id) => (id ? ctx.pessoa(id) : null);
+    const motor = MOTORES[mesa.jogo];
     const vez = mesa.posicao.vez;
     const daVez = mesa.estado === 'jogando' && idDaCor(mesa, vez) === ctx.eu;
     const ultimo = mesa.lances.at(-1);
     return {
       id: mesa.id,
+      jogo: mesa.jogo,
       estado: mesa.estado,
       anfitriao: quem(mesa.anfitriao),
       tempo: mesa.tempo,
@@ -357,14 +385,14 @@ export function criarMesas({
       recusou: quem(mesa.recusou),
       brancas: quem(mesa.brancas),
       pretas: quem(mesa.pretas),
-      fen: escreverFen(mesa.posicao),
+      fen: motor.escreverFen(mesa.posicao),
       vez,
       xeque: mesa.xeque,
       lances: mesa.lances.map(({ san, de, para }) => ({ san, de, para })),
       ultimo: ultimo ? { de: ultimo.de, para: ultimo.para } : null,
       // Só quem tem a vez recebe os lances possíveis: é para a tela dele mostrar para onde a
       // peça vai. Quem vale é sempre o servidor — isto é ajuda, não autorização.
-      legais: daVez ? lancesLegais(mesa.posicao).map(({ de, para, promocao, san }) => ({ de, para, promocao, san })) : [],
+      legais: daVez ? motor.legais(mesa.posicao) : [],
       relogio: verRelogio(mesa, agora),
       empateOferecidoPor: mesa.empateOferecidoPor,
       revanchePedidaPor: mesa.revanchePedidaPor,
@@ -380,23 +408,26 @@ export function criarMesas({
   return {
     /**
      * O que vai de carona no `/rooms`: as mesas DESTE servidor, para a tela marcar quem está
-     * jogando, e os convites de quem perguntou.
+     * jogando, e os convites de quem perguntou, de todos os servidores dele. Um jogo por vez:
+     * o `/rooms` manda o xadrez em `jogos` e a dama em `damas`, porque o app de antes da dama
+     * leria uma mesa de dama como se fosse de xadrez.
      */
-    /** As mesas daqui e os convites de todos os servidores de quem perguntou. */
-    resumo(ctx, fora = {}) {
+    resumo(ctx, fora = {}, jogo = 'xadrez') {
       const agora = relogio();
       faxina(agora);
       // Buscar as salas é o app do jogador aberto, e isso conta como aparecer: quem saiu da tela
       // do jogo para ler o chat não abandonou a partida. Abandonar é fechar o app.
       for (const mesa of mesas.values()) if (jogandoNela(mesa, ctx.eu)) mesa.jogadorVistoEm = agora;
 
-      const daqui = [...mesas.values()].filter((m) => m.sid === ctx.sid);
+      const doJogo = [...mesas.values()].filter((m) => m.jogo === jogo);
+      const daqui = doJogo.filter((m) => m.sid === ctx.sid);
       // Convite para quem está no meio de uma partida espera ela acabar: tocar no meio do jogo
       // atrapalharia, e aceitar não daria. Terminada a partida, se a mesa ainda estiver lá, ele volta.
       const livre = !emPartida(ctx.eu);
       return {
         mesas: daqui.map((m) => ({
           id: m.id,
+          jogo: m.jogo,
           estado: m.estado,
           anfitriao: m.anfitriao,
           brancas: m.brancas,
@@ -405,9 +436,9 @@ export function criarMesas({
           vez: m.estado === 'jogando' ? m.posicao.vez : null,
         })),
         convites: livre
-          ? [...mesas.values()].filter((m) => m.estado === 'lobby' && m.convidado === ctx.eu
+          ? doJogo.filter((m) => m.estado === 'lobby' && m.convidado === ctx.eu
             && (m.sid === ctx.sid || !!fora.ativoEm?.(m.sid, ctx.eu))).map((m) => ({
-            mesa: m.id, servidor: m.sid, servidorNome: fora.nomeDoServidor?.(m.sid) ?? null,
+            mesa: m.id, jogo: m.jogo, servidor: m.sid, servidorNome: fora.nomeDoServidor?.(m.sid) ?? null,
             de: m.sid === ctx.sid || !fora.pessoaEm ? ctx.pessoa(m.anfitriao) : fora.pessoaEm(m.sid, m.anfitriao),
             tempo: m.tempo, cor: COR_DO_CONVIDADO[m.cor],
           }))
@@ -415,20 +446,21 @@ export function criarMesas({
       };
     },
 
-    abrir(ctx, { tempo = null, cor = 'sorteio' } = {}) {
+    abrir(ctx, { tempo = null, cor = 'sorteio', jogo = 'xadrez' } = {}) {
       const agora = relogio();
       faxina(agora);
-      validarEscolha({ tempo, cor });
+      validarEscolha({ tempo, cor, jogo });
       if (emPartida(ctx.eu)) throw new ErroDeConta('Você está numa partida em andamento.', 409);
       const minhas = [...mesas.values()].filter((m) => m.estado === 'lobby' && m.anfitriao === ctx.eu);
-      if (minhas.some((m) => m.sid === ctx.sid)) throw new ErroDeConta('Você já tem uma mesa aberta aqui.', 409);
-      // A mesa que ficou esperando noutro servidor sai: ninguém espera em duas mesas ao mesmo
-      // tempo, e ela não teria como aparecer na tela deste servidor para ser fechada.
+      if (minhas.some((m) => m.sid === ctx.sid && m.jogo === jogo)) throw new ErroDeConta('Você já tem uma mesa aberta aqui.', 409);
+      // A mesa que ficou esperando noutro servidor, ou de outro jogo, sai: ninguém espera em
+      // duas mesas ao mesmo tempo, e quem abre a de dama largou a de xadrez.
       for (const m of minhas) mesas.delete(m.id);
 
       const mesa = {
         id: proxima++,
         sid: ctx.sid,
+        jogo,
         estado: 'lobby',
         anfitriao: ctx.eu,
         tempo,
@@ -437,7 +469,7 @@ export function criarMesas({
         recusou: null,
         brancas: null,
         pretas: null,
-        posicao: lerFen(POSICAO_INICIAL),
+        posicao: MOTORES[jogo].lerFen(MOTORES[jogo].inicial),
         chaves: [],
         lances: [],
         xeque: false,

@@ -7,6 +7,7 @@ import './styles.css';
 import './configuracoes.css';
 import './palco.css';
 import './catan.css';
+import './dama.css';
 import './dadosNoCopo.css';
 import './sobreOTabuleiro.css';
 import { capturarErrosGlobais } from './registro';

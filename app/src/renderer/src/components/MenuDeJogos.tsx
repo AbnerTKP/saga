@@ -4,6 +4,8 @@ import { apuracaoDaUrna } from '../api';
 import { Peca } from './Tabuleiro';
 import { QuadroNaTela } from './TelaDaLuta';
 import { CapaDoCatan } from './CapaDoCatan';
+import { CapaDaDama } from './ConviteDeXadrez';
+import type { JogoDeMesa } from '../jogos';
 import { retratoPronto } from '../dragao/desenho';
 import { criarQuadro } from '../dragao/quadro';
 import { desenharCapa } from '../urna/cabine';
@@ -14,15 +16,18 @@ import { desenharCapa } from '../urna/cabine';
  * embaixo o que acontece ali; com uma partida, mesa ou arena de pé, a frase fica azul e a capa ganha
  * o ponto, e clicar leva de volta a ela em vez de abrir outra.
  */
-export function MenuDeJogos({ em, minha, luta, catan, onXadrez, onLuta, onCatan, onUrna, onClose }: {
+export function MenuDeJogos({ em, minha, jogoDaMinha, luta, catan, onXadrez, onDama, onLuta, onCatan, onUrna, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
+  /** A sua mesa de xadrez ou de dama, e de qual dos dois ela é. */
   minha: 'lobby' | 'jogando' | 'fim' | null;
+  jogoDaMinha: JogoDeMesa | null;
   /** O que a capa do Dragão Quadrado diz embaixo do nome: abrir uma arena, voltar à sua, ou assistir. */
   luta: string;
   /** O mesmo para o Catan: abrir uma mesa, voltar à sua, ou assistir. */
   catan: string;
   onXadrez: () => void;
+  onDama: () => void;
   onLuta: () => void;
   onCatan: () => void;
   onUrna: () => void;
@@ -50,14 +55,18 @@ export function MenuDeJogos({ em, minha, luta, catan, onXadrez, onLuta, onCatan,
   }, []);
 
   // Parado, cada frase começa por "abrir"; qualquer outra coisa é algo de pé para voltar ou assistir.
+  const daMesa = (jogo: JogoDeMesa) => (jogoDaMinha !== jogo || !minha ? 'abrir uma mesa'
+    : minha === 'jogando' ? 'voltar à sua partida' : 'voltar à sua mesa');
   const capas: { nome: string; sub: string; capa: ReactNode; fundo: string; abrir: () => void }[] = [
     {
       nome: 'Xadrez',
-      sub: minha === 'jogando' ? 'voltar à sua partida' : minha ? 'voltar à sua mesa' : 'abrir uma mesa',
+      sub: daMesa('xadrez'),
       capa: <span className="capa-de-xadrez"><Peca letra="n" /></span>,
       fundo: '#eed8b4',
       abrir: onXadrez,
     },
+    // No lugar da Fórmula 1, que saiu no mesmo dia em que a dama chegou (07/10/2026).
+    { nome: 'Dama', sub: daMesa('dama'), capa: <CapaDaDama />, fundo: 'var(--madeira-clara)', abrir: onDama },
     {
       nome: 'Dragão Quadrado', sub: luta, fundo: '#6fa8dc', abrir: onLuta,
       capa: <QuadroNaTela chave="icone" className="capa-de-luta" quadro={() => retratoPronto('goiaba')} />,

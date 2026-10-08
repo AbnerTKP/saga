@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarMesas, PLATEIA, ESQUECIDA, ABANDONADA } from './jogos.mjs';
 import { POSICAO_INICIAL } from './xadrez.mjs';
+import { POSICAO_INICIAL as DAMA_INICIAL } from './dama.mjs';
 import { ErroDeConta } from './contas.mjs';
 
 const TKP = 1, JUNINHO = 2, TAVA = 3, BLANKITO = 4;
@@ -102,11 +103,11 @@ test('o convite chega só a quem foi chamado, com a cor DELE, e acompanha o que 
   t.mesas.agir(t.como(TKP), { id, acao: 'chamar', alvo: JUNINHO });
 
   assert.deepEqual(t.mesas.resumo(t.como(JUNINHO)).convites, [
-    { mesa: id, servidor: 1, servidorNome: null, de: { id: TKP, nome: 'TKP', foto: null, idExibido: null }, tempo: 600, cor: 'pretas' },
+    { mesa: id, jogo: 'xadrez', servidor: 1, servidorNome: null, de: { id: TKP, nome: 'TKP', foto: null, idExibido: null }, tempo: 600, cor: 'pretas' },
   ]);
   const deOutro = t.mesas.resumo(t.como(TAVA));
   assert.deepEqual(deOutro.convites, []);
-  assert.deepEqual(deOutro.mesas, [{ id, estado: 'lobby', anfitriao: TKP, brancas: null, pretas: null, convidado: JUNINHO, vez: null }]);
+  assert.deepEqual(deOutro.mesas, [{ id, jogo: 'xadrez', estado: 'lobby', anfitriao: TKP, brancas: null, pretas: null, convidado: JUNINHO, vez: null }]);
 
   t.mesas.agir(t.como(TKP), { id, acao: 'configurar', tempo: null, cor: 'sorteio' });
   assert.deepEqual(t.mesas.resumo(t.como(JUNINHO)).convites.map((c) => [c.tempo, c.cor]), [[null, 'sorteio']]);
@@ -204,7 +205,7 @@ test('só quem tem a vez joga, e o lance que não vale volta com o motivo do mot
   assert.equal(legais.length, 20);
   assert.deepEqual(Object.keys(legais[0]).sort(), ['de', 'para', 'promocao', 'san']);
   assert.deepEqual(t.mesas.resumo(t.como(TAVA)).mesas,
-    [{ id, estado: 'jogando', anfitriao: TKP, brancas: TKP, pretas: JUNINHO, convidado: null, vez: 'b' }]);
+    [{ id, jogo: 'xadrez', estado: 'jogando', anfitriao: TKP, brancas: TKP, pretas: JUNINHO, convidado: null, vez: 'b' }]);
 });
 
 test('promoção: as quatro peças aparecem nos lances possíveis, e sem escolher não vale', () => {
@@ -452,4 +453,74 @@ test('o convite de xadrez chega de outro servidor da pessoa, e não de um que el
   assert.deepEqual(mesas, []);
   assert.deepEqual(convites.map((c) => [c.mesa, c.servidor, c.servidorNome, c.de.nome, c.cor]), [[id, 2, 'servidor 2', 'TKP em 2', 'pretas']]);
   assert.deepEqual(t.mesas.resumo(t.como(JUNINHO, 1), fora(false)).convites, []);
+});
+
+// ---- a dama, nas mesmas mesas ----------------------------------------------------------
+
+test('a dama abre na mesma mesa, com o tabuleiro dela e os lances que valem para quem tem a vez', () => {
+  const t = montar();
+  const aberta = t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas', jogo: 'dama' });
+  assert.equal(aberta.jogo, 'dama');
+  t.mesas.agir(t.como(TKP), { id: aberta.id, acao: 'chamar', alvo: JUNINHO });
+  t.mesas.agir(t.como(JUNINHO), { id: aberta.id, acao: 'aceitar' });
+  const minha = t.mesas.ver(t.como(TKP), aberta.id);
+  assert.equal(minha.fen, DAMA_INICIAL);
+  assert.equal(minha.legais.length, 7);
+  assert.deepEqual(Object.keys(minha.legais[0]).sort(), ['caminho', 'capturadas', 'de', 'para', 'san']);
+
+  const { mesa } = t.mesas.agir(t.como(TKP), { id: aberta.id, acao: 'lance', de: 'c3', para: 'd4' });
+  assert.equal(mesa.vez, 'b');
+  assert.deepEqual(mesa.lances.map((l) => l.san), ['c3-d4']);
+  assert.equal(mesa.xeque, false);
+  // Lance de xadrez numa mesa de dama não vale.
+  assert.throws(() => t.mesas.agir(t.como(JUNINHO), { id: aberta.id, acao: 'lance', de: 'b6', para: 'b5' }), recusa(400));
+});
+
+test('dama: perder todas as peças acaba a partida', () => {
+  const t = montar();
+  const { id } = t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas', jogo: 'dama' });
+  t.mesas.agir(t.como(TKP), { id, acao: 'chamar', alvo: JUNINHO });
+  t.mesas.agir(t.como(JUNINHO), { id, acao: 'aceitar' });
+  // Joga ao acaso até alguém vencer ou empatar: a mesa tem de chegar ao fim sozinha.
+  let mesa = t.mesas.ver(t.como(TKP), id);
+  for (let k = 0; k < 600 && mesa.estado === 'jogando'; k++) {
+    const quem = mesa.vez === 'w' ? TKP : JUNINHO;
+    const legais = t.mesas.ver(t.como(quem), id).legais;
+    const l = legais[k % legais.length];
+    mesa = t.mesas.agir(t.como(quem), { id, acao: 'lance', de: l.de, para: l.para, caminho: l.caminho }).mesa;
+  }
+  assert.equal(mesa.estado, 'fim');
+  assert.ok(['semPecas', 'semLances', 'vinteLances', 'repeticao'].includes(mesa.fim.motivo), mesa.fim.motivo);
+});
+
+test('o /rooms manda xadrez e dama separados: o app de antes não vê mesa de dama', () => {
+  const t = montar();
+  const xadrez = t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas' });
+  const dama = t.mesas.abrir(t.como(TAVA), { tempo: null, cor: 'brancas', jogo: 'dama' });
+  t.mesas.agir(t.como(TKP), { id: xadrez.id, acao: 'chamar', alvo: JUNINHO });
+  t.mesas.agir(t.como(TAVA), { id: dama.id, acao: 'chamar', alvo: JUNINHO });
+  const doXadrez = t.mesas.resumo(t.como(JUNINHO));
+  const daDama = t.mesas.resumo(t.como(JUNINHO), {}, 'dama');
+  assert.deepEqual(doXadrez.mesas.map((m) => [m.id, m.jogo]), [[xadrez.id, 'xadrez']]);
+  assert.deepEqual(doXadrez.convites.map((c) => [c.mesa, c.jogo]), [[xadrez.id, 'xadrez']]);
+  assert.deepEqual(daDama.mesas.map((m) => [m.id, m.jogo]), [[dama.id, 'dama']]);
+  assert.deepEqual(daDama.convites.map((c) => [c.mesa, c.jogo]), [[dama.id, 'dama']]);
+});
+
+test('abrir a mesa de dama fecha a de xadrez que estava esperando, e vice-versa', () => {
+  const t = montar();
+  const xadrez = t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas' });
+  t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas', jogo: 'dama' });
+  assert.throws(() => t.mesas.ver(t.como(TKP), xadrez.id), recusa(404));
+  assert.throws(() => t.mesas.abrir(t.como(TKP), { jogo: 'dama' }), recusa(409, /já tem uma mesa/));
+  assert.throws(() => t.mesas.abrir(t.como(TKP), { jogo: 'gamão' }), recusa(400));
+});
+
+test('quem joga dama não entra numa partida de xadrez ao mesmo tempo', () => {
+  const t = montar();
+  const { id } = t.mesas.abrir(t.como(TKP), { tempo: null, cor: 'brancas', jogo: 'dama' });
+  t.mesas.agir(t.como(TKP), { id, acao: 'chamar', alvo: JUNINHO });
+  t.mesas.agir(t.como(JUNINHO), { id, acao: 'aceitar' });
+  const xadrez = t.mesas.abrir(t.como(TAVA), { tempo: null, cor: 'brancas' });
+  assert.throws(() => t.mesas.agir(t.como(TAVA), { id: xadrez.id, acao: 'chamar', alvo: TKP }), recusa(409));
 });

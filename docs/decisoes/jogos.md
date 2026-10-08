@@ -1,4 +1,4 @@
-# Xadrez, Urna e Catan
+# Xadrez, Dama, Urna e Catan
 
 App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/CLAUDE.md`.
 
@@ -72,6 +72,52 @@ App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/C
   e motor pelos alto-falantes do dono — com ele ao vivo na Saga, e a live levou o som junto:
   o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
   do teste leva `mute-audio`.
+
+## A Dama (07/10/2026)
+
+Pedido do dono: "faça o jogo dama no saga", junto com tirar a Fórmula 1. Antes do código, a prancheta
+(claude.ai/artifact/Tp5T8SgQM53FsswEAbgkks) com três visuais na mesma jogada, feitos com o CSS de
+verdade: **A — madeira** (o tabuleiro do xadrez), B — torneio (verde e creme), C — tampinhas de
+boteco. Ele escolheu **a A** e as **regras brasileiras** (contra a americana).
+
+- **A dama mora nas MESAS do xadrez** (`jogos.mjs`), e não numa cópia delas. O convite em cartão, o
+  relógio, a plateia, o empate, a revanche, a faxina e "uma partida por pessoa" são os mesmos; cada
+  mesa diz o seu `jogo`, e o motor sai de `MOTORES` (`xadrez.mjs` ou `dama.mjs`). Quem joga dama não
+  entra numa partida de xadrez ao mesmo tempo, e abrir a mesa de um jogo fecha a que você tinha
+  esperando no outro. No app é a mesma coisa: a mesma `TelaDoXadrez`, que lê `mesa.jogo` e troca o
+  tabuleiro (`TabuleiroDaDama`), as peças tomadas e a anotação. As duas listas (`jogos` e `damas`)
+  viram uma só no `App`.
+- **No `/rooms` a dama vai num campo À PARTE (`damas`)**, e o xadrez continua em `jogos`. O app de
+  antes da dama leria uma mesa de dama como xadrez: um convite "para jogar xadrez" que abriria peças
+  de xadrez sobre a posição da dama. Assim o app velho simplesmente não vê a dama. Servidor velho com
+  app novo abriria xadrez no lugar da dama (ignora o `jogo`); o app confere o `jogo` da mesa que
+  voltou e, não sendo dama, fecha a mesa e avisa.
+- **A regra é do servidor** (`dama.mjs`, puro), como a do xadrez: cada leitura traz os lances que
+  valem para quem tem a vez, já com a captura obrigatória e a lei da maioria. O lance anda com o
+  `caminho` (as casas onde a peça pousa), porque a dama pode chegar à mesma casa por dois caminhos
+  tomando peças diferentes — `dama.test.mjs` tem esse losango. As regras, da CBJD: pedra captura para
+  trás; dama voa e captura de longe; tomar o máximo é obrigatório (pedra e dama valem igual); a tomada
+  fica no tabuleiro até o fim do lance (não se pousa nela nem se salta duas vezes); a pedra que passa
+  pela última fileira no meio de uma captura segue pedra. Perde quem fica sem peça ou sem lance.
+  Empate: três repetições ou **20 lances de cada lado** só de damas, sem captura nem pedra.
+  **Não entraram** os empates de final da regra oficial (duas damas contra uma etc., em 5 lances):
+  hoje esses finais acabam pelos 20 lances. A prova é a mesma do Catan — 120 partidas ao acaso
+  conferindo que nada oferecido é recusado e que as peças tomadas são as que somem —, e não perft,
+  porque não achei contagem publicada da dama brasileira em que confiasse.
+- **Na tela, um clique na chegada joga a sequência inteira.** A rota aparece tracejada ao escolher
+  a peça, com as paradas numeradas e um X nas peças que saem; com dois caminhos para a mesma casa,
+  as paradas do meio viram alvos (`clicar`, em `dama.ts`, puro e testado). **Capturar obrigatório
+  acende um anel dourado nas peças que capturam** e a coluna diz por quê. Na primeira versão o anel
+  só aparecia depois de clicar numa peça que não podia; visto na foto, quem não conhece a regra
+  brasileira não entenderia por que as outras não respondem.
+- **As cores da dama moram no `tokens.css`** (`--madeira-*`, `--dama-*`), porque o `design.test.ts`
+  não deixa cor crua em `.css` novo. O tabuleiro reaproveita `.tabuleiro`/`.casa` do xadrez.
+- **Visto** pela `ferramentas/fotografar`, passo `20-dama`, no renderer de verdade contra servidor
+  local (Chrome headless e mudo): o convite em cartão, a partida vista de pretas, um lance pela tela,
+  a captura obrigatória com o anel, a rota, a captura feita, o fim. A ferramenta passou a rodar no
+  Windows (`SAGA_RAIZ`, `SAGA_CHROME`). **Não foi exercido**: o Electron; duas pessoas de verdade;
+  o menu de jogos (precisa de LiveKit local, que esta máquina não tem); a dama coroada na tela (só
+  nos testes e na prancheta); nenhum som.
 
 ## A Urna (17/09/2026)
 

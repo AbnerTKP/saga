@@ -4,7 +4,7 @@ import { ocupantes } from '../ocupantes';
 import { contaDaIdentidade, identidadeDe } from '../pessoas';
 import { acaoDaLive, seloDaLive, type AcaoDaLive } from '../cartaoDaLive';
 import type { LiveNoChat } from '../lives';
-import type { ResumoDaMesa } from '../jogos';
+import type { JogoDeMesa, ResumoDaMesa } from '../jogos';
 import { moverSala, type Alvo } from '../ordenacao';
 import { COMO_SE_LE, EXPLICACAO, type Status } from '../presenca';
 import type { useRoom } from '../useRoom';
@@ -31,7 +31,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, onPartida, onXadrez, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   categorias: Categoria[];
   /**
@@ -58,10 +58,14 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   nomeDoJogador: (id: number | null) => string;
   /** A sua mesa, se você tem uma: muda o que o menu de jogos oferece. */
   minhaPartida: 'lobby' | 'jogando' | 'fim' | null;
+  /** De qual jogo é a sua mesa: xadrez ou dama. */
+  jogoDaMinhaPartida: JogoDeMesa | null;
   /** Abrir uma partida: a sua, ou a de quem está jogando, como plateia. */
   onPartida: (mesaId: number) => void;
   /** O item Xadrez do menu de jogos: abre uma mesa, ou volta para a sua. */
   onXadrez: () => void;
+  /** O item Dama, idem. */
+  onDama: () => void;
   /** O subtítulo de cada jogo no menu de jogos, e o que ele faz. */
   textoDaLuta: string;
   onLuta: () => void;
@@ -396,10 +400,12 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
     <MenuDeJogos
       em={menuDeJogos}
       minha={minhaPartida}
+      jogoDaMinha={jogoDaMinhaPartida}
       luta={textoDaLuta}
       catan={textoDoCatan}
       onCatan={onCatan}
       onXadrez={onXadrez}
+      onDama={onDama}
       onLuta={onLuta}
       onUrna={onUrna}
       onClose={() => setMenuDeJogos(null)}

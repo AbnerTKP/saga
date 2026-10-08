@@ -22,11 +22,15 @@
 // `roteiro`); o resto — subir, semear, stub, esperar, fotografar, derrubar — vale igual.
 // Precisa do Google Chrome em /Applications; o `livekit-server` é opcional (sem ele, a call
 // e o menu de jogos ficam de fora).
+//
+// No Windows (07/10/2026, para a dama): SAGA_RAIZ com o caminho do repositório e SAGA_CHROME
+// com o do chrome.exe. O vite sobe pelo node (o `.bin/vite` de lá é um .cmd) e os processos
+// herdam o ambiente inteiro — sem SystemRoot e companhia, nem o Node nem o Chrome abrem rede.
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync, openSync, appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { semear, depoisDoDono, SENHA } from './semear.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +39,8 @@ const SCRATCH = process.env.SAGA_FOTOS_TMP ?? join(tmpdir(), 'saga-fotos');
 const RAIZ = process.env.SAGA_RAIZ ?? '/Users/loki/Documents/app-comunicacao';
 const EXEC = join(SCRATCH, 'antes-execucao');          // banco, logs, cache do vite, pids
 const PERFIL = join(SCRATCH, 'chrome-perfil');
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const CHROME = process.env.SAGA_CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const WINDOWS = process.platform === 'win32';
 const PORTA = { saga: 3901, vite: 5901, cdp: 9901, livekit: 7901 };
 const LK = { chave: 'fotokey', segredo: 'segredo-de-mentira-so-para-as-fotos-da-saga-local' };
 
@@ -874,6 +879,55 @@ async function roteiro(dados) {
     await esperarQue(`!document.querySelector('.tela-do-catan')`, { teto: 10000, oque: 'a mesa fechar' });
     await sairDaConta();
   });
+
+  await passo('20-dama', async () => {
+    if (!(await existe('.connect-card'))) await sairDaConta();
+    const sid = dados.servidores.cantinho;
+    const api = async (ap, metodo, caminho, corpo) => {
+      const r = await fetch(dados.base + caminho, {
+        method: metodo, body: corpo ? JSON.stringify(corpo) : undefined,
+        headers: { 'content-type': 'application/json', 'x-sessao': dados.contas[ap].token, 'x-servidor': String(sid) },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(`${caminho} (${ap}) → ${r.status}: ${j.error ?? ''}`);
+      return j;
+    };
+    const naMesa = (ap, corpo) => api(ap, 'POST', '/jogos/mesa', { id, ...corpo });
+    // O TKP abre e chama pela rede; a Marina recebe o convite NA TELA e joga por ela.
+    const { mesa: aberta } = await api('TKP', 'POST', '/jogos/abrir', { tempo: 300, cor: 'brancas', jogo: 'dama' });
+    const id = aberta.id;
+    await naMesa('TKP', { acao: 'chamar', alvo: dados.contas.Marina.id });
+
+    await entrarComo('Marina');
+    await abrirServidor('Cantinho');
+    await esperar({ sel: '.cartao-de-convite', texto: 'dama' }, 10000);
+    await foto('20a-dama-convite', 'Dama, o convite: o mesmo cartão do xadrez, com a capa da dama.');
+    await clicar({ sel: '.cartao-de-convite button', texto: 'Jogar' });
+    await esperar('.tela-do-xadrez .peca-de-dama', 10000);
+    await foto('20b-dama-comeco', 'Dama, o começo visto pela Marina (pretas embaixo): a vez é das brancas.');
+
+    await naMesa('TKP', { acao: 'lance', de: 'c3', para: 'd4' });
+    await esperar('.casa.clicavel[data-casa="b6"]', 10000);
+    await clicar({ sel: '.casa[data-casa="b6"]' });
+    await clicar({ sel: '.casa[data-casa="c5"]' });
+    await esperarQue(`!!document.querySelector('.casa[data-casa="c5"] .peca-de-dama.preta')`, { oque: 'b6–c5 feito pela tela' });
+    // O TKP toma de d4 em b6, e a Marina passa a ser obrigada a retomar.
+    await naMesa('TKP', { acao: 'lance', de: 'd4', para: 'b6' });
+    await esperar('.dama-aviso', 10000);
+    await esperar('.casa.obrigada[data-casa="a7"]');
+    await foto('20c-dama-captura-obrigatoria', 'Dama, captura obrigatória: o aviso na coluna, e o anel dourado em a7 e c7, as únicas que respondem.');
+    await clicar({ sel: '.casa[data-casa="a7"]' });
+    await esperar('.rota-da-dama');
+    await foto('20e-dama-rota', 'Dama, a peça escolhida: a rota tracejada, a parada numerada e o X na peça que sai.');
+    await clicar({ sel: '.casa[data-casa="c5"]' });
+    await esperarQue(`!document.querySelector('.dama-aviso')`, { oque: 'a captura feita' });
+    await foto('20f-dama-depois', 'Dama, depois da captura: a lista de lances com ×, e a peça tomada ao lado do nome.');
+
+    await naMesa('TKP', { acao: 'desistir' });
+    await esperar('.xadrez-fim', 10000);
+    await foto('20g-dama-fim', 'Dama, o fim: o TKP desistiu.');
+    await clicar({ sel: '.xadrez-fim button', texto: 'Sair da mesa' });
+  });
 }
 
 // ---------------------------------------------------------------------------------------
@@ -885,7 +939,9 @@ async function principal() {
   mkdirSync(join(EXEC, 'banco'), { recursive: true });
   rmSync(PERFIL, { recursive: true, force: true });
 
-  const base = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: EXEC, LANG: 'pt_BR.UTF-8' };
+  const base = WINDOWS
+    ? { ...process.env, TMPDIR: EXEC, LANG: 'pt_BR.UTF-8' }
+    : { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: EXEC, LANG: 'pt_BR.UTF-8' };
 
   let comLiveKit = false;
   try { execFileSync('which', ['livekit-server']); comLiveKit = true; } catch { log('sem livekit-server: a call e o menu de jogos ficam de fora'); }
@@ -907,7 +963,8 @@ async function principal() {
     LIVEKIT_PUBLIC_URL: `ws://127.0.0.1:${PORTA.livekit}`,
     SEM_NOTAS: '1', GIPHY_KEY: '', RESEND_KEY: '', EMAIL_DE: '',
   };
-  const argsSaga = ['--import', join(AQUI, 'ferramentas', 'so-local.mjs'), join(RAIZ, 'server', 'index.mjs')];
+  // Como URL: no Windows o --import não aceita caminho com letra de disco.
+  const argsSaga = ['--import', pathToFileURL(join(AQUI, 'ferramentas', 'so-local.mjs')).href, join(RAIZ, 'server', 'index.mjs')];
   const BASE = `http://127.0.0.1:${PORTA.saga}`;
   subir('saga', process.execPath, argsSaga, { env: envSaga });
   await esperarHttp(`${BASE}/health`);
@@ -933,7 +990,10 @@ async function principal() {
   await bater(true);
   const relogio = setInterval(() => bater(), 4000);
 
-  subir('vite', join(RAIZ, 'app', 'node_modules', '.bin', 'vite'), ['--config', join(AQUI, 'ferramentas', 'vite.config.mjs')], {
+  const [viteCmd, viteArgs] = WINDOWS
+    ? [process.execPath, [join(RAIZ, 'app', 'node_modules', 'vite', 'bin', 'vite.js')]]
+    : [join(RAIZ, 'app', 'node_modules', '.bin', 'vite'), []];
+  subir('vite', viteCmd, [...viteArgs, '--config', join(AQUI, 'ferramentas', 'vite.config.mjs')], {
     env: { ...base, PORTA_SAGA: String(PORTA.saga), PORTA_VITE: String(PORTA.vite), VITE_CACHE: join(EXEC, 'vite-cache') },
   });
   await esperarHttp(`http://127.0.0.1:${PORTA.vite}/`, 60000);

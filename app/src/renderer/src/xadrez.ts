@@ -142,7 +142,9 @@ export function descreverMesa(tempo: number | null, cor: CorEscolhida): string {
 }
 
 export type MotivoDoFim =
-  | 'mate' | 'afogamento' | 'material' | 'cinquentaLances' | 'repeticao' | 'tempo' | 'desistencia' | 'empate';
+  | 'mate' | 'afogamento' | 'material' | 'cinquentaLances' | 'repeticao' | 'tempo' | 'desistencia' | 'empate'
+  // Os da dama, que divide a mesa e este texto com o xadrez.
+  | 'semPecas' | 'semLances' | 'vinteLances';
 
 const TITULO_DO_FIM: Record<MotivoDoFim, string> = {
   mate: 'Xeque-mate',
@@ -153,6 +155,9 @@ const TITULO_DO_FIM: Record<MotivoDoFim, string> = {
   cinquentaLances: 'Empate',
   repeticao: 'Empate por repetição',
   empate: 'Empate',
+  semPecas: 'Sem peças',
+  semLances: 'Sem lance',
+  vinteLances: 'Empate',
 };
 
 const EMPATE: Partial<Record<MotivoDoFim, string>> = {
@@ -161,6 +166,7 @@ const EMPATE: Partial<Record<MotivoDoFim, string>> = {
   cinquentaLances: 'Cinquenta lances de cada lado sem captura nem lance de peão.',
   repeticao: 'A mesma posição apareceu três vezes.',
   empate: 'Os dois aceitaram o empate.',
+  vinteLances: 'Vinte lances de cada lado só com damas, sem captura.',
 };
 
 type Jogador = { id: number; nome: string };
@@ -183,6 +189,8 @@ export function textoDoFim(
     return { titulo, frase: `${perdeu.id === euId ? 'O seu tempo' : `O tempo de ${perdeu.nome}`} acabou. ${vitoria}` };
   }
   if (fim.motivo === 'desistencia') return { titulo, frase: `${quem(perdeu)} desistiu. ${vitoria}` };
+  if (fim.motivo === 'semPecas') return { titulo, frase: `${quem(perdeu)} ficou sem peças. ${vitoria}` };
+  if (fim.motivo === 'semLances') return { titulo, frase: `${quem(perdeu)} ficou sem lance. ${vitoria}` };
   return { titulo, frase: vitoria };
 }
 

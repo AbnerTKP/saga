@@ -8,8 +8,13 @@
  */
 import type { Membro } from './api.ts';
 
+/** Os jogos de dupla que dividem a mesma mesa: o convite, o relógio e a plateia são iguais. */
+export type JogoDeMesa = 'xadrez' | 'dama';
+
 export type ResumoDaMesa = {
   id: number;
+  /** Servidor antigo não manda: aí é xadrez. */
+  jogo?: JogoDeMesa;
   estado: 'lobby' | 'jogando' | 'fim';
   anfitriao: number;
   brancas: number | null;
@@ -17,6 +22,9 @@ export type ResumoDaMesa = {
   convidado: number | null;
   vez: 'w' | 'b' | null;
 };
+
+export const jogoDaMesa = (m: { jogo?: JogoDeMesa }): JogoDeMesa => m.jogo ?? 'xadrez';
+export const NOME_DO_JOGO: Record<JogoDeMesa, string> = { xadrez: 'Xadrez', dama: 'Dama' };
 
 /** Quem está numa partida em andamento, e em qual mesa. */
 export function jogandoAgora(mesas: ResumoDaMesa[]): Map<number, ResumoDaMesa> {

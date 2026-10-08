@@ -2,6 +2,15 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A Dama (07/10/2026), madeira e regras brasileiras.** O que está medido: a regra (`dama.test.mjs`:
+  captura obrigatória, lei da maioria, pedra capturando para trás, dama voadora, tomada que bloqueia,
+  pedra que passa pela última fileira capturando, dois caminhos para a mesma casa, empates, e 120
+  partidas ao acaso), as mesas (`jogos.test.mjs`), a rede (`api.test.mjs`) e a tela no RENDERER pelo
+  passo `20-dama` do `ferramentas/fotografar` (convite, partida vista de pretas, lance pela tela,
+  captura obrigatória com o anel, rota, fim). **Não foi exercido**: uma partida entre dois computadores;
+  o Electron e o Windows de verdade; a capa no menu de jogos (a bancada daqui não tem LiveKit); a dama
+  coroada na tela; o som do lance e do convite (são os do xadrez).
+
 - **A Urna do 2º turno (05/10/2026): 13 × 22, a mesa com digital e caderno, o mural, a mão nova e a
   apuração frente a frente.** O que está medido: a regra (`jogo.test.ts`: segurar e soltar no leitor,
   a primeira leitura falhando, a caneta parando onde parou, o mural, quem volta pulando a mesa), a

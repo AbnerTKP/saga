@@ -1486,7 +1486,7 @@ test('xadrez pela rede: abrir, chamar, o convite no /rooms, aceitar, jogar, assi
   assert.deepEqual(dasPretas.plateia.map((p) => p.id), [tava.eu.id]);
 
   const noResumo = (await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa })).corpo.jogos.mesas.find((m) => m.id === id);
-  assert.deepEqual(noResumo, { id, estado: 'jogando', anfitriao: tkp.eu.id, brancas: tkp.eu.id, pretas: juninho.eu.id, convidado: null, vez: 'b' });
+  assert.deepEqual(noResumo, { id, jogo: 'xadrez', estado: 'jogando', anfitriao: tkp.eu.id, brancas: tkp.eu.id, pretas: juninho.eu.id, convidado: null, vez: 'b' });
 
   // Noutro servidor o número não abre a mesa: responde como mesa que não existe.
   const outro = (await chamar('POST', '/servidores/criar', { sessao: tava.token, corpo: { nome: 'Clube do Xadrez' } })).corpo.servidor;
@@ -1500,6 +1500,33 @@ test('xadrez pela rede: abrir, chamar, o convite no /rooms, aceitar, jogar, assi
   assert.equal((await naMesa(tkp.token, { id, acao: 'fechar' })).status, 409);
   assert.equal((await naMesa(juninho.token, { id, acao: 'desistir' })).corpo.mesa.fim.vencedor, tkp.eu.id);
   assert.deepEqual((await naMesa(juninho.token, { id, acao: 'fechar' })).corpo, { ok: true });
+});
+
+test('dama pela rede: a mesma mesa, o convite em `damas` e nunca em `jogos`, e o lance com o caminho', async () => {
+  const tkp = (await cadastrar('dama_tkp')).corpo;
+  const juninho = (await cadastrar('dama_juninho')).corpo;
+  const casa = tkp.servidor.id;
+  const naMesa = (sessao, corpo) => chamar('POST', '/jogos/mesa', { sessao, servidor: casa, corpo });
+
+  const aberta = await chamar('POST', '/jogos/abrir', { sessao: tkp.token, servidor: casa, corpo: { tempo: null, cor: 'brancas', jogo: 'dama' } });
+  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
+  const { id } = aberta.corpo.mesa;
+  assert.equal(aberta.corpo.mesa.jogo, 'dama');
+  assert.equal((await naMesa(tkp.token, { id, acao: 'chamar', alvo: juninho.eu.id })).status, 200);
+
+  // O app de antes da dama lê só `jogos`: a mesa de dama não pode aparecer ali.
+  const salas = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo;
+  assert.ok(!salas.jogos.mesas.some((m) => m.id === id));
+  assert.deepEqual(salas.jogos.convites.filter((c) => c.mesa === id), []);
+  assert.deepEqual(salas.damas.convites.map((c) => [c.mesa, c.jogo, c.cor]), [[id, 'dama', 'pretas']]);
+
+  assert.equal((await naMesa(juninho.token, { id, acao: 'aceitar' })).status, 200);
+  const jogou = await naMesa(tkp.token, { id, acao: 'lance', de: 'c3', para: 'd4', caminho: ['d4'] });
+  assert.equal(jogou.status, 200, JSON.stringify(jogou.corpo));
+  assert.deepEqual(jogou.corpo.mesa.lances, [{ san: 'c3-d4', de: 'c3', para: 'd4' }]);
+  const errado = await naMesa(juninho.token, { id, acao: 'lance', de: 'b6', para: 'b5' });
+  assert.equal(errado.status, 400);
+  assert.equal((await naMesa(tkp.token, { id, acao: 'desistir' })).status, 200);
 });
 
 // --- Catan --------------------------------------------------------------------

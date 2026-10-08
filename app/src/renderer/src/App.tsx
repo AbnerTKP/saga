@@ -12,7 +12,7 @@ import {
   abrirCatan, agirNaMesaDoCatan,
   agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde, moverPessoa, acaoNoBot, podeSobre, conferirMovimento } from './api';
-import { ehMinhaVez, jogandoAgora, minhaMesa, oQueTocarNaMesa, type ResumoDaMesa } from './jogos';
+import { ehMinhaVez, jogandoAgora, jogoDaMesa, minhaMesa, NOME_DO_JOGO, oQueTocarNaMesa, type JogoDeMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
 import { anotar } from './registro';
 import { ARQUIVOS } from './sons';
@@ -619,7 +619,13 @@ export function App() {
         setSalasDoServidor((a) => mesmoSeIgual(a, { servidorId, rooms: lista.rooms, categorias: lista.categorias }));
         // As mesas de xadrez vêm na mesma resposta. Servidor antigo não manda o campo: aí
         // não há jogo nenhum e nada quebra, como acontece com o "está digitando".
-        setJogos((a) => mesmoSeIgual(a, { servidorId, mesas: lista.jogos?.mesas ?? [], convites: lista.jogos?.convites ?? [] }));
+        // A dama mora nas mesmas mesas e chega num campo à parte (o app de antes dela a leria como
+        // xadrez); aqui as duas listas viram uma, e cada mesa diz o seu jogo.
+        setJogos((a) => mesmoSeIgual(a, {
+          servidorId,
+          mesas: [...(lista.jogos?.mesas ?? []), ...(lista.damas?.mesas ?? [])],
+          convites: [...(lista.jogos?.convites ?? []), ...(lista.damas?.convites ?? [])],
+        }));
         // As arenas do Dragão Quadrado, idem. Servidor antigo não manda: não há luta.
         setLutas((a) => mesmoSeIgual(a, { servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] }));
         // As mesas do Catan, idem. Servidor antigo não manda: não há Catan.
@@ -1151,18 +1157,33 @@ export function App() {
     setJogoAberto({ tipo: 'xadrez', mesaId, servidorId });
   }, [sessao?.servidor?.id]);
 
-  /** O item Xadrez do menu de jogos: volta para a sua mesa, ou abre uma e cai no lobby. */
-  const abrirXadrez = useCallback(async () => {
+  /**
+   * Os itens Xadrez e Dama do menu de jogos: volta para a sua mesa daquele jogo, ou abre uma e
+   * cai no lobby. A mesa esperando no OUTRO jogo o servidor fecha sozinho; a partida andando no
+   * outro, não — ele recusa, e o aviso diz por quê.
+   */
+  const abrirMesaDe = useCallback(async (jogo: JogoDeMesa) => {
     const servidorId = sessao?.servidor?.id;
     if (!servidorId) return;
-    if (minhaMesaAgora) { setJogoAberto({ tipo: 'xadrez', mesaId: minhaMesaAgora.id, servidorId }); return; }
+    if (minhaMesaAgora && jogoDaMesa(minhaMesaAgora) === jogo) {
+      setJogoAberto({ tipo: 'xadrez', mesaId: minhaMesaAgora.id, servidorId });
+      return;
+    }
     try {
       // Os padrões do desenho: 10 minutos para cada um, peças no sorteio. Os dois se trocam
       // no lobby, que é a tela que abre em seguida.
-      const mesa = await abrirMesa(600, 'sorteio', servidorId);
+      const mesa = await abrirMesa(600, 'sorteio', servidorId, jogo);
+      // Servidor de antes da dama ignora o jogo e abre xadrez: melhor dizer do que desenhar
+      // peças de xadrez num convite de dama.
+      if (jogoDaMesa(mesa) !== jogo) {
+        await agirNaMesa(mesa.id, { acao: 'fechar' }, servidorId).catch(() => {});
+        throw new Error('O servidor ainda não tem a dama. Tente depois da próxima atualização.');
+      }
       setJogoAberto({ tipo: 'xadrez', mesaId: mesa.id, servidorId });
-    } catch (e) { notas.mostrarFalha(e, 'Xadrez'); }
+    } catch (e) { notas.mostrarFalha(e, NOME_DO_JOGO[jogo]); }
   }, [sessao?.servidor?.id, minhaMesaAgora, notas]);
+  const abrirXadrez = useCallback(() => abrirMesaDe('xadrez'), [abrirMesaDe]);
+  const abrirDama = useCallback(() => abrirMesaDe('dama'), [abrirMesaDe]);
 
   /**
    * Aceitar um convite é ir até ele. A partida é de um servidor, e a faixa que a traz de volta
@@ -1190,7 +1211,7 @@ export function App() {
       // Cancelado, ou você entrou noutra partida no meio: o convite sai da tela do mesmo
       // jeito, senão fica um botão que não faz mais nada.
       setConviteRespondido(c.mesa);
-      notas.mostrarFalha(e, 'Xadrez');
+      notas.mostrarFalha(e, NOME_DO_JOGO[jogoDaMesa(c)]);
     } finally {
       setRespondendoConvite(false);
     }
@@ -1537,8 +1558,10 @@ export function App() {
         jogando={jogandoPorPessoa}
         nomeDoJogador={nomeDoJogador}
         minhaPartida={minhaMesaAgora?.estado ?? null}
+        jogoDaMinhaPartida={minhaMesaAgora ? jogoDaMesa(minhaMesaAgora) : null}
         onPartida={abrirPartida}
         onXadrez={abrirXadrez}
+        onDama={abrirDama}
         textoDaLuta={textoDaLuta}
         onLuta={abrirLuta}
         textoDoCatan={textoDoCatan}
@@ -1706,6 +1729,7 @@ export function App() {
           />
         ) : minhaMesaAgora && !jogoAberto ? (
           <FaixaDaPartida
+            jogo={NOME_DO_JOGO[jogoDaMesa(minhaMesaAgora)]}
             estado={minhaMesaAgora.estado}
             titulo={minhaMesaAgora.estado === 'lobby'
               ? 'mesa aberta'

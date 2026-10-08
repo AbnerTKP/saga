@@ -201,6 +201,37 @@
   --sombra-3: 0 16px 48px var(--preto-55);
 
   /* ===================================================================== */
+  /* A DAMA — as cores do JOGO, não do app (a lição da primeira F1). O     */
+  /* tabuleiro é a madeira do xadrez; as peças, creme e chocolate em       */
+  /* relevo, com a coroa dourada — a opção A que o dono escolheu.          */
+  /* ===================================================================== */
+  --madeira-clara: #eed8b4;
+  --madeira-escura: #b1865f;
+  --dama-branca-luz: #fffaf0;
+  --dama-branca: #eadcc0;
+  --dama-branca-sombra: #cdb88f;
+  --dama-branca-borda: #a8916a;
+  --dama-branca-sulco: rgba(140,110,70,.35);
+  --dama-preta-luz: #6a4b38;
+  --dama-preta: #3d2a1f;
+  --dama-preta-sombra: #2a1c14;
+  --dama-preta-borda: #1a110c;
+  --dama-preta-sulco: rgba(255,230,200,.14);
+  --dama-coroa: #e0b13e;
+  --dama-coroa-traco: #8a6414;
+  --dama-sombra: rgba(0,0,0,.38);
+  --dama-rota: rgba(30,120,50,.85);
+  --dama-passo: rgba(20,85,30,.85);
+  --dama-alvo: rgba(20,85,30,.42);
+  --dama-escolhida: rgba(20,85,30,.35);
+  --dama-ultimo: rgba(205,210,106,.55);
+  --dama-sai: rgba(224,72,82,.95);
+  --dama-obrigada: rgba(240,200,80,.95);
+  --dama-aviso: #f0c850;
+  --dama-aviso-fundo: rgba(240,200,80,.10);
+  --dama-aviso-borda: rgba(240,200,80,.35);
+
+  /* ===================================================================== */
   /* CAMADAS — a escada comentada em .modal-back, agora como variável.      */
   /* Camada nova entra NA escada; o design.test.ts confere a ordem.        */
   /* ===================================================================== */

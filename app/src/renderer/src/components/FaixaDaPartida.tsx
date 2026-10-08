@@ -24,7 +24,7 @@ export function FaixaDaPartida({ jogo = 'Xadrez', estado, titulo, minhaVez, outr
       <span className="faixa-icone"><Icon name="controle" size={15} /></span>
       <span className="faixa-nome strong">{jogo}</span>
       <span className="faixa-partida-titulo">{titulo}</span>
-      {estado === 'jogando' && (jogo === 'Xadrez' || jogo === 'Catan') && (
+      {estado === 'jogando' && (jogo === 'Xadrez' || jogo === 'Dama' || jogo === 'Catan') && (
         <span className={`xadrez-chip ${minhaVez ? 'vez' : ''}`}>
           {minhaVez ? 'Sua vez' : outroNome ? `vez de ${outroNome}` : 'vez do outro'}
         </span>

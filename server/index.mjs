@@ -143,7 +143,7 @@ const svc = new RoomServiceClient(HOST, KEY, SECRET);
 const db = abrirBanco(BANCO);
 // Quem está escrevendo agora. Mora na memória do processo de propósito — ver digitando.mjs.
 const digitando = criarRegistroDeDigitacao();
-// As mesas de xadrez, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
+// As mesas de xadrez e de dama, também na memória: REINICIAR O SERVIDOR ENCERRA AS PARTIDAS em andamento.
 // Publicar o servidor com alguém jogando apaga a partida dele — ver jogos.mjs.
 const mesas = criarMesas();
 // As mesas do Catan, pelo mesmo motivo e com o mesmo preço — ver catans.mjs.
@@ -1073,6 +1073,9 @@ const ROTAS = {
       rooms: salas,
       categorias: categoriasM.listarCategorias(db, sid),
       jogos: mesas.resumo(naMesa(sid, eu), foraDaqui(eu)),
+      // A dama mora nas mesmas mesas, mas vai num campo à parte: o app de antes dela leria uma
+      // mesa de dama como xadrez e desenharia peças de xadrez no tabuleiro.
+      damas: mesas.resumo(naMesa(sid, eu), foraDaqui(eu), 'dama'),
       // As arenas do Dragão Quadrado vão pela mesma carona, e pelo mesmo motivo do xadrez: o
       // convite tem de chegar a quem está em qualquer tela — inclusive olhando outro servidor.
       lutas: arenas.resumo(naArena(req, sid, eu), foraDaqui(eu)),
@@ -1472,7 +1475,8 @@ const ROTAS = {
     return { conversa: conversas.abrir(db, eu, alvo) };
   },
 
-  // --- xadrez -----------------------------------------------------------------
+  // --- xadrez e dama ----------------------------------------------------------
+  // `abrir` leva o jogo (`jogo: 'dama'`; sem ele, xadrez); o resto é igual para os dois.
   // A mesa é sempre do servidor do pedido; a de outro responde como mesa que não existe. Quem
   // valida o lance é o servidor, nunca o app de quem joga — ver xadrez.mjs.
   'POST /jogos/abrir': async (req) => {

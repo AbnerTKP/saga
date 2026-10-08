@@ -6,9 +6,11 @@
 //   página (script-src 'self') barraria; e nada fica vigiando os arquivos do repositório.
 // - O endereço do servidor é trocado NA HORA de servir o api.ts ('localhost:3001', o de
 //   desenvolvimento) pelo servidor local das fotos. O arquivo do repositório não muda.
-import react from '/Users/loki/Documents/app-comunicacao/app/node_modules/@vitejs/plugin-react/dist/index.js';
+import { pathToFileURL } from 'node:url';
 
 const RAIZ = process.env.SAGA_RAIZ ?? '/Users/loki/Documents/app-comunicacao';
+// Pelo RAIZ, e não por um caminho escrito: no Windows o repositório mora noutro lugar.
+const { default: react } = await import(pathToFileURL(`${RAIZ}/app/node_modules/@vitejs/plugin-react/dist/index.js`).href);
 const PORTA_SAGA = process.env.PORTA_SAGA ?? '3901';
 const PORTA_VITE = Number(process.env.PORTA_VITE ?? 5901);
 

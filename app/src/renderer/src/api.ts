@@ -9,7 +9,8 @@ import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
 import type { AcaoNaMesaDoCatan, CatanNoServidor, MesaDoCatan } from './catan';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
-import type { ResumoDaMesa } from './jogos';
+import type { JogoDeMesa, ResumoDaMesa } from './jogos';
+import type { LanceDaDama } from './dama';
 import type { IdDoCenario, IdDoLutador } from './dragao/tipos';
 import { PROTOCOLO_DA_LUTA } from './dragao/protocolo';
 import type { CorpoDoRelato } from './relato';
@@ -577,7 +578,7 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
   // busca que toda tela já faz, e uma terceira só para elas dobraria o trânsito para
   // dizer coisas que mudam devagar. Servidor antigo não manda nenhum dos dois.
   pedir<{
-    servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor;
+    servidorId?: number; rooms: RoomInfo[]; categorias: Categoria[]; jogos?: JogosNoServidor; damas?: JogosNoServidor;
     /** A hora do servidor na resposta. Servidor antigo não manda. */
     agora?: number;
     lutas?: LutasNoServidor;
@@ -601,13 +602,15 @@ export type PessoaDaMesa = { id: number; nome: string; foto: string | null; idEx
  * `servidor` e `servidorNome`: de que servidor é a mesa. O convite chega de qualquer servidor da
  * pessoa, e responder vai ao servidor DELE. Servidor antigo não manda: aí é o servidor aberto.
  */
-export type ConviteDeJogo = { mesa: number; servidor?: number; servidorNome?: string | null; de: PessoaDaMesa; tempo: number | null; cor: CorEscolhida };
+export type ConviteDeJogo = { mesa: number; jogo?: JogoDeMesa; servidor?: number; servidorNome?: string | null; de: PessoaDaMesa; tempo: number | null; cor: CorEscolhida };
 
 export type JogosNoServidor = { mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] };
 
-/** A mesa como quem pediu a vê. */
+/** A mesa como quem pediu a vê. A de dama tem a mesma forma; muda o `fen` e os `legais`. */
 export type Mesa = {
   id: number;
+  /** Servidor antigo não manda: aí é xadrez. */
+  jogo?: JogoDeMesa;
   estado: 'lobby' | 'jogando' | 'fim';
   anfitriao: PessoaDaMesa;
   /** Segundos para cada jogador; null é sem relógio. */
@@ -624,7 +627,7 @@ export type Mesa = {
   lances: { san: string; de: string; para: string }[];
   ultimo: { de: string; para: string } | null;
   /** Os lances que valem — só para quem está na vez; para os outros, vazio. */
-  legais: LanceLegal[];
+  legais: LanceLegal[] | LanceDaDama[];
   relogio: Relogio | null;
   empateOferecidoPor: number | null;
   revanchePedidaPor: number | null;
@@ -639,15 +642,15 @@ export type Mesa = {
 export type AcaoNaMesa =
   | { acao: 'configurar'; tempo?: number | null; cor?: CorEscolhida }
   | { acao: 'chamar'; alvo: number }
-  | { acao: 'lance'; de: string; para: string; promocao?: Promocao }
+  | { acao: 'lance'; de: string; para: string; promocao?: Promocao; caminho?: string[] }
   | { acao: 'cancelarConvite' | 'aceitar' | 'recusar' | 'desistir' | 'oferecerEmpate' | 'aceitarEmpate' | 'recusarEmpate' | 'revanche' | 'fechar' };
 
 /**
  * A mesa é de um servidor, e o pedido vai sempre ao servidor DELA — nunca ao aberto: trocar
  * de servidor no meio de uma partida não pode mandar o lance para outro lugar.
  */
-export const abrirMesa = async (tempo: number | null, cor: CorEscolhida, servidorId: number) =>
-  (await pedir<{ mesa: Mesa }>('POST', '/jogos/abrir', { tempo, cor }, servidorId)).mesa;
+export const abrirMesa = async (tempo: number | null, cor: CorEscolhida, servidorId: number, jogo: JogoDeMesa = 'xadrez') =>
+  (await pedir<{ mesa: Mesa }>('POST', '/jogos/abrir', { tempo, cor, jogo }, servidorId)).mesa;
 
 /** Quem pede e não joga entra na plateia: é assim que o servidor conta quem assiste. */
 export const verMesa = async (id: number, servidorId: number) =>

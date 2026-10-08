@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { agirNaMesa, verMesa, type AcaoNaMesa, type Membro, type Mesa, type PessoaDaMesa } from '../api';
-import { quemChamar, type Chamavel } from '../jogos';
+import { jogoDaMesa, NOME_DO_JOGO, quemChamar, type Chamavel } from '../jogos';
+import { anotar, capturaObrigatoria, tomadasNaDama, type LanceDaDama } from '../dama';
 import {
   emPares, formatarRelogio, lerCasas, partesDoLance, plateiaDaPartida, POUCO_TEMPO, restante, TEMPOS,
-  textoDoFim, tomadas, type CorEscolhida, type Lado,
+  textoDoFim, tomadas, type CorEscolhida, type Lado, type LanceLegal,
 } from '../xadrez';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { Tabuleiro } from './Tabuleiro';
+import { PecaDeDama, TabuleiroDaDama } from './TabuleiroDaDama';
 
 /** De quanto em quanto a tela pergunta pela mesa: o lance do outro chega em até isto. */
 const INTERVALO = 800;
@@ -19,10 +21,16 @@ const VAO = 20;
 
 const ROTULO_DA_COR: Record<CorEscolhida, string> = { brancas: 'Brancas', sorteio: 'Sorteio', pretas: 'Pretas' };
 
+/** O lance que saiu daqui e ainda não voltou do servidor. Na dama, com as tomadas e a rota. */
+type Pendente = { de: string; para: string; caminho?: string[]; capturadas?: string[] };
+
 /**
  * A partida da dupla, na tela dela — e só ela: várias duplas jogam ao mesmo tempo, cada uma
  * na sua, e quem é de fora entra como plateia. É a mesma tela do começo ao fim: a mesa
  * aberta (o lobby), a partida e o fim, conforme o que o servidor diz da mesa.
+ *
+ * Serve ao xadrez e à dama: a mesa em volta é a mesma (`server/jogos.mjs`), e o jogo vem da
+ * própria mesa (`mesa.jogo`). Muda o tabuleiro, as peças tomadas e a anotação dos lances.
  */
 export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogando, live, onFechar, onAviso }: {
   mesaId: number;
@@ -42,7 +50,7 @@ export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogand
 }) {
   const [mesa, setMesa] = useState<Mesa | null>(null);
   const [falhou, setFalhou] = useState<string | null>(null);
-  const [pendente, setPendente] = useState<{ de: string; para: string } | null>(null);
+  const [pendente, setPendente] = useState<Pendente | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const recebidaEm = useRef(0);
   const fecharRef = useRef(onFechar);
@@ -80,7 +88,7 @@ export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogand
         if (!vivo) return;
         if ((e as { status?: number }).status === 404) {
           vivo = false;
-          if (!saindo.current) avisarRef.current('info', 'A mesa de xadrez foi fechada.');
+          if (!saindo.current) avisarRef.current('info', 'A mesa foi fechada.');
           fecharRef.current();
           return;
         }
@@ -94,9 +102,9 @@ export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogand
     return () => { vivo = false; clearInterval(id); };
   }, [mesaId, servidorId, receber]);
 
-  const agir = useCallback(async (a: AcaoNaMesa) => {
+  const agir = useCallback(async (a: AcaoNaMesa, comoFica?: LanceDaDama) => {
     if (a.acao === 'fechar') saindo.current = true;
-    if (a.acao === 'lance') setPendente({ de: a.de, para: a.para });
+    if (a.acao === 'lance') setPendente(comoFica ?? { de: a.de, para: a.para });
     setOcupado(true);
     try {
       receber(await agirNaMesa(mesaId, a, servidorId));
@@ -145,7 +153,7 @@ export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogand
     <div className="tela-do-xadrez">
       <header className="stage-head">
         <Icon name="controle" />
-        <span className="strong">Xadrez</span>
+        <span className="strong">{mesa ? NOME_DO_JOGO[jogoDaMesa(mesa)] : 'Mesa'}</span>
         {titulo && <span className="xadrez-titulo">{titulo}</span>}
         {souPlateia && <span className="selo-assistindo"><Icon name="olho" size={12} /> assistindo</span>}
       </header>
@@ -169,18 +177,25 @@ export function TelaDoXadrez({ mesaId, servidorId, euId, membros, naCall, jogand
 
 function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, naCall, jogando, onAgir, onSair }: {
   mesa: Mesa; euId: number; casa: number; passou: number;
-  pendente: { de: string; para: string } | null;
+  pendente: Pendente | null;
   ocupado: boolean;
   live?: ReactNode;
   membros: Membro[]; naCall: Set<number>; jogando: Set<number>;
-  onAgir: (a: AcaoNaMesa) => void;
+  onAgir: (a: AcaoNaMesa, comoFica?: LanceDaDama) => void;
   onSair: () => void;
 }) {
+  const daDama = jogoDaMesa(mesa) === 'dama';
   const minhaCor: Lado | null = mesa.eu === 'brancas' ? 'w' : mesa.eu === 'pretas' ? 'b' : null;
   // Quem joga vê a própria cor embaixo; quem abriu a mesa de pretas já a vê assim no lobby.
   const embaixo: Lado = minhaCor ?? (mesa.eu === 'anfitriao' && mesa.cor === 'pretas' ? 'b' : 'w');
   const emCima: Lado = embaixo === 'w' ? 'b' : 'w';
-  const { pelasBrancas, pelasPretas } = tomadas(lerCasas(mesa.fen));
+  // O que cada lado tomou: no xadrez, os desenhos das peças; na dama, uma peça e o número.
+  const tomou: { w: ReactNode; b: ReactNode } = (() => {
+    if (!daDama) { const t = tomadas(lerCasas(mesa.fen)); return { w: t.pelasBrancas, b: t.pelasPretas }; }
+    const t = tomadasNaDama(lerCasas(mesa.fen));
+    const conta = (n: number, letra: string) => (n ? <span className="dama-tomadas" title="Peças que já tomou"><PecaDeDama letra={letra} mini />×{n}</span> : null);
+    return { w: conta(t.pelasBrancas, 'p'), b: conta(t.pelasPretas, 'P') };
+  })();
   const altura = casa * 8 + 2 * BARRA + 2 * RESPIRO;
   const noLobby = mesa.estado === 'lobby';
   const relogioDoLobby = mesa.tempo ? <Relogio ms={mesa.tempo * 1000} correndo={false} /> : null;
@@ -195,7 +210,7 @@ function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, n
       <BarraDoJogador
         pessoa={pessoa}
         detalhe={`${lado === 'w' ? 'brancas' : 'pretas'}${voce ? ' · você' : ''}`}
-        tomou={lado === 'w' ? pelasBrancas : pelasPretas}
+        tomou={tomou[lado]}
       >
         {venceu && <span className="xadrez-chip venceu">Venceu</span>}
         {ms !== null
@@ -224,10 +239,22 @@ function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, n
         ) : barraDe(emCima)}
 
         <div className="xadrez-tabuleiro-e-camada">
-          <Tabuleiro
+          {daDama ? (
+            <TabuleiroDaDama
+              fen={mesa.fen}
+              embaixo={embaixo}
+              legais={mesa.estado === 'jogando' ? mesa.legais as LanceDaDama[] : []}
+              ultimo={mesa.ultimo}
+              pendente={pendente ? { san: '', caminho: [pendente.para], capturadas: [], ...pendente } : null}
+              casa={casa}
+              onLance={mesa.estado === 'jogando' && souJogador
+                ? (l) => onAgir({ acao: 'lance', de: l.de, para: l.para, caminho: l.caminho }, l)
+                : undefined}
+            />
+          ) : <Tabuleiro
             fen={mesa.fen}
             embaixo={embaixo}
-            legais={mesa.estado === 'jogando' ? mesa.legais : []}
+            legais={mesa.estado === 'jogando' ? mesa.legais as LanceLegal[] : []}
             ultimo={mesa.ultimo}
             xeque={mesa.xeque}
             vez={mesa.vez}
@@ -236,7 +263,7 @@ function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, n
             onLance={mesa.estado === 'jogando' && souJogador
               ? (de, para, promocao) => onAgir({ acao: 'lance', de, para, ...(promocao ? { promocao } : {}) })
               : undefined}
-          />
+          />}
           {fim && (
             <div className="xadrez-fim">
               <div className="xadrez-fim-cartao">
@@ -293,7 +320,7 @@ function Partida({ mesa, euId, casa, passou, pendente, ocupado, live, membros, n
 function BarraDoJogador({ pessoa, detalhe, tomou, children }: {
   pessoa: PessoaDaMesa | null;
   detalhe: string;
-  tomou: string;
+  tomou: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -303,7 +330,9 @@ function BarraDoJogador({ pessoa, detalhe, tomou, children }: {
         <span className="xadrez-nome">{pessoa?.nome ?? '…'}</span>
         <span className="xadrez-lado">{detalhe}</span>
       </span>
-      {tomou && <span className="xadrez-tomadas" title="Peças que já tomou">{tomou}</span>}
+      {typeof tomou === 'string'
+        ? tomou && <span className="xadrez-tomadas" title="Peças que já tomou">{tomou}</span>
+        : tomou}
       <span className="spacer" />
       {children}
     </div>
@@ -320,10 +349,11 @@ function Relogio({ ms, correndo }: { ms: number; correndo: boolean }) {
   );
 }
 
-function Lance({ san, ultimo }: { san: string; ultimo: boolean }) {
+function Lance({ san, ultimo, daDama }: { san: string; ultimo: boolean; daDama: boolean }) {
   return (
     <span className={`xadrez-lance ${ultimo ? 'ultimo' : ''}`}>
-      {partesDoLance(san).map((p, i) => <span key={i} className={p.figura ? 'figura' : undefined}>{p.texto}</span>)}
+      {daDama ? anotar(san)
+        : partesDoLance(san).map((p, i) => <span key={i} className={p.figura ? 'figura' : undefined}>{p.texto}</span>)}
     </span>
   );
 }
@@ -355,6 +385,11 @@ function ColunaDosLances({ mesa, euId, altura, ocupado, live, souJogador, outro,
   const ultimo = mesa.lances.length - 1;
   const plateia = plateiaDaPartida(mesa.plateia, euId);
   const empateDoOutro = mesa.empateOferecidoPor !== null && mesa.empateOferecidoPor !== euId;
+  const daDama = jogoDaMesa(mesa) === 'dama';
+  // Na dama, quando você é obrigado a capturar, a coluna diz por que só algumas peças respondem.
+  const legaisDaDama = daDama && souJogador && mesa.estado === 'jogando' ? mesa.legais as LanceDaDama[] : [];
+  const obrigado = capturaObrigatoria(legaisDaDama);
+  const maisDeUma = obrigado && legaisDaDama[0].capturadas.length > 1;
 
   return (
     <div className="xadrez-lateral" style={{ height: altura }}>
@@ -363,11 +398,17 @@ function ColunaDosLances({ mesa, euId, altura, ocupado, live, souJogador, outro,
         {pares.length === 0 ? <span className="muted small">As brancas começam.</span> : pares.map((p) => (
           <div key={p.numero} className="xadrez-par">
             <span className="xadrez-numero">{p.numero}.</span>
-            <Lance san={p.brancas} ultimo={(p.numero - 1) * 2 === ultimo} />
-            {p.pretas ? <Lance san={p.pretas} ultimo={(p.numero - 1) * 2 + 1 === ultimo} /> : <span />}
+            <Lance san={p.brancas} ultimo={(p.numero - 1) * 2 === ultimo} daDama={daDama} />
+            {p.pretas ? <Lance san={p.pretas} ultimo={(p.numero - 1) * 2 + 1 === ultimo} daDama={daDama} /> : <span />}
           </div>
         ))}
       </div>
+      {obrigado && (
+        <div className="dama-aviso">
+          <strong>Captura obrigatória.</strong>{' '}
+          {maisDeUma ? 'E tem de ser a que toma mais peças: só as peças que fazem isso respondem.' : 'Só as peças que podem capturar respondem.'}
+        </div>
+      )}
       {live && <div className="xadrez-live">{live}</div>}
       {plateia && (
         <div className="xadrez-plateia" title={`Assistindo: ${mesa.plateia.map((p) => p.nome).join(', ')}`}>
@@ -441,7 +482,7 @@ function Lobby({ mesa, euId, altura, ocupado, membros, naCall, jogando, onAgir }
 
   return (
     <div className="xadrez-lateral xadrez-lobby" style={{ height: altura }}>
-      <div className="xadrez-cabecalho">Mesa de xadrez</div>
+      <div className="xadrez-cabecalho">Mesa de {NOME_DO_JOGO[jogoDaMesa(mesa)].toLowerCase()}</div>
       <div className="xadrez-escolha">
         <span className="xadrez-rotulo">Tempo para cada um</span>
         <div className="xadrez-chips">
