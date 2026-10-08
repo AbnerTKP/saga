@@ -1824,10 +1824,6 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 .medidor-cortado, .medidor-passa { position: absolute; top: 0; bottom: 0; transition: width .05s linear; }
 .medidor-cortado { left: 0; width: calc(min(var(--nivel), var(--corte)) * 1%); background: var(--text3); }
 .medidor-passa { left: calc(var(--corte) * 1%); width: calc(max(0, var(--nivel) - var(--corte)) * 1%); background: var(--falando); }
-/* Sozinha, o corte é um tracejado que não se arrasta: ele mostra, não pede mão. */
-.medidor-marca { position: absolute; top: 0; bottom: 0; left: calc(var(--corte) * 1% - 1px); width: 2px;
-  background: repeating-linear-gradient(to bottom, var(--white) 0 3px, transparent 3px 5px);
-  opacity: .7; pointer-events: none; }
 .form .medidor input[type="range"], .medidor input[type="range"] { position: absolute; inset: 0; width: 100%;
   height: 16px; margin: 0; padding: 0; border: 0; background: transparent; -webkit-appearance: none;
   appearance: none; cursor: pointer; }

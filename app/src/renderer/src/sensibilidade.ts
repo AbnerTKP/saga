@@ -15,9 +15,7 @@ export type Supressao = 'desligada' | 'padrao' | 'forte';
 
 export type AjustesDoMicrofone = {
   supressao: Supressao;
-  /** Ajustar sozinha: o corte acompanha o barulho do ambiente. */
-  auto: boolean;
-  /** O corte escolhido à mão, em dBFS. Guardado mesmo com `auto`, para voltar a ele. */
+  /** O corte, em dBFS: abaixo dele nada sai para a call. */
   corte: number;
 };
 
@@ -25,7 +23,7 @@ export type AjustesDoMicrofone = {
  * Já nasce ligado, e forte. Quem ouve a casa dos outros não é quem precisa mexer em
  * ajuste — é o outro. Um padrão desligado só funcionaria para quem abrisse a tela.
  */
-export const AJUSTES_PADRAO: AjustesDoMicrofone = { supressao: 'forte', auto: true, corte: -50 };
+export const AJUSTES_PADRAO: AjustesDoMicrofone = { supressao: 'forte', corte: -50 };
 
 /** O prefixo antigo fica: é o de todas as chaves do app (ver CLAUDE.md). */
 export const CHAVE_DO_MICROFONE = 'cantinho.microfone';
@@ -35,14 +33,16 @@ const SUPRESSOES: Supressao[] = ['desligada', 'padrao', 'forte'];
 /** A régua da barra: de −100 dB (nada) a 0 dB (o máximo que o microfone entrega). */
 export const PISO_DA_REGUA = -100;
 
-/** Lê o que ficou guardado. Chave vazia, lixo ou pedaço faltando voltam ao padrão. */
+/**
+ * Lê o que ficou guardado. Chave vazia, lixo ou pedaço faltando voltam ao padrão. O `auto`
+ * de quem ligou o "Ajustar sozinha" fica no `localStorage` e é ignorado: ver `avancar`.
+ */
 export function ajustesGuardados(texto: string | null): AjustesDoMicrofone {
   let bruto: unknown;
   try { bruto = texto ? JSON.parse(texto) : null; } catch { bruto = null; }
   const o = (bruto && typeof bruto === 'object' ? bruto : {}) as Record<string, unknown>;
   return {
     supressao: SUPRESSOES.includes(o.supressao as Supressao) ? (o.supressao as Supressao) : AJUSTES_PADRAO.supressao,
-    auto: typeof o.auto === 'boolean' ? o.auto : AJUSTES_PADRAO.auto,
     corte: typeof o.corte === 'number' && Number.isFinite(o.corte) ? limitar(o.corte, PISO_DA_REGUA, 0) : AJUSTES_PADRAO.corte,
   };
 }
@@ -70,53 +70,10 @@ export function nivelDoBloco(amostras: ArrayLike<number>) {
 
 // ---- o corte ----------------------------------------------------------------
 
-/**
- * O corte automático sai de DUAS medidas, e a segunda veio de uma medida que falhou.
- *
- * A primeira é o barulho do ambiente: o corte fica esta folga acima dele. Sozinha ela não
- * segura TV: medido com voz e uma TV ao fundo passando pelo caminho de verdade, a TV tem
- * pausas, nas pausas o "barulho da casa" some, e o corte desceu a −70 dB — a TV passou
- * inteira (−29 dB na saída). Pelo ambiente não há como separar a TV da sua voz.
- *
- * A segunda é a SUA voz, que chega mais alta porque está perto do microfone: o corte fica
- * no máximo esta distância abaixo dela. É o que tira a TV — enquanto ela for mais baixa
- * que você. Uma TV mais alta que a sua voz, nenhuma régua de volume separa.
- */
-export const FOLGA_DO_AUTOMATICO = 15;
-/**
- * Os dois números abaixo foram escolhidos numa varredura, e não de olho, porque um puxa
- * contra o outro: esquecer rápido a voz deixa a TV voltar enquanto você está calado;
- * ficar muito perto dela corta quem passou a falar mais baixo. Voz a −12 dB, TV com
- * pausas ao fundo, quanto tempo calado até a TV passar:
- *
- *   abaixo  esquece     TV 15 dB abaixo  TV 20 dB abaixo  voz 10 dB mais baixa
- *   14 dB   0,02 dB/s   24 s             274 s            volta em 2 s
- *   16 dB   0,05 dB/s   4 s              70 s             volta em 2 s
- *   18 dB   0,1  dB/s   4 s              14 s             volta em 2 s
- *
- * TV só 15 dB abaixo de você volta em segundos: é o caso do ajuste à mão.
- */
-export const ABAIXO_DA_VOZ = 14;
-export const VOZ_ESQUECE_DB_POR_S = 0.02;
-/** O corte automático nunca desce a ponto de abrir para o silêncio, nem sobe a ponto de cortar voz. */
-export const CORTE_AUTOMATICO_MIN = -70;
-export const CORTE_AUTOMATICO_MAX = -20;
 /** Aberto, só fecha abaixo do corte menos isto: sem a histerese, voz no limite picota. */
 export const HISTERESE = 4;
 /** O fim de uma palavra e o respiro entre duas não podem fechar o microfone. */
 export const SEGURAR_MS = 300;
-
-/**
- * O barulho do ambiente é o som MAIS BAIXO dos últimos segundos. Toda fala tem pausa —
- * entre frases, para respirar — e é na pausa que o barulho da casa aparece sozinho. Uma
- * média subindo devagar confundiria fala comprida com barulho, e levaria mais de um minuto
- * para alcançar uma TV ligada no meio da call; o mínimo de uma janela alcança na largura
- * dela. A janela vai em baldes de meio segundo para não guardar amostra nenhuma.
- */
-export const BALDE_MS = 500;
-export const BALDES = 10;
-/** Antes de haver o que medir, o piso é o de um quarto quieto. */
-const PISO_INICIAL = -60;
 
 export type Portao = {
   aberto: boolean;
@@ -124,50 +81,29 @@ export type Portao = {
   abaixoHaMs: number;
   /** O nível suavizado, que é o que decide e o que a barra mostra. */
   nivel: number;
-  /** O menor nível de cada meio segundo; `Infinity` é balde ainda vazio. */
-  baldes: number[];
-  balde: number;
-  baldeMs: number;
-  /** O barulho do ambiente, estimado. */
-  piso: number;
-  /** O nível da sua fala, lembrado. `PISO_DA_REGUA` enquanto você não falou. */
-  voz: number;
 };
 
 export function novoPortao(): Portao {
-  return { aberto: false, abaixoHaMs: 0, nivel: PISO_DA_REGUA, baldes: new Array(BALDES).fill(Infinity), balde: 0, baldeMs: 0, piso: PISO_INICIAL, voz: PISO_DA_REGUA };
-}
-
-export function corteVigente(p: Portao, auto: boolean, corteManual: number) {
-  if (!auto) return corteManual;
-  return limitar(Math.max(p.piso + FOLGA_DO_AUTOMATICO, p.voz - ABAIXO_DA_VOZ), CORTE_AUTOMATICO_MIN, CORTE_AUTOMATICO_MAX);
+  return { aberto: false, abaixoHaMs: 0, nivel: PISO_DA_REGUA };
 }
 
 /**
  * Um passo do portão. MUDA o objeto em vez de devolver outro: roda centenas de vezes por
  * segundo dentro do processador de áudio, onde criar objeto é criar lixo no meio do som.
+ *
+ * O corte é FIXO. Existiu um "Ajustar sozinha" (setembro a outubro de 2026), que punha o
+ * corte acima do barulho da casa e até 14 dB abaixo da sua fala lembrada, subindo até −20
+ * dB — e era ele que "mutava a pessoa sozinha". Medido nesta mesma conta (08/10/2026):
+ * depois de uma risada alta, a fala normal passava 7% nos 30 s seguintes e 0% no minuto
+ * seguinte, e a voz a −24 dB com o jogo saindo pela caixa a −34 passava 15%. Sem ícone de
+ * mudo nenhum: quem falava não tinha como saber. Com o corte fixo em −50 dB, 100% nos dois.
+ * O preço é a TV e o teclado nas pausas, que o automático tirava; voz cortada é pior.
  */
-export function avancar(p: Portao, nivelDb: number, dtMs: number, auto: boolean, corteManual: number) {
+export function avancar(p: Portao, nivelDb: number, dtMs: number, corte: number) {
   // Sobe na hora e desce devagar: o começo de uma sílaba não pode esperar, e o nível não
   // pode despencar no vão entre duas.
   p.nivel = nivelDb > p.nivel ? nivelDb : p.nivel + (nivelDb - p.nivel) * Math.min(1, dtMs / 60);
 
-  if (p.nivel < p.baldes[p.balde]) p.baldes[p.balde] = p.nivel;
-  p.baldeMs += dtMs;
-  if (p.baldeMs >= BALDE_MS) {
-    p.baldeMs = 0;
-    p.balde = (p.balde + 1) % BALDES;
-    p.baldes[p.balde] = Infinity;
-  }
-  let menor = Infinity;
-  for (let i = 0; i < BALDES; i++) if (p.baldes[i] < menor) menor = p.baldes[i];
-  p.piso = menor === Infinity ? PISO_INICIAL : menor;
-
-  // A voz sobe em 150 ms, e não num bloco: um estalo não pode virar "a sua voz".
-  if (p.nivel > p.voz) p.voz += (p.nivel - p.voz) * Math.min(1, dtMs / 150);
-  else p.voz = Math.max(PISO_DA_REGUA, p.voz - (VOZ_ESQUECE_DB_POR_S * dtMs) / 1000);
-
-  const corte = corteVigente(p, auto, corteManual);
   if (p.nivel > corte) {
     p.aberto = true;
     p.abaixoHaMs = 0;

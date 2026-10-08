@@ -10,6 +10,7 @@ import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
+import { ESPERAS_PARA_REABRIR_MS, deveReabrirMicrofone } from './microfoneCaido';
 import { podeTransmitir } from './transmitir';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
@@ -63,6 +64,7 @@ import {
   type AudioCaptureOptions,
   type RemoteTrackPublication,
   type LocalTrackPublication,
+  type TrackPublication,
   type ScreenShareCaptureOptions,
   type TrackPublishOptions,
 } from 'livekit-client';
@@ -233,6 +235,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const querFalar = useRef(true);
   /** Ver o efeito principal: é ele quem ouve a mudança de permissão, e chama isto. */
   const aoMudarPermissao = useRef<() => void>(() => undefined);
+  /** Idem para o microfone que o LiveKit mutou sozinho; ver `microfoneCaido.ts`. */
+  const aoMutarOMicrofone = useRef<() => void>(() => undefined);
 
   // Soundboard. O som vai para a sala numa faixa própria, e não misturado ao microfone:
   // assim tocar não depende de estar com o microfone ligado, e mutar alguém não muta os
@@ -555,7 +559,11 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
       })
       .on(RoomEvent.ParticipantDisconnected, () => { tocarAviso('saiu', deafenedRef.current); bump(); })
-      .on(RoomEvent.TrackMuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
+      .on(RoomEvent.TrackMuted, (pub: TrackPublication, quem: Participant) => {
+        microfoneRef.current.eventos.reavaliar();
+        bump();
+        if (quem === room.localParticipant && pub.source === Track.Source.Microphone) aoMutarOMicrofone.current();
+      })
       .on(RoomEvent.TrackUnmuted, () => { microfoneRef.current.eventos.reavaliar(); bump(); })
       .on(RoomEvent.ActiveDeviceChanged, (tipo: MediaDeviceKind, id: string) => {
         microfoneRef.current.eventos.trocouDeMicrofone();
@@ -675,6 +683,46 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     tocarAviso(lp().isMicrophoneEnabled ? 'micLigou' : 'micMutou', deafenedRef.current);
     bump();
   }, [room, tocarAviso, falhouOMicrofone]);
+
+  /**
+   * O microfone que CAIU volta sozinho, e ninguém fica mudo sem ter pedido. Quem decide se é
+   * queda é `microfoneCaido.ts`; aqui moram as tentativas. Cada uma pede o microfone de
+   * volta (o LiveKit reabre a faixa que terminou) e, falhando, passa ao padrão do sistema
+   * para a próxima. Antes de cada uma, confere de novo: quem se mutou, desligou o fone ou
+   * saiu nesse meio-tempo decidiu, e isso não se desfaz.
+   */
+  const reabrindoMicrofone = useRef(false);
+  aoMutarOMicrofone.current = async () => {
+    const faixa = lp().getTrackPublication(Track.Source.Microphone)?.track;
+    const caiu = deveReabrirMicrofone({
+      querFalar: querFalar.current, surdo: deafenedRef.current, conectado: room.state === 'connected',
+      faixaAcabou: faixa?.mediaStreamTrack?.readyState === 'ended',
+    });
+    if (!caiu || reabrindoMicrofone.current) return;
+    reabrindoMicrofone.current = true;
+    anotar('aviso', 'microfone', 'o microfone caiu e o LiveKit o mutou; tentando reabrir');
+    try {
+      for (const espera of ESPERAS_PARA_REABRIR_MS) {
+        await new Promise((r) => setTimeout(r, espera));
+        if (!querFalar.current || deafenedRef.current || room.state !== 'connected') return;
+        if (lp().isMicrophoneEnabled) return;
+        try {
+          await lp().setMicrophoneEnabled(true);
+          if (lp().isMicrophoneEnabled) {
+            anotar('info', 'microfone', `reaberto sozinho, ${espera} ms depois de cair`);
+            return;
+          }
+        } catch (e) {
+          anotar('erro', 'microfone', e);
+          await trocarAparelho(room, 'audioinput', '').catch(() => undefined);
+        }
+      }
+      falhouOMicrofone(new Error('ele parou e não consegui reabrir. Confira se está conectado e clique no microfone.'));
+    } finally {
+      reabrindoMicrofone.current = false;
+      bump();
+    }
+  };
 
   const toggleCam = useCallback(async () => {
     await lp().setCameraEnabled(!lp().isCameraEnabled).catch((e: Error) => setError(`Câmera: ${e.message}`));

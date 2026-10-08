@@ -38,13 +38,12 @@ function Medidor({ microfone, compacto }: { microfone: MicrofoneDaCall; compacto
     const el = barra.current;
     if (!el) return;
     el.style.setProperty('--nivel', String(m ? porcentoDoDb(m.nivel) : 0));
-    if (m && ajustes.auto) el.style.setProperty('--corte', String(porcentoDoDb(m.corte)));
     setAberto(m ? m.aberto : null);
-  }), [microfone.ouvir, ajustes.auto]);
+  }), [microfone.ouvir]);
 
   useEffect(() => {
-    if (!ajustes.auto) barra.current?.style.setProperty('--corte', String(porcentoDoDb(ajustes.corte)));
-  }, [ajustes.auto, ajustes.corte]);
+    barra.current?.style.setProperty('--corte', String(porcentoDoDb(ajustes.corte)));
+  }, [ajustes.corte]);
 
   const selo = aberto === null ? null : (
     <span className={`selo-do-microfone ${aberto ? 'passando' : ''}`}>
@@ -58,20 +57,14 @@ function Medidor({ microfone, compacto }: { microfone: MicrofoneDaCall; compacto
         <span className="rotulo-da-sensibilidade">Sensibilidade</span>
         {selo}
       </div>
-      <label className="check">
-        <input type="checkbox" checked={ajustes.auto} onChange={(e) => definir({ auto: e.target.checked })} />
-        Ajustar sozinha
-      </label>
-      <div className={`medidor ${ajustes.auto ? 'automatico' : ''}`} ref={barra}>
+      <div className="medidor" ref={barra}>
         <div className="medidor-trilho">
           <div className="medidor-cortado" />
           <div className="medidor-passa" />
         </div>
-        {ajustes.auto && <div className="medidor-marca" />}
         <input
           type="range" min={0} max={100} step={1}
           aria-label="Sensibilidade do microfone"
-          disabled={ajustes.auto}
           value={Math.round(porcentoDoDb(ajustes.corte))}
           onChange={(e) => definir({ corte: dbDoPorcento(Number(e.target.value)) })}
         />
@@ -115,9 +108,7 @@ export function BlocoDoMicrofone({ microfone, semTitulo }: { microfone: Microfon
           <Medidor microfone={microfone} />
           <small className="muted">
             A barra anda com o seu microfone, e o que fica à esquerda do corte não sai para a
-            call. {ajustes.auto
-              ? 'Sozinha, a Saga põe o corte (o tracejado) acima do barulho de casa e um pouco abaixo da sua voz — é por isso que ela precisa te ouvir falar uma vez.'
-              : 'Arraste a bolinha para logo acima do barulho de casa, falando normalmente.'}
+            call. Arraste a bolinha para logo acima do barulho de casa, falando normalmente.
             {' '}Vale só para o SEU microfone: para você não ouvir a casa de alguém, é ele quem precisa disto ligado.
           </small>
         </div>

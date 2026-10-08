@@ -93,7 +93,7 @@ export class MontagemDoMicrofone {
   }
 
   private mensagem(): MensagemParaOMicrofone {
-    return { tipo: 'ajustes', usarFiltro: this.ajustes.supressao === 'forte', auto: this.ajustes.auto, corte: this.ajustes.corte };
+    return { tipo: 'ajustes', usarFiltro: this.ajustes.supressao === 'forte', corte: this.ajustes.corte };
   }
 
   /**

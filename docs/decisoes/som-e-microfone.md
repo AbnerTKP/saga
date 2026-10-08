@@ -1,13 +1,13 @@
 # Som e microfone
 
-Supressão de ruído, corte automático, soundboard e os sons de aviso.
+Supressão de ruído, o corte, soundboard e os sons de aviso.
 
 ## Decisões que não são óbvias no código
 
 - **O barulho de casa se tira em QUEM FALA, e por isso nasce ligado.** Supressão de ruído e
   sensibilidade agem no seu microfone antes de ele sair: quem ouve a casa de um amigo não
   tem ajuste nenhum que resolva, é o amigo quem precisa da versão nova. Por isso o padrão
-  é Forte com "Ajustar sozinha" (`AJUSTES_PADRAO`, testado) — desligado, só funcionaria
+  é Forte, com o corte em −50 dB (`AJUSTES_PADRAO`, testado) — desligado, só funcionaria
   para quem abrisse a tela. O desenho foi o escolhido pelo dono entre três: um bloco em
   "Sua conta" e o botão direito no microfone abrindo um cartão igual ao do status, para
   ajustar no meio da call. O microfone deixou de ser `disabled` fora da call — botão
@@ -33,14 +33,26 @@ Supressão de ruído, corte automático, soundboard e os sons de aviso.
   O processador de áudio vai como `?worker&url`, que o Vite empacota com a regra de
   `sensibilidade.ts` dentro e emite como ARQUIVO: embutido como `data:` o CSP o recusaria,
   a mesma armadilha dos sons.
-- **O corte automático ouve a SUA voz, não só o ambiente — e isso veio de uma medida que
-  falhou.** A primeira versão punha o corte acima do barulho da casa (mínimo dos últimos
-  5 s). Pelo caminho de verdade a TV passou inteira: TV tem pausas, na pausa o "barulho"
-  some, e o corte desceu a −70. Hoje o corte fica também até 14 dB abaixo da sua fala
-  lembrada, que esquece 0,02 dB por segundo — números escolhidos numa varredura (a tabela
-  está em `sensibilidade.ts`): TV 20 dB abaixo de você fica de fora por mais de 4 min de
-  silêncio seu; 15 dB abaixo, volta em 24 s, e é o caso do ajuste à mão. TV mais alta que
-  a sua voz, nenhuma régua de volume separa. Antes de você falar a primeira vez, a TV passa.
+- **O corte automático ("Ajustar sozinha") SAIU em 08/10/2026: era ele que "mutava a pessoa
+  sozinha".** Ele punha o corte acima do barulho da casa (`piso + 15`) e até 14 dB abaixo da
+  fala lembrada, subindo até −20 dB, e a fala lembrada esquecia só 0,02 dB por segundo. Medido
+  na própria conta, antes de tirar: depois de uma risada alta, a fala normal passava 7% nos 30 s
+  seguintes e 0% no minuto seguinte (uns 6 minutos até o corte descer); com o jogo saindo pela
+  caixa a −34 dB, a voz a −24 passava 15%. Sem ícone de mudo: quem falava não tinha como saber,
+  e quem joga ou faz live era o mais atingido. O corte agora é fixo (−50 dB, ou o que a pessoa
+  arrastar), e os dois casos viraram teste. O `auto` guardado por quem o ligou é ignorado. O
+  preço é a TV e o teclado nas pausas, que só ele tirava. Voz cortada é pior. A história de
+  como ele foi afinado (a TV com pausas, a varredura de 14 dB e 0,02 dB/s) está no git, até 72db710.
+- **O microfone que cai volta sozinho** (`microfoneCaido.ts`, 08/10/2026). Quando o aparelho
+  some (fone Bluetooth piscando, Windows trocando o padrão), o livekit-client tenta o padrão
+  UMA vez e, falhando, muta e desiste: "could not restart track, muting instead". Era a outra
+  metade do "muta sozinha", com o ícone riscado. O Blankito ficou 7 minutos mudo às 00:53 UTC
+  de 08/10 sem fone desligado nem nada mudando na sala. Hoje o app tenta de volta em 0,5, 2, 5
+  e 10 s (a falha passa ao padrão do sistema para a próxima tentativa) e, sem conseguir, avisa
+  na tela. **Só reabre faixa que TERMINOU**: o mudo de moderador, o seu e o do fone calam uma
+  faixa viva, e reabrir aquilo desfaria a decisão de alguém. **Não foi exercido com aparelho
+  de verdade**: os microfones falsos do Chromium não desconectam, e uma bancada com Electron
+  nesta máquina abriria o aviso do firewall na tela do dono.
 - **O anel de "falando" mede a minha voz DEPOIS do corte.** Medindo o cru, ele acenderia
   com a TV que o corte acabou de tirar da call. E o medidor agora é refeito quando a faixa
   muda — antes ele só era criado uma vez por pessoa, e trocar de microfone o deixava

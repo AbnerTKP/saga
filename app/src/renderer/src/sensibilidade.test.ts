@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AJUSTES_PADRAO, CORTE_AUTOMATICO_MAX, CORTE_AUTOMATICO_MIN, ajustesGuardados, avancar, corteVigente,
-  dbDoPorcento, nivelDoBloco, novoPortao, porcentoDoDb, type Portao,
+  AJUSTES_PADRAO, ajustesGuardados, avancar, dbDoPorcento, nivelDoBloco, novoPortao, porcentoDoDb, type Portao,
 } from './sensibilidade.ts';
 
 /** Um bloco do processador de áudio: 128 amostras a 48 kHz. */
@@ -15,14 +14,21 @@ function sorteio(semente = 7) {
 }
 
 /** Roda `ms` de som em torno de `db` e devolve a fração do tempo com o microfone aberto. */
-function tocar(p: Portao, db: number, ms: number, auto: boolean, corte = -50, variacao = 3, rnd = sorteio()) {
+function tocar(p: Portao, db: number, ms: number, corte = -50, variacao = 3, rnd = sorteio()) {
   let abertos = 0, blocos = 0;
   for (let t = 0; t < ms; t += BLOCO_MS) {
-    avancar(p, db + rnd() * variacao, BLOCO_MS, auto, corte);
+    avancar(p, db + rnd() * variacao, BLOCO_MS, corte);
     blocos++;
     if (p.aberto) abertos++;
   }
   return abertos / blocos;
+}
+
+/** Fala com pausas de respiro, `segundos` dela; devolve a fração da fala que passou. */
+function falar(p: Portao, db: number, segundos: number, corte = -50) {
+  let passou = 0;
+  for (let i = 0; i < segundos / 2; i++) { passou += tocar(p, db, 1600, corte); tocar(p, -60, 400, corte); }
+  return passou / (segundos / 2);
 }
 
 test('o que ficou guardado: vazio, lixo e pedaço faltando voltam ao padrão', () => {
@@ -30,17 +36,22 @@ test('o que ficou guardado: vazio, lixo e pedaço faltando voltam ao padrão', (
   assert.deepEqual(ajustesGuardados(''), AJUSTES_PADRAO);
   assert.deepEqual(ajustesGuardados('{isso não é json'), AJUSTES_PADRAO);
   assert.deepEqual(ajustesGuardados('"forte"'), AJUSTES_PADRAO);
-  assert.deepEqual(ajustesGuardados('{"supressao":"turbo","auto":"sim","corte":"-40"}'), AJUSTES_PADRAO);
+  assert.deepEqual(ajustesGuardados('{"supressao":"turbo","corte":"-40"}'), AJUSTES_PADRAO);
   assert.deepEqual(ajustesGuardados('{"supressao":"padrao"}'), { ...AJUSTES_PADRAO, supressao: 'padrao' });
-  assert.deepEqual(ajustesGuardados('{"supressao":"desligada","auto":false,"corte":-42}'), { supressao: 'desligada', auto: false, corte: -42 });
+  assert.deepEqual(ajustesGuardados('{"supressao":"desligada","corte":-42}'), { supressao: 'desligada', corte: -42 });
   // Um corte fora da régua não pode virar microfone que nunca abre.
   assert.equal(ajustesGuardados('{"corte":40}').corte, 0);
   assert.equal(ajustesGuardados('{"corte":-400}').corte, -100);
 });
 
-test('o padrão nasce ligado e forte: quem ouve o barulho não é quem precisa mexer', () => {
+test('o "Ajustar sozinha" guardado por quem o ligou é ignorado: vale o corte fixo', () => {
+  assert.deepEqual(ajustesGuardados('{"supressao":"forte","auto":true,"corte":-50}'), { supressao: 'forte', corte: -50 });
+  assert.equal('auto' in AJUSTES_PADRAO, false);
+});
+
+test('o padrão nasce forte, com o corte em −50 dB: quem ouve o barulho não é quem precisa mexer', () => {
   assert.equal(AJUSTES_PADRAO.supressao, 'forte');
-  assert.equal(AJUSTES_PADRAO.auto, true);
+  assert.equal(AJUSTES_PADRAO.corte, -50);
 });
 
 test('a régua da barra vai de −100 dB a 0 dB e não passa das pontas', () => {
@@ -59,97 +70,48 @@ test('nível de um bloco: silêncio digital é o fundo da régua, e um seno chei
   assert.ok(Math.abs(nivelDoBloco(seno) + 3.01) < 0.05, String(nivelDoBloco(seno)));
 });
 
-test('à mão: silêncio fica fechado e a voz abre no primeiro bloco', () => {
+test('silêncio fica fechado e a voz abre no primeiro bloco', () => {
   const p = novoPortao();
-  assert.equal(tocar(p, -80, 1000, false), 0);
-  avancar(p, -20, BLOCO_MS, false, -50);
+  assert.equal(tocar(p, -80, 1000), 0);
+  avancar(p, -20, BLOCO_MS, -50);
   assert.equal(p.aberto, true);
 });
 
 test('o respiro entre duas palavras não fecha; um silêncio de verdade fecha', () => {
   const p = novoPortao();
-  tocar(p, -20, 500, false, -50, 0);
-  tocar(p, -80, 150, false, -50, 0);
+  tocar(p, -20, 500, -50, 0);
+  tocar(p, -80, 150, -50, 0);
   assert.equal(p.aberto, true, '150 ms de pausa não fecha');
-  tocar(p, -20, 500, false, -50, 0);
-  tocar(p, -80, 450, false, -50, 0);
+  tocar(p, -20, 500, -50, 0);
+  tocar(p, -80, 450, -50, 0);
   assert.equal(p.aberto, false, '450 ms de silêncio fecha');
 });
 
 test('voz no limite não picota: entre o corte e o corte menos a histerese, continua aberto', () => {
   const p = novoPortao();
-  tocar(p, -20, 300, false, -50, 0);
-  assert.equal(tocar(p, -52, 2000, false, -50, 0), 1);
+  tocar(p, -20, 300, -50, 0);
+  assert.equal(tocar(p, -52, 2000, -50, 0), 1);
 });
 
-test('sozinha, numa casa com barulho constante: o barulho fica de fora e a voz passa', () => {
+// O "mutar sozinho" (08/10/2026): o corte automático subia até −20 dB e calava a fala
+// normal, sem ícone de mudo. Estes são os dois casos medidos nele — passavam 7% e 15%.
+test('depois de uma risada alta, a fala normal continua passando inteira', () => {
   const p = novoPortao();
-  tocar(p, -50, 6000, true);
-  const corte = corteVigente(p, true, -50);
-  assert.ok(corte > -45 && corte <= CORTE_AUTOMATICO_MAX, `corte ${corte}`);
-  assert.ok(tocar(p, -50, 2000, true) < 0.05, 'o barulho quase nunca abre');
-  assert.ok(tocar(p, -20, 2000, true) > 0.99, 'a voz passa');
+  falar(p, -22, 10);
+  for (let i = 0; i < 3; i++) tocar(p, -6, 1500);
+  assert.equal(falar(p, -24, 30), 1);
+  assert.equal(falar(p, -24, 60), 1);
 });
 
-test('sozinha, numa conversa com pausas: o piso fica no barulho, não sobe para a voz', () => {
+test('com o som do jogo saindo pela caixa, a voz passa inteira', () => {
   const p = novoPortao();
-  let aberto = 0;
-  for (let i = 0; i < 10; i++) {
-    aberto += tocar(p, -20, 1500, true);
-    tocar(p, -50, 400, true);
-  }
-  assert.ok(p.piso < -45, `piso ${p.piso}`);
-  assert.ok(aberto / 10 > 0.99, 'a fala continua passando inteira');
+  let voz = 0;
+  for (let i = 0; i < 20; i++) { tocar(p, -34, 900); voz += tocar(p, -24, 900); }
+  assert.equal(voz / 20, 1);
 });
 
-test('sozinha, uma fala comprida sem pausa nenhuma não se corta', () => {
+test('à mão vale o que a pessoa escolheu: o barulho abaixo do corte fica de fora', () => {
   const p = novoPortao();
-  tocar(p, -55, 3000, true);
-  assert.ok(tocar(p, -20, 10000, true) > 0.99);
-});
-
-test('sozinha, a TV ligada no meio da call é alcançada em segundos', () => {
-  const p = novoPortao();
-  tocar(p, -60, 5000, true);
-  const r = sorteio(3);
-  tocar(p, -38, 6000, true, -50, 4, r);
-  assert.ok(tocar(p, -38, 2000, true, -50, 4, r) < 0.1, `depois de 6 s a TV quase não passa (piso ${p.piso})`);
-  assert.ok(tocar(p, -18, 1000, true) > 0.99, 'a voz perto do microfone continua passando');
-});
-
-test('sozinha, a TV com pausas não entra depois que você falou — foi o que a medida pegou', () => {
-  const p = novoPortao();
-  tocar(p, -12, 2000, true);
-  let tv = 0;
-  for (let i = 0; i < 6; i++) {
-    tv += tocar(p, -32, 1700, true);
-    tocar(p, -75, 300, true, -50, 2);
-  }
-  assert.ok(tv / 6 < 0.1, `a TV passou ${(100 * tv / 6).toFixed(0)}% do tempo (corte ${corteVigente(p, true, -50)})`);
-  assert.ok(tocar(p, -13, 1000, true) > 0.99, 'a voz continua passando');
-});
-
-test('sozinha, alguns minutos calado não deixam a TV alcançar a voz lembrada', () => {
-  const p = novoPortao();
-  tocar(p, -12, 2000, true);
-  for (let i = 0; i < 90; i++) { tocar(p, -32, 1700, true, -50, 3); tocar(p, -75, 300, true, -50, 2); }
-  assert.ok(tocar(p, -32, 2000, true) < 0.1, `depois de 3 min calado (corte ${corteVigente(p, true, -50)})`);
-});
-
-test('sozinha, quem passa a falar 10 dB mais baixo continua passando', () => {
-  const p = novoPortao();
-  tocar(p, -12, 5000, true);
-  let passou = 0;
-  for (let i = 0; i < 5; i++) { passou += tocar(p, -22, 1600, true); tocar(p, -60, 400, true); }
-  assert.ok(passou / 5 > 0.9, `passou ${(100 * passou / 5).toFixed(0)}%`);
-});
-
-test('o corte automático tem limites: nem abre para o silêncio, nem corta voz', () => {
-  const p = novoPortao();
-  tocar(p, -100, 6000, true, -50, 0);
-  assert.equal(corteVigente(p, true, -50), CORTE_AUTOMATICO_MIN);
-  tocar(p, 0, 6000, true, -50, 0);
-  assert.equal(corteVigente(p, true, -50), CORTE_AUTOMATICO_MAX);
-  // À mão vale o que a pessoa escolheu, qualquer que seja o piso.
-  assert.equal(corteVigente(p, false, -63), -63);
+  assert.ok(tocar(p, -45, 3000, -40) < 0.05);
+  assert.ok(tocar(p, -20, 2000, -40) > 0.99);
 });

@@ -8,7 +8,7 @@
  *
  * Entrada 0 é o som cru; entrada 1, o que saiu do filtro de voz (quando há um).
  */
-import { avancar, corteVigente, nivelDoBloco, novoPortao } from './sensibilidade.ts';
+import { avancar, nivelDoBloco, novoPortao } from './sensibilidade.ts';
 
 declare const sampleRate: number;
 declare function registerProcessor(nome: string, classe: unknown): void;
@@ -18,7 +18,7 @@ declare class AudioWorkletProcessor {
 }
 
 export type MensagemParaOMicrofone =
-  | { tipo: 'ajustes'; usarFiltro: boolean; auto: boolean; corte: number };
+  | { tipo: 'ajustes'; usarFiltro: boolean; corte: number };
 
 export type MensagemDoMicrofone =
   | { tipo: 'medida'; nivel: number; corte: number; aberto: boolean }
@@ -38,7 +38,6 @@ const MEDIR_A_CADA_MS = 50;
 class Microfone extends AudioWorkletProcessor {
   private portao = novoPortao();
   private usarFiltro = false;
-  private auto = true;
   private corte = -50;
   private filtroVivo = false;
   private filtroFalhou = false;
@@ -62,7 +61,6 @@ class Microfone extends AudioWorkletProcessor {
 
   private ajustar(o: Partial<MensagemParaOMicrofone>) {
     if (typeof o.usarFiltro === 'boolean') this.usarFiltro = o.usarFiltro;
-    if (typeof o.auto === 'boolean') this.auto = o.auto;
     if (typeof o.corte === 'number') this.corte = o.corte;
   }
 
@@ -90,7 +88,7 @@ class Microfone extends AudioWorkletProcessor {
       }
     }
 
-    avancar(this.portao, nivelDoBloco(fonte), this.blocoMs, this.auto, this.corte);
+    avancar(this.portao, nivelDoBloco(fonte), this.blocoMs, this.corte);
     const alvo = this.portao.aberto ? 1 : 0;
     for (let i = 0; i < fonte.length; i++) {
       if (this.ganho < alvo) this.ganho = Math.min(alvo, this.ganho + this.subida);
@@ -104,7 +102,7 @@ class Microfone extends AudioWorkletProcessor {
       this.port.postMessage({
         tipo: 'medida',
         nivel: this.portao.nivel,
-        corte: corteVigente(this.portao, this.auto, this.corte),
+        corte: this.corte,
         aberto: this.portao.aberto,
       } satisfies MensagemDoMicrofone);
     }
