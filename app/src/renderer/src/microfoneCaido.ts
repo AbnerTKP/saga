@@ -30,6 +30,7 @@ export function deveReabrirMicrofone(e: EstadoDoMicrofone) {
 
 /**
  * Quanto esperar antes de cada tentativa. A primeira é logo: a troca de padrão do Windows
- * costuma estar pronta em meio segundo. As outras dão tempo de o Bluetooth voltar.
+ * costuma estar pronta em meio segundo. As outras dão tempo de o Bluetooth voltar. Passadas
+ * todas, não se desiste: o próximo aparelho conectado (`MediaDevicesChanged`) tenta de novo.
  */
 export const ESPERAS_PARA_REABRIR_MS = [500, 2000, 5000, 10000] as const;

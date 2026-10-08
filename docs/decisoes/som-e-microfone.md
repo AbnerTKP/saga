@@ -48,8 +48,9 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
   UMA vez e, falhando, muta e desiste: "could not restart track, muting instead". Era a outra
   metade do "muta sozinha", com o ícone riscado. O Blankito ficou 7 minutos mudo às 00:53 UTC
   de 08/10 sem fone desligado nem nada mudando na sala. Hoje o app tenta de volta em 0,5, 2, 5
-  e 10 s (a falha passa ao padrão do sistema para a próxima tentativa) e, sem conseguir, avisa
-  na tela. **Só reabre faixa que TERMINOU**: o mudo de moderador, o seu e o do fone calam uma
+  e 10 s (a falha passa ao padrão do sistema para a próxima tentativa). Sem conseguir, avisa na
+  tela e **não desiste**: o próximo aparelho conectado tenta de novo. "O negócio é parar de
+  mutar quando desconecta o mic" (o dono): o mudo é escolha da pessoa, não do aparelho. **Só reabre faixa que TERMINOU**: o mudo de moderador, o seu e o do fone calam uma
   faixa viva, e reabrir aquilo desfaria a decisão de alguém. **Não foi exercido com aparelho
   de verdade**: os microfones falsos do Chromium não desconectam, e uma bancada com Electron
   nesta máquina abriria o aviso do firewall na tela do dono.

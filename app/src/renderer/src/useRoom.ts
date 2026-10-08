@@ -576,7 +576,13 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           .then((nome) => anotar('info', 'microfone', `em uso: ${nome}`));
       })
       // Aparelho que chega ou sai: a lista muda, e a escolha guardada pode voltar a valer.
-      .on(RoomEvent.MediaDevicesChanged, () => { conferirMicrofone(); conferirSaidaECamera(); bump(); })
+      // Aparelho que chega também é a deixa do microfone que caiu: quem ficou fora mais que as
+      // tentativas de `aoMutarOMicrofone` volta a falar quando ele é conectado de novo, sem prazo.
+      .on(RoomEvent.MediaDevicesChanged, () => {
+        conferirMicrofone().finally(() => aoMutarOMicrofone.current());
+        conferirSaidaECamera();
+        bump();
+      })
       .on(RoomEvent.TrackPublished, (pub: RemoteTrackPublication, quem: Participant) => {
         if (pub.source === Track.Source.ScreenShare) tocarAviso('live', deafenedRef.current);
         // Transmissão que começa não entra sozinha: ela aparece apagada na lista, e só
@@ -717,7 +723,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
           await trocarAparelho(room, 'audioinput', '').catch(() => undefined);
         }
       }
-      falhouOMicrofone(new Error('ele parou e não consegui reabrir. Confira se está conectado e clique no microfone.'));
+      falhouOMicrofone(new Error('ele parou. Quando ele for conectado de novo, a Saga o religa sozinha.'));
     } finally {
       reabrindoMicrofone.current = false;
       bump();
