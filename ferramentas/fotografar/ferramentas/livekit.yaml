@@ -10,9 +10,12 @@ rtc:
   use_external_ip: false
   # Candidato em 127.0.0.1: o pion (ICE do LiveKit) descarta o loopback sem isto.
   enable_loopback_candidate: true
-  interfaces:
+  # Por IP, e não pelo nome da interface: `lo0` só existe no Mac (no Windows ela se chama
+  # "Loopback Pseudo-Interface 1"), e sem interface nenhuma a call não conecta. Medido no
+  # Windows em 08/10/2026: só 127.0.0.1 escuta, e a call conecta.
+  ips:
     includes:
-      - lo0
+      - 127.0.0.1/32
 keys:
   fotokey: segredo-de-mentira-so-para-as-fotos-da-saga-local
 room:
