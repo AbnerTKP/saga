@@ -69,6 +69,33 @@
   .versao { margin: 20px 0 0; font-size: 13.5px; color: var(--fraco); }
   .versao a { color: var(--suave); }
 
+  /* ---------- entrar no navegador ----------
+     A Saga também abre no navegador (a mesma conta do app), e é por aqui que se entra: o
+     endereço da página e o da Saga web são o mesmo, então a sessão guardada aqui é a que a
+     Saga encontra ao abrir. No celular este cartão sobe para antes dos botões de baixar —
+     lá não há o que instalar. */
+  .no-navegador { margin-top: 30px; max-width: 440px; padding: 20px; border-radius: var(--raio);
+    background: var(--carta); border: 1px solid var(--linha); }
+  .no-navegador-cabeca { margin-bottom: 14px; }
+  .no-navegador-cabeca b { display: block; font-size: 17px; color: var(--claro); letter-spacing: -.01em; }
+  .no-navegador-cabeca span { display: block; font-size: 14px; color: var(--suave); line-height: 1.45; margin-top: 2px; }
+  .no-navegador label { display: block; margin-bottom: 12px; font-size: 12px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--suave); }
+  .no-navegador input { display: block; width: 100%; height: 46px; margin-top: 6px; padding: 0 14px;
+    border-radius: 10px; border: 1px solid var(--linha); background: var(--fundo); color: var(--claro);
+    font: inherit; font-size: 16px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .no-navegador input:focus { outline: none; border-color: var(--acento); }
+  .no-navegador .botao { width: 100%; justify-content: center; margin-top: 4px; font-weight: 650; }
+  .no-navegador .botao:disabled { opacity: .6; cursor: default; transform: none; }
+  .entrar-erro { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px;
+    color: #ffb4b9; background: #e0485222; border: 1px solid #e0485255; }
+  .entrar-links { margin: 12px 0 0; font-size: 14px; color: var(--fraco); }
+  .entrar-trocar { margin-top: 12px; padding: 0; border: 0; background: none; color: var(--suave);
+    font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+  .no-celular-primeiro .no-navegador { margin: 0 0 30px; }
+  .so-no-computador { margin: 0 0 12px; font-size: 14.5px; color: var(--suave); }
+  .so-no-computador b { color: var(--texto); }
+
   /* ---------- retrato ---------- */
   .retrato { margin-top: 68px; padding-bottom: 92px; }
   .moldura {
@@ -180,6 +207,30 @@
     <p class="versao" id="versao">
       <a href="https://github.com/AbnerTKP/saga/releases" rel="noopener">Ver todas as versões</a>
     </p>
+
+    <form class="no-navegador" id="entrar" novalidate>
+      <div class="no-navegador-cabeca">
+        <b>Usar no navegador</b>
+        <span>Com o mesmo apelido e senha do app. No celular, a Saga abre aqui mesmo.</span>
+      </div>
+      <label>Apelido
+        <input id="entrar-apelido" name="apelido" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label>Senha
+        <input id="entrar-senha" name="senha" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="entrar-erro" id="entrar-erro" role="alert" hidden></p>
+      <button class="botao principal" id="entrar-botao" type="submit">Entrar na Saga</button>
+      <p class="entrar-links"><a href="app/">Criar conta</a> · <a href="app/" id="entrar-esqueci">Esqueci a senha</a></p>
+    </form>
+    <div class="no-navegador" id="ja-dentro" hidden>
+      <div class="no-navegador-cabeca">
+        <b>Você já entrou neste navegador</b>
+        <span id="ja-dentro-quem"></span>
+      </div>
+      <a class="botao principal" href="app/">Abrir a Saga</a>
+      <button type="button" class="entrar-trocar" id="entrar-trocar">Entrar com outra conta</button>
+    </div>
   </div>
 
   <div class="largura retrato">
@@ -402,6 +453,96 @@
       document.getElementById('mudancas').hidden = false;
     })
     .catch(function () { /* fica o link para a página de versões, que também é sempre a mais nova */ });
+})();
+</script>
+<script>
+// Entrar na Saga do navegador. A Saga web mora em ./app/, no MESMO endereço desta página:
+// a sessão guardada aqui é a que ela encontra ao abrir, e por isso as chaves são as dela
+// (`cantinho.*`, o prefixo antigo de propósito — ver app/src/renderer/src/api.ts).
+(function () {
+  var API = 'https://76.13.225.79';
+  var ler = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var guardar = function (k, v) {
+    try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sem storage */ }
+  };
+  var form = document.getElementById('entrar');
+  var dentro = document.getElementById('ja-dentro');
+  var apelido = document.getElementById('entrar-apelido');
+  var senha = document.getElementById('entrar-senha');
+  var erro = document.getElementById('entrar-erro');
+  var botao = document.getElementById('entrar-botao');
+
+  // No celular não há o que instalar: entrar vem antes dos botões de baixar, e estes ficam
+  // com a frase do que só o computador faz.
+  var celular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(max-width: 720px)').matches;
+  if (celular) {
+    var baixar = document.querySelector('.baixar');
+    var capa = baixar.parentNode;
+    capa.classList.add('no-celular-primeiro');
+    capa.insertBefore(form, baixar);
+    capa.insertBefore(dentro, baixar);
+    var frase = document.createElement('p');
+    frase.className = 'so-no-computador';
+    frase.innerHTML = 'No computador, a Saga também <b>transmite a tela com o som</b> e tem os jogos:';
+    capa.insertBefore(frase, baixar);
+    var legenda = document.querySelector('.marca span');
+    if (legenda) legenda.textContent = 'no navegador, Windows e Mac';
+  }
+
+  var mostrarDentro = function () {
+    var quem = ler('cantinho.apelido');
+    document.getElementById('ja-dentro-quem').textContent = quem ? 'Como ' + quem + '.' : '';
+    form.hidden = true;
+    dentro.hidden = false;
+  };
+  if (ler('cantinho.sessao')) mostrarDentro();
+  apelido.value = ler('cantinho.apelido') || '';
+
+  document.getElementById('entrar-trocar').addEventListener('click', function () {
+    guardar('cantinho.sessao', null);
+    guardar('cantinho.servidor', null);
+    dentro.hidden = true;
+    form.hidden = false;
+    apelido.focus();
+  });
+  // "Esqueci a senha" mora na Saga, que já sabe fazer isso. O apelido digitado vai junto,
+  // para ela abrir no "Entrar", com ele preenchido.
+  document.getElementById('entrar-esqueci').addEventListener('click', function () {
+    if (apelido.value.trim()) guardar('cantinho.apelido', apelido.value.trim());
+  });
+
+  var falhar = function (msg) {
+    erro.textContent = msg;
+    erro.hidden = false;
+    botao.disabled = false;
+    botao.textContent = 'Entrar na Saga';
+  };
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var a = apelido.value.trim();
+    if (!a || !senha.value) { falhar('Escreva o apelido e a senha.'); return; }
+    erro.hidden = true;
+    botao.disabled = true;
+    botao.textContent = 'Entrando…';
+    fetch(API + '/entrar', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ apelido: a, senha: senha.value }),
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+    }).then(function (res) {
+      if (!res.ok || !res.j || !res.j.token) {
+        falhar((res.j && res.j.error) || 'O servidor recusou (erro ' + res.status + ').');
+        return;
+      }
+      guardar('cantinho.sessao', res.j.token);
+      if (res.j.eu && res.j.eu.apelido) guardar('cantinho.apelido', res.j.eu.apelido);
+      if (res.j.servidor && res.j.servidor.id) guardar('cantinho.servidor', String(res.j.servidor.id));
+      location.href = 'app/';
+    }).catch(function () {
+      falhar('Não consegui falar com o servidor. Confira sua internet.');
+    });
+  });
 })();
 </script>
 </body>
