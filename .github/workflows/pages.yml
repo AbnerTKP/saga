@@ -1,14 +1,24 @@
-# Publica a página de download (site/) no GitHub Pages.
+# Publica no GitHub Pages a página de download (site/) e, dentro dela, a Saga do navegador
+# (site/app/, construída de app/ pelo `build:web`).
 #
-# Ela não acompanha a versão do app: os links de download saem da API do GitHub, sempre
-# do release mais recente. Publicar uma versão nova do app não pede mexer aqui, e mexer
-# aqui não gera instalador nenhum.
+# Desde que a Saga ganhou a versão do navegador (12/10/2026), a página ACOMPANHA a versão: é a
+# mesma Saga que os amigos instalam, e ela não pode chegar antes do servidor que a atende — a
+# mesma regra do app instalado. Por isso não há mais publicação a cada push: quem dispara é o
+# release.yml, depois do servidor e do Release, passando a tag em `versao`. O código construído
+# é o DAQUELA tag, e não o da main de agora.
+#
+# Disparado pela main, e não pela tag, porque o ambiente `github-pages` só aceita publicação a
+# partir da main (regra de proteção do repositório). O "Run workflow" à mão continua valendo:
+# com `versao` vazio, publica o commit escolhido — use a tag da versão atual, senão a Saga do
+# navegador sai com código que ninguém recebeu no app.
 name: pages
 on:
-  push:
-    branches: [main]
-    paths: ['site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
+    inputs:
+      versao:
+        description: 'Tag da versão a publicar (ex.: v0.73.0). Vazio: o commit escolhido acima.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -28,6 +38,20 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.versao || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # A Saga do navegador mora em site/app/: mesmo endereço da página, então o entrar da
+      # página guarda a sessão que a Saga encontra ao abrir.
+      - run: pnpm --filter app build:web
+      - run: |
+          rm -rf site/app
+          cp -r app/out/web site/app
+          test -f site/app/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

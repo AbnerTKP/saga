@@ -58,6 +58,23 @@ jobs:
     secrets:
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
+  # A Saga do navegador e a página de download, da MESMA tag — ver pages.yml. Depois do
+  # Release, e portanto depois do servidor: a web é a mesma Saga e não pode chegar antes do
+  # servidor que a atende. O workflow do Pages roda na main (é de onde o ambiente
+  # `github-pages` aceita publicar) e constrói o código da tag que vai em `versao`. Disparar
+  # pelo GITHUB_TOKEN vale: `workflow_dispatch` é a exceção à regra de que o token não
+  # dispara outros workflows.
+  pagina:
+    needs: criar-release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f versao="$TAG"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+
   # O pacote da Microsoft Store da mesma versão, como artefato — ver loja.yml. Depois do
   # Release, e não junto dos instaladores: falhando aqui, o .exe e o .dmg saem do mesmo jeito.
   loja:
