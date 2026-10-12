@@ -60,4 +60,5 @@ export const podeEnviar = (texto: string) => texto.trim().length >= 3;
 
 /** O nome do sistema como a pessoa fala, e não como o Node chama. */
 export const nomeDoSistema = (plataforma: string) =>
-  plataforma === 'darwin' ? 'Mac' : plataforma === 'win32' ? 'Windows' : plataforma === 'linux' ? 'Linux' : plataforma;
+  plataforma === 'darwin' ? 'Mac' : plataforma === 'win32' ? 'Windows' : plataforma === 'linux' ? 'Linux'
+    : plataforma === 'web' ? 'navegador' : plataforma;

@@ -111,6 +111,14 @@ type ControlesDaLive = {
   /** A janela por cima do jogo. Sai daqui na prévia da PRÓPRIA tela: pôr a sua imagem por
       cima do seu jogo é um espelho dentro do espelho. */
   overlay?: OverlayDaLive;
+  /**
+   * Só no celular: ouvir a live sem receber a imagem. A live sai inteira, sem versões menores
+   * (escolha do dono), e no 4G a imagem é quase todo o peso — 1080p60 passa de 3 GB por hora.
+   * Escondido, o vídeo para de chegar: o adaptiveStream do LiveKit pausa a faixa que não está
+   * visível, e o som da tela, que vem noutra faixa, continua.
+   */
+  soOSom?: boolean;
+  onSoOSom?: (v: boolean) => void;
 };
 
 function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
@@ -143,6 +151,11 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   const telaCheia = () => {
     const alvo = caixa.current;
     if (!alvo) return;
+    // O Safari do iPhone não põe em tela cheia uma caixa qualquer, só o próprio <video>.
+    if (!alvo.requestFullscreen) {
+      (ref.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null)?.webkitEnterFullscreen?.();
+      return;
+    }
     if (document.fullscreenElement === alvo) {
       document.exitFullscreen().catch((e) => anotar('erro', 'tela', e));
     } else {
@@ -162,7 +175,7 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   return (
     <div
       ref={caixa}
-      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${falando.has(tile.participant.identity) && !isScreen ? 'speaking' : ''} ${controles ? 'com-controles' : ''} ${controles && visiveis ? 'controles-visiveis' : ''}`}
+      className={`tile ${big ? 'big' : ''} ${preencher ? 'preencher' : ''} ${falando.has(tile.participant.identity) && !isScreen ? 'speaking' : ''} ${controles ? 'com-controles' : ''} ${controles && visiveis ? 'controles-visiveis' : ''} ${controles?.soOSom ? 'so-o-som' : ''}`}
       // Na live escolhida, clicar na imagem mostra os controles. Clicar SAÍA da live — um
       // clique para dar foco à janela bastava para perder a transmissão.
       onClick={controles ? mostrar : onClick}
@@ -171,6 +184,15 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
       onDoubleClick={(e) => { e.stopPropagation(); telaCheia(); }}
     >
       <video ref={ref} autoPlay playsInline muted className={tile.local && !isScreen ? 'mirror' : ''} />
+      {controles?.soOSom && (
+        <div className="aviso-so-o-som">
+          <Icon name="speaker" size={22} />
+          <span>Só o som da live</span>
+          <button type="button" className="primary sm" onClick={(e) => { e.stopPropagation(); controles.onSoOSom?.(false); }}>
+            Ver a imagem
+          </button>
+        </div>
+      )}
       {controles ? (
         <>
           <div className="controles-da-live cima" {...soDosControles}>
@@ -186,6 +208,14 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
           <div className="controles-da-live baixo" {...soDosControles}>
             {!controles.local && <ControleDeVolume volume={controles.volume} onVolume={controles.onVolume} claro />}
             <span className="spacer" />
+            {controles.onSoOSom && !controles.local && (
+              <button type="button" className={`controles-texto ${controles.soOSom ? 'ligado' : ''}`}
+                aria-pressed={!!controles.soOSom}
+                title="Ouvir sem receber a imagem — gasta muito menos dados"
+                onClick={() => controles.onSoOSom!(!controles.soOSom)}>
+                Só o som
+              </button>
+            )}
             <button
               type="button"
               className={`controles-icone ${controles.preencher ? 'ligado' : ''}`}
@@ -221,7 +251,11 @@ function VideoTile({ tile, big, preencher, falando, onClick, controles }: {
   );
 }
 
-export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, estadoDaMusica, onBot, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas }: {
+export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meuId, podeApagar, estadoDaMusica, onBot, lives, onAssistirLive, onVoltarAVoz, jogo, faixaDaPartida, conversa, telaDeAmigos, overlay, barraDaCall, botaoDePessoas, voltar, onPessoas }: {
+  /** No celular: voltar do lugar aberto para a lista de salas (ver celular.ts). */
+  voltar?: () => void;
+  /** No celular a lista de pessoas não cabe ao lado: ela abre por cima, por este botão. */
+  onPessoas?: () => void;
   /**
    * Os controles da call NO PALCO, perto do que se vê (surgem com o mouse sobre ele). Antes
    * moravam só no canto de baixo da coluna da esquerda, longe da call.
@@ -312,6 +346,8 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
    * ouve. Sem escolha, silêncio — que é o que audivel.ts já dizia.
    */
   const liveNoPalco = rm.liveNoPalco;
+  /** "Só o som" da live, no celular — ver ControlesDaLive. */
+  const [soOSom, setSoOSom] = useState(false);
   const focusTile = liveNoPalco ?? rm.tiles.find((t) => t.key === focus) ?? null;
   const rest = focusTile ? rm.tiles.filter((t) => t.key !== focusTile.key) : rm.tiles;
 
@@ -350,6 +386,7 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
       onPreencher: trocarPreencher,
       onSair: () => rm.assistir(null),
       overlay: t.local ? undefined : overlay,
+      ...(voltar ? { soOSom, onSoOSom: setSoOSom } : {}),
     };
   };
 
@@ -407,7 +444,17 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   // A tela de amigos é uma tela de conta, não de servidor: ela traz o próprio cabeçalho e
   // não tem call nem sala em volta.
   if (telaDeAmigos) {
-    return <main className="stage">{telaDeAmigos}</main>;
+    return (
+      <main className="stage">
+        {voltar && (
+          <header className="stage-head">
+            <button type="button" className="voltar-do-celular" onClick={voltar} aria-label="Voltar"><Icon name="voltar" size={24} /></button>
+            <span className="strong">Amigos</span>
+          </header>
+        )}
+        {telaDeAmigos}
+      </main>
+    );
   }
 
   // A partida toma o palco inteiro: é a tela da dupla, sem a faixa da call e sem o resto da
@@ -424,6 +471,12 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
   return (
     <main className="stage">
       <header className="stage-head">
+        {/* No celular o palco DESCE (a call continua na faixa de baixo); o chat volta. */}
+        {voltar && (
+          <button type="button" className="voltar-do-celular" onClick={voltar} aria-label="Voltar para as salas">
+            <Icon name={conversa || salaAberta?.tipo === 'texto' ? 'voltar' : 'abaixo'} size={24} />
+          </button>
+        )}
         {conversa ? (
           <>
             {/* A pessoa no lugar do nome da sala: numa conversa privada é ela o lugar. */}
@@ -436,8 +489,13 @@ export function Stage({ rm, pessoas, onPessoa, salaAberta, servidorId, chat, meu
           <>
             <Icon name={salaAberta?.tipo === 'texto' ? 'texto' : 'speaker'} />
             <span className="strong">{salaAberta?.name ?? rm.salaDaVoz?.nome ?? 'Escolha uma sala'}</span>
-            {botaoDePessoas && <span className="ferramentas-do-palco">{botaoDePessoas}</span>}
+            {botaoDePessoas && !onPessoas && <span className="ferramentas-do-palco">{botaoDePessoas}</span>}
           </>
+        )}
+        {onPessoas && !conversa && (
+          <button type="button" className="pessoas-do-celular" onClick={onPessoas} aria-label="Pessoas do servidor">
+            <Icon name="pessoas" size={22} />
+          </button>
         )}
       </header>
 

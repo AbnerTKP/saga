@@ -10,7 +10,7 @@ import { Icon } from './Icon';
  * agora e saber quem faz parte. Os cargos só com quem está aqui, e quem está offline num
  * grupo único no fim — ver listaDePessoas.ts.
  */
-export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJogador, onPartida, onPessoa }: {
+export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJogador, onPartida, onPessoa, onFechar }: {
   membros: Membro[];
   cargos: Cargo[];
   /** Ids de quem está em alguma sala de voz agora. */
@@ -23,6 +23,8 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJoga
   onPartida: (mesaId: number) => void;
   /** Esquerdo abre o perfil; direito, as ações. */
   onPessoa: (m: Membro, em: { x: number; y: number }, tipo: 'perfil' | 'acoes') => void;
+  /** No celular a lista abre por cima de tudo, e precisa de um jeito de fechar. */
+  onFechar?: () => void;
 }) {
   // Banido não é pessoa DESTE servidor: some daqui e mora nas configurações, em Banidos.
   // Ficava na lista com o nome riscado, como se ainda fizesse parte.
@@ -31,7 +33,14 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJoga
 
   return (
     <aside className="lista-membros">
-      <div className="lista-membros-topo">Pessoas <span className="count">{presentes.length}</span></div>
+      <div className="lista-membros-topo">
+        Pessoas <span className="count">{presentes.length}</span>
+        {onFechar && (
+          <button type="button" className="fechar-lista-de-membros" onClick={onFechar} aria-label="Fechar a lista de pessoas">
+            <Icon name="close" size={20} />
+          </button>
+        )}
+      </div>
 
       <div className="lista-membros-corpo">
         {grupos.map((g) => (

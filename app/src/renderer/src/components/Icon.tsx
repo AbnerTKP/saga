@@ -73,6 +73,10 @@ const paths: Record<string, string> = {
   maisSimples: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
   // Triângulo para baixo: abre um menu. Era o glifo ▾ de 11 px, que mal se via.
   seta: 'M7 9.5l5 5 5-5z',
+  // A seta para trás do celular: voltar do lugar aberto para a lista de salas.
+  voltar: 'M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z',
+  // Para baixo: o palco da call DESCE e a call continua na faixa — não é sair.
+  abaixo: 'M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z',
   // O bot de música: a nota é ele (avatar, linha na barra, selo); os outros são os botões do cartão.
   nota: 'M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z',
   tocar: 'M8 5v14l11-7z',

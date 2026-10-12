@@ -69,3 +69,11 @@ export const PAGINAS_DA_CONTA: Pagina<PaginaDaConta>[] = [
   { id: 'atalhos', titulo: 'Atalhos', icone: 'teclado', grupo: 'Este computador', busca: ['teclado', 'overlay', 'live por cima do jogo', 'travar'] },
   { id: 'inicio', titulo: 'Inicialização', icone: 'atualizar', grupo: 'Este computador', busca: ['ligar o computador', 'abrir com o sistema', 'windows', 'mac', 'versão', 'atualização'] },
 ];
+
+/**
+ * As páginas da conta onde a Saga está aberta. No navegador não há atalho que valha fora da
+ * aba, nem overlay, nem "abrir junto com o sistema": as duas páginas que só falam disso somem,
+ * em vez de mostrar chaves que não fazem nada.
+ */
+export const paginasDaConta = (web: boolean): Pagina<PaginaDaConta>[] =>
+  web ? PAGINAS_DA_CONTA.filter((p) => p.id !== 'atalhos' && p.id !== 'inicio') : PAGINAS_DA_CONTA;

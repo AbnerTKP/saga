@@ -195,6 +195,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const medidores = useRef(new Map<string, { an: AnalyserNode; buf: Float32Array<ArrayBuffer>; pico: number; faixa: MediaStreamTrack }>());
   const ctxDosNiveis = useRef<AudioContext | null>(null);
   const [status, setStatus] = useState<Status>('idle');
+  /**
+   * O navegador não deixou a call tocar som. O app instalado nunca chega aqui (o Electron
+   * libera o som da janela), mas o navegador do celular só toca áudio depois de um TOQUE —
+   * e entrar na voz termina depois de esperar a rede, longe do toque que o pediu. Aí o
+   * `startAudio` do fim do `join` é recusado em silêncio, e a call conecta muda. Quem
+   * destrava é `liberarSom`, chamado de dentro de um toque.
+   */
+  const [somTravado, setSomTravado] = useState(false);
   const [salaDaVoz, setSalaDaVoz] = useState<SalaDaVoz | null>(null);
   /**
    * A call que caiu sem eu ter desligado, para o app poder voltar sozinho.
@@ -620,7 +628,8 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         bump();
         if (quem === room.localParticipant) aoMudarPermissao.current();
       })
-      .on(RoomEvent.MediaDevicesError, (e: Error) => { anotar('erro', 'aparelhos', e); onError(e); });
+      .on(RoomEvent.MediaDevicesError, (e: Error) => { anotar('erro', 'aparelhos', e); onError(e); })
+      .on(RoomEvent.AudioPlaybackStatusChanged, () => setSomTravado(!room.canPlaybackAudio));
 
     return () => {
       room.removeAllListeners();
@@ -646,6 +655,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       // Quem entra também ouve: é o retorno de que a sala pegou de verdade.
       tocarAviso('entrou', deafenedRef.current);
       await room.startAudio().catch(() => undefined);
+      setSomTravado(!room.canPlaybackAudio);
       // O `startAudio` desmuta todo elemento de áudio — inclusive os que a surdez calou.
       aplicarAudio();
       // Quem entra na sala já de fone desligado precisa aparecer assim desde o começo: o
@@ -1351,8 +1361,16 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     (t) => t.source === Track.Source.ScreenShare && t.participant.identity === assistindo,
   ) ?? null;
 
+  /** Destrava o som da call. Só funciona chamado de dentro de um toque — ver `somTravado`. */
+  const liberarSom = useCallback(async () => {
+    await room.startAudio().catch(() => undefined);
+    aplicarAudio();
+    setSomTravado(!room.canPlaybackAudio);
+  }, [room, aplicarAudio]);
+
   return {
     room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened, surdos,
+    somTravado: status !== 'idle' && somTravado, liberarSom,
     liveNoPalco,
     falando: falandoAgora,
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,

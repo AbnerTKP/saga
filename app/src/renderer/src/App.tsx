@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import logo from './marca.png';
 import {
   buscarSalas, pedirTokenDaSala, quemSou, sair, lerToken, guardarToken, moderar, baterPresenca,
@@ -16,15 +16,10 @@ import { ehMinhaVez, jogandoAgora, jogoDaMesa, minhaMesa, NOME_DO_JOGO, oQueToca
 import { criarAvisos } from './avisos';
 import { anotar } from './registro';
 import { ARQUIVOS } from './sons';
-import { TelaDoXadrez } from './components/TelaDoXadrez';
 import { ConviteDeXadrez } from './components/ConviteDeXadrez';
 import { FaixaDaPartida } from './components/FaixaDaPartida';
-import { TelaDoCatan } from './components/TelaDoCatan';
 import { ConviteDeCatan } from './components/ConviteDeCatan';
 import { minhaMesaDoCatan, oQueTocarNoCatan, type ConviteDeCatan as ConviteParaOCatan, type ResumoDaMesaDoCatan } from './catan';
-import { TelaDaLuta } from './components/TelaDaLuta';
-import { TelaDaUrna } from './components/TelaDaUrna';
-import { ConviteDeLuta } from './components/ConviteDeLuta';
 import { BotaoDeRelatar, EVENTO_DO_AVISO } from './components/Relatar';
 import { anotarOnde, descreverTela } from './relato';
 import { useRoom, type SalaDaVoz } from './useRoom';
@@ -79,7 +74,25 @@ import { useOverlayDaLive } from './useOverlayDaLive';
 import { alternarMudo } from './volume';
 import { mesmoSeIgual } from './igual';
 import type { UpdateState } from './desktop';
+
 import { MOTIVO_SEM_TRANSMITIR } from './transmitir';
+import { recursosDaTela, useCelular, useTelaDoCelular } from './celular';
+import { BarraDoCelular, type AbaDoCelular } from './components/BarraDoCelular';
+import { TelaDoVoce } from './components/TelaDoVoce';
+
+/**
+ * As telas dos jogos só chegam quando alguém abre um jogo. Elas são mais da metade do peso
+ * do app — o Dragão sozinho tem as artes de pixel inteiras —, e no navegador do celular cada
+ * quilo é baixado pela rede de dados antes de a Saga abrir. No app instalado, a espera é a
+ * de ler um arquivo do disco.
+ */
+const TelaDoXadrez = lazy(() => import('./components/TelaDoXadrez').then((m) => ({ default: m.TelaDoXadrez })));
+const TelaDoCatan = lazy(() => import('./components/TelaDoCatan').then((m) => ({ default: m.TelaDoCatan })));
+const TelaDaLuta = lazy(() => import('./components/TelaDaLuta').then((m) => ({ default: m.TelaDaLuta })));
+const TelaDaUrna = lazy(() => import('./components/TelaDaUrna').then((m) => ({ default: m.TelaDaUrna })));
+// O convite do Dragão desenha a ficha em pixel, e por isso puxa o Dragão inteiro junto.
+const ConviteDeLuta = lazy(() => import('./components/ConviteDeLuta').then((m) => ({ default: m.ConviteDeLuta })));
+const comEspera = (tela: ReactNode) => <Suspense fallback={<div className="carregando">Abrindo o jogo…</div>}>{tela}</Suspense>;
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
 const ULTIMO_APELIDO = 'cantinho.apelido';
@@ -197,6 +210,16 @@ export function App() {
    * é um clique no quadrado, sem recarregar nada.
    */
   const [modoConversas, setModoConversas] = useState(false);
+  /**
+   * No navegador do celular, uma tela de cada vez — ver celular.ts. A aba "Você" e a lista
+   * de pessoas são as duas coisas que no computador ficam sempre à vista e aqui se abrem.
+   */
+  const celular = useCelular();
+  const telaDoCelular = useTelaDoCelular(celular);
+  const [voceNoCelular, setVoceNoCelular] = useState(false);
+  const [pessoasNoCelular, setPessoasNoCelular] = useState(false);
+  // Voltou para a lista: a lista de pessoas era daquele lugar.
+  useEffect(() => { if (telaDoCelular.tela === 'lista') setPessoasNoCelular(false); }, [telaDoCelular.tela]);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [amigos, setAmigos] = useState<{ pedidos: number; ids: number[] }>({ pedidos: 0, ids: [] });
   const [conversaAberta, setConversaAberta] = useState<ConversaAberta | null>(null);
@@ -563,6 +586,8 @@ export function App() {
     setRespondendoCatan(false);
     setJogoAberto(null);
     setModoConversas(false);
+    setVoceNoCelular(false);
+    setPessoasNoCelular(false);
     setConversaAberta(null);
     setConversas([]);
     setAmigos({ pedidos: 0, ids: [] });
@@ -772,14 +797,16 @@ export function App() {
   const abrirSala = useCallback(async (sala: RoomInfo) => {
     // Com uma partida na tela você não está lendo conversa nenhuma: clicar numa sala de voz
     // tem de abrir o palco dela, e não devolver o chat que estava atrás do jogo.
-    const lendo = jogoAberto ? null : rooms.find((s) => s.id === salaAbertaId) ?? null;
+    // No celular, quem toca numa sala está olhando a LISTA, e não lendo conversa nenhuma: a
+    // sala de voz tocada abre o palco dela.
+    const lendo = jogoAberto || celular ? null : rooms.find((s) => s.id === salaAbertaId) ?? null;
     const { abrir, entrar } = oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null);
     setJogoAberto(null);
     if (abrir) setSalaAbertaId(sala.id);
     const naVoz = entrar ? paraAVoz(sala) : null;
     if (!naVoz) return;
     try { await entrarNaVoz(naVoz); } catch (e) { rm.setError((e as Error).message); }
-  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId, jogoAberto]);
+  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId, jogoAberto, celular]);
 
   const logout = useCallback(async () => {
     await rm.leave();
@@ -948,6 +975,10 @@ export function App() {
   }, [pedido, notas]);
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
+  const recursos = recursosDaTela({ web: window.desktop.platform === 'web', celular });
+  const abaDoCelular: AbaDoCelular = voceNoCelular ? 'voce' : modoConversas ? 'conversas' : 'servidores';
+  /** No celular, abrir um lugar troca a tela; no computador, `abrirLugar` não faz nada. */
+  const abrirLugar = telaDoCelular.abrirLugar;
   /** O palco está mostrando a call (e não um chat, um jogo ou as conversas). */
   const palcoNaCall = !modoConversas && !jogoAberto && salaAberta?.tipo !== 'texto' && !!rm.salaDaVoz;
   const semPessoas = modoConversas || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
@@ -1093,7 +1124,7 @@ export function App() {
   const assistirDaBarra = useCallback(async (sala: RoomInfo, identity: string) => {
     const naVoz = paraAVoz(sala);
     if (!naVoz) return;
-    const lendo = rooms.find((s) => s.id === salaAbertaId) ?? null;
+    const lendo = celular ? null : rooms.find((s) => s.id === salaAbertaId) ?? null;
     if (oQueFazerAoClicar(sala, lendo, rm.salaDaVoz?.id ?? null).abrir) setSalaAbertaId(sala.id);
     setJogoAberto(null);
     try {
@@ -1102,7 +1133,7 @@ export function App() {
     } catch (e) {
       rm.setError((e as Error).message);
     }
-  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId]);
+  }, [rm, entrarNaVoz, paraAVoz, rooms, salaAbertaId, celular]);
 
   /**
    * O xadrez visto da busca de salas: quem está jogando (o controle ao lado do nome), a
@@ -1538,7 +1569,7 @@ export function App() {
       )}
     {/* Sem a lista de pessoas, a coluna dela sai da grade: no modo conversas não há
         servidor aberto para ter gente. */}
-    <div className={`app ${semPessoas ? 'sem-pessoas' : ''}`}>
+    <div className={`app ${semPessoas ? 'sem-pessoas' : ''}${celular ? ` celular no-celular-${telaDoCelular.tela}${voceNoCelular ? ' voce-aberto' : ''}${pessoasNoCelular && !semPessoas ? ' pessoas-abertas' : ''}` : ''}`}>
       <Sidebar
         rooms={rooms}
         categorias={categorias}
@@ -1551,10 +1582,11 @@ export function App() {
         eu={eu}
         servidor={servidor}
         rm={rm}
-        onAbrir={abrirSala}
+        onAbrir={(s) => { void abrirSala(s); abrirLugar(); }}
         lives={lives}
-        onAssistirLive={assistirDaBarra}
-        onAbrirPalco={abrirPalcoDaVoz}
+        onAssistirLive={(s, quem) => { void assistirDaBarra(s, quem); abrirLugar(); }}
+        onAbrirPalco={() => { abrirPalcoDaVoz(); abrirLugar(); }}
+        recursos={recursos}
         jogando={jogandoPorPessoa}
         nomeDoJogador={nomeDoJogador}
         minhaPartida={minhaMesaAgora?.estado ?? null}
@@ -1586,8 +1618,8 @@ export function App() {
         conversaAbertaId={conversaNaTela?.id ?? null}
         emAmigos={modoConversas && !conversaNaTela}
         pedidos={amigos.pedidos}
-        onAbrirConversa={abrirConversaDaLista}
-        onAbrirAmigos={() => { setConversaAberta(null); abrirConversas(); }}
+        onAbrirConversa={(id) => { abrirConversaDaLista(id); abrirLugar(); }}
+        onAbrirAmigos={() => { setConversaAberta(null); abrirConversas(); abrirLugar(); }}
         // Arrastar alguém para outra sala. Arrastar a si mesmo é só trocar de sala; os outros,
         // com a permissão e abaixo de mim — o servidor confere de novo.
         podeMover={(p) => p.identity === identidadeDe(eu.id)
@@ -1617,6 +1649,8 @@ export function App() {
         salaAberta={modoConversas ? null : salaAberta}
         servidorId={servidor.id}
         onVoltarAVoz={abrirPalcoDaVoz}
+        voltar={celular ? telaDoCelular.voltar : undefined}
+        onPessoas={celular && !modoConversas ? () => setPessoasNoCelular(true) : undefined}
         conversa={conversaNaTela}
         telaDeAmigos={modoConversas && !conversaNaTela ? (
           <TelaDeAmigos onConversar={conversarCom} onMudou={recarregarServidor} />
@@ -1642,11 +1676,11 @@ export function App() {
             <button className={rm.deafened ? 'off' : ''} onClick={rm.toggleDeafen} title={rm.deafened ? 'Voltar a ouvir' : 'Ensurdecer'}>
               <Icon name={rm.deafened ? 'headOff' : 'head'} />
             </button>
-            <span className="divisor" />
-            <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
-            <button className={rm.screenOn ? 'on' : ''} onClick={compartilhar} aria-disabled={!rm.podeTransmitir || undefined}
-              title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>
-            <button onClick={() => setSoundboard(true)} title="Soundboard"><Icon name="speaker" /></button>
+            {(recursos.ligarCamera || recursos.transmitir || recursos.soundboard) && <span className="divisor" />}
+            {recursos.ligarCamera && <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>}
+            {recursos.transmitir && <button className={rm.screenOn ? 'on' : ''} onClick={compartilhar} aria-disabled={!rm.podeTransmitir || undefined}
+              title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>}
+            {recursos.soundboard && <button onClick={() => setSoundboard(true)} title="Soundboard"><Icon name="speaker" /></button>}
             <span className="divisor" />
             <button className="desligar" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
           </div>
@@ -1654,7 +1688,7 @@ export function App() {
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro. O Catan começado toma a JANELA:
         // a Saga sai da frente pelo CSS (`.app:has(.catan-mesa)`, no catan.css).
-        jogo={jogoAberto?.tipo === 'catan' ? (live) => (
+        jogo={!recursos.jogos ? undefined : jogoAberto?.tipo === 'catan' ? (live) => comEspera(
           <TelaDoCatan
             key={`catan-${jogoAberto.mesaId}`}
             mesaId={jogoAberto.mesaId}
@@ -1670,7 +1704,7 @@ export function App() {
             onFechar={() => setJogoAberto(null)}
             onAviso={notas.mostrar}
           />
-        ) : jogoAberto?.tipo === 'urna' ? (live) => (
+        ) : jogoAberto?.tipo === 'urna' ? (live) => comEspera(
           <TelaDaUrna
             key={`urna-${jogoAberto.servidorId}`}
             servidorId={jogoAberto.servidorId}
@@ -1680,7 +1714,7 @@ export function App() {
             live={live}
             onFechar={() => setJogoAberto(null)}
           />
-        ) : jogoAberto?.tipo === 'luta' ? (live) => (
+        ) : jogoAberto?.tipo === 'luta' ? (live) => comEspera(
           <TelaDaLuta
             key={`luta-${jogoAberto.servidorId}`}
             arenaId={jogoAberto.arenaId}
@@ -1694,7 +1728,7 @@ export function App() {
             onArena={(id) => setJogoAberto((j) => (j?.tipo === 'luta' ? { ...j, arenaId: id } : j))}
             onFechar={() => setJogoAberto(null)}
           />
-        ) : jogoAberto?.tipo === 'xadrez' ? (live) => (
+        ) : jogoAberto?.tipo === 'xadrez' ? (live) => comEspera(
           <TelaDoXadrez
             key={jogoAberto.mesaId}
             mesaId={jogoAberto.mesaId}
@@ -1708,7 +1742,7 @@ export function App() {
             onAviso={notas.mostrar}
           />
         ) : undefined}
-        faixaDaPartida={minhaMesaCatan && minhaMesaCatan.estado !== 'fim' && !jogoAberto ? (
+        faixaDaPartida={!recursos.jogos ? undefined : minhaMesaCatan && minhaMesaCatan.estado !== 'fim' && !jogoAberto ? (
           <FaixaDaPartida
             jogo="Catan"
             estado={minhaMesaCatan.estado}
@@ -1827,6 +1861,7 @@ export function App() {
         // Pelo mesmo caminho de todo mundo: a lista tem o membro na mão, mas montar o
         // objeto aqui é como as duas versões do cartão nasceram.
         onPessoa={(m, em, tipo) => abrirMenu(identidadeDe(m.id), m.nome, em, tipo)}
+        onFechar={celular ? () => setPessoasNoCelular(false) : undefined}
       />
       )}
 
@@ -1836,9 +1871,9 @@ export function App() {
         modoConversas={modoConversas}
         // Um número só: mensagens privadas por ler mais pedidos de amizade esperando.
         aviso={conversas.reduce((n, c) => n + c.naoLidas, 0) + amigos.pedidos}
-        onConversas={abrirConversas}
+        onConversas={() => { setVoceNoCelular(false); abrirConversas(); }}
         // Clicar num servidor SAI do modo conversas: é ele que você está abrindo.
-        onEscolher={(id) => { setModoConversas(false); if (id !== servidor.id) trocarDeServidor(id); }}
+        onEscolher={(id) => { setVoceNoCelular(false); setModoConversas(false); if (id !== servidor.id) trocarDeServidor(id); }}
         // Botão direito noutro servidor: troca primeiro e só então abre o menu — ele lê
         // o servidor da sessão ao abrir, e abrir antes mostraria o de onde você veio.
         onAjustar={async (id, em) => { if (id !== servidor.id) await trocarDeServidor(id); setMenuDoServidor(em); }}
@@ -1847,6 +1882,35 @@ export function App() {
         // Só o dono da Saga recebe a porta; para os outros ela não existe.
         onAdministracao={eu.donoDaSaga ? () => setAdministracao(true) : undefined}
       />
+
+      {celular && voceNoCelular && (
+        <TelaDoVoce
+          eu={eu}
+          statusEscolhido={statusEscolhido}
+          onStatus={escolherStatus}
+          onConfiguracoes={() => setDevices(true)}
+          onSair={logout}
+        />
+      )}
+      {celular && (
+        <BarraDoCelular
+          aba={abaDoCelular}
+          avisoDasConversas={conversas.reduce((n, c) => n + c.naoLidas, 0) + amigos.pedidos}
+          rm={rm}
+          onAba={(a) => {
+            setVoceNoCelular(a === 'voce');
+            if (a === 'servidores') setModoConversas(false);
+            if (a === 'conversas') abrirConversas();
+          }}
+          onAbrirCall={() => { abrirPalcoDaVoz(); abrirLugar(); }}
+        />
+      )}
+      {/* O navegador recusou o som da call: só um toque destrava (ver `somTravado`). */}
+      {rm.somTravado && (
+        <button type="button" className="liberar-som" onClick={() => void rm.liberarSom()}>
+          <Icon name="speaker" size={18} /> Toque aqui para ouvir a call
+        </button>
+      )}
 
       {menuDoBot && (() => {
         const estado = musica.estadoDaSala(menuDoBot.salaId);
@@ -1968,7 +2032,8 @@ export function App() {
         avisos={notas.avisos}
         // O convite para jogar fica na mesma pilha, num cartão grande (a opção C do dono), e não
         // some sozinho: quem chamou está esperando a resposta.
-        extra={(convite || conviteDeLuta || conviteDeCatan) && (
+        // No celular os jogos ficam para depois: o convite seria um "aceitar" que não leva a nada.
+        extra={recursos.jogos && (convite || conviteDeLuta || conviteDeCatan) && (
           <>
             {conviteDeCatan && (
               <ConviteDeCatan
@@ -1980,12 +2045,14 @@ export function App() {
               />
             )}
             {conviteDeLuta && (
-              <ConviteDeLuta
-                convite={conviteDeLuta}
-                servidorAberto={servidorAberto}
-                onLutar={() => responderConviteDeLuta(conviteDeLuta, true)}
-                onRecusar={() => responderConviteDeLuta(conviteDeLuta, false)}
-              />
+              <Suspense fallback={null}>
+                <ConviteDeLuta
+                  convite={conviteDeLuta}
+                  servidorAberto={servidorAberto}
+                  onLutar={() => responderConviteDeLuta(conviteDeLuta, true)}
+                  onRecusar={() => responderConviteDeLuta(conviteDeLuta, false)}
+                />
+              </Suspense>
             )}
             {convite && (
               <ConviteDeXadrez

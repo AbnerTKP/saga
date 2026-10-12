@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Saga</title>
+    <!--
+      Celular primeiro: sem o viewport, o navegador desenha a página em 980 px e encolhe.
+      `interactive-widget=resizes-content` faz o teclado ENCOLHER a página em vez de passar
+      por cima do campo de escrever (Chrome do Android); `viewport-fit=cover` deixa a Saga ir
+      até a borda e as margens seguras (`env(safe-area-inset-*)`) cuidarem do recorte.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="color-scheme" content="dark" />
+    <!-- "Adicionar à tela de início" abre sem a barra do navegador, como um app. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Saga" />
+    <link rel="apple-touch-icon" href="./icone-180.png" />
+    <link rel="icon" href="./icone-192.png" type="image/png" />
+    <!--
+      O mesmo trilho do app instalado: script só desta página, nada de fora executa. A
+      conexão vai ao servidor do grupo e ao servidor de voz (`wss:`), e as imagens podem vir
+      de qualquer https (GIFs, fotos guardadas no servidor).
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream: https:; connect-src 'self' https: wss:; worker-src 'self' blob:;" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./entrada.ts"></script>
+  </body>
+</html>

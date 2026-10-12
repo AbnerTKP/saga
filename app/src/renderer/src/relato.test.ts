@@ -38,4 +38,6 @@ test('enviar pede algumas letras, e o sistema tem nome de gente', () => {
   assert.equal(podeEnviar('som'), true);
   assert.equal(nomeDoSistema('darwin'), 'Mac');
   assert.equal(nomeDoSistema('win32'), 'Windows');
+  // A Saga aberta no navegador do celular: o relato precisa dizer que não era o app instalado.
+  assert.equal(nomeDoSistema('web'), 'navegador');
 });

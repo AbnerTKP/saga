@@ -13,7 +13,7 @@ import { pareceEmail } from '../email';
 import { Icon } from './Icon';
 import { Configuracoes, Linha, Pagina as Folha, Secao } from './Configuracoes';
 import { CaixaDeRelato } from './Relatar';
-import { PAGINAS_DA_CONTA, type Pagina, type PaginaDaConta } from '../paginasDeConfiguracao';
+import { paginasDaConta, type Pagina, type PaginaDaConta } from '../paginasDeConfiguracao';
 import { EscolherImagem } from './EscolherImagem';
 import { BlocoDoMicrofone } from './AjustesDoMicrofone';
 import type { MicrofoneDaCall } from '../useMicrofone';
@@ -271,7 +271,7 @@ export function ConfiguracoesDaConta({
   const [saindo, setSaindo] = useState(false);
 
   const paginas: Pagina<PaginaDaConta | 'relatar' | 'registro' | 'admin' | 'sair'>[] = [
-    ...PAGINAS_DA_CONTA,
+    ...paginasDaConta(window.desktop.platform === 'web'),
     { id: 'relatar', titulo: 'Relatar um problema', icone: 'relatar', grupo: 'A Saga', busca: ['erro', 'bug', 'ideia', 'sugestão'], acao: () => setRelatando(true) },
     { id: 'registro', titulo: 'Registro de erros', icone: 'documento', grupo: 'A Saga', busca: ['log', 'erro', 'diagnóstico'], acao: onRegistro },
     ...(donoDaSaga ? [{ id: 'admin' as const, titulo: 'Administração da Saga', icone: 'grade', grupo: 'A Saga', busca: ['berserk', 'servidores', 'contas', 'código de senha'], acao: onAdministracao }] : []),

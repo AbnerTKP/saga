@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buscarPaginas, paginasDoServidor, PAGINAS_DA_CONTA } from './paginasDeConfiguracao.ts';
+import { buscarPaginas, paginasDaConta, paginasDoServidor, PAGINAS_DA_CONTA } from './paginasDeConfiguracao.ts';
 import type { Cargo } from './api.ts';
 
 const cargo = (permissoes: Cargo['permissoes'], dono = false): Cargo => ({ id: 1, nome: 'x', cor: null, nivel: 10, permissoes, dono });
@@ -31,4 +31,9 @@ test('a busca acha pelo título e pelos sinônimos, sem acento e sem maiúscula'
 
 test('"quem pode ver" leva a Salas e categorias', () => {
   assert.deepEqual(buscarPaginas(paginasDoServidor(cargo([], true)), 'privada').map((p) => p.id), ['salas']);
+});
+
+test('no navegador as páginas do computador (atalhos e inicialização) somem; no app, ficam', () => {
+  assert.deepEqual(paginasDaConta(true).map((p) => p.id), ['perfil', 'conta', 'voz']);
+  assert.deepEqual(paginasDaConta(false), PAGINAS_DA_CONTA);
 });

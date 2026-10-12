@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { urlDoArquivo, type Cargo, type Categoria, type Conversa, type Membro, type RoomInfo, type Servidor } from '../api';
 import { ocupantes } from '../ocupantes';
 import { contaDaIdentidade, identidadeDe } from '../pessoas';
@@ -15,9 +15,14 @@ import { FotoDoServidor } from './TrilhaDeServidores';
 import { Nome } from './Nome';
 import { Sinal } from './Sinal';
 import { CartaoDaLive } from './CartaoDaLive';
-import { MenuDeJogos } from './MenuDeJogos';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import { MOTIVO_SEM_TRANSMITIR } from '../transmitir';
+import type { Recursos } from '../celular';
+
+const TUDO: Recursos = { transmitir: true, ligarCamera: true, soundboard: true, jogos: true };
+
+// As capas do menu de jogos são desenhadas pelo Dragão: o menu chega quando é aberto.
+const MenuDeJogos = lazy(() => import('./MenuDeJogos').then((m) => ({ default: m.MenuDeJogos })));
 
 type RM = ReturnType<typeof useRoom>;
 
@@ -31,8 +36,10 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
+  /** O que esta tela oferece: no navegador não há transmitir; no celular, nem jogos. */
+  recursos?: Recursos;
   categorias: Categoria[];
   /**
    * As salas DESTE servidor já chegaram. Logo depois de trocar de servidor ainda não, e
@@ -316,16 +323,18 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
         {rm.status === 'connected' && <Sinal room={rm.room} qualidade={rm.room.localParticipant.connectionQuality} />}
       </button>
       <div className="voice-actions">
-        <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>
-        <button className={rm.screenOn ? 'on' : ''} onClick={onShare} aria-disabled={!rm.podeTransmitir || undefined}
-          title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>
-        <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>
+        {recursos.ligarCamera && <button className={rm.camOn ? 'on' : ''} onClick={rm.toggleCam} title="Câmera"><Icon name="camera" /></button>}
+        {recursos.transmitir && <button className={rm.screenOn ? 'on' : ''} onClick={onShare} aria-disabled={!rm.podeTransmitir || undefined}
+          title={rm.screenOn ? 'Parar de compartilhar' : rm.podeTransmitir ? 'Compartilhar tela' : MOTIVO_SEM_TRANSMITIR}><Icon name="screen" /></button>}
+        {recursos.soundboard && <button onClick={onSoundboard} title="Soundboard"><Icon name="speaker" /></button>}
         {/* Os jogos moram aqui porque é daqui que se chama gente: o lobby chama
             primeiro quem está na call. */}
-        <button className={menuDeJogos ? 'on' : ''} data-abre-jogos onClick={abrirJogos}
-          title={minhaPartida ? 'Jogos — você tem uma mesa aberta' : 'Jogos'}>
-          <Icon name="controle" />
-        </button>
+        {recursos.jogos && (
+          <button className={menuDeJogos ? 'on' : ''} data-abre-jogos onClick={abrirJogos}
+            title={minhaPartida ? 'Jogos — você tem uma mesa aberta' : 'Jogos'}>
+            <Icon name="controle" />
+          </button>
+        )}
         <button className="danger" onClick={rm.leave} title="Desconectar"><Icon name="hangup" /></button>
       </div>
     </div>
@@ -397,7 +406,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   );
 
   const menuDeJogosAberto = menuDeJogos && (
-    <MenuDeJogos
+    <Suspense fallback={null}><MenuDeJogos
       em={menuDeJogos}
       minha={minhaPartida}
       jogoDaMinha={jogoDaMinhaPartida}
@@ -409,7 +418,7 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       onLuta={onLuta}
       onUrna={onUrna}
       onClose={() => setMenuDeJogos(null)}
-    />
+    /></Suspense>
   );
 
   /**

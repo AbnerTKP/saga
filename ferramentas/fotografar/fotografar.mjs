@@ -52,6 +52,9 @@ const TAMANHOS = arg('tamanhos', '1280x800').split(',').map((t) => t.split('x').
 const SO = arg('so', '') ? arg('so', '').split(',') : null;
 const SAIDA = resolve(arg('saida', join(SCRATCH, 'fotos')));
 const PLATAFORMA = arg('plataforma', 'darwin');
+// --celular: tela de celular de verdade (toque, densidade 2, navegador móvel). Use com
+// --plataforma=web e --tamanhos=390x844: é a Saga do navegador do celular (ver celular.ts).
+const CELULAR = process.argv.includes('--celular');
 
 // Proteções que não dependem de cuidado: nada escreve no repositório nem na Saga instalada.
 for (const p of [EXEC, PERFIL, SAIDA]) {
@@ -272,7 +275,8 @@ async function digitar(a, texto) {
 async function moverMouse(x, y) { await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); }
 
 async function viewport(w, h) {
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: CELULAR ? 2 : 1, mobile: CELULAR });
+  if (CELULAR) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await esperarQue(`innerWidth === ${w} && innerHeight === ${h}`, { teto: 5000 });
 }
 
@@ -473,6 +477,33 @@ async function roteiro(dados) {
     const copiou = await avaliar(`window.__copiado === document.querySelector('.modal .codigo-convite').value`);
     log('convite: o "Copiar" chegou à ponte com o código?', copiou);
     if (!copiou) throw new Error('o Copiar do convite não mandou o código para a ponte');
+  });
+
+  await passo('22-celular', async () => {
+    // A Saga do navegador do celular (rode com --celular --plataforma=web --tamanhos=390x844).
+    await esperar('.app.celular', 8000);
+    await foto('22a-celular-salas', 'Celular: a trilha e as salas do Cantinho, com as abas Servidores, Conversas e Você embaixo.');
+    await clicar(sala('geral'));
+    await esperar({ sel: '.app.no-celular-lugar .chat-log .msg', texto: '21h na Sala 2' }, 15000);
+    await foto('22b-celular-chat', 'Celular: a sala de texto geral na tela inteira, com o voltar no alto.');
+    await clicar({ sel: '.pessoas-do-celular' });
+    await esperar('.app.pessoas-abertas .lista-membros');
+    await foto('22c-celular-pessoas', 'Celular: a lista de pessoas do servidor, aberta por cima pelo botão do cabeçalho.');
+    await clicar({ sel: '.fechar-lista-de-membros' });
+    await clicar({ sel: '.voltar-do-celular' });
+    await esperar('.app.no-celular-lista');
+    await clicar({ sel: '.abas-do-celular button', texto: 'Conversas' });
+    await esperar('.app.celular .sidebar');
+    await foto('22d-celular-conversas', 'Celular: a aba Conversas — amigos e conversas privadas.');
+    await clicar({ sel: '.abas-do-celular button', texto: 'Você' });
+    await esperar('.tela-do-voce');
+    await foto('22e-celular-voce', 'Celular: a aba Você — status, configurações, relatar e sair.');
+    await clicar({ sel: '.tela-do-voce .voce-linha', texto: 'Configurações' });
+    await esperar('.modal-back', 8000).catch(() => {});
+    await foto('22f-celular-configuracoes', 'Celular: as configurações da conta, abertas da aba Você.');
+    await tecla('Escape');
+    await clicar({ sel: '.abas-do-celular button', texto: 'Servidores' });
+    await esperar('.app.celular .sidebar .rooms');
   });
 
   await passo('03-menu-do-servidor', async () => {
@@ -1122,7 +1153,9 @@ async function principal() {
       // Cada tamanho começa do zero: sem crachá, sem apelido lembrado, e o grupo com o mesmo status.
       await bater(true);
       await cdp.send('Storage.clearDataForOrigin', { origin: `http://127.0.0.1:${PORTA.vite}`, storageTypes: 'all' });
-      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${PORTA.vite}/` });
+      // No celular, a página da WEB (src/renderer/web): a ponte do navegador de verdade toma o
+      // lugar do preload de mentira, e ela tem a <meta viewport> que o index do Electron não tem.
+      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${PORTA.vite}/${CELULAR ? 'web/' : ''}` });
       await viewport(w, h);
       await roteiro(dados);
     }

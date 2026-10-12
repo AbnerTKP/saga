@@ -41,6 +41,7 @@ server/   Node puro + SQLite + LiveKit (o que fica no ar 24 h)
 | Arquivos | `/root/server`, compose `docker-compose.ip.yml`, banco em `/dados` |
 | Repositório | `AbnerTKP/saga`, link fixo `/releases/latest` |
 | Dono | apelido `TKP` |
+| Saga no navegador | `https://abnertkp.github.io/saga/app/`, no GitHub Pages, no mesmo endereço da página de download (que tem o entrar). Sobe **com a versão**, pelo job `pagina` do `release.yml` — nunca a cada push. Ver `docs/decisoes/navegador-e-celular.md` |
 | Chave do Giphy | `GIPHY_KEY` no `.env` da VPS; vazio desliga a busca sem quebrar nada |
 | E-mail (Resend) | `RESEND_KEY` + `EMAIL_DE` no `.env` da VPS; vazios, a Saga não pede e-mail a ninguém. **Desligado desde que nasceu (17/09/2026): a conta do Resend não tem domínio verificado** e, assim, só entrega no e-mail do dono — ligar antes disso trava o grupo inteiro fora. Ver `server/CLAUDE.md`, "O e-mail da conta" |
 | Senha do grupo | **não existe mais** — `APP_PASSWORD` ficou no `.env` sem uso |
@@ -177,6 +178,7 @@ errado":
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
 | Xadrez, Dama, Urna, Catan e o menu de jogos, app e servidor (`xadrez`, `dama`, `TabuleiroDaDama`, `urna/`, `catan`, `desenhoDoCatan`, `jogos.mjs`, `dama.mjs`, `urnas.mjs`, `catan.mjs`, `catans.mjs`); a Fórmula 1, que saiu em 07/10/2026 | `docs/decisoes/jogos.md` | não — leia |
 | Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`) | `docs/decisoes/telas-e-visual.md` | não — leia |
+| A Saga no navegador e no celular: a ponte do navegador, o arranjo do celular, o entrar da página de download e a publicação no Pages (`web/`, `celular`, `BarraDoCelular`, `TelaDoVoce`, `site/`, `pages.yml`) | `docs/decisoes/navegador-e-celular.md` | não — leia |
 | O que foi medido e o que falta o dono confirmar | `docs/confirmar-com-o-dono.md` | não — leia antes de dizer "pronto" |
 | A reestruturação da interface (set/2026): o levantamento, as decisões do dono, o design system e o que falta (hub de comunidades, selo de verificado) | `docs/reestruturacao-da-interface.md` | não — leia antes de mexer em tela |
 

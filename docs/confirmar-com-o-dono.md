@@ -2,6 +2,18 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A Saga no navegador do celular (12/10/2026).** O que está medido: a tela em celular emulado
+  (Chrome, toque, 390 × 844) pelo passo `22-celular` do `ferramentas/fotografar`, com a ponte do
+  navegador de verdade; o palco da call numa bancada com call de mentira; e ponta a ponta com o
+  build de verdade servido como o Pages, contra o servidor local: entrar pela página de download,
+  a Saga abrindo logada, o voltar do celular. **Não foi exercido**: um celular de verdade (Android
+  e iPhone); a call com o servidor de voz de verdade — falar, ouvir, o "Toque aqui para ouvir a
+  call" e se o LiveKit para mesmo de mandar a imagem com "Só o som" e com a live fora da tela (lido
+  no código do livekit-client, não medido); a bateria e os dados num uso longo; a aba em segundo
+  plano (o navegador pode congelar a call com a tela apagada); o Safari do iPhone em geral
+  (zoom dos campos, tela cheia da live, o campo de escrever crescendo); a publicação no Pages pelo
+  `release.yml`, que só roda na próxima tag.
+
 - **O campo de várias linhas, a lista colada e os "Copiar" do convite (12/10/2026).** O que está
   medido: no Electron do projeto, o `navigator.clipboard` negado pelo porteiro e a ponte copiando; o
   Ctrl+V confiável de uma lista (marcadores, cursor, Ctrl+Z) e de código; a regra (`colagem.test.ts`,

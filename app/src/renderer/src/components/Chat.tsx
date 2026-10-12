@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { urlDoArquivo, type Digitando, type EstadoDaMusica, type Mensagem } from '../api';
 import { useImagemParada, useJanelaEmFoco } from '../imagemParada';
 import { Icon } from './Icon';
@@ -20,6 +20,8 @@ import { linhasComLista } from '../listas';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+const CRESCE_SOZINHO = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
 
 /**
  * O texto da mensagem com os endereços clicáveis.
@@ -258,6 +260,16 @@ export function Chat({
    */
   const lugar = chave ?? sala;
   useEffect(() => { if (sala) campo.current?.focus(); }, [lugar]);
+
+  // O campo cresce com o texto pelo `field-sizing` do CSS. Navegador que não o conhece (o
+  // Safari do iPhone, na Saga do navegador) recebe a altura medida aqui; o teto continua o
+  // do CSS, e daí em diante o campo rola por dentro.
+  useLayoutEffect(() => {
+    const c = campo.current;
+    if (!c || CRESCE_SOZINHO) return;
+    c.style.height = 'auto';
+    c.style.height = `${c.scrollHeight}px`;
+  }, [texto]);
 
   // Trocou de lugar: o menu e a confirmação eram de uma mensagem que já não está na tela.
   useEffect(() => { setMenuDaMensagem(null); setApagando(null); }, [lugar]);

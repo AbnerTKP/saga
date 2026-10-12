@@ -1,0 +1,208 @@
+/*
+ * A Saga no navegador do celular — a opção A da prancheta (12/10/2026), "como o Discord".
+ *
+ * Uma coisa na tela de cada vez: a LISTA (trilha + salas, com a faixa da call e as abas
+ * embaixo) ou o LUGAR aberto (sala de texto, conversa, palco da call). Quem troca uma pela
+ * outra é a classe `no-celular-lista` / `no-celular-lugar` que o App põe na `.app` — ver
+ * celular.ts. As peças são as mesmas do computador: aqui só muda onde cada uma fica e o
+ * tamanho do alvo, que no celular é o polegar (44 px no mínimo).
+ *
+ * Tudo vale só com `.app.celular`, que o App põe apenas no navegador estreito. O app
+ * instalado nunca recebe a classe, e a janela dele não fica abaixo de 900 px — então as
+ * regras por largura, mais abaixo, também não o alcançam.
+ */
+
+/* ---- o que vale em qualquer tela do navegador estreito (entrar, tela inicial, a Saga) --- */
+@media (max-width: 760px) {
+  /* A altura que o navegador do celular mostra DE FATO, com a barra de endereço. 100% é a
+     altura sem ela, e o campo de escrever ficava escondido atrás. */
+  #root { height: 100dvh; }
+  /* Abaixo de 16 px o Safari do iPhone dá zoom na página ao tocar no campo, e não volta. */
+  input, textarea, select { font-size: 16px; }
+  .chat-input textarea { font-size: 16px; }
+  .avisos { left: 10px; right: 10px; bottom: calc(132px + env(safe-area-inset-bottom)); }
+  /* A versão no canto: no celular ela caía em cima da aba "Você". Ela continua na aba
+     Você > Configurações, e no relato. */
+  .marca-versao { display: none; }
+  .connect-card { width: auto; max-width: calc(100vw - 24px); }
+
+  /* As configurações: o cabeçalho, as páginas numa faixa que rola para o lado, e a página
+     aberta embaixo, na largura inteira. Era o menu lateral de 200 px ao lado da página, e a
+     página saía da tela pela direita. `display: contents` põe o cabeçalho e o corpo do
+     conteúdo direto na grade da caixa, para o cabeçalho poder ficar ACIMA do menu. */
+  .cfg-caixa { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  .cfg-conteudo { display: contents; }
+  .cfg-cabeca { order: 1; padding: env(safe-area-inset-top) var(--e2) 0 var(--e4); height: calc(56px + env(safe-area-inset-top)); }
+  .cfg-tecla { display: none; }
+  .cfg-botao-icone { width: 44px; height: 44px; }
+  .cfg-menu { order: 2; flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: var(--e1m);
+    padding: var(--e2) var(--e3); border-right: 0; border-bottom: 1px solid var(--borda-sutil); scrollbar-width: none; }
+  .cfg-menu > div { display: contents; }
+  /* Mais forte que a linha de cima: o cartão "de quem é" também é um <div> do menu. */
+  .cfg-menu > .cfg-escopo, .cfg-menu .cfg-busca, .cfg-menu .cfg-grupo, .cfg-menu .cfg-risco { display: none; }
+  .cfg-item { flex: none; width: auto; min-height: 38px; padding: 0 var(--e3); border-radius: var(--raio-cheio);
+    border: 1px solid var(--borda-sutil); }
+  .cfg-item-nome { overflow: visible; }
+  .cfg-item[aria-current="page"]::before { display: none; }
+  .cfg-corpo { order: 3; padding: var(--e4) var(--e4) calc(var(--e7) + env(safe-area-inset-bottom)); }
+}
+
+/* ---- a grade ------------------------------------------------------------------------ */
+.app.celular {
+  display: grid; height: 100%;
+  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.app.celular > .trilha { grid-column: 1; grid-row: 1; }
+.app.celular > .sidebar { grid-column: 2; grid-row: 1; min-width: 0; }
+.app.celular > .tela-do-voce { grid-column: 1 / -1; grid-row: 1; }
+.app.celular > .barra-do-celular { grid-column: 1 / -1; grid-row: 2; }
+.app.celular > .stage { display: none; }
+.app.celular > .lista-membros { display: none; }
+
+/* A aba "Você" toma o lugar da trilha e das salas. */
+.app.celular.voce-aberto > .trilha,
+.app.celular.voce-aberto > .sidebar { display: none; }
+
+/* O lugar aberto toma a tela inteira; a lista espera atrás. O palco fica montado (com
+   `display: none` na lista), e é assim que a live que ninguém está olhando PARA de chegar: o
+   adaptiveStream do LiveKit pausa o vídeo que não está visível — no 4G, é o que mais pesa. */
+.app.celular.no-celular-lugar > .trilha,
+.app.celular.no-celular-lugar > .sidebar,
+.app.celular.no-celular-lugar > .tela-do-voce,
+.app.celular.no-celular-lugar > .barra-do-celular { display: none; }
+.app.celular.no-celular-lugar > .stage { display: flex; grid-column: 1 / -1; grid-row: 1 / -1; }
+
+/* As pessoas do servidor abrem por cima de tudo, pelo botão do cabeçalho. */
+.app.celular.pessoas-abertas > .lista-membros {
+  display: flex; position: fixed; inset: 0; z-index: var(--z-painel); border-left: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.fechar-lista-de-membros {
+  margin-left: auto; width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: var(--raio-4); color: var(--text2);
+}
+
+/* ---- trilha e salas --------------------------------------------------------------- */
+/* O nome do servidor é um <button>, e botão centraliza o texto: na barra estreita do
+   computador não se nota, na largura do celular ele ia parar no meio. */
+.app.celular .nome-do-servidor { text-align: left; }
+.app.celular > .trilha { padding: 12px 0; gap: 10px; padding-top: calc(12px + env(safe-area-inset-top)); }
+.app.celular .trilha .quadro-servidor { width: 46px; height: 46px; font-size: 14px; }
+.app.celular .trilha .quadro-servidor.atual::before,
+.app.celular .trilha .quadro-conversas.atual::before { left: -11px; }
+.app.celular .sidebar-head { padding-top: env(safe-area-inset-top); height: calc(56px + env(safe-area-inset-top)); }
+.app.celular .rooms { padding: 10px 10px 16px; }
+.app.celular .room { min-height: 44px; font-size: 16px; border-radius: var(--raio-4); }
+.app.celular .room svg { width: 20px; height: 20px; }
+.app.celular .people li { padding: 7px 6px; font-size: 15px; }
+/* A call e a conta moram no pé da tela (a faixa e as abas), e não embaixo das salas. */
+.app.celular .sidebar .voice-panel,
+.app.celular .sidebar .user-panel { display: none; }
+
+/* ---- o pé: a call e as abas --------------------------------------------------------- */
+.barra-do-celular { background: var(--bg1); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.call-no-celular { display: flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px;
+  background: var(--bg2); border-bottom: 1px solid var(--line); }
+.call-no-celular-quem { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start;
+  gap: 1px; text-align: left; line-height: 1.25; padding: 2px 0; }
+.call-no-celular-quem .strong { display: flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--ok-texto); }
+.call-no-celular-quem .small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-no-celular > button:not(.call-no-celular-quem) {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center;
+  border-radius: var(--raio-4); background: var(--bg3); color: var(--text);
+}
+.call-no-celular > button.off { color: var(--perigo-texto); }
+.call-no-celular > button.sair { background: var(--perigo-cheio); color: var(--branco); }
+.abas-do-celular { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; height: 60px; }
+.abas-do-celular button { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font-size: 11px; font-weight: 650; color: var(--text3); position: relative; }
+.abas-do-celular button.atual { color: var(--white); }
+.abas-do-celular button.atual svg { color: var(--accent-claro); }
+.marca-da-aba { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--perigo-cheio); color: var(--branco); border: 2px solid var(--bg1);
+  font-size: 10.5px; font-weight: 800; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+
+/* ---- o cabeçalho do lugar aberto -------------------------------------------------------- */
+.app.celular .stage-head { height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0; gap: 6px; flex: none; }
+.app.celular .stage-head .strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16.5px; }
+.voltar-do-celular, .pessoas-do-celular {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center;
+  border-radius: var(--raio-4); color: var(--text2);
+}
+.pessoas-do-celular { margin-left: auto; }
+
+/* ---- o chat ----------------------------------------------------------------------------- */
+.app.celular .msg { grid-template-columns: 38px minmax(0, 1fr); gap: 10px; padding: 3px 14px; }
+.app.celular .msg-lado .avatar { width: 38px; height: 38px; }
+.app.celular .chat-input { margin: 6px 10px calc(10px + env(safe-area-inset-bottom)); }
+.app.celular .chat-input .rotulo-gif { padding: 0 8px; }
+/* A live que você assiste enquanto lê fica no canto, menor: a conversa é o que se veio ler. */
+.app.celular .mini-live { width: 190px; right: 10px; bottom: 88px; }
+
+/* ---- o palco da call ---------------------------------------------------------------- */
+.app.celular .stage-body.em-call { display: flex; flex-direction: column; }
+.app.celular .videos { margin: 0; border-radius: 0; padding: 10px; flex: 1; min-height: 0; overflow-y: auto; }
+/* Os controles da call: SEMPRE à mostra e no pé da tela, onde o polegar alcança. No
+   computador eles surgem com o mouse; no toque não há mouse para os chamar. */
+.app.celular .barra-da-call-no-palco {
+  position: static; transform: none; opacity: 1; pointer-events: auto; order: 2; flex: none;
+  justify-content: center; gap: 14px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  border-radius: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg1); box-shadow: none;
+}
+.app.celular .barra-da-call-no-palco button { width: 58px; height: 58px; border-radius: 50%; background: var(--bg3); }
+.app.celular .barra-da-call-no-palco button.desligar { width: 58px; background: var(--perigo-cheio); }
+.app.celular .barra-da-call-no-palco .divisor { display: none; }
+/* A live em cima, na largura inteira e 16:9; quem está na call embaixo, em duas colunas. */
+.app.celular .focus-layout { flex: none; gap: 10px; }
+.app.celular .focus-layout .tile.big { flex: none; width: 100%; aspect-ratio: 16 / 9; }
+.app.celular .strip { height: auto; overflow: visible; display: grid; gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 120px; }
+.app.celular .strip .tile, .app.celular .strip .tile.live-apagada { width: auto; }
+.app.celular .grid { flex: none; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 160px; }
+.app.celular .grid.n1 { grid-template-columns: 1fr; grid-auto-rows: auto; }
+.app.celular .grid.n1 .tile { aspect-ratio: 4 / 3; }
+.app.celular .empty .avatars { flex-wrap: wrap; justify-content: center; gap: 14px; }
+.app.celular .escolher-live-cartoes { flex-wrap: wrap; justify-content: center; }
+
+/* ---- o som que o navegador travou ------------------------------------------------- */
+.liberar-som {
+  position: fixed; left: 50%; top: calc(66px + env(safe-area-inset-top)); transform: translateX(-50%);
+  z-index: var(--z-avisos); display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+  border-radius: var(--raio-cheio); background: var(--acento-cheio); color: var(--sobre-acento);
+  font-weight: 700; box-shadow: var(--sombra-2); white-space: nowrap;
+}
+
+/* ---- a aba "Você" ------------------------------------------------------------------- */
+.tela-do-voce { overflow-y: auto; background: var(--bg1); padding: calc(20px + env(safe-area-inset-top)) 12px 20px;
+  display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+.voce-cabeca { display: flex; align-items: center; gap: 16px; padding: 4px 8px; }
+.voce-nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.voce-nome .strong { font-size: 20px; color: var(--white); }
+.voce-grupo { display: flex; flex-direction: column; gap: 2px; background: var(--bg2); border-radius: var(--raio-5); padding: 6px; }
+.voce-grupo .cabecalho-de-categoria { padding: 8px 10px 4px; }
+.voce-linha { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 10px; border-radius: var(--raio-4);
+  text-align: left; color: var(--text2); }
+.voce-linha .quem { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.voce-linha .strong { color: var(--white); font-size: 15.5px; }
+.voce-linha.atual { background: var(--accent-tenue); }
+.voce-linha.atual > svg { color: var(--accent-claro); }
+.voce-linha.sair-da-conta .strong, .voce-linha.sair-da-conta > svg { color: var(--perigo-texto); }
+.voce-linha .presenca { position: static; width: 12px; height: 12px; margin: 0 4px; flex: none; }
+.voce-pe { text-align: center; margin: 4px 16px 0; }
+
+/* ---- a live no celular: "Só o som" -------------------------------------------------- */
+/* `display: none`, e não `visibility`: é o que o LiveKit lê para dar o vídeo por invisível e
+   parar de recebê-lo (`isElementInViewport`, no livekit-client). O som da tela é outra faixa. */
+.tile.so-o-som video { display: none; }
+.aviso-so-o-som { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--e2); background: var(--bg1); color: var(--text2); font-size: 14px; font-weight: 600; }
+.controles-texto { height: 34px; padding: 0 12px; border-radius: var(--raio-3); color: var(--branco);
+  font-size: 13px; font-weight: 700; background: var(--veu-forte); }
+.controles-texto.ligado { background: var(--acento-cheio); color: var(--sobre-acento); }
+/* Os controles da live no celular: cabem numa linha. O volume encolhe (o celular tem os
+   botões dele), a porcentagem sai e "Só o som" não quebra. */
+.app.celular .controles-da-live { gap: 8px; padding-left: 10px; padding-right: 10px; }
+.app.celular .controles-da-live .volume-da-live input { width: 72px !important; }
+.app.celular .controles-da-live .volume-pct { display: none; }
+.controles-texto { white-space: nowrap; }

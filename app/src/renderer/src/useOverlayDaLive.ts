@@ -43,7 +43,9 @@ export function useOverlayDaLive(
   const somAgora = useRef(som);
   somAgora.current = som;
 
-  const disponivel = typeof window !== 'undefined' && !!window.desktop?.overlay;
+  // A janela por cima do jogo é do app instalado: no navegador a ponte tem o `overlay` só
+  // para responder "não há", e o botão não pode aparecer prometendo uma janela que não vem.
+  const disponivel = typeof window !== 'undefined' && !!window.desktop?.overlay && window.desktop.platform !== 'web';
 
   const pararDeMandar = useCallback(() => {
     parar.current?.();
