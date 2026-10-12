@@ -163,7 +163,8 @@ function stub(plataforma) {
       estaMaximizada: () => Promise.resolve(false), aoMaximizar: desinscrever },
     registrar: nada,
     lerRegistro: () => Promise.resolve(''),
-    copiarRegistro: nada,
+    // Guarda o que foi copiado, para o passo do chat conferir que o "Copiar" chegou à ponte.
+    copiarRegistro: (t) => { window.__copiado = String(t); return Promise.resolve(); },
     abrirPastaDoRegistro: nada,
     onUpdate: () => {},
     updateAtual: () => Promise.resolve({ fase: 'nenhuma' }),
@@ -437,6 +438,41 @@ async function roteiro(dados) {
       .catch((e) => log('achado:', e.message));
     await moverMouse(640, 20);
     await foto('02-principal-sala-de-texto', 'Tela principal do dono (TKP) no servidor Cantinho, sala de texto #geral com conversa, salas em categorias à esquerda, pessoas por cargo e trilha de servidores à direita.');
+  });
+
+  await passo('21-colar-lista-no-chat', async () => {
+    // A colagem é SINTÉTICA: o evento leva o HTML e o texto puro que o Chromium põe na área de
+    // transferência ao copiar uma lista (medido no Electron em 12/10/2026), e a área de
+    // transferência desta máquina não é tocada. É o caminho do colar do chat com lista — o
+    // colar sem lista é o padrão do <textarea>, que um evento sintético não executa.
+    const html = '<p>Plano pro fim de semana:</p><ul><li>Sexta: <b>Catan</b> às 21h na Sala 2</li>'
+      + '<li>Sábado: dama e xadrez<ul><li>quem perder paga o lanche</li><li>levar o fone bom, porque o microfone do notebook pega tudo e todo mundo reclama do eco na call, de novo, como na semana passada</li></ul></li>'
+      + '<li>Domingo: descanso</li></ul><ol><li>instalar a versão nova</li><li>testar o colar de lista</li></ol>';
+    const puro = ['Plano pro fim de semana:', '', 'Sexta: Catan às 21h na Sala 2', 'Sábado: dama e xadrez',
+      'quem perder paga o lanche'].join('\n');
+    await clicar(sala('geral'));
+    await esperar({ sel: '.chat-log .msg', texto: '21h na Sala 2' }, 15000);
+    await avaliar(`(() => { const c = document.querySelector('.chat-input textarea'); c.focus();
+      const dt = new DataTransfer(); dt.setData('text/html', ${JSON.stringify(html)}); dt.setData('text/plain', ${JSON.stringify(puro)});
+      c.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+    await esperarQue(`document.querySelector('.chat-input textarea').value.includes('  ◦ quem perder')`, { oque: 'lista colada no campo' });
+    log('campo depois de colar:', await avaliar(`document.querySelector('.chat-input textarea').value`));
+    await moverMouse(640, 20);
+    await foto('21a-lista-colada-no-campo', 'Lista copiada de uma página e colada no campo do chat: cada item na sua linha, com "•", "◦" e números; a caixa cresce com o texto.');
+    await tecla('Enter');
+    await esperar({ sel: '.chat-log .msg .item-de-lista', texto: 'quem perder paga o lanche' }, 10000);
+    await esperarQue(`document.querySelector('.chat-input textarea').value === ''`, { oque: 'campo vazio depois de mandar' });
+    await foto('21b-lista-na-conversa', 'A lista mandada, na conversa: o item comprido quebra e continua embaixo do texto, não da bolinha.');
+
+    // O "Copiar" do convite tem de chegar à ponte do processo principal (o stub guarda o texto).
+    await clicar({ sel: '.cabeca-do-servidor' });
+    await clicar({ sel: '.menu-do-servidor button', texto: 'Convidar gente' });
+    await esperarQue(`(document.querySelector('.modal .codigo-convite')?.value ?? '').length > 0`, { oque: 'código do convite' });
+    await clicar({ sel: '.modal .linha-campo button.primary', texto: 'Copiar' });
+    await esperar({ sel: '.modal .linha-campo button.primary', texto: 'Copiado' }, 5000);
+    const copiou = await avaliar(`window.__copiado === document.querySelector('.modal .codigo-convite').value`);
+    log('convite: o "Copiar" chegou à ponte com o código?', copiou);
+    if (!copiou) throw new Error('o Copiar do convite não mandou o código para a ponte');
   });
 
   await passo('03-menu-do-servidor', async () => {

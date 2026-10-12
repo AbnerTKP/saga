@@ -131,6 +131,29 @@ Mensagens, anexos, "está digitando", amigos e o modo conversas (a regra do serv
   "barulho na mensagem particular" achando que não havia; havia, e calava justamente
   quando fazia falta. Com a janela atrás, o marcador para (a mensagem fica como não lida,
   e é isso que a busca enxerga para tocar o sino) e anda sozinho quando você volta.
+- **O campo tem várias linhas, como no Discord: Enter manda, Shift+Enter quebra a linha.** Era
+  um `<input>`, e colar uma lista copiada "bonita" juntava tudo numa linha só — o `<input>`
+  troca cada quebra por espaço (medido no Electron em 12/10/2026: `"Coisas para hoje:  Comprar
+  pão Ligar para o João antes das 18h…"`). O `<textarea>` cresce com o texto
+  (`field-sizing: content`) até 40% da altura da janela, e daí rola por dentro; numa linha só ele
+  tem a altura do campo antigo, e a barra não mudou de tamanho. Os botões ficam na ÚLTIMA linha
+  quando ele cresce — é onde o cursor está, como o enviar do WhatsApp e do Slack. O Enter
+  durante a composição de um acento (IME) é da composição, não do enviar.
+- **Colar lista traz os marcadores, que o texto puro do Chromium perde.** Copiar `<li>` de uma
+  página dá só o texto de cada item, sem "•" e sem recuo. Quando o HTML que veio junto tem
+  lista, o texto sai dele (`colagem.ts`, puro e testado com o HTML de verdade que o Chromium
+  pôs na área de transferência): "•" no primeiro nível, "◦" e "▪" nos de dentro, o número na
+  numerada, e a segunda linha de um item embaixo do texto dele. Sem lista no HTML, vale o
+  colar normal do campo — código copiado de um editor continua com o recuo. Entra por
+  `insertText`: no lugar do cursor, dentro do limite de 2000, e o Ctrl+Z desfaz a colagem
+  inteira. Medido com Ctrl+V confiável no Electron (a área de transferência do sistema, com o
+  envelope `<!--StartFragment-->` do Windows): lista, desfazer e código colado.
+- **Na conversa, o item de lista tem recuo pendurado** (`listas.ts`, puro e testado): o
+  marcador na frente e o que não coube embaixo do TEXTO, não da bolinha. "-" e "*" seguidos de
+  espaço viram a bolinha do nível, como o Discord faz com o markdown; número fica como foi
+  escrito; `**negrito**`, "-5 graus" e "2026." não são item. O marcador é texto, e não um
+  `::before`: quem seleciona e copia a lista leva as bolinhas junto. Mensagem sem item nenhum
+  é desenhada exatamente como antes.
 - **A barra de escrever é UMA caixa**, com o anexar dentro à esquerda e o GIF e o enviar
   dentro à direita; quem acende ao receber o cursor é a caixa (`:focus-within`), não o
   campo. Eram quatro coisas soltas na mesma linha e nada dizia que formavam um lugar de

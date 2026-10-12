@@ -2,6 +2,15 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **O campo de várias linhas, a lista colada e os "Copiar" do convite (12/10/2026).** O que está
+  medido: no Electron do projeto, o `navigator.clipboard` negado pelo porteiro e a ponte copiando; o
+  Ctrl+V confiável de uma lista (marcadores, cursor, Ctrl+Z) e de código; a regra (`colagem.test.ts`,
+  `listas.test.ts`, `copiar.test.ts`); e a tela no RENDERER pelo passo `21-colar-lista-no-chat` do
+  `ferramentas/fotografar` (colar, mandar, a lista na conversa, e o "Copiar" do convite chegando à
+  ponte com o código). **Não foi exercido**: a Saga instalada de verdade; colar do Google Docs, do
+  Notion, do WhatsApp e do Word reais (o do Docs está no teste pelo formato conhecido, não por cópia
+  feita aqui); Shift+Enter e o Enter de acento no teclado de verdade; o Mac.
+
 - **A rede, o mudo sozinho e o cartão do ping (08/10/2026).** O que está medido:
   - os buffers UDP de 5 MB valendo nas conexões novas da produção;
   - o servidor de voz parando o envio de quem transmite para ninguém (LiveKit 1.9.12 e 1.13.9, numa cópia isolada na VPS);

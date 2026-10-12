@@ -486,6 +486,11 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .msg .text { line-height: 1.45; word-break: break-word; white-space: pre-wrap; }
 .msg .text a { color: var(--accent-claro); text-decoration: none; border-bottom: 1px solid rgba(107,163,245,.35); font-size: inherit; }
 .msg .text a:hover { border-bottom-color: var(--accent-claro); }
+/* A lista da mensagem: o marcador fica na frente e o que não coube continua embaixo do
+   TEXTO, não da bolinha — ver listas.ts. O recuo é o do nível, 1,3em por degrau. */
+.msg .text .linha { min-height: 1lh; }
+.msg .text .item-de-lista { padding-left: calc((var(--nivel, 0) + 1) * 1.3em); text-indent: -1.3em; }
+.msg .text .marcador { display: inline-block; min-width: 1.3em; text-indent: 0; }
 
 /* Alguém pôs a tela no ar enquanto você lia. É uma faixa no fim da conversa, não uma
    mensagem: ela some quando a transmissão acaba, e por isso não leva hora nem fica no
@@ -517,15 +522,22 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 /* A barra é UMA caixa, não quatro coisas soltas na mesma linha: o campo, o anexar, o GIF
    e o enviar moram dentro dela, e é a caixa que acende ao receber o cursor. Antes nada
    dizia que aquilo formava um lugar de escrever. */
-.chat-input { display: flex; align-items: center; gap: var(--e1);
+.chat-input { display: flex; align-items: flex-end; gap: var(--e1);
   margin: var(--e2) var(--e5) var(--e4); padding: 5px 5px 5px 6px;
   background: var(--bg3); border: 1px solid transparent; border-radius: 14px;
   transition: border-color .12s, background .12s; }
 .chat-input:focus-within { border-color: var(--accent); background: var(--bg0); }
-.chat-input input { flex: 1; min-width: 0; background: none; border: none; padding: 11px 10px; }
-.chat-input input:focus { outline: none; }
+/* O campo tem várias linhas e cresce com o texto (`field-sizing`), até um teto em que passa a
+   rolar por dentro. Numa linha só ele tem a altura do <input> que substituiu — 21 px de
+   linha e 11 px de cada lado —, e a barra fica do mesmo tamanho de antes. */
+.chat-input textarea { flex: 1; min-width: 0; resize: none; field-sizing: content;
+  max-height: 40vh; padding: 11px 10px; font: inherit; line-height: 21px; color: var(--white);
+  background: none; border: none; outline: none; overflow-y: auto; }
 .chat-input button { width: 36px; height: 36px; display: grid; place-items: center;
   color: var(--text2); border-radius: 10px; flex: none; }
+/* Os botões ficam na ÚLTIMA linha quando o campo cresce, como o enviar do WhatsApp e do
+   Slack: é ali que o cursor está. Numa linha só, os 3,5 px os deixam no meio, como antes. */
+.chat-input > button { margin-bottom: 3.5px; }
 .chat-input button:hover:not(:disabled) { color: var(--white); background: var(--bg4); }
 .chat-input button:disabled { opacity: .4; }
 /* O GIF é palavra e não desenho: "GIF" é o nome da coisa, e um ícone aqui precisaria de

@@ -15,6 +15,8 @@ import type { LiveNoChat } from '../lives';
 import { arquivoColado, vaiComoImagem } from '../anexos';
 import { comandosParaOMenu } from '../comandos';
 import { RespostaDoBot } from './RespostaDoBot';
+import { textoDaListaColada } from '../colagem';
+import { linhasComLista } from '../listas';
 
 const hora = (t: number) =>
   new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -33,6 +35,28 @@ function comLinks(texto: string) {
       ? <a key={i} href={p.href} target="_blank" rel="noreferrer noopener">{p.valor}</a>
       : <span key={i}>{p.valor}</span>
   ));
+}
+
+/**
+ * O texto da mensagem; com lista, cada item com o recuo pendurado — ver listas.ts.
+ *
+ * O marcador é TEXTO, e não um `::before`: quem seleciona a lista e copia leva as bolinhas
+ * junto. O espaço depois dele também é texto, pelo mesmo motivo.
+ */
+function TextoDaMensagem({ texto }: { texto: string }) {
+  const linhas = linhasComLista(texto);
+  if (!linhas) return <div className="text">{comLinks(texto)}</div>;
+  return (
+    <div className="text">
+      {linhas.map((l, i) => (
+        l.tipo === 'item' ? (
+          <div key={i} className="item-de-lista" style={{ '--nivel': l.nivel } as React.CSSProperties}>
+            <span className="marcador">{`${l.marcador} `}</span>{comLinks(l.texto)}
+          </div>
+        ) : <div key={i} className="linha">{comLinks(l.texto)}</div>
+      ))}
+    </div>
+  );
 }
 
 const PESO = ['B', 'KB', 'MB', 'GB'];
@@ -209,7 +233,7 @@ export function Chat({
   const [arrastando, setArrastando] = useState(false);
   const [erroDoAnexo, setErroDoAnexo] = useState<string | null>(null);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
-  const campo = useRef<HTMLInputElement>(null);
+  const campo = useRef<HTMLTextAreaElement>(null);
   const fim = useRef<HTMLDivElement>(null);
   /**
    * Se a conversa está grudada no fim.
@@ -242,9 +266,12 @@ export function Chat({
   // Travado é diferente de não ter lugar: a conversa está aberta e é lida normalmente —
   // o que fechou foi o campo de escrever.
   const travado = semSala || !!bloqueio;
+  const podeEnviar = !travado && progresso === null && (!!texto.trim() || !!anexo);
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
+    // O Enter do campo chega aqui por `requestSubmit`, que não olha se o botão está apagado.
+    if (!podeEnviar) return;
     if (anexo) {
       const arquivo = anexo, t = texto;
       setErroDoAnexo(null);
@@ -279,16 +306,28 @@ export function Chat({
 
   /**
    * Colar uma imagem (Ctrl+V, Cmd+V) escolhe — não manda, igual a arrastar: vira a mesma
-   * ficha, onde dá para escrever junto ou desistir. Colar texto segue normal no campo.
+   * ficha, onde dá para escrever junto ou desistir.
+   *
+   * Colar texto é o colar do campo, que guarda as quebras de linha. A exceção é a lista: o
+   * texto puro que o Chromium põe na área de transferência perde os marcadores, e então o
+   * texto sai do HTML que veio junto — ver colagem.ts.
    */
-  const colar = (e: React.ClipboardEvent) => {
+  const colar = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const a = arquivoColado(e.clipboardData);
-    if (!a) return;
-    // O texto que às vezes vem junto (o nome do arquivo, o endereço da imagem) não vai
-    // para o campo: quem colou uma imagem colou a imagem.
+    if (a) {
+      // O texto que às vezes vem junto (o nome do arquivo, o endereço da imagem) não vai
+      // para o campo: quem colou uma imagem colou a imagem.
+      e.preventDefault();
+      setAnexo(a);
+      setErroDoAnexo(null);
+      return;
+    }
+    const lista = textoDaListaColada(e.clipboardData.getData('text/html'));
+    if (lista === null) return;
     e.preventDefault();
-    setAnexo(a);
-    setErroDoAnexo(null);
+    // `insertText`, e não `setTexto`: entra no lugar do cursor, respeita o limite do campo e
+    // o Ctrl+Z desfaz a colagem inteira, como desfaria a normal.
+    document.execCommand('insertText', false, lista);
   };
 
   // O cartão mais recente de cada música do bot — ver `principal` em RespostaDoBot.
@@ -404,7 +443,7 @@ export function Chat({
                       <span className="time">{hora(m.criadoEm)}</span>
                     </div>
                   )}
-                  {m.texto && <div className="text">{comLinks(m.texto)}</div>}
+                  {m.texto && <TextoDaMensagem texto={m.texto} />}
                   {m.imagem && (
                     <button
                       className="msg-imagem"
@@ -516,8 +555,12 @@ export function Chat({
         >
           <Icon name="mais" size={22} />
         </button>
-        <input
+        {/* Várias linhas, como no Discord: Enter manda, Shift+Enter quebra a linha, e a caixa
+            cresce com o texto até um teto (`field-sizing`, no CSS). Era um <input>, e colar
+            uma lista juntava tudo numa linha só — o <input> troca a quebra por espaço. */}
+        <textarea
           ref={campo}
+          rows={1}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
@@ -534,19 +577,27 @@ export function Chat({
           maxLength={2000}
           onPaste={colar}
           onKeyDown={(e) => {
-            if (menuDeComandos.length === 0) return;
-            const c = menuDeComandos[Math.min(escolhido, menuDeComandos.length - 1)];
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (menuDeComandos.length > 0) {
+              const c = menuDeComandos[Math.min(escolhido, menuDeComandos.length - 1)];
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const passo = e.key === 'ArrowDown' ? 1 : -1;
+                setEscolhido((i) => (i + passo + menuDeComandos.length) % menuDeComandos.length);
+                return;
+              }
+              if (e.key === 'Tab' || (e.key === 'Enter' && (texto !== `/${c.nome}` || c.argumento))) {
+                // Enter no nome já inteiro de um comando sem argumento (/pular) manda; no pedaço
+                // (/pu), ou num que pede o que tocar (/tocar), completa e espera o resto.
+                e.preventDefault();
+                completar(c.nome);
+                return;
+              }
+              if (e.key === 'Escape') { setTexto(''); return; }
+            }
+            // Durante a composição (acento no teclado de outra língua, IME) o Enter é dela.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              const passo = e.key === 'ArrowDown' ? 1 : -1;
-              setEscolhido((i) => (i + passo + menuDeComandos.length) % menuDeComandos.length);
-            } else if (e.key === 'Tab' || (e.key === 'Enter' && (texto !== `/${c.nome}` || c.argumento))) {
-              // Enter no nome já inteiro de um comando sem argumento (/pular) manda; no pedaço
-              // (/pu), ou num que pede o que tocar (/tocar), completa e espera o resto.
-              e.preventDefault();
-              completar(c.nome);
-            } else if (e.key === 'Escape') {
-              setTexto('');
+              e.currentTarget.form?.requestSubmit();
             }
           }}
         />
@@ -565,7 +616,7 @@ export function Chat({
         </button>
         <button
           className="enviar"
-          disabled={travado || progresso !== null || (!texto.trim() && !anexo)}
+          disabled={!podeEnviar}
           title={anexo ? (ehImagem ? 'Enviar a imagem' : 'Enviar o arquivo') : 'Enviar'}
         >
           <Icon name="send" size={17} />
