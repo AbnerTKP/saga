@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
 import { useFecharComEsc } from '../useFechar';
 import { criarConvite, type Convite } from '../api';
+import { copiarTexto } from '../copiar';
 
 /**
  * A caixa de convidar gente.
@@ -31,10 +32,12 @@ export function Convidar({ nomeDoServidor, onClose }: {
 
   useEffect(() => { void gerar(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const copiar = () => {
+  // "Copiado" só depois que copiou de verdade — ver copiar.ts.
+  const copiar = async () => {
     if (!convite) return;
-    navigator.clipboard?.writeText(convite.codigo);
-    setCopiado(true);
+    const deu = await copiarTexto(convite.codigo);
+    setCopiado(deu);
+    setErro(deu ? null : 'Não consegui copiar. Selecione o código e copie à mão.');
   };
 
   return (

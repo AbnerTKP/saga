@@ -144,6 +144,14 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   nem resolve, nem rejeita —, então `catch` nenhum vê nada e o registro fica limpo. Medido
   com o Electron do projeto: sem `'fullscreen'` na lista, `NADA — promessa nunca respondeu`;
   com ela, `promessa resolveu`. A tela cheia da v0.18.0 nunca funcionou em versão nenhuma.
+- **Copiar é pela ponte do processo principal (`log:copiar`), nunca pelo `navigator.clipboard`.**
+  O `writeText` da janela pede `clipboard-sanitized-write`, o porteiro nega, e a promessa cai com
+  "Write permission denied" — medido em 12/10/2026 com o Electron do projeto e o mesmo porteiro.
+  Os dois "Copiar" do convite iam por ali sem esperar a resposta: diziam "Copiado" e não copiavam
+  nada, desde que nasceram. Hoje toda tela usa `copiarTexto` (`renderer/src/copiar.ts`), e o
+  `copiar.test.ts` falha se alguém voltar ao `navigator.clipboard`. A permissão não foi liberada
+  de propósito: a ponte já existia, não depende de foco, e é um caminho só para conferir. O
+  Ctrl+C de texto selecionado é outro mecanismo (o comando nativo do Chromium) e sempre funcionou.
 - **No Windows a barra da janela é do app; no Mac, continua a do sistema.** A do Windows
   era a branca do sistema, a única coisa na tela que não era da Saga. O dono escolheu entre
   três desenhos renderizados: a faixa de 34 px (logo e "Saga") com os três botões da altura

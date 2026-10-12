@@ -3,14 +3,11 @@ import {
   contasDaSaga, definirBerserk, emitirRecuperacao, urlDoArquivo, ErroDoServidor, type ContaDaSaga,
 } from '../api';
 import { explicarFalha, pendente } from '../recuperacao';
-import { comLimite } from '../limite';
+import { copiarTexto } from '../copiar';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 
 const hora = (t: number) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-/** Quanto se espera a ponte do processo principal responder antes de dar a cópia por falha. */
-const PRAZO_DE_COPIAR = 3000;
 
 /**
  * O que o dono da Saga decide sobre as CONTAS, como bloco — não como janela.
@@ -89,26 +86,11 @@ export function BlocosDaSaga({ meuId, ativa = true }: {
     } finally { setOcupado(null); }
   };
 
-  /**
-   * Copia pelo processo principal, e só diz "copiado" depois que ele respondeu.
-   *
-   * É a ponte do "Copiar tudo" do registro de erros: o nome é do registro, mas ela escreve
-   * qualquer texto com o `clipboard` do processo principal, e é o caminho de copiar que o
-   * app já usa. O `navigator.clipboard` da janela depende de foco e passa pelo porteiro de
-   * permissões do Electron, que só libera mídia, tela, notificação e tela cheia — como ele se
-   * comporta ali não foi medido, e permissão negada naquele porteiro já deixou promessa
-   * pendurada sem erro nenhum. O prazo faz uma resposta que não vem virar falha, e não um
-   * botão esperando para sempre.
-   */
+  // Pela ponte do processo principal, e "Copiado" só depois que ela respondeu — ver copiar.ts.
   const copiar = async (id: number, codigo: string) => {
     const minha = novaTentativa(id);
     setCopias((m) => ({ ...m, [id]: 'copiando' }));
-    let resultado: 'copiado' | 'falhou' = 'copiado';
-    try {
-      await comLimite(window.desktop.copiarRegistro(codigo), PRAZO_DE_COPIAR, 'sem resposta');
-    } catch {
-      resultado = 'falhou';
-    }
+    const resultado = (await copiarTexto(codigo)) ? 'copiado' : 'falhou';
     if (tentativas.current[id] === minha) setCopias((m) => ({ ...m, [id]: resultado }));
   };
 

@@ -19,6 +19,7 @@ import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { EscolherImagem } from './EscolherImagem';
 import { FotoDoServidor } from './TrilhaDeServidores';
+import { copiarTexto } from '../copiar';
 
 // Espelho da regra do servidor, só para não mostrar botão que será recusado. Quem decide
 // de verdade é o servidor: aqui é conveniência, não segurança.
@@ -523,7 +524,10 @@ function PaginaConvites({ eu, servidor, ocupado, setErro, setAviso }: Ctx) {
         <div className="cfg-campo-linha">
           <input readOnly value={convite?.codigo ?? ''} placeholder="Gere um código" className="cfg-codigo" style={{ textAlign: 'center', fontSize: 16 }} aria-label="Código do convite" />
           <button className="cfg-botao" data-variante="primario" disabled={ocupado} onClick={gerar}>{convite ? 'Gerar outro' : 'Gerar'}</button>
-          {convite && <button className="cfg-botao" onClick={() => { navigator.clipboard?.writeText(convite.codigo); setAviso('Código copiado.'); }}>Copiar</button>}
+          {convite && <button className="cfg-botao" onClick={async () => {
+            if (await copiarTexto(convite.codigo)) setAviso('Código copiado.');
+            else setErro('Não consegui copiar. Selecione o código e copie à mão.');
+          }}>Copiar</button>}
         </div>
       </Secao>
       {veLista && vivos && (
