@@ -12,7 +12,10 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   no código do livekit-client, não medido); a bateria e os dados num uso longo; a aba em segundo
   plano (o navegador pode congelar a call com a tela apagada); o Safari do iPhone em geral
   (zoom dos campos, tela cheia da live, o campo de escrever crescendo); a publicação no Pages pelo
-  `release.yml`, que só roda na próxima tag.
+  `release.yml`, que só roda na próxima tag. **Depois (13/10/2026)**: no celular, tocar em quem está
+  numa sala de voz entra na call (conferido com toque de verdade, numa bancada); e no iPhone a call
+  toca pela Web Audio para sair no alto-falante — não exercido: tem de sair no alto-falante com o
+  microfone aberto, e o volume de cada pessoa e o fone desligado têm de continuar valendo.
 
 - **O campo de várias linhas, a lista colada e os "Copiar" do convite (12/10/2026).** O que está
   medido: no Electron do projeto, o `navigator.clipboard` negado pelo porteiro e a ponte copiando; o
