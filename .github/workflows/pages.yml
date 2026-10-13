@@ -45,6 +45,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # Nada publica com teste falhando: chamado pelo release.yml os testes já rodaram, mas o
+      # "Run workflow" à mão (publicar só a web) não passa por lá.
+      - run: pnpm --filter app test
+      - run: pnpm --filter app typecheck
       # A Saga do navegador mora em site/app/: mesmo endereço da página, então o entrar da
       # página guarda a sessão que a Saga encontra ao abrir.
       - run: pnpm --filter app build:web
