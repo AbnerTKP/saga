@@ -1587,6 +1587,7 @@ export function App() {
         onAssistirLive={(s, quem) => { void assistirDaBarra(s, quem); abrirLugar(); }}
         onAbrirPalco={() => { abrirPalcoDaVoz(); abrirLugar(); }}
         recursos={recursos}
+        pessoaAbreACall={celular}
         jogando={jogandoPorPessoa}
         nomeDoJogador={nomeDoJogador}
         minhaPartida={minhaMesaAgora?.estado ?? null}

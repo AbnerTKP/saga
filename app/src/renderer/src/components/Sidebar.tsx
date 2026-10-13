@@ -36,8 +36,15 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO, pessoaAbreACall = false }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
+  /**
+   * No celular, tocar em quem está numa sala de voz ENTRA na call, como tocar na sala (pedido
+   * do dono, 13/10/2026). A linha da pessoa é quase toda a sala de voz na tela do celular, e o
+   * perfil que ela abria no lugar era o toque errado. Segurar o dedo continua abrindo as
+   * opções da pessoa (o botão direito do celular), e o perfil fica a um toque dentro do palco.
+   */
+  pessoaAbreACall?: boolean;
   /** O que esta tela oferece: no navegador não há transmitir; no celular, nem jogos. */
   recursos?: Recursos;
   categorias: Categoria[];
@@ -635,7 +642,11 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
                         // Quem transmite já ganha o cartão da live ao apontar; o balão amarelo
                         // do navegador por cima dele diria outra coisa no mesmo lugar.
                         title={p.screen ? undefined : `${p.name} — clique para o perfil, botão direito para as opções`}
-                        onClick={(e) => { e.stopPropagation(); fecharCartao(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil'); }}
+                        onClick={(e) => {
+                          e.stopPropagation(); fecharCartao();
+                          if (pessoaAbreACall) { onAbrir(r); return; }
+                          onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'perfil');
+                        }}
                         /* Sem parar aqui, o clique sobe até a lista de salas e abre O MENU DELA junto:
                            dois menus na tela, um por cima do outro. */
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); fecharCartao(); onPessoa(p.identity, p.name, { x: e.clientX, y: e.clientY }, 'acoes'); }}

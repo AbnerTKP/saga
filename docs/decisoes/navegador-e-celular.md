@@ -48,6 +48,13 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
 - **No celular, tocar numa sala de voz abre o palco.** No computador, "lendo uma conversa,
   entrar numa call só entra" (`navegacao.ts`); no celular, quem toca está olhando a lista, e
   não lendo nada.
+- **No celular, tocar em quem está numa sala de voz também entra na call** (pedido do dono,
+  13/10/2026: "ao clicar nas pessoas da call mesmo assim eu quero entrar direto na call"). Na
+  tela do celular as pessoas são quase toda a sala de voz, e o perfil que elas abriam era o toque
+  errado. Segurar o dedo continua abrindo as opções da pessoa, e o perfil fica a um toque dentro
+  do palco. No computador, nada muda: o clique na pessoa abre o perfil. Conferido com toque de
+  verdade (`Input.dispatchTouchEvent`) na lista de salas de verdade, numa bancada com a call
+  fingida.
 - **O palco desce, não fecha**: o ⌄ volta à lista e a call continua na faixa sobre as abas,
   com microfone, fone e sair.
 - **As configurações** viram cabeçalho, as páginas numa faixa que rola para o lado e a página
