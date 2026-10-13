@@ -15,6 +15,7 @@ import { podeTransmitir } from './transmitir';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
 import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, trocarAparelho } from './aparelhos';
+import { tocarNoAltoFalante } from './altoFalante';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -63,6 +64,7 @@ import {
   AudioPresets,
   type AudioCaptureOptions,
   type RemoteTrackPublication,
+  type RemoteAudioTrack,
   type LocalTrackPublication,
   type TrackPublication,
   type ScreenShareCaptureOptions,
@@ -312,31 +314,51 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    * (surdez, volume da pessoa, foco) mexia num pedaço e eles se atropelavam.
    */
   const aplicarAudio = useCallback(() => {
+    const decidir = (identity: string, fonte: string | undefined, nome: string | undefined) => {
+      const ehLive = fonte === Track.Source.ScreenShareAudio;
+      // O soundboard tem volume próprio, e global: não é a voz da pessoa, e abaixar o
+      // efeito não pode abaixar quem está falando junto dele.
+      // A música do bot também é publicada como `unknown`: quem separa as duas é o nome.
+      const guardado = nome === NOME_DA_FAIXA_DE_MUSICA
+        ? volumeDaMusicaRef.current
+        : fonte === FONTE_DO_SOUNDBOARD
+          ? volumeDoSoundboardRef.current
+          : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
+      const calado = mudo({ ehLive, identity }, {
+        surdo: deafenedRef.current,
+        liveNoPalco: assistindoRef.current,
+      });
+      return { calado, volume: calado ? 0 : VOLUME(guardado) };
+    };
+
+    // No iPhone a call toca pela Web Audio (ver altoFalante.ts): o LiveKit deixa os <audio>
+    // MUDOS de propósito e o som sai de um ganho por faixa. O volume vai na faixa; mexer no
+    // `muted` dos elementos tocaria tudo em dobro, pelo fone do celular.
+    const sala = roomRef.current;
+    if (sala?.options.webAudioMix) {
+      sala.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => {
+        try {
+          const faixa = pub.track as RemoteAudioTrack | undefined;
+          faixa?.setVolume(decidir(p.identity, pub.source, pub.trackName).volume);
+        } catch (e) {
+          anotar('erro', 'audio', e);
+        }
+      }));
+      return;
+    }
+
     getAudioRoot().querySelectorAll<HTMLMediaElement>('audio').forEach((el) => {
       // Um elemento problemático não pode derrubar a tela inteira. Já derrubou: um volume
       // acima de 1 lançava exceção aqui dentro de um efeito do React, e a janela ficava
       // cinza. Ajustar áudio é acessório; ficar sem o app, não.
       try {
-        const identity = el.dataset.identity ?? '';
-        const ehLive = el.dataset.source === Track.Source.ScreenShareAudio;
-        // O soundboard tem volume próprio, e global: não é a voz da pessoa, e abaixar o
-        // efeito não pode abaixar quem está falando junto dele.
-        // A música do bot também é publicada como `unknown`: quem separa as duas é o nome.
-        const guardado = el.dataset.nome === NOME_DA_FAIXA_DE_MUSICA
-          ? volumeDaMusicaRef.current
-          : el.dataset.source === FONTE_DO_SOUNDBOARD
-            ? volumeDoSoundboardRef.current
-            : (ehLive ? volumesDaTela : volumes).current.get(identity) ?? 1;
-        const calado = mudo({ ehLive, identity }, {
-          surdo: deafenedRef.current,
-          liveNoPalco: assistindoRef.current,
-        });
+        const { calado, volume } = decidir(el.dataset.identity ?? '', el.dataset.source, el.dataset.nome);
         // Calado é `muted` E volume zero. O `muted` sozinho não segurava: o LiveKit o escreve
         // por conta própria — o `room.startAudio()` põe `muted = false` em TODO elemento de
         // áudio, e era assim que quem entrava numa sala de fone desligado ouvia quem já
         // estava lá. Medido numa bancada com duas Saga de verdade (22/09/2026). No volume o
         // LiveKit não mexe.
-        el.volume = calado ? 0 : VOLUME(guardado);
+        el.volume = volume;
         el.muted = calado;
       } catch (e) {
         anotar('erro', 'audio', e);
@@ -348,6 +370,9 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     const r = new Room({
       adaptiveStream: true,
       dynacast: true,
+      // No iPhone, a call pela Web Audio, que o Safari manda para o alto-falante mesmo com o
+      // microfone aberto — ver altoFalante.ts. Em todo o resto, os <audio> de sempre.
+      webAudioMix: tocarNoAltoFalante(),
       videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
       audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });

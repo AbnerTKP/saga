@@ -88,6 +88,19 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
 - **Safari do iPhone**: campo abaixo de 16 px dá zoom ao tocar (todos os campos vão a 16 px na
   tela estreita); tela cheia só existe no próprio `<video>` (`webkitEnterFullscreen`); e o
   campo de escrever cresce por JavaScript onde o `field-sizing` do CSS não existe.
+- **No iPhone a call toca pela Web Audio, para sair no alto-falante** (pedido do dono,
+  13/10/2026: "deixa só alto-falante"). O site não escolhe a saída do som no celular: no Android
+  o Chrome só oferece a "padrão" — que já é o alto-falante, ou o fone e o Bluetooth quando estão
+  ligados (o Chromium fechou o pedido de liberar a escolha, 41276355) —, e no iPhone o Safari
+  decide sozinho e, com o microfone aberto, manda o `<audio>` para o fone de pôr no ouvido. O
+  `webAudioMix` do LiveKit toca a call por um `AudioContext`, que pelos relatos sai no
+  alto-falante mesmo com o microfone aberto; o volume de cada pessoa passa para a faixa
+  (`setVolume`), porque os `<audio>` ficam mudos de propósito. **Só no iPhone e no iPad**
+  (`altoFalante.ts`): no Chrome o cancelamento de eco não pega o som da Web Audio, e ligar isto
+  no computador ou no Android devolveria a call para quem fala. **Não exercido**: a bancada daqui
+  não tem iPhone nem servidor de voz. Ficou de fora, de propósito, fechar o microfone ao mutar
+  (`stopMicTrackOnMute`), que também devolveria o alto-falante: com ele, o mudo de um moderador
+  pareceria "o microfone caiu" (`microfoneCaido.ts`), e a Saga reabriria o microfone sozinha.
 - **A altura da tela é a `100dvh`**: com 100%, o campo de escrever ficava atrás da barra de
   endereço.
 
