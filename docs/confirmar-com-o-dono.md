@@ -16,6 +16,12 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   numa sala de voz entra na call (conferido com toque de verdade, numa bancada); e no iPhone a call
   toca pela Web Audio para sair no alto-falante — não exercido: tem de sair no alto-falante com o
   microfone aberto, e o volume de cada pessoa e o fone desligado têm de continuar valendo.
+  **Depois (19/10/2026)**: a volta de outro app (`acordarSom.ts`). Não exercido: no iPhone, numa
+  call, ir a outro app por uns 30 s e voltar — tem de voltar a ouvir e a ser ouvido sozinho, ou
+  aparecer "Toque aqui para ligar o som da call" e um toque resolver; o anel de quem fala tem de
+  voltar a acender. Com outro app na frente a call continua parando: é do iPhone, não da Saga.
+  E, no computador, o microfone que cai (Bluetooth, troca de padrão) tem de voltar sozinho — a
+  volta nunca tinha disparado (ver `som-e-microfone.md`).
 
 - **O campo de várias linhas, a lista colada e os "Copiar" do convite (12/10/2026).** O que está
   medido: no Electron do projeto, o `navigator.clipboard` negado pelo porteiro e a ponte copiando; o

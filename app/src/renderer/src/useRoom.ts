@@ -16,6 +16,8 @@ import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
 import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, trocarAparelho } from './aparelhos';
 import { tocarNoAltoFalante } from './altoFalante';
+import { acordarContexto } from './acordarSom';
+import { aoDespertar } from './despertar';
 
 type ModoDeAudio = 'nao' | 'loopbackWithoutChrome' | 'loopback' | 'loopbackWithMute';
 
@@ -366,13 +368,20 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     });
   }, []);
 
+  /**
+   * O contexto que toca a call no iPhone. É da Saga, e não do LiveKit, para ela poder acordá-lo
+   * quando a pessoa volta de outro app — o LiveKit só retoma o `suspended` (ver acordarSom.ts).
+   * Dado por nós, o LiveKit também não o fecha ao sair da sala.
+   */
+  const somDaCall = useRef<AudioContext | null>(null);
   const room = useMemo(() => {
+    somDaCall.current = tocarNoAltoFalante() ? new AudioContext({ latencyHint: 'interactive' }) : null;
     const r = new Room({
       adaptiveStream: true,
       dynacast: true,
       // No iPhone, a call pela Web Audio, que o Safari manda para o alto-falante mesmo com o
       // microfone aberto — ver altoFalante.ts. Em todo o resto, os <audio> de sempre.
-      webAudioMix: tocarNoAltoFalante(),
+      webAudioMix: somDaCall.current ? { audioContext: somDaCall.current } : false,
       videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
       audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
@@ -734,10 +743,14 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    */
   const reabrindoMicrofone = useRef(false);
   aoMutarOMicrofone.current = async () => {
-    const faixa = lp().getTrackPublication(Track.Source.Microphone)?.track;
+    // A faixa CRUA. Com o filtro de voz, o `mediaStreamTrack` da faixa da call é a saída dele,
+    // que nunca termina: o microfone caía, a conta dava "viva", e isto nunca reabria nada.
+    // Achado lendo o livekit-client 2.22 (19/10/2026), e conferido rodando o getter dele.
+    const crua = microfoneRef.current.eventos.faixaCrua()
+      ?? lp().getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
     const caiu = deveReabrirMicrofone({
       querFalar: querFalar.current, surdo: deafenedRef.current, conectado: room.state === 'connected',
-      faixaAcabou: faixa?.mediaStreamTrack?.readyState === 'ended',
+      faixaAcabou: crua?.readyState === 'ended',
     });
     if (!caiu || reabrindoMicrofone.current) return;
     reabrindoMicrofone.current = true;
@@ -1386,12 +1399,55 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     (t) => t.source === Track.Source.ScreenShare && t.participant.identity === assistindo,
   ) ?? null;
 
+  /** Todo contexto de áudio que a call usa agora: microfone, som da call no iPhone, anel, soundboard. */
+  const contextosDaCall = useCallback(() => [
+    microfoneRef.current.eventos.contexto(), somDaCall.current, ctxDosNiveis.current, audio.current,
+  ].filter((c): c is AudioContext => c !== null), []);
+  /** `true` se todos voltaram a tocar. */
+  const acordarOSom = useCallback(async () =>
+    (await Promise.all(contextosDaCall().map((c) => acordarContexto(c)))).every(Boolean), [contextosDaCall]);
+
+  /**
+   * Voltar para a Saga depois de outro app: a call volta sozinha.
+   *
+   * Com a Saga atrás, o iPhone para o microfone e o som (ver acordarSom.ts) — e na volta nada
+   * os religava: o contexto do microfone ficava `interrupted`, e os outros não ouviam mais
+   * quem voltou. Aqui, a cada volta: acorda os contextos, destrava o som da call se o LiveKit
+   * o deu por travado, e confere de novo o microfone que caiu — as tentativas de
+   * `aoMutarOMicrofone` podem ter se esgotado com a página atrás, sem microfone para achar. O
+   * que só um toque destrava acende o "Toque aqui", que acorda tudo junto.
+   *
+   * No computador isto roda a cada foco da janela, e sem efeito: lá tudo já está tocando.
+   */
+  useEffect(() => {
+    if (status === 'idle') return;
+    let vivo = true;
+    const voltou = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const acordou = await acordarOSom();
+      if (!vivo) return;
+      if (!room.canPlaybackAudio) {
+        await room.startAudio().catch(() => undefined);
+        // O `startAudio` desmuta todo elemento de áudio — inclusive os que a surdez calou.
+        aplicarAudio();
+      }
+      if (!vivo) return;
+      setSomTravado(!room.canPlaybackAudio || !acordou);
+      aoMutarOMicrofone.current();
+    };
+    const pararDeDespertar = aoDespertar(() => { void voltou(); });
+    return () => { vivo = false; pararDeDespertar(); };
+  }, [room, status, acordarOSom, aplicarAudio]);
+
   /** Destrava o som da call. Só funciona chamado de dentro de um toque — ver `somTravado`. */
   const liberarSom = useCallback(async () => {
+    // Os contextos primeiro: o iPhone só aceita retomar no instante do toque.
+    const acordando = acordarOSom();
     await room.startAudio().catch(() => undefined);
     aplicarAudio();
-    setSomTravado(!room.canPlaybackAudio);
-  }, [room, aplicarAudio]);
+    const acordou = await acordando;
+    setSomTravado(!room.canPlaybackAudio || !acordou);
+  }, [room, aplicarAudio, acordarOSom]);
 
   return {
     room, status, salaDaVoz, error, tipoDoAviso, setError, avisar, participants, tiles, deafened, surdos,

@@ -83,8 +83,26 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
 
 - **Som travado**: o navegador do celular só toca áudio depois de um toque, e entrar na voz
   termina depois de esperar a rede, longe do toque. A call conectaria muda. `somTravado` (do
-  `AudioPlaybackStatusChanged` do LiveKit) acende "Toque aqui para ouvir a call", e o toque
-  chama `liberarSom`.
+  `AudioPlaybackStatusChanged` do LiveKit) acende "Toque aqui para ligar o som da call", e o
+  toque chama `liberarSom`.
+- **Com outro app na frente, a call para — e isso não tem conserto no navegador** (relato do
+  dono, 19/10/2026, no iPhone: "ao minimizar [...] a voz para [...] não me ouvem mais"). O
+  Safari do iPhone suspende a página inteira: microfone e som param juntos, e a Apple não deixa
+  página nenhuma gravar em segundo plano (os relatos do WebKit vão de 2018 a hoje, sem
+  conserto). O Chrome do Android 14 em diante corta só o microfone, uns 5 s depois, e continua
+  tocando a call: falta a ele a permissão de microfone em segundo plano (Chromium 374374232,
+  aberto). Continuar falando com outro app na frente só com app instalado — no iPhone, app de
+  loja com o modo de áudio em segundo plano —, que é outro projeto.
+- **O que se conserta é a VOLTA** (`acordarSom.ts`, efeito "Voltar para a Saga" no `useRoom`).
+  O iPhone deixa os contextos de áudio em `interrupted`, e a Saga e o LiveKit só retomavam o
+  `suspended`: o do caminho do microfone ficava parado, e os outros não ouviam mais quem voltou.
+  A cada volta (aba visível, foco, rede), a Saga acorda todos os contextos da call — o do
+  microfone, o do som da call no iPhone (agora da Saga, dado ao `webAudioMix`, para ela
+  alcançá-lo), o do anel e o do soundboard —, suspende e retoma o que diz `running` com o
+  relógio parado (WebKit 263627), não espera um `resume` que não responde (WebKit 281566),
+  destrava o som do LiveKit e confere de novo o microfone que caiu. O que só um toque destrava
+  acende o mesmo "Toque aqui", e o toque acorda tudo junto. **Não exercido**: sem iPhone nem
+  servidor de voz aqui; conferido pela leitura do livekit-client 2.22 e por testes da regra.
 - **Safari do iPhone**: campo abaixo de 16 px dá zoom ao tocar (todos os campos vão a 16 px na
   tela estreita); tela cheia só existe no próprio `<video>` (`webkitEnterFullscreen`); e o
   campo de escrever cresce por JavaScript onde o `field-sizing` do CSS não existe.

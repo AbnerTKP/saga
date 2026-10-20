@@ -40,6 +40,11 @@ function carregar(ctx: BaseAudioContext) {
 export class MontagemDoMicrofone {
   /** O que vai para a call. */
   readonly saida: MediaStreamTrack;
+  /**
+   * O microfone cru, que entra. É ele que termina quando o aparelho cai — a `saida` é do
+   * contexto de áudio e continua viva, calada.
+   */
+  readonly entrada: MediaStreamTrack;
   private fonte: MediaStreamAudioSourceNode;
   private filtro: RnnoiseWorkletNode | null = null;
   private fim: AudioWorkletNode;
@@ -53,6 +58,7 @@ export class MontagemDoMicrofone {
 
   private constructor(ctx: AudioContext, faixa: MediaStreamTrack, ajustes: AjustesDoMicrofone) {
     this.ajustes = ajustes;
+    this.entrada = faixa;
     this.fonte = ctx.createMediaStreamSource(new MediaStream([faixa]));
     this.fim = new AudioWorkletNode(ctx, 'saga-microfone', {
       numberOfInputs: 2,

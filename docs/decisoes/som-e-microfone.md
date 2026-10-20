@@ -54,6 +54,13 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
   faixa viva, e reabrir aquilo desfaria a decisão de alguém. **Não foi exercido com aparelho
   de verdade**: os microfones falsos do Chromium não desconectam, e uma bancada com Electron
   nesta máquina abriria o aviso do firewall na tela do dono.
+  **E até 19/10/2026 ele nunca disparou**: "a faixa terminou" lia o `mediaStreamTrack` da faixa
+  da call, e com o filtro de voz montado (sempre) o livekit-client 2.22 devolve ali a SAÍDA do
+  filtro — uma faixa do contexto de áudio, que continua viva e calada quando o microfone cai.
+  A conta dava "viva", e a queda parecia mudo de moderador. Hoje ela lê o microfone cru
+  (`entrada`, em `MontagemDoMicrofone`). Achado lendo o livekit-client e conferido rodando o
+  getter dele; a queda de verdade continua não exercida. É a mesma conferência que roda na
+  volta do celular de outro app — ver `navegador-e-celular.md`.
 - **O anel de "falando" mede a minha voz DEPOIS do corte.** Medindo o cru, ele acenderia
   com a TV que o corte acabou de tirar da call. E o medidor agora é refeito quando a faixa
   muda — antes ele só era criado uma vez por pessoa, e trocar de microfone o deixava

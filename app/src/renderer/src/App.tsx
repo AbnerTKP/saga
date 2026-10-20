@@ -1906,10 +1906,11 @@ export function App() {
           onAbrirCall={() => { abrirPalcoDaVoz(); abrirLugar(); }}
         />
       )}
-      {/* O navegador recusou o som da call: só um toque destrava (ver `somTravado`). */}
+      {/* O navegador recusou o som da call — ao entrar, ou na volta de outro app, que também
+          pode ter calado o microfone: só um toque destrava os dois (ver `somTravado`). */}
       {rm.somTravado && (
         <button type="button" className="liberar-som" onClick={() => void rm.liberarSom()}>
-          <Icon name="speaker" size={18} /> Toque aqui para ouvir a call
+          <Icon name="speaker" size={18} /> Toque aqui para ligar o som da call
         </button>
       )}
 

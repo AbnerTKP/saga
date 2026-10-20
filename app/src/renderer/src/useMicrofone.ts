@@ -6,6 +6,7 @@ import {
 import { anotar } from './registro';
 import { AJUSTES_PADRAO, CHAVE_DO_MICROFONE, ajustesGuardados, type AjustesDoMicrofone } from './sensibilidade';
 import { MontagemDoMicrofone, type EstadoDoFiltro, type Medida } from './montagemDoMicrofone';
+import { precisaRetomar } from './acordarSom';
 
 /**
  * Supressão de ruído e sensibilidade do SEU microfone, na call e fora dela.
@@ -38,7 +39,13 @@ function lerAjustes() {
 }
 
 export function useMicrofone(room: Room): MicrofoneDaCall & {
-  eventos: { aoPublicar: (pub: LocalTrackPublication) => void; reavaliar: () => void; trocouDeMicrofone: () => void };
+  eventos: {
+    aoPublicar: (pub: LocalTrackPublication) => void; reavaliar: () => void; trocouDeMicrofone: () => void;
+    /** O microfone cru da call, para saber se ele caiu — ver `entrada` em MontagemDoMicrofone. */
+    faixaCrua: () => MediaStreamTrack | null;
+    /** O contexto do caminho do microfone, se já existe — para acordá-lo; ver acordarSom.ts. */
+    contexto: () => AudioContext | null;
+  };
 } {
   const [ajustes, setAjustes] = useState(lerAjustes);
   const ajustesRef = useRef(ajustes);
@@ -48,7 +55,8 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
   const ctxRef = useRef<AudioContext | null>(null);
   const contexto = () => {
     if (!ctxRef.current || ctxRef.current.state === 'closed') ctxRef.current = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
-    if (ctxRef.current.state === 'suspended') ctxRef.current.resume().catch((e) => anotar('erro', 'microfone', e));
+    // O `interrupted` é o do iPhone que voltou de outro app; ver acordarSom.ts.
+    if (precisaRetomar(ctxRef.current.state)) ctxRef.current.resume().catch((e) => anotar('erro', 'microfone', e));
     return ctxRef.current;
   };
 
@@ -180,6 +188,8 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
     }
   }, [criarProcessador]);
   const trocouDeMicrofone = useCallback(() => { fecharPrevia(); reavaliar(); }, [fecharPrevia, reavaliar]);
+  const faixaCrua = useCallback(() => daCall.current?.entrada ?? null, []);
+  const contextoAtual = useCallback(() => ctxRef.current, []);
 
   const definir = useCallback((mudanca: Partial<AjustesDoMicrofone>) => {
     const antes = ajustesRef.current;
@@ -215,5 +225,8 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
 
   useEffect(() => () => { fecharPrevia(); fonteAtual.current?.parar(); }, [fecharPrevia]);
 
-  return { ajustes, definir, estadoDoFiltro, ouvir, eventos: { aoPublicar, reavaliar, trocouDeMicrofone } };
+  return {
+    ajustes, definir, estadoDoFiltro, ouvir,
+    eventos: { aoPublicar, reavaliar, trocouDeMicrofone, faixaCrua, contexto: contextoAtual },
+  };
 }
