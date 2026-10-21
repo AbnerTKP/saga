@@ -31,9 +31,16 @@ import mensagem from './mensagem.ogg';
 // abaixo dos avisos porque toca a cada jogada do outro.
 import lance from './lance.ogg';
 import fimDaPartida from './fim-da-partida.ogg';
+// Alguém começou a assistir à SUA live (20/10/2026, escolhido de ouvido na prancheta entre três):
+// três gotas subindo, sol5 · si5 · ré6, a 75 ms uma da outra — "chegou gente". Não se confunde
+// com entrar na call (o grave) nem com a live começando (si5 → mi6). Feito pelo mesmo caminho dos
+// outros: senoides com a oitava e a duodécima fracas, ataque em cosseno de 12 ms, cada nota
+// durando 8/decaimento, PCM em float e o ganho medido para o pico de -3 dB (EBU R128: -13,4 LUFS).
+// Toca no volume dos chamados (ver `CHAMADOS` em avisos.ts).
+import plateia from './plateia.ogg';
 import type { Aviso } from '../avisos';
 
 export const ARQUIVOS: Record<Aviso, string> = {
   entrou, saiu, live, convite,
-  liveEntrou, liveSaiu, micLigou, micMutou, mensagem, lance, fimDaPartida,
+  liveEntrou, liveSaiu, micLigou, micMutou, mensagem, lance, fimDaPartida, plateia,
 };

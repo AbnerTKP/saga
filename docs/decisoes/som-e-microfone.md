@@ -166,6 +166,11 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
   o dia inteiro e só respondem ao que a sua mão acabou de fazer. E o que toca sai do que o
   microfone FICOU, não do que foi pedido: falhar em adquirir o dispositivo deixaria um
   "ligou" mentindo.
+- **Alguém chegando na sua live são três gotas subindo** (sol5 · si5 · ré6, a 75 ms uma da outra),
+  escolhidas de ouvido pelo dono entre três na prancheta de 20/10/2026. Não se confundem com entrar
+  na call (o grave) nem com a live começando (si5 → mi6). Feitas pelo caminho da família — ataque em
+  cosseno, a nota durando 8/decaimento, PCM em float e o ganho medido —: pico −3 dB, −13,4 LUFS
+  integrados (o `live-entrou` é −12,1). Tocam como chamado: ver `voz-e-live.md`.
 - **A mensagem privada é um sino, e o convite de xadrez são duas notas.** Os dois chegam
   pelo canto da tela e precisam ser distinguíveis de ouvido, sem olhar. O **lance** do
   outro é madeira e não nota — estalo de ruído com um baque grave —, e fica 4 dB abaixo

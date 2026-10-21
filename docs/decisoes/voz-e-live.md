@@ -117,6 +117,15 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
   `ParticipantAttributesChanged` em quem já estava na sala; duas mudanças renderam um
   evento só. O evento continua ligado, porque quando vem é imediato — quem garante é a
   volta, igual ao medidor de quem está falando.
+- **Quem transmite ouve quem chega na live** (20/10/2026, pedido do dono: "um apito pra quem tá
+  streamando ouvir quem entra"). Sai da mesma lista de espectadores — o atributo `assistindo`, que já
+  se conserta sozinho a cada 1,5 s —, e não de evento nenhum. A regra é `quemChegou`
+  (`espectadores.ts`, pura e testada): só quem COMEÇA a assistir, sair não apita, e a mesma pessoa
+  não apita de novo em menos de um minuto — trocar de live, a internet piscar ou você reconectar não
+  vira sirene. Toca no volume dos chamados (`CHAMADOS`), porque quem transmite está dentro de um jogo,
+  e não vai para a live: é som da Saga, e a captura exclui a Saga (`restrictOwnAudio`). Quem está com
+  app velho não anuncia o `assistindo` e não faz apito — o mesmo de hoje na contagem. **Não foi
+  ouvido numa live de verdade.**
 - **Quem olha a própria transmissão não é plateia.** Dá para pôr a sua live no palco (é a
   prévia do que você manda), e contar isso diria "1 assistindo" para quem está sozinho. A
   regra vive em `espectadores.ts`, pura e testada.

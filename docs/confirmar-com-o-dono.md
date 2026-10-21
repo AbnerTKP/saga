@@ -2,6 +2,26 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A atividade e o apito da live (20/10/2026).** O que está medido: a detecção rodando DE VERDADE
+  neste Windows (o `main/atividade.ts` com um Electron falso, contra o registro e os programas reais):
+  o GTA San Andreas DE que o dono estava jogando apareceu pelo Steam em 63 ms, com nome e ícone; com
+  ele escondido, o mesmo jogo apontado pelo nome do programa apareceu em 353 ms; o "Escolher" listou
+  as janelas em 284 ms. As telas, no renderer de verdade contra um servidor local (roteiro do
+  `ferramentas/fotografar` na pasta de rascunho): a lista com o jogo de três pessoas (linhas de 48 px,
+  como as outras), o MEU jogo fazendo o caminho inteiro (processo principal → sinal de vida →
+  servidor → lista), o perfil com e sem capa, a página Atividade, o "Escolher", o "Não mostrar"
+  tirando o jogo da lista na hora, e a tela de amigos. E a ponte no Electron de verdade (o build,
+  escondido, mudo e com pasta de dados própria): a página pediu, o jogo chegou pelo `aoMudar`, o
+  "Escolher" listou as janelas e desligar mandou `null`. **Não foi exercido**: a Saga INSTALADA
+  jogando de verdade — e se alguma janela de console pisca a cada leitura (vai com `windowsHide`,
+  mas só se vê na tela de quem joga); jogo
+  fora do Steam de verdade (VALORANT, LoL, Minecraft Java pelo título); o Mac inteiro (Steam pelo
+  `registry.vdf`, `ps`, os nomes de programa do Mac); o pacote da Microsoft Store (se o `reg` e o
+  `tasklist` rodam de dentro dele); e **o apito**: a regra está testada (`quemChegou`) e o som foi
+  medido (pico −3 dB, −13,4 LUFS), mas ninguém ouviu numa live de verdade — o servidor de voz não
+  roda nesta máquina. O que conferir: transmitir, pedir para alguém clicar em Assistir, e ouvir as
+  três gotas uma vez; a mesma pessoa saindo e voltando em menos de um minuto não apita de novo.
+
 - **A Saga no navegador do celular (12/10/2026).** O que está medido: a tela em celular emulado
   (Chrome, toque, 390 × 844) pelo passo `22-celular` do `ferramentas/fotografar`, com a ponte do
   navegador de verdade; o palco da call numa bancada com call de mentira; e ponta a ponta com o

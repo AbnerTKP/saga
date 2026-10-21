@@ -7,6 +7,8 @@
 export type Aviso =
   // acontecimentos da call e da Saga
   | 'entrou' | 'saiu' | 'live' | 'convite' | 'mensagem' | 'lance' | 'fimDaPartida'
+  // alguém começou a assistir à SUA live (só quem transmite ouve)
+  | 'plateia'
   // o que você acabou de fazer: confirmação, não notícia
   | 'liveEntrou' | 'liveSaiu' | 'micLigou' | 'micMutou';
 
@@ -14,8 +16,9 @@ export type Aviso =
 export const VOLUME_DO_AVISO = 0.45;
 
 /**
- * Os CHAMADOS: o que chega dirigido a você e pede que você olhe — a mensagem privada e o convite
- * para jogar. O dono pediu "um som mais evidente" (06/10/2026): no volume dos outros, eles se
+ * Os CHAMADOS: o que chega dirigido a você e pede que você olhe — a mensagem privada, o convite
+ * para jogar e, desde 20/10/2026, alguém chegando na SUA live: quem transmite está dentro de um
+ * jogo, e o pedido do dono foi justamente ouvir isso por cima dele. O dono pediu "um som mais evidente" (06/10/2026): no volume dos outros, eles se
  * perdiam embaixo do som de um jogo, que é justamente onde a pessoa está quando eles chegam.
  *
  * O resto continua baixo, e por um motivo cada: entrar e sair da call acontecem o tempo todo e
@@ -23,7 +26,7 @@ export const VOLUME_DO_AVISO = 0.45;
  * o LANCE do xadrez toca a cada jogada do outro — numa partida, dezenas de vezes —, então chamar
  * alto em cada um seria o aviso que a pessoa desliga. O Catan tem os seus em `somDoCatan.ts`.
  */
-export const CHAMADOS: ReadonlySet<Aviso> = new Set<Aviso>(['mensagem', 'convite']);
+export const CHAMADOS: ReadonlySet<Aviso> = new Set<Aviso>(['mensagem', 'convite', 'plateia']);
 export const VOLUME_DO_CHAMADO = 0.9;
 
 /** O volume de cada aviso: o dos chamados, ou o baixo de sempre. */

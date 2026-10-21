@@ -24,7 +24,7 @@ test('passado o intervalo, o aviso volta a tocar', () => {
 /** Um arquivo por aviso, com o nome no lugar da URL: o teste só precisa distinguir. */
 const ARQUIVOS: Record<Aviso, string> = {
   entrou: 'a', saiu: 'b', live: 'c', convite: 'd', mensagem: 'e', lance: 'f',
-  fimDaPartida: 'g', liveEntrou: 'h', liveSaiu: 'i', micLigou: 'j', micMutou: 'k',
+  fimDaPartida: 'g', liveEntrou: 'h', liveSaiu: 'i', micLigou: 'j', micMutou: 'k', plateia: 'l',
 };
 
 test('cada aviso tem o próprio relógio: "entrou" não cala "live"', () => {
@@ -65,11 +65,13 @@ test('tocar que lança na hora também não derruba quem avisou', () => {
   assert.deepEqual(falhas, ['live']);
 });
 
-test('mensagem e convite chamam alto; o resto continua baixo', () => {
+test('mensagem, convite e gente chegando na sua live chamam alto; o resto continua baixo', () => {
   assert.ok(VOLUME_DO_CHAMADO >= 2 * VOLUME_DO_AVISO, 'chamado tem de se ouvir por cima de um jogo');
   assert.ok(VOLUME_DO_CHAMADO <= 1, 'o Audio não toca acima de 1');
   assert.equal(volumeDo('mensagem'), VOLUME_DO_CHAMADO);
   assert.equal(volumeDo('convite'), VOLUME_DO_CHAMADO);
+  // Quem transmite está dentro de um jogo: foi para ouvir por cima dele que o dono pediu.
+  assert.equal(volumeDo('plateia'), VOLUME_DO_CHAMADO);
   // O lance toca a cada jogada do outro; entrar, sair e o microfone não são com você.
   for (const baixo of ['lance', 'entrou', 'saiu', 'micLigou', 'micMutou', 'liveEntrou'] as const) {
     assert.equal(volumeDo(baixo), VOLUME_DO_AVISO, baixo);

@@ -46,3 +46,34 @@ export function porTransmissao(pessoas: NaCall[]): Map<string, Espectador[]> {
   for (const lista of mapa.values()) lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   return mapa;
 }
+
+/**
+ * Quanto tempo a MESMA pessoa espera para fazer o apito de novo. Quem fica trocando de live,
+ * ou cuja internet pisca e volta, não pode virar sirene no ouvido de quem transmite.
+ */
+export const REPETIR_O_APITO = 60_000;
+
+/**
+ * Quem acabou de chegar na SUA live — o apito de quem transmite (pedido do dono, 20/10/2026).
+ *
+ * `antes` é quem assistia na volta anterior; `anunciados`, quando cada um fez o apito pela
+ * última vez. Devolve quem apita agora e o registro atualizado — sem mexer no que recebeu.
+ * Sair não apita: o pedido foi ouvir quem ENTRA.
+ */
+export function quemChegou(
+  antes: ReadonlySet<string>,
+  agora: readonly string[],
+  anunciados: ReadonlyMap<string, number>,
+  instante: number,
+): { chegaram: string[]; anunciados: Map<string, number> } {
+  const novos = new Map(anunciados);
+  const chegaram: string[] = [];
+  for (const identity of agora) {
+    if (antes.has(identity)) continue;
+    const ultimo = anunciados.get(identity);
+    if (ultimo !== undefined && instante - ultimo < REPETIR_O_APITO) continue;
+    chegaram.push(identity);
+    novos.set(identity, instante);
+  }
+  return { chegaram, anunciados: novos };
+}

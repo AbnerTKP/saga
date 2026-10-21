@@ -8,7 +8,7 @@ import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
-import { porTransmissao, ASSISTINDO, SURDO } from './espectadores';
+import { porTransmissao, quemChegou, ASSISTINDO, SURDO } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { ESPERAS_PARA_REABRIR_MS, deveReabrirMicrofone } from './microfoneCaido';
 import { podeTransmitir } from './transmitir';
@@ -1376,6 +1376,26 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     nome: p.name || p.identity,
     assistindo: p === room.localParticipant ? assistindo : (p.attributes?.[ASSISTINDO] || null),
   })));
+
+  /**
+   * O apito de quem transmite: alguém começou a assistir à SUA live (pedido do dono em
+   * 20/10/2026). Sai da mesma conta de cima — a lista de quem assiste, que já se conserta
+   * sozinha a cada 1,5 s —, e a regra de quem apita é `quemChegou`, pura e testada. O som é da
+   * Saga, e por isso não vai para a live (ver `restrictOwnAudio`, em main/CLAUDE.md).
+   */
+  const noAr = status !== 'idle' && room.localParticipant.isScreenShareEnabled;
+  const minhaPlateia = noAr
+    ? (espectadores.get(room.localParticipant.identity) ?? []).map((e) => e.identity).join('|')
+    : '';
+  const plateiaDeAntes = useRef<Set<string>>(new Set());
+  const apitosDados = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const agora = minhaPlateia ? minhaPlateia.split('|') : [];
+    const { chegaram, anunciados } = quemChegou(plateiaDeAntes.current, agora, apitosDados.current, Date.now());
+    plateiaDeAntes.current = new Set(agora);
+    apitosDados.current = anunciados;
+    if (chegaram.length) tocarAviso('plateia', deafenedRef.current);
+  }, [minhaPlateia, tocarAviso]);
 
   /**
    * Quem está sem ouvir ninguém. O meu sai do estado daqui — eu sei se desliguei o fone —,
