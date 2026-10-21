@@ -241,7 +241,8 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   | o quê | quanto | quando roda |
   |---|---|---|
   | `reg query HKCU\Software\Valve\Steam\Apps /s` | ~36 ms (quase tudo é abrir o `reg.exe`) | a cada 15 s |
-  | `tasklist /fo csv /nh` | ~280 ms de relógio, ~0,3–0,4 s de processador | a cada 60 s, e só sem jogo do Steam aberto |
+  | as janelas abertas (`desktopCapturer`, só os ids) | ~80 ms, ~70 ms de processador | a cada 15 s, sem jogo do Steam aberto |
+  | `tasklist /fo csv /nh` | ~280 ms de relógio, ~0,3–0,4 s de processador | quando abre ou fecha uma janela, e a cada 5 min |
   | `tasklist /v` sem filtro | 5,3 s | nunca |
   | `tasklist /v /fi "IMAGENAME eq javaw.exe"` | ~135 ms | só com o Java aberto (o Minecraft se reconhece pelo título) |
   | PowerShell com as janelas abertas | ~280 ms | só no "Escolher" das configurações |
@@ -256,6 +257,23 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   de console na tela de quem joga. Exercido de verdade neste Windows com um Electron falso: o GTA SA
   DE aberto apareceu em 63 ms pelo Steam e em 353 ms pelo nome do programa. **Não exercido**: a Saga
   instalada, o Mac e o pacote da Microsoft Store — ver `docs/confirmar-com-o-dono.md`.
+- **A lista de programas é lida quando ABRE ou FECHA uma janela, e não de minuto em minuto** (v0.74.1).
+  Na v0.74.0 ela rodava a cada 60 s, e o dono reportou que a atividade "só aparece se desmarcar e
+  marcar de novo". Medido na Saga compilada contra um servidor local: o jogo aberto ANTES da Saga
+  aparecia em 1–2 s; o aberto DEPOIS, 43 s depois. Desmarcar e marcar força uma leitura na hora, e
+  era isso que parecia consertar. Hoje, sem jogo do Steam, cada volta de 15 s lista as janelas pelo id
+  (o título do navegador muda a cada aba; o id, não) e lê os programas quando o conjunto mudou — jogo
+  que abre abre janela. A volta longa ficou em 5 min, só de garantia. Medido com o `tasklist` de
+  verdade e a lista de janelas simulada: aparece em 12 s e some 7,5 s depois de fechar. No Mac listar
+  janelas pede a permissão de gravar a tela (sem ela, lança), e lá o `ps` é barato: roda a cada 15 s.
+- **O ícone do jogo de fora do Steam sai da JANELA dele, e não do arquivo do programa.** Medido com o
+  LoL aberto: o caminho do `League of Legends.exe` vem VAZIO pelo `Get-Process` e pelo
+  `Win32_Process` (o anticheat da Riot protege o processo), e o `appIcon` da janela "League of
+  Legends (TM) Client" vem inteiro, 32×32, em ~90 ms. A janela é a de título que começa com o nome do
+  jogo (`janelaDoJogo`, testada), nunca a do navegador; ou a que a pessoa escolheu no "Escolher". O
+  PNG vai à tela, que o sobe UMA vez ao servidor (`POST /eu/atividade/icone`); quem olha baixa de lá
+  pelo hash. Exercido de ponta a ponta com o LoL do dono aberto: 2,5 KB, e a outra conta recebeu o
+  arquivo certo.
 
 ## A limitação que caiu sem ser atacada
 

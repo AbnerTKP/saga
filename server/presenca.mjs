@@ -77,7 +77,7 @@ const DESDE_MAIS_ANTIGO = 7 * 24 * 60 * 60_000;
  * dá para mostrar a ninguém.
  *
  * Do Steam vêm o número do jogo e o hash do ícone, e é com eles que a Saga de quem olha monta
- * o endereço da imagem no Steam. Por isso os dois são conferidos à risca: número inteiro, hash
+ * o endereço da imagem no Steam. De fora do Steam vem `imagem`, o nome de um arquivo daqui. Por isso os dois são conferidos à risca: número inteiro, hash
  * de 40 letras hexadecimais. Um endereço livre aqui faria o app de todo mundo buscar o que
  * quem mandou quisesse.
  */
@@ -92,7 +92,10 @@ export function lerAtividade(a, agora = Date.now()) {
   const desde = Number.isFinite(pedido) ? Math.min(agora, Math.max(agora - DESDE_MAIS_ANTIGO, pedido)) : agora;
   const steam = Number.isInteger(a.steam) && a.steam > 0 && a.steam < 2 ** 31 ? a.steam : null;
   const icone = steam !== null && typeof a.icone === 'string' && /^[0-9a-f]{40}$/.test(a.icone) ? a.icone : null;
-  return { nome, desde, steam, icone };
+  // O ícone de jogo de fora do Steam: um arquivo NOSSO (o nome é o hash), subido pela rota do
+  // ícone. Só esse formato passa — nunca um endereço.
+  const imagem = typeof a.imagem === 'string' && /^[0-9a-f]{32}\.png$/.test(a.imagem) ? a.imagem : null;
+  return { nome, desde, steam, icone, imagem };
 }
 
 /** Guarda (ou apaga, com `null`) a atividade de alguém, anotando quando ela foi contada. */
@@ -111,5 +114,5 @@ export function atividadeDe(usuarioId, vistoEm, agora = Date.now()) {
   const a = atividades.get(usuarioId);
   if (!a) return null;
   if (agora - a.em > SILENCIO_ATE_OFFLINE || statusDeVerdade('online', vistoEm, agora) === 'offline') return null;
-  return { nome: a.nome, desde: a.desde, steam: a.steam, icone: a.icone };
+  return { nome: a.nome, desde: a.desde, steam: a.steam, icone: a.icone, imagem: a.imagem };
 }

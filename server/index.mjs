@@ -9,7 +9,7 @@ import { SignJWT } from 'jose';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirBanco, garantirServidor } from './banco.mjs';
-import { salvarImagem, salvarSom, salvarArquivoEmFluxo, nomeDeArquivoLimpo, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
+import { salvarImagem, salvarIconeDeJogo, salvarSom, salvarArquivoEmFluxo, nomeDeArquivoLimpo, nomeValido, pastaDosArquivos, ErroDeArquivo, LIMITES } from './arquivos.mjs';
 import * as sons from './sons.mjs';
 import { buscarGifs, baixarGif } from './giphy.mjs';
 import * as enquadramento from './enquadramento.mjs';
@@ -1149,6 +1149,15 @@ const ROTAS = {
   },
 
   // --- o que é da Saga, e não de um servidor ---------------------------------
+  /**
+   * O ícone de um jogo de fora do Steam, tirado da janela dele pelo app de quem joga. Sobe
+   * uma vez e vira um nome de arquivo (o hash), que vai na atividade — cada um baixa uma vez.
+   */
+  'POST /eu/atividade/icone': async (req) => {
+    exigirConta(req);
+    return { imagem: salvarIconeDeJogo(ARQUIVOS, await lerBinario(req, LIMITES.iconeDeJogo, 'O ícone')) };
+  },
+
   'POST /eu/presenca': async (req) => {
     const eu = exigirConta(req);
     // `atividade` só vem do app de computador; o do navegador não a manda, e assim não a apaga.

@@ -2084,7 +2084,7 @@ test('a atividade vai no sinal de vida e aparece para quem está no mesmo servid
   assert.equal(r.status, 200);
   const comoODonoVe = async () => (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.membros
     .find((m) => m.apelido === 'jogadora')?.atividade;
-  assert.deepEqual(await comoODonoVe(), valheim);
+  assert.deepEqual(await comoODonoVe(), { ...valheim, imagem: null });
 
   // O sinal da Saga do navegador não diz nada de jogo, e por isso não apaga.
   await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: {} });
@@ -2096,4 +2096,28 @@ test('a atividade vai no sinal de vida e aparece para quem está no mesmo servid
 
   await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: { atividade: null } });
   assert.equal(await comoODonoVe(), null);
+});
+
+test('o ícone de jogo de fora do Steam sobe, vira nome de arquivo e vai na atividade', async () => {
+  const quem = (await cadastrar('jogadora2')).corpo;
+  const png = Buffer.alloc(64);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(png);
+  png.writeUInt32BE(32, 16);
+  png.writeUInt32BE(32, 20);
+  const subir = await fetch(`${base}/eu/atividade/icone`, {
+    method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-sessao': quem.token }, body: png,
+  });
+  assert.equal(subir.status, 200);
+  const { imagem } = await subir.json();
+  assert.match(imagem, /^[0-9a-f]{32}\.png$/);
+  assert.equal((await fetch(`${base}/arquivos/${imagem}`)).status, 200);
+
+  const sem = await fetch(`${base}/eu/atividade/icone`, { method: 'POST', body: png });
+  assert.equal(sem.status, 401, 'sem conta, nada sobe');
+
+  await chamar('POST', '/eu/presenca', { sessao: quem.token, corpo: { atividade: { nome: 'League of Legends', desde: Date.now(), imagem } } });
+  const dono = await sessaoDe('abner');
+  const vista = (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.membros.find((m) => m.apelido === 'jogadora2');
+  assert.equal(vista.atividade.imagem, imagem);
+  assert.equal(vista.atividade.steam, null);
 });

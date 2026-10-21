@@ -28,6 +28,7 @@ export const LIMITES = {
   // fácil dos 5 MB do GIF (uma tela Retina inteira chega a 10); acima disto, o app manda
   // como arquivo comum, e nada se perde. Vai para a memória inteira, então não cresce muito.
   imagemDoChat: 15 * 1024 * 1024,
+  iconeDeJogo: 64 * 1024,     // 64 KB — o ícone de 32×32 que o app tira da janela do jogo tem uns 2 KB
   // Arquivo qualquer no chat. Só é grande assim porque ele vai para o disco EM FLUXO:
   // juntar na memória, como os outros fazem, estouraria o teto de 512 MB do contêiner —
   // e foi falta de memória que já derrubou a máquina inteira uma vez.
@@ -87,6 +88,26 @@ export class ErroDeArquivo extends Error {
 export function salvarImagem(pasta, buf, papel) {
   return guardar(pasta, buf, LIMITES[papel] ?? LIMITES.foto, tipoDaImagem,
     'Nenhuma imagem foi enviada.', 'Só aceito PNG, JPG, GIF ou WEBP.', 'A imagem');
+}
+
+/** O lado de um PNG, lido do cabeçalho (IHDR): largura e altura, em pixels. */
+export function ladosDoPng(buf) {
+  if (tipoDaImagem(buf) !== 'png' || buf.length < 24) return null;
+  return { largura: buf.readUInt32BE(16), altura: buf.readUInt32BE(20) };
+}
+
+/**
+ * O ícone do jogo aberto de alguém (a "Atividade"), para quem joga fora do Steam — o Steam tem
+ * o ícone no CDN dele, e esses não. Só PNG, e pequeno: é o ícone que o app tira da janela do
+ * jogo, e um ícone de 4000 px seria outra coisa usando esta porta.
+ */
+export function salvarIconeDeJogo(pasta, buf) {
+  const pequeno = (b) => {
+    const lados = ladosDoPng(b);
+    return lados && lados.largura <= 256 && lados.altura <= 256 ? 'png' : null;
+  };
+  return guardar(pasta, buf, LIMITES.iconeDeJogo, pequeno,
+    'Nenhum ícone foi enviado.', 'O ícone do jogo tem de ser um PNG de até 256 px.', 'O ícone');
 }
 
 /** Mesmo caminho da imagem, para os sons do soundboard. */

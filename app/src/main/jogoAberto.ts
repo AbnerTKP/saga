@@ -23,6 +23,11 @@ export type JogoAberto = {
   /** O hash do ícone do Steam (o nome do arquivo no cache dele, que é o mesmo do CDN). */
   icone: string | null;
   origem: 'steam' | 'conhecido' | 'seu';
+  /**
+   * O ícone do jogo de FORA do Steam, em PNG (data URL), tirado da janela dele. A tela o sobe
+   * uma vez ao servidor; quem olha baixa de lá. O do Steam vem do CDN, pelo `icone`.
+   */
+  iconeLocal?: string | null;
 };
 
 export type AppDoSteam = { id: number; nome: string | null; rodando: boolean };
@@ -32,8 +37,11 @@ export type AjustesDaAtividade = {
   mostrar: boolean;
   /** Chaves (`steam:892970`, `exe:valorant-win64-shipping.exe`) que não aparecem. */
   escondidos: string[];
-  /** Programas que a pessoa apontou como jogo, com o nome que os outros veem. */
-  meus: { exe: string; nome: string }[];
+  /**
+   * Programas que a pessoa apontou como jogo, com o nome que os outros veem — e o título da
+   * janela que ela escolheu, que é de onde sai o ícone.
+   */
+  meus: { exe: string; nome: string; janela?: string }[];
 };
 
 /** Um programa aberto com janela, para a pessoa apontar o jogo que a Saga não achou. */
@@ -128,7 +136,8 @@ export function normalizarAjustes(a: unknown): AjustesDaAtividade {
     ? o.meus.flatMap((m) => {
       const exe = typeof m?.exe === 'string' ? m.exe.trim().toLowerCase() : '';
       const nome = typeof m?.nome === 'string' ? m.nome.trim() : '';
-      return exe && nome ? [{ exe, nome: nome.slice(0, 80) }] : [];
+      const janela = typeof m?.janela === 'string' && m.janela.length <= 300 ? m.janela : undefined;
+      return exe && nome ? [{ exe, nome: nome.slice(0, 80), ...(janela ? { janela } : {}) }] : [];
     })
     : [];
   return { mostrar: o.mostrar !== false, escondidos, meus };
@@ -373,4 +382,57 @@ export function lerAppsDoMac(saida: string, proprio: string): ProgramaAberto[] {
     vistos.set(exe, { exe, titulo: m[1] });
   }
   return [...vistos.values()].sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt'));
+}
+
+// --- as janelas: o sinal de que algo abriu, e de onde sai o ícone ------------
+
+/** Uma janela aberta, como o Electron a lista (`desktopCapturer`): o id é o da janela, e não muda com o título. */
+export type JanelaAberta = { id: string; titulo: string };
+
+/**
+ * Abriu ou fechou alguma janela? É o sinal para ler a lista de programas na hora, em vez de
+ * esperar a volta longa. Pelo ID da janela, e não pelo título: o título do navegador muda a
+ * cada aba, e cada troca de aba viraria uma leitura de programas.
+ */
+export function janelasMudaram(antes: ReadonlySet<string> | null, agora: readonly string[]): boolean {
+  if (!antes) return true;
+  const novas = new Set(agora);
+  return novas.size !== antes.size || [...novas].some((id) => !antes.has(id));
+}
+
+/** Navegador nunca é a janela do jogo, mesmo com o nome do jogo no título (um vídeo, uma wiki). */
+const NAVEGADOR = /\s[-–—]\s(?:Google Chrome|Mozilla Firefox|Microsoft\u200b?\s?Edge|Opera|Brave|Vivaldi)$/i;
+// O ™ e o ® saem ANTES do NFKD, que transforma o ™ em "TM": "EA SPORTS FC™ 25" virava "fctm 25".
+const normalizar = (s: string) => s.replace(/\(tm\)|™|®/gi, '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * A janela do jogo, para tirar o ícone dela. A que a pessoa apontou, se ainda estiver aberta;
+ * senão a de título que começa com o nome do jogo ("League of Legends (TM) Client"), ou cujo
+ * título é o começo do nome ("Overwatch" para o Overwatch 2). Entre várias, a de título mais
+ * curto — o cliente do LoL ("League of Legends") ganha da janela do jogo, e os dois têm o ícone.
+ */
+export function janelaDoJogo(janelas: readonly JanelaAberta[], nome: string, apontada?: string | null): JanelaAberta | null {
+  const candidatas = janelas.filter((j) => j.titulo && !NAVEGADOR.test(j.titulo));
+  if (apontada) {
+    const exata = candidatas.find((j) => j.titulo === apontada);
+    if (exata) return exata;
+  }
+  const alvo = normalizar(nome);
+  const servem = candidatas.filter((j) => {
+    const t = normalizar(j.titulo);
+    return t.startsWith(alvo) || (t.length >= 5 && alvo.startsWith(t));
+  });
+  return servem.sort((a, b) => a.titulo.length - b.titulo.length)[0] ?? null;
+}
+
+/** No Mac, o `.app` de um programa da saída do `ps -axo comm=` — é dele que sai o ícone. */
+export function pacoteDoMac(saida: string, exe: string): string | null {
+  for (const linha of saida.split(/\r?\n/)) {
+    const caminho = linha.trim();
+    if (caminho.split('/').pop()?.toLowerCase() !== exe) continue;
+    const fim = caminho.indexOf('.app/');
+    return fim > 0 ? caminho.slice(0, fim + 4) : null;
+  }
+  return null;
 }

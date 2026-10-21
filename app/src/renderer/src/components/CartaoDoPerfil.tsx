@@ -8,6 +8,7 @@ import type { PessoaNaCall } from './MenuDaPessoa';
 import { useFecharComEsc } from '../useFechar';
 import { COMO_SE_LE, PODE_CLICAR, type ComAPessoa } from '../amizade';
 import { capaDoJogo, haQuantoTempo, type Atividade } from '../atividade';
+import { IconeDoJogo } from './IconeDoJogo';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -167,7 +168,7 @@ export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onV
 
 /**
  * "Jogando agora": a capa em pé do jogo, como a caixa dele (opção P1 da prancheta de
- * 20/10/2026), o nome e há quanto tempo. Jogo de fora do Steam não tem capa: entra o controle.
+ * 20/10/2026), o nome e há quanto tempo. Jogo de fora do Steam não tem capa: entra o ícone dele.
  * A capa que não carrega também vira o controle — a mesma regra da foto.
  */
 function JogandoAgora({ atividade }: { atividade: Atividade }) {
@@ -179,7 +180,10 @@ function JogandoAgora({ atividade }: { atividade: Atividade }) {
       <div className="atv-cartao-corpo">
         {capa && quebrou !== capa
           ? <img className="atv-capa" src={capa} alt="" draggable={false} onError={() => setQuebrou(capa)} />
-          : <span className="atv-capa-vazia" aria-hidden="true"><Icon name="controle" size={30} /></span>}
+          : (
+            // Sem capa (jogo de fora do Steam): o ícone da janela dele, ou o controle.
+            <span className="atv-capa-vazia" aria-hidden="true"><IconeDoJogo atividade={atividade} tamanho={40} /></span>
+          )}
         <div className="atv-cartao-texto">
           <div className="atv-cartao-jogo">{atividade.nome}</div>
           <div className="atv-cartao-sub">{haQuantoTempo(atividade.desde, Date.now())}</div>

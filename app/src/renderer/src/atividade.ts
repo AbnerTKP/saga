@@ -9,7 +9,11 @@
 import type { AjustesDaAtividade, JogoNoComputador } from './desktop';
 
 /** O que o servidor diz que alguém está jogando. Servidor antigo não manda o campo. */
-export type Atividade = { nome: string; desde: number; steam: number | null; icone: string | null };
+export type Atividade = {
+  nome: string; desde: number; steam: number | null; icone: string | null;
+  /** O ícone de jogo de fora do Steam: um arquivo do nosso servidor (o nome é o hash). */
+  imagem?: string | null;
+};
 
 /** Onde ficam os ajustes e os jogos já vistos, neste computador. O prefixo é o de sempre. */
 export const CHAVE_DOS_AJUSTES = 'cantinho.atividade';
@@ -25,15 +29,43 @@ export function lerAjustes(texto: string | null): AjustesDaAtividade {
   const escondidos = Array.isArray(o.escondidos) ? [...new Set(o.escondidos.filter((x): x is string => typeof x === 'string'))] : [];
   const meus = Array.isArray(o.meus)
     ? o.meus.flatMap((m) => (m && typeof m.exe === 'string' && typeof m.nome === 'string' && m.exe && m.nome.trim()
-      ? [{ exe: m.exe.toLowerCase(), nome: m.nome.trim() }] : []))
+      ? [{ exe: m.exe.toLowerCase(), nome: m.nome.trim(), ...(typeof m.janela === 'string' ? { janela: m.janela } : {}) }] : []))
     : [];
   return { mostrar: o.mostrar !== false, escondidos, meus };
 }
 
-/** O que vai no sinal de vida: só o que os outros veem — nem a chave nem de onde veio. */
-export function paraMandar(jogo: JogoNoComputador | null, ajustes: AjustesDaAtividade): Atividade | null {
+/**
+ * O que vai no sinal de vida: só o que os outros veem — nem a chave nem de onde veio. `imagem`
+ * é o ícone de jogo de fora do Steam já subido ao servidor (ver `useAtividade`).
+ */
+export function paraMandar(jogo: JogoNoComputador | null, ajustes: AjustesDaAtividade, imagem: string | null = null): Atividade | null {
   if (!jogo || !ajustes.mostrar || ajustes.escondidos.includes(jogo.chave)) return null;
-  return { nome: jogo.nome, desde: jogo.desde, steam: jogo.steam, icone: jogo.icone };
+  return { nome: jogo.nome, desde: jogo.desde, steam: jogo.steam, icone: jogo.icone, imagem: jogo.steam ? null : imagem };
+}
+
+/**
+ * Os bytes do PNG de um data URL. Sem `fetch`: o CSP da tela libera `connect-src *`, e o `*`
+ * não cobre o esquema `data:` — o `fetch` seria recusado.
+ */
+export function bytesDoPng(dataUrl: string): Uint8Array<ArrayBuffer> | null {
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) return null;
+  const binario = atob(m[1]);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+/** Onde fica, neste computador, o nome no servidor do ícone já subido de cada jogo. */
+export const CHAVE_DOS_ICONES = 'cantinho.iconesDosJogos';
+
+/** Os ícones já subidos, conferidos: chave do jogo → nome do arquivo no servidor. */
+export function lerIconesSubidos(texto: string | null): Record<string, string> {
+  try {
+    const v = JSON.parse(texto ?? '');
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    return Object.fromEntries(Object.entries(v).filter(([, n]) => typeof n === 'string' && /^[0-9a-f]{32}\.png$/.test(n))) as Record<string, string>;
+  } catch { return {}; }
 }
 
 const CDN = 'https://cdn.cloudflare.steamstatic.com';

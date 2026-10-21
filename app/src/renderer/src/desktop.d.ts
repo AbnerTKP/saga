@@ -114,7 +114,7 @@ declare global {
 }
 
 /** O que a pessoa decidiu na página Atividade (o par de `AjustesDaAtividade` do processo principal). */
-export type AjustesDaAtividade = { mostrar: boolean; escondidos: string[]; meus: { exe: string; nome: string }[] };
+export type AjustesDaAtividade = { mostrar: boolean; escondidos: string[]; meus: { exe: string; nome: string; janela?: string }[] };
 
 /** O jogo aberto neste computador, como o processo principal conta (ver main/jogoAberto.ts). */
 export type JogoNoComputador = {
@@ -124,6 +124,8 @@ export type JogoNoComputador = {
   icone: string | null;
   origem: 'steam' | 'conhecido' | 'seu';
   desde: number;
+  /** O ícone de um jogo de fora do Steam, em PNG (data URL), tirado da janela dele. */
+  iconeLocal?: string | null;
 };
 
 /** Um programa com janela, para apontar o jogo que a Saga não achou sozinha. */

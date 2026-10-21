@@ -176,7 +176,9 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   - **A linha não cresce**, medido: com o espaço de 1 px entre as duas linhas ela saía com 49,4 px
     contra 48 das outras; sem ele, todas 48.
   - **O controle do jogo sem imagem é NEUTRO**, e não azul: o controle azul ao lado do nome já é o da
-    partida de xadrez, e aquele se clica.
+    partida de xadrez, e aquele se clica. Desde a v0.74.1 ele quase não aparece: o jogo de fora do
+    Steam leva o ícone da janela dele (o dono: "o lol ficou um ícone padrão"), na lista e no perfil,
+    onde entra no lugar da capa.
   - **Nos amigos, o jogo toma o lugar do status** ("Jogando VALORANT" em vez de "Online"), como no
     Discord. Na linha da call não entra nada: é a mais estreita do app.
   - **A página Atividade mora em "Este computador"** e some no navegador, que não vê programas.

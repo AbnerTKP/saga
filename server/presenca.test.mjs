@@ -52,10 +52,18 @@ test('sair apaga o sinal: fechar o app não deixa ninguém online', () => {
 
 // --- a atividade -------------------------------------------------------------
 
-const VALHEIM = { nome: 'Valheim', desde: 1_000_000, steam: 892970, icone: '2f64c9a826e2c6cf3253fea4834c2e612db09143' };
+const VALHEIM = { nome: 'Valheim', desde: 1_000_000, steam: 892970, icone: '2f64c9a826e2c6cf3253fea4834c2e612db09143', imagem: null };
 
 test('a atividade do Steam chega inteira', () => {
   assert.deepEqual(lerAtividade(VALHEIM, 2_000_000), VALHEIM);
+});
+
+test('jogo de fora do Steam leva o ícone como arquivo NOSSO, e só nesse formato', () => {
+  const lol = lerAtividade({ nome: 'League of Legends', imagem: '0123456789abcdef0123456789abcdef.png' }, 2_000_000);
+  assert.equal(lol.imagem, '0123456789abcdef0123456789abcdef.png');
+  for (const ruim of ['https://x/y.png', '../../etc/passwd', '0123456789abcdef0123456789abcdef.gif', 'ABCDEF0123456789ABCDEF0123456789.png', 5]) {
+    assert.equal(lerAtividade({ nome: 'X', imagem: ruim }, 2_000_000).imagem, null, String(ruim));
+  }
 });
 
 test('nada aberto é null, e o que não dá para mostrar é recusado', () => {

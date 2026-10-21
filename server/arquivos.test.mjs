@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos, salvarArquivo, nomeDeArquivoLimpo, salvarArquivoEmFluxo } from './arquivos.mjs';
+import { tipoDaImagem, tipoDoAudio, salvarImagem, salvarSom, nomeValido, LIMITES, ErroDeArquivo , pastaDosArquivos, salvarArquivo, nomeDeArquivoLimpo, salvarArquivoEmFluxo, salvarIconeDeJogo, ladosDoPng } from './arquivos.mjs';
 
 const pasta = () => mkdtempSync(join(tmpdir(), 'img-'));
 const comCabecalho = (bytes, tamanho = 64) =>
@@ -238,4 +238,28 @@ test('envio grande demais em pedaços pequenos é recusado sem derrubar o proces
     process.off('uncaughtException', anotar);
   }
   assert.deepEqual(quedas.map((e) => e.code ?? e.message), []);
+});
+
+/** Um PNG com o cabeçalho de verdade até o IHDR: assinatura, tamanho e tipo do bloco, largura e altura. */
+const pngDe = (largura, altura) => {
+  const b = Buffer.alloc(64);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(b);
+  b.writeUInt32BE(largura, 16);
+  b.writeUInt32BE(altura, 20);
+  return b;
+};
+
+test('o ícone do jogo: PNG pequeno vira arquivo nosso; o resto é recusado', () => {
+  const p = pasta();
+  try {
+    assert.deepEqual(ladosDoPng(pngDe(32, 32)), { largura: 32, altura: 32 });
+    const nome = salvarIconeDeJogo(p, pngDe(32, 32));
+    assert.match(nome, /^[0-9a-f]{32}\.png$/);
+    assert.ok(nomeValido(nome));
+    assert.throws(() => salvarIconeDeJogo(p, pngDe(512, 512)), /256/, 'grande demais para ser ícone');
+    assert.throws(() => salvarIconeDeJogo(p, comCabecalho([0xff, 0xd8, 0xff])), /PNG/, 'JPG não');
+    assert.throws(() => salvarIconeDeJogo(p, Buffer.concat([pngDe(32, 32), Buffer.alloc(LIMITES.iconeDeJogo)])), (e) => e.status === 413);
+  } finally {
+    rmSync(p, { recursive: true, force: true });
+  }
 });

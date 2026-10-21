@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   lerAjustes, paraMandar, iconeDoJogo, capaDoJogo, haQuantoTempo, anotarVisto, lerVistos, AJUSTES_PADRAO, VISTOS_NO_MAXIMO,
+  lerIconesSubidos, bytesDoPng,
 } from './atividade.ts';
 import type { JogoNoComputador } from './desktop';
 
@@ -20,7 +21,7 @@ test('nasce ligada, e chave vazia ou estragada não desliga ninguém', () => {
 });
 
 test('vai para o servidor só o que os outros veem, e nada se estiver desligado ou escondido', () => {
-  assert.deepEqual(paraMandar(VALHEIM, AJUSTES_PADRAO), { nome: 'Valheim', desde: 1000, steam: 892970, icone: VALHEIM.icone });
+  assert.deepEqual(paraMandar(VALHEIM, AJUSTES_PADRAO), { nome: 'Valheim', desde: 1000, steam: 892970, icone: VALHEIM.icone, imagem: null });
   assert.equal(paraMandar(VALHEIM, { ...AJUSTES_PADRAO, mostrar: false }), null);
   assert.equal(paraMandar(VALHEIM, { ...AJUSTES_PADRAO, escondidos: ['steam:892970'] }), null);
   assert.equal(paraMandar(null, AJUSTES_PADRAO), null);
@@ -58,4 +59,32 @@ test('o jogo aberto vai para o topo dos vistos, sem repetir, e a lista tem teto'
   assert.deepEqual(lerVistos(JSON.stringify(dois)), dois);
   assert.deepEqual(lerVistos('{"x":1}'), []);
   assert.deepEqual(lerVistos('[{"chave":1}]'), []);
+});
+
+test('jogo de fora do Steam leva o ícone subido; o do Steam continua pelo CDN', () => {
+  const lol = { chave: 'exe:league of legends.exe', nome: 'League of Legends', steam: null, icone: null, origem: 'conhecido' as const, desde: 5 };
+  const nome = '0123456789abcdef0123456789abcdef.png';
+  assert.equal(paraMandar(lol, AJUSTES_PADRAO, nome)?.imagem, nome);
+  assert.equal(paraMandar(lol, AJUSTES_PADRAO)?.imagem, null, 'sem ícone subido ainda, vai sem');
+  assert.equal(paraMandar(VALHEIM, AJUSTES_PADRAO, nome)?.imagem, null, 'o do Steam não leva o nosso');
+});
+
+test('os ícones já subidos guardados neste computador, conferidos', () => {
+  const nome = '0123456789abcdef0123456789abcdef.png';
+  assert.deepEqual(lerIconesSubidos(JSON.stringify({ 'exe:lol.exe': nome, 'exe:x.exe': 'https://mal/x.png', 'exe:y.exe': 3 })), { 'exe:lol.exe': nome });
+  assert.deepEqual(lerIconesSubidos('lixo'), {});
+  assert.deepEqual(lerIconesSubidos('[]'), {});
+});
+
+test('o PNG do ícone sai do data URL sem fetch, e só PNG', () => {
+  // Um PNG de 1×1 de verdade.
+  const bytes = bytesDoPng('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+  assert.deepEqual([...bytes!.slice(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  assert.equal(bytesDoPng('data:image/jpeg;base64,AAAA'), null);
+  assert.equal(bytesDoPng('https://x/y.png'), null);
+});
+
+test('o programa apontado guarda o título da janela', () => {
+  assert.deepEqual(lerAjustes('{"meus":[{"exe":"MeuJogo.exe","nome":"Meu Jogo","janela":"MeuJogo v1.2"}]}').meus,
+    [{ exe: 'meujogo.exe', nome: 'Meu Jogo', janela: 'MeuJogo v1.2' }]);
 });

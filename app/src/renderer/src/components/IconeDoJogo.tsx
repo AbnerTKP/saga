@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { iconeDoJogo, type Atividade } from '../atividade';
+import { urlDoArquivo } from '../api';
 import { Icon } from './Icon';
 
 /**
- * O ícone do jogo: o do Steam, quando o jogo é de lá; o controle da Saga, quando não é — ou
- * quando a imagem não carrega (sem internet para o Steam, jogo tirado da loja). Imagem que
- * falha vira o controle, e não um quadrado vazio: a mesma regra da foto que não carrega.
+ * O ícone do jogo: o do Steam, quando o jogo é de lá; o da janela do jogo, subido ao nosso
+ * servidor, quando não é (o LoL, o VALORANT); e o controle da Saga quando não há nenhum — ou
+ * quando a imagem não carrega. Imagem que falha vira o controle, e não um quadrado vazio: a
+ * mesma regra da foto que não carrega. `local` é o ícone que ainda nem subiu (a SUA página).
  */
-export function IconeDoJogo({ atividade, tamanho }: { atividade: Pick<Atividade, 'steam' | 'icone'>; tamanho: number }) {
-  const url = iconeDoJogo(atividade);
+export function IconeDoJogo({ atividade, tamanho, local }: {
+  atividade: Pick<Atividade, 'steam' | 'icone' | 'imagem'>; tamanho: number; local?: string | null;
+}) {
+  const url = iconeDoJogo(atividade) ?? urlDoArquivo(atividade.imagem) ?? local ?? null;
   // Guarda a URL que falhou, e não um sim/não: outro jogo tenta a imagem dele de novo.
   const [quebrou, setQuebrou] = useState<string | null>(null);
   if (url && quebrou !== url) {

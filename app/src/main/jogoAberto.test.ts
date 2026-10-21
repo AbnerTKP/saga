@@ -4,6 +4,7 @@ import {
   lerAppsDoRegistro, lerValorDoRegistro, lerAppsDoVdf, nomeNoManifesto, bibliotecasDoSteam, iconeNaPasta,
   jogoDoSteam, lerTasklist, lerTitulosDoTasklist, lerPs, precisamDeTitulo, jogoDosProgramas, continuar,
   normalizarAjustes, lerJanelasDoWindows, lerAppsDoMac, AJUSTES_PADRAO, type AjustesDaAtividade,
+  janelasMudaram, janelaDoJogo, pacoteDoMac,
 } from './jogoAberto.ts';
 
 // Recorte da saída de verdade, do Windows do dono (20/10/2026), com o Valheim posto como aberto.
@@ -188,4 +189,46 @@ test('a lista para escolher: só o que tem janela, sem o sistema e sem a própri
   const mac = '/Applications/Saga.app/Contents/MacOS/Saga\n/Applications/Saga.app/Contents/Frameworks/Saga Helper (GPU).app/Contents/MacOS/Saga Helper (GPU)\n'
     + '/Applications/Celeste.app/Contents/MacOS/Celeste\n/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder\n/usr/libexec/xpcproxy\n';
   assert.deepEqual(lerAppsDoMac(mac, 'Saga'), [{ exe: 'celeste', titulo: 'Celeste' }]);
+});
+
+test('a lista de programas é lida quando ABRE ou FECHA uma janela, e não quando muda um título', () => {
+  assert.equal(janelasMudaram(null, ['window:1:0']), true, 'a primeira olhada sempre lê');
+  const antes = new Set(['window:1:0', 'window:2:0']);
+  assert.equal(janelasMudaram(antes, ['window:2:0', 'window:1:0']), false, 'as mesmas janelas, em outra ordem');
+  assert.equal(janelasMudaram(antes, ['window:1:0', 'window:2:0', 'window:3:0']), true, 'abriu uma');
+  assert.equal(janelasMudaram(antes, ['window:1:0']), true, 'fechou uma');
+  assert.equal(janelasMudaram(antes, ['window:1:0', 'window:9:0']), true, 'trocou uma por outra');
+});
+
+test('a janela de onde sai o ícone: a do jogo, nunca a do navegador', () => {
+  // As janelas de verdade do Windows do dono com o LoL aberto (20/10/2026), mais um navegador.
+  const janelas = [
+    { id: 'a', titulo: 'League of Legends (TM) Client' },
+    { id: 'b', titulo: 'Saga' },
+    { id: 'c', titulo: 'NVIDIA GeForce Overlay' },
+    { id: 'd', titulo: 'League of Legends - Guia de campeões - Google Chrome' },
+  ];
+  assert.equal(janelaDoJogo(janelas, 'League of Legends')?.id, 'a');
+  assert.equal(janelaDoJogo(janelas.slice(1), 'League of Legends'), null, 'só o navegador falando do jogo não serve');
+  // O cliente e o jogo abertos: o de título mais curto, e os dois têm o ícone do LoL.
+  assert.equal(janelaDoJogo([...janelas, { id: 'e', titulo: 'League of Legends' }], 'League of Legends')?.id, 'e');
+  assert.equal(janelaDoJogo([{ id: 'o', titulo: 'Overwatch' }], 'Overwatch 2')?.id, 'o', 'o título é o começo do nome');
+  assert.equal(janelaDoJogo([{ id: 'v', titulo: 'VALORANT  ' }], 'VALORANT')?.id, 'v');
+  assert.equal(janelaDoJogo([{ id: 'f', titulo: 'EA SPORTS FC™ 25' }], 'EA SPORTS FC 25')?.id, 'f');
+  assert.equal(janelaDoJogo([{ id: 'm', titulo: 'Minecraft* 1.21.4 - Multiplayer' }], 'Minecraft')?.id, 'm');
+  assert.equal(janelaDoJogo([{ id: 'x', titulo: 'Sap' }], 'Sapo Rei'), null, 'título curto demais não vale como começo do nome');
+  // O que a pessoa apontou vale primeiro, com o título que ela escolheu.
+  assert.equal(janelaDoJogo([{ id: 'p', titulo: 'MeuJogo v1.2' }, { id: 'q', titulo: 'Meu Jogo Indie' }], 'Meu Jogo Indie', 'MeuJogo v1.2')?.id, 'p');
+});
+
+test('no Mac, o ícone sai do .app do programa', () => {
+  const ps = '/Applications/Roblox.app/Contents/MacOS/RobloxPlayer\n/usr/sbin/cfprefsd\n';
+  assert.equal(pacoteDoMac(ps, 'robloxplayer'), '/Applications/Roblox.app');
+  assert.equal(pacoteDoMac(ps, 'cfprefsd'), null, 'fora de um .app não há ícone de app');
+  assert.equal(pacoteDoMac(ps, 'outro'), null);
+});
+
+test('o programa apontado guarda o título da janela escolhida, de onde sai o ícone', () => {
+  assert.deepEqual(normalizarAjustes({ meus: [{ exe: 'MeuJogo.exe', nome: 'Meu Jogo', janela: 'MeuJogo v1.2' }] }).meus,
+    [{ exe: 'meujogo.exe', nome: 'Meu Jogo', janela: 'MeuJogo v1.2' }]);
 });

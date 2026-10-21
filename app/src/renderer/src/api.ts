@@ -799,6 +799,9 @@ async function enviarImagem<T>(rota: string, arquivo: File | null): Promise<T> {
 }
 
 export const minhaFoto = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/foto', a);
+/** O ícone de um jogo de fora do Steam, tirado da janela dele. Devolve o nome do arquivo no servidor. */
+export const subirIconeDoJogo = async (png: Blob) =>
+  (await enviarImagem<{ imagem: string }>('/eu/atividade/icone', new File([png], 'icone.png', { type: 'image/png' }))).imagem;
 export const meuBanner = (a: File | null) => enviarImagem<{ eu: Membro }>('/eu/banner', a);
 export const fotoDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/foto', a);
 export const bannerDoServidor = (a: File | null) => enviarImagem<{ servidor: Servidor }>('/servidor/banner', a);

@@ -1,13 +1,13 @@
-import { ipcMain, type BrowserWindow } from 'electron';
+import { app, desktopCapturer, ipcMain, type BrowserWindow } from 'electron';
 import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { registrar } from './registro';
 import {
-  AJUSTES_PADRAO, bibliotecasDoSteam, continuar, iconeNaPasta, jogoDoSteam, jogoDosProgramas, lerAppsDoMac,
-  lerAppsDoRegistro, lerAppsDoVdf, lerJanelasDoWindows, lerPs, lerTasklist, lerTitulosDoTasklist,
-  lerValorDoRegistro, nomeNoManifesto, normalizarAjustes, precisamDeTitulo,
+  AJUSTES_PADRAO, bibliotecasDoSteam, continuar, iconeNaPasta, janelaDoJogo, janelasMudaram, jogoDoSteam,
+  jogoDosProgramas, lerAppsDoMac, lerAppsDoRegistro, lerAppsDoVdf, lerJanelasDoWindows, lerPs, lerTasklist,
+  lerTitulosDoTasklist, lerValorDoRegistro, nomeNoManifesto, normalizarAjustes, pacoteDoMac, precisamDeTitulo,
   type AjustesDaAtividade, type AppDoSteam, type JogoAberto, type ProgramaAberto,
 } from './jogoAberto';
 
@@ -21,16 +21,24 @@ import {
  * | o quê | quanto | quando |
  * |---|---|---|
  * | `reg query …\Steam\Apps /s` | ~36 ms (quase tudo é abrir o `reg.exe`) | a cada 15 s |
- * | `tasklist /fo csv /nh` | ~280 ms de relógio, ~0,3–0,4 s de processador | a cada 60 s, e só sem jogo do Steam |
+ * | as janelas abertas (`desktopCapturer`) | ~80 ms, ~70 ms de processador | a cada 15 s, sem jogo do Steam |
+ * | `tasklist /fo csv /nh` | ~280 ms de relógio, ~0,3–0,4 s de processador | quando abre ou fecha uma janela, e a cada 5 min |
  * | `tasklist /v` sem filtro | 5,3 s | nunca |
  *
- * Então: o Steam, que é barato, a cada 15 s; a lista de programas a cada minuto, e nem isso
- * enquanto o Steam já disse qual é o jogo. Uma volta nunca começa antes de a anterior
- * terminar, e com "Mostrar o que estou jogando" desligado nada roda.
+ * Então: o Steam, que é barato, a cada 15 s. A lista de programas, que é cara, só quando ABRE
+ * OU FECHA uma janela — jogo que abre abre janela — e, por garantia, a cada 5 min. Na primeira
+ * versão ela era lida de minuto em minuto, e um jogo de fora do Steam aberto com a Saga já
+ * aberta levava até um minuto para aparecer (medido: 43 s). O dono achou que só aparecia
+ * desmarcando e marcando a opção, que é o que força uma leitura na hora. No Mac o `ps` é
+ * barato e roda a cada 15 s. Uma volta nunca começa antes de a anterior terminar, e com
+ * "Mostrar o que estou jogando" desligado nada roda.
  */
 
 const STEAM_A_CADA = 15_000;
-const PROGRAMAS_A_CADA = 60_000;
+/** A volta longa da lista de programas: com as janelas avisando, é só garantia. */
+const PROGRAMAS_A_CADA = process.platform === 'darwin' ? STEAM_A_CADA : 5 * 60_000;
+/** Sem conseguir listar as janelas no Windows, volta o ritmo da primeira versão. */
+const PROGRAMAS_SEM_JANELAS = 60_000;
 
 export type JogoContado = JogoAberto & { desde: number };
 
@@ -43,6 +51,10 @@ let geracao = 0;
 /** Quando a lista de programas foi lida, e o que se achou nela. Zero = ler na próxima volta. */
 let programasEm = 0;
 let doUltimoPrograma: JogoAberto | null = null;
+/** As janelas da última volta, pelo id. Null = ainda não se olhou. */
+let janelasAntes: Set<string> | null = null;
+/** A última saída do `ps` no Mac: é dela que sai o `.app` de onde se tira o ícone. */
+let ultimoPs = '';
 let janela: () => BrowserWindow | null = () => null;
 /** O custo de cada leitura vai para o registro UMA vez por abertura: é o que se mede na máquina de alguém. */
 const jaMedi = new Set<string>();
@@ -134,8 +146,51 @@ async function jogoNoSteam(): Promise<JogoAberto | null> {
 
 async function programasAbertos(): Promise<string[]> {
   if (process.platform === 'win32') return lerTasklist(await rodar('tasklist', ['/fo', 'csv', '/nh']));
-  if (process.platform === 'darwin') return lerPs(await rodar('ps', ['-axo', 'comm='], 'utf8'));
+  if (process.platform === 'darwin') return lerPs(ultimoPs = await rodar('ps', ['-axo', 'comm='], 'utf8'));
   return [];
+}
+
+/**
+ * As janelas abertas, pelo id — só no Windows. No Mac listar janelas pede a permissão de
+ * gravar a tela (sem ela, LANÇA), e lá o `ps` já é barato o bastante para rodar sempre.
+ */
+async function janelasAgora(icones = false) {
+  if (process.platform !== 'win32') return null;
+  return desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: icones })
+    .catch(() => null);
+}
+
+const iconesDosProgramas = new Map<string, string>();
+const iconeTentadoEm = new Map<string, number>();
+
+/**
+ * O ícone de um jogo de fora do Steam: o da JANELA dele, que o Windows dá mesmo quando o
+ * processo é protegido pelo anticheat. Medido com o LoL aberto em 20/10/2026: o caminho do
+ * programa do jogo vem VAZIO (`Get-Process` e `Win32_Process`), e o ícone da janela "League of
+ * Legends (TM) Client" vem inteiro, 32×32, em ~90 ms. No Mac, o ícone do `.app` (não exercido).
+ * Achado, fica guardado; não achado, tenta de novo no máximo uma vez por minuto.
+ */
+async function iconeDoPrograma(jogo: JogoAberto): Promise<string | null> {
+  const guardado = iconesDosProgramas.get(jogo.chave);
+  if (guardado) return guardado;
+  if (Date.now() - (iconeTentadoEm.get(jogo.chave) ?? 0) < 60_000) return null;
+  iconeTentadoEm.set(jogo.chave, Date.now());
+  let imagem: Electron.NativeImage | null = null;
+  if (process.platform === 'win32') {
+    const fontes = await janelasAgora(true) ?? [];
+    const apontada = ajustes.meus.find((m) => `exe:${m.exe}` === jogo.chave)?.janela;
+    const achada = janelaDoJogo(fontes.map((f) => ({ id: f.id, titulo: f.name })), jogo.nome, apontada);
+    imagem = fontes.find((f) => f.id === achada?.id)?.appIcon ?? null;
+  } else if (process.platform === 'darwin') {
+    const pacote = pacoteDoMac(ultimoPs, jogo.chave.replace(/^exe:/, ''));
+    if (pacote) imagem = await app.getFileIcon(pacote, { size: 'normal' }).catch(() => null);
+  }
+  if (!imagem || imagem.isEmpty()) return null;
+  // Ícone de janela pode vir grande (256 px); o servidor aceita até 256, e a tela mostra no máximo 40.
+  const lado = imagem.getSize();
+  const png = (lado.width > 64 ? imagem.resize({ width: 64, height: 64, quality: 'best' }) : imagem).toDataURL();
+  iconesDosProgramas.set(jogo.chave, png);
+  return png;
 }
 
 /** Só para os poucos programas que exigem o título (o Java do Minecraft): filtrado, ~135 ms. */
@@ -158,7 +213,8 @@ async function jogoNosProgramas(): Promise<JogoAberto | null> {
 
 function contar(jogo: JogoAberto | null) {
   const novo = continuar(atual, jogo, Date.now());
-  if (novo?.chave === atual?.chave && novo?.nome === atual?.nome) return;
+  // O ícone conta: ele pode chegar uma volta depois do jogo (a janela ainda não tinha aberto).
+  if (novo?.chave === atual?.chave && novo?.nome === atual?.nome && novo?.iconeLocal === atual?.iconeLocal) return;
   atual = novo;
   const j = janela();
   if (j && !j.isDestroyed()) j.webContents.send('atividade:mudou', atual);
@@ -176,11 +232,16 @@ async function volta() {
       // lida na volta seguinte, e não um minuto depois com o resultado de antes do jogo.
       programasEm = 0;
     } else {
-      if (Date.now() - programasEm >= PROGRAMAS_A_CADA) {
+      const janelas = await medido('janelas', () => janelasAgora());
+      const ids = janelas?.map((f) => f.id) ?? null;
+      const abriuOuFechou = ids ? janelasMudaram(janelasAntes, ids) : false;
+      if (ids) janelasAntes = new Set(ids);
+      const prazo = ids || process.platform !== 'win32' ? PROGRAMAS_A_CADA : PROGRAMAS_SEM_JANELAS;
+      if (abriuOuFechou || Date.now() - programasEm >= prazo) {
         programasEm = Date.now();
         doUltimoPrograma = await jogoNosProgramas();
       }
-      jogo = doUltimoPrograma;
+      jogo = doUltimoPrograma && { ...doUltimoPrograma, iconeLocal: await iconeDoPrograma(doUltimoPrograma) };
     }
     // Escondeu o jogo enquanto a volta corria: o que ela achou já não vale.
     if (ajustes.mostrar && comecouEm === geracao) contar(jogo);
@@ -199,6 +260,8 @@ function recomecar() {
   geracao++;
   if (relogio) { clearTimeout(relogio); relogio = null; }
   programasEm = 0;
+  // Mexeu nos ajustes (apontou um jogo, por exemplo): o ícone que faltava é procurado de novo já.
+  iconeTentadoEm.clear();
   if (ajustes.mostrar) void volta();
   else contar(null);
 }

@@ -459,7 +459,9 @@ O que vale para quem mexe em `server/`: regras que não são óbvias no código.
   contou; `null` apaga. E o número do Steam e o hash do ícone são conferidos à risca (inteiro, 40
   letras hexadecimais): é com eles que o app de quem olha MONTA o endereço da imagem, e texto livre
   ali faria a Saga de todo mundo buscar o que quem mandou quisesse. Atividade recusada recusa o sinal
-  inteiro, sem renovar nada pela metade (`presenca.test.mjs`, `api.test.mjs`).
+  inteiro, sem renovar nada pela metade (`presenca.test.mjs`, `api.test.mjs`). O ícone de jogo de fora
+  do Steam (o LoL não tem CDN) sobe por `POST /eu/atividade/icone`: só PNG de até 256 px e 64 KB
+  (`salvarIconeDeJogo`), e na atividade vai só o NOME do arquivo (`imagem`, 32 hex + `.png`).
 
 ## Administração da Saga
 

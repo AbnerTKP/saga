@@ -2,6 +2,13 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A atividade na v0.74.1 (21/10/2026): o jogo que abre depois e o ícone de fora do Steam.** Medido:
+  com a Saga compilada contra um servidor local e o LoL do dono aberto, o LoL apareceu em ~1 s com o
+  ícone de verdade, que subiu e chegou à outra conta; e, com o `tasklist` de verdade e a lista de
+  janelas simulada, um jogo aberto com a Saga já aberta apareceu em 12 s e sumiu 7,5 s depois de
+  fechar. **Não exercido**: um jogo de verdade abrindo com a Saga INSTALADA já aberta (é o caso que o
+  dono reportou); o ícone de outros jogos de fora do Steam (VALORANT, Fortnite, Roblox, Minecraft); o
+  ícone no Mac (sai do `.app`).
 - **A atividade e o apito da live (20/10/2026).** O que está medido: a detecção rodando DE VERDADE
   neste Windows (o `main/atividade.ts` com um Electron falso, contra o registro e os programas reais):
   o GTA San Andreas DE que o dono estava jogando apareceu pelo Steam em 63 ms, com nome e ícone; com

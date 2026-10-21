@@ -37,7 +37,8 @@ export function PaginaDaAtividade({ atividade }: { atividade: AtividadeDaTela })
     const exe = escolhido.exe;
     mudarAjustes((a) => ({
       ...a,
-      meus: [...a.meus.filter((m) => m.exe !== exe), { exe, nome: nome.trim() }],
+      // O título da janela escolhida vai junto: é dela que sai o ícone do jogo.
+      meus: [...a.meus.filter((m) => m.exe !== exe), { exe, nome: nome.trim(), janela: escolhido.titulo }],
       // Apontar de novo um programa escondido é querer que ele apareça.
       escondidos: a.escondidos.filter((c) => c !== `exe:${exe}`),
     }));
@@ -51,7 +52,7 @@ export function PaginaDaAtividade({ atividade }: { atividade: AtividadeDaTela })
     return (
       <div key={v.chave} className="cfg-linha atv-jogo" data-escondido={escondido(v.chave) ? '' : undefined}>
         <div className="atv-jogo-quem">
-          <IconeDoJogo atividade={v} tamanho={32} />
+          <IconeDoJogo atividade={v} tamanho={32} local={(aberto ? jogo?.iconeLocal : null) ?? v.iconeLocal} />
           <div className="cfg-linha-texto">
             <span className="cfg-rotulo">
               {v.nome}
