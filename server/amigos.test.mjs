@@ -124,6 +124,7 @@ test('a pessoa aparece como CONTA: sem cargo, sem nome exibido, sem identificado
   cria('juninho');
   const { amigo } = pedir(db, tkp, { apelido: 'juninho' });
 
-  assert.deepEqual(Object.keys(amigo).sort(), ['enquadramento', 'foto', 'id', 'nome', 'status', 'turbo']);
+  // O jogo aberto é da pessoa, como o status — não de um servidor —, e por isso entra aqui.
+  assert.deepEqual(Object.keys(amigo).sort(), ['atividade', 'enquadramento', 'foto', 'id', 'nome', 'status', 'turbo']);
   assert.equal(amigo.nome, 'juninho');
 });

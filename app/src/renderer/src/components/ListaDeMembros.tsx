@@ -4,6 +4,7 @@ import { agruparPessoas } from '../listaDePessoas';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
 import { Icon } from './Icon';
+import { IconeDoJogo } from './IconeDoJogo';
 
 /**
  * Todo mundo do servidor, e não só quem está numa sala: é a diferença entre saber quem está
@@ -59,11 +60,12 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJoga
               // ela que ainda se vê o cargo de cada um.
               const cor = m.cargo?.cor;
               const mesa = jogando.get(m.id);
+              const atv = m.atividade;
               return (
                 <button
                   key={m.id}
-                  className={`membro-linha ${naCall ? 'na-voz' : ''} ${offline ? 'offline' : ''}`}
-                  title={`${m.nome} — ${m.cargoNome}${naCall ? ' · na voz agora' : ''}`}
+                  className={`membro-linha ${naCall ? 'na-voz' : ''} ${offline ? 'offline' : ''} ${atv ? 'atv-com-jogo' : ''}`}
+                  title={`${m.nome} — ${m.cargoNome}${naCall ? ' · na voz agora' : ''}${atv ? ` · jogando ${atv.nome}` : ''}`}
                   onClick={(e) => onPessoa(m, { x: e.clientX, y: e.clientY }, 'perfil')}
                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPessoa(m, { x: e.clientX, y: e.clientY }, 'acoes'); }}
                 >
@@ -72,22 +74,32 @@ export function ListaDeMembros({ membros, cargos, naVoz, eu, jogando, nomeDoJoga
                   <span className="membro-nome" style={cor && !m.turbo ? { color: cor } : undefined}>
                     <Nome membro={m} />
                   </span>
-                  {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="berserk" size={13} /></span>}
-                  {/* O controle é o botão, como o selo AO VIVO na barra. Aqui ele é um span
-                      dentro do botão da linha: botão dentro de botão o navegador desfaz. */}
-                  {mesa && (
-                    <span
-                      className="selo-na-linha jogo"
-                      role="button"
-                      title={m.id === eu.id
-                        ? 'Voltar à sua partida'
-                        : `Assistir ${nomeDoJogador(mesa.brancas)} × ${nomeDoJogador(mesa.pretas)}`}
-                      onClick={(e) => { e.stopPropagation(); onPartida(mesa.id); }}
-                    >
-                      <Icon name="controle" size={13} />
-                    </span>
-                  )}
-                  {m.id === eu.id && <span className="muted small">você</span>}
+                  {/* As marcas num grupo: sem jogo ele some (`display: contents`) e a linha é a de
+                      sempre; com jogo, ficam na primeira linha e o jogo passa embaixo delas. */}
+                  <span className="atv-marcas">
+                    {m.turbo && <span className="marca-berserk" title="Berserk"><Icon name="berserk" size={13} /></span>}
+                    {atv && <IconeDoJogo atividade={atv} tamanho={20} />}
+                    {/* O controle é o botão, como o selo AO VIVO na barra. Aqui ele é um span
+                        dentro do botão da linha: botão dentro de botão o navegador desfaz. */}
+                    {mesa && (
+                      <span
+                        className="selo-na-linha jogo"
+                        role="button"
+                        title={m.id === eu.id
+                          ? 'Voltar à sua partida'
+                          : `Assistir ${nomeDoJogador(mesa.brancas)} × ${nomeDoJogador(mesa.pretas)}`}
+                        onClick={(e) => { e.stopPropagation(); onPartida(mesa.id); }}
+                      >
+                        <Icon name="controle" size={13} />
+                      </span>
+                    )}
+                    {m.id === eu.id && <span className="muted small">você</span>}
+                  </span>
+                  {/* O jogo aberto mora embaixo do nome, e o ícone dele à direita (opção C da
+                      prancheta de 20/10/2026). A segunda linha cabe na altura da foto, e passa por
+                      baixo das marcas: na sua própria linha, Berserk + ícone + "você" comiam o
+                      nome do jogo inteiro ("Jogando…"), visto na foto da conferência. */}
+                  {atv && <span className="atv-jogando">Jogando <b>{atv.nome}</b></span>}
                 </button>
               );
             })}

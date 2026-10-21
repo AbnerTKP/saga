@@ -59,21 +59,23 @@ export function paginasDoServidor(cargo: Cargo | null | undefined): Pagina<Pagin
   return lista.filter((p): p is Pagina<PaginaDoServidor> => !!p);
 }
 
-export type PaginaDaConta = 'perfil' | 'conta' | 'voz' | 'atalhos' | 'inicio';
+export type PaginaDaConta = 'perfil' | 'conta' | 'voz' | 'atividade' | 'atalhos' | 'inicio';
 
 /** As páginas das SUAS configurações (as ações — relatar, registro, administração, sair — quem monta é a tela). */
 export const PAGINAS_DA_CONTA: Pagina<PaginaDaConta>[] = [
   { id: 'perfil', titulo: 'Seu perfil', icone: 'perfil', grupo: 'Sua conta', busca: ['foto', 'capa', 'banner', 'nome', 'enquadrar', 'gif', 'avatar'] },
   { id: 'conta', titulo: 'Conta e segurança', icone: 'escudo', grupo: 'Sua conta', busca: ['senha', 'e-mail', 'email', 'apelido', 'segurança'] },
   { id: 'voz', titulo: 'Voz e vídeo', icone: 'mic', grupo: 'Este computador', busca: ['microfone', 'mic', 'câmera', 'camera', 'saída de som', 'fone', 'supressão', 'ruído', 'sensibilidade', 'qualidade', 'tela', 'transmissão', 'soundboard'] },
+  { id: 'atividade', titulo: 'Atividade', icone: 'controle', grupo: 'Este computador', busca: ['jogo', 'jogando', 'steam', 'status de jogo', 'esconder jogo', 'o que estou jogando'] },
   { id: 'atalhos', titulo: 'Atalhos', icone: 'teclado', grupo: 'Este computador', busca: ['teclado', 'overlay', 'live por cima do jogo', 'travar'] },
   { id: 'inicio', titulo: 'Inicialização', icone: 'atualizar', grupo: 'Este computador', busca: ['ligar o computador', 'abrir com o sistema', 'windows', 'mac', 'versão', 'atualização'] },
 ];
 
 /**
  * As páginas da conta onde a Saga está aberta. No navegador não há atalho que valha fora da
- * aba, nem overlay, nem "abrir junto com o sistema": as duas páginas que só falam disso somem,
- * em vez de mostrar chaves que não fazem nada.
+ * aba, nem overlay, nem "abrir junto com o sistema", nem como ver os programas abertos: as
+ * páginas que só falam disso somem, em vez de mostrar chaves que não fazem nada.
  */
+const SO_NO_COMPUTADOR: ReadonlySet<PaginaDaConta> = new Set(['atividade', 'atalhos', 'inicio']);
 export const paginasDaConta = (web: boolean): Pagina<PaginaDaConta>[] =>
-  web ? PAGINAS_DA_CONTA.filter((p) => p.id !== 'atalhos' && p.id !== 'inicio') : PAGINAS_DA_CONTA;
+  web ? PAGINAS_DA_CONTA.filter((p) => !SO_NO_COMPUTADOR.has(p.id)) : PAGINAS_DA_CONTA;

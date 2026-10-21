@@ -2075,3 +2075,25 @@ test('sem envio de e-mail, pedir código diz por quê — e nunca é 401', async
   assert.equal(pedir.status, 503);
   assert.equal((await chamar('GET', '/eu', { sessao: quem.token })).corpo.emailPendente, null);
 });
+
+test('a atividade vai no sinal de vida e aparece para quem está no mesmo servidor', async () => {
+  const jogadora = (await cadastrar('jogadora')).corpo;
+  const dono = await sessaoDe('abner');
+  const valheim = { nome: 'Valheim', desde: Date.now() - 60_000, steam: 892970, icone: '2f64c9a826e2c6cf3253fea4834c2e612db09143' };
+  const r = await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: { status: 'online', atividade: valheim } });
+  assert.equal(r.status, 200);
+  const comoODonoVe = async () => (await chamar('GET', '/servidor', { sessao: dono.token })).corpo.membros
+    .find((m) => m.apelido === 'jogadora')?.atividade;
+  assert.deepEqual(await comoODonoVe(), valheim);
+
+  // O sinal da Saga do navegador não diz nada de jogo, e por isso não apaga.
+  await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: {} });
+  assert.equal((await comoODonoVe())?.nome, 'Valheim');
+
+  // Recusada inteira: nem o sinal é renovado pela metade.
+  const ruim = await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: { atividade: { nome: '' } } });
+  assert.equal(ruim.status, 400);
+
+  await chamar('POST', '/eu/presenca', { sessao: jogadora.token, corpo: { atividade: null } });
+  assert.equal(await comoODonoVe(), null);
+});

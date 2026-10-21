@@ -46,6 +46,7 @@ export const doMembro = (m: Membro): PessoaNaCall => ({
   turbo: m.turbo,
   idExibido: m.idExibido,
   status: m.status,
+  atividade: m.atividade ?? null,
 });
 
 /** Quem apareceu nas salas de voz, separado pelo servidor em cuja lista apareceu. */

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { podeSobre, type Acao, type AcaoDeModeracao, type Cargo, type Membro } from '../api';
+import type { Atividade } from '../atividade';
 import { COMO_SE_LE, PODE_CLICAR, type ComAPessoa } from '../amizade';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
@@ -21,6 +22,8 @@ export type PessoaNaCall = {
   entrouEm?: number | null;
   turbo?: boolean;
   idExibido?: string | null;
+  /** O jogo aberto no computador dela. Só a lista de membros sabe; a call, não. */
+  atividade?: Atividade | null;
 };
 
 export function MenuDaPessoa({ pessoa, eu, cargos, em, volume, onVolume, onAcao, onVerPerfil, onClose, deOutroServidor, amizade, onAmizade }: {

@@ -166,6 +166,21 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
   botão**. Por isso a caixa não pergunta nada ao `App`: o `App` ANOTA onde a pessoa está
   (`relato.ts`), e o relato leva junto.
 
+- **O jogo de cada um (20/10/2026): embaixo do nome, com o ícone à direita, e a capa no perfil.**
+  Escolhas do dono na prancheta, entre três para a lista (só a linha, só o ícone, os dois — ele quis
+  os dois) e duas para o perfil (capa em pé, faixa larga). O que a tela de verdade cobrou depois:
+  - **Com jogo, a linha da pessoa vira GRADE**: foto nas duas linhas, nome e marcas em cima, e o jogo
+    embaixo, passando por baixo das marcas também. Na flex de sempre, a SUA linha — Berserk, o ícone
+    do jogo e "você" — espremia o texto até sobrar "Jogando…" sem jogo nenhum. Sem jogo o grupo das
+    marcas é `display: contents` e a linha é exatamente a de antes.
+  - **A linha não cresce**, medido: com o espaço de 1 px entre as duas linhas ela saía com 49,4 px
+    contra 48 das outras; sem ele, todas 48.
+  - **O controle do jogo sem imagem é NEUTRO**, e não azul: o controle azul ao lado do nome já é o da
+    partida de xadrez, e aquele se clica.
+  - **Nos amigos, o jogo toma o lugar do status** ("Jogando VALORANT" em vez de "Online"), como no
+    Discord. Na linha da call não entra nada: é a mais estreita do app.
+  - **A página Atividade mora em "Este computador"** e some no navegador, que não vê programas.
+
 ## O visual
 
 - **A paleta sai da logo, não do Discord.** O acento era `#5865f2` — letra por letra o

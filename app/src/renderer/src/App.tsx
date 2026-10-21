@@ -40,6 +40,7 @@ import { MenuDaSala, type AcaoNaSala } from './components/MenuDaSala';
 import { QuemPodeVer } from './components/QuemPodeVer';
 import { PedirNome } from './components/PedirNome';
 import { statusParaMandar, type Status } from './presenca';
+import { useAtividade } from './useAtividade';
 import { Stage } from './components/Stage';
 import { ScreenPicker } from './components/ScreenPicker';
 import { ConfiguracoesDaConta } from './components/ConfiguracoesDaConta';
@@ -274,6 +275,11 @@ export function App() {
   // `entrarNaVoz`, que nasce mais abaixo; a referência é preenchida lá.
   const cumprirOrdem = useRef<() => void>(() => undefined);
   const rm = useRoom(sessao?.eu?.turbo ?? false, aoChegarAlguem, () => cumprirOrdem.current());
+  // O jogo aberto neste computador, para o "Jogando…" do pessoal — ver useAtividade.ts.
+  const atividade = useAtividade(!!sessao?.eu);
+  // Em referência: o sinal de vida vive num intervalo, e o jogo mudando não pode refazê-lo.
+  const atividadeRef = useRef(atividade.paraOServidor);
+  useEffect(() => { atividadeRef.current = atividade.paraOServidor; }, [atividade.paraOServidor]);
 
   /**
    * A live por cima do jogo.
@@ -496,7 +502,7 @@ export function App() {
       try {
         const ocioso = await window.desktop.ociosidade();
         if (!vivo) return;
-        const agora = await baterPresenca(statusParaMandar(statusEscolhido, ocioso));
+        const agora = await baterPresenca(statusParaMandar(statusEscolhido, ocioso), atividadeRef.current);
         // A lista de pessoas vem de 10 em 10 s, e o sinal de vida corre ao lado dela: quem
         // abria o app se via apagado na própria lista por 10 s, e "ocupado" levava 8 s para
         // aparecer — medido. Status confirmado diferente do anterior pede a lista na hora.
@@ -515,6 +521,15 @@ export function App() {
     const pararDeDespertar = aoDespertar(bater);
     return () => { vivo = false; clearInterval(id); pararDeDespertar(); };
   }, [sessao?.eu?.id, statusEscolhido, recarregarServidor]);
+
+  /**
+   * O jogo abriu ou fechou: conta na hora, sem esperar o sinal de 30 s, e pede a lista de
+   * pessoas para a sua linha mudar junto. No navegador não há o que contar.
+   */
+  useEffect(() => {
+    if (!sessao?.eu || atividade.paraOServidor === undefined) return;
+    baterPresenca(undefined, atividade.paraOServidor).then(() => recarregarServidor()).catch(() => undefined);
+  }, [sessao?.eu?.id, atividade.paraOServidor, recarregarServidor]);
 
   const escolherStatus = useCallback((s: Status) => {
     setStatusEscolhido(s);
@@ -1510,6 +1525,7 @@ export function App() {
             volumeDaMusica={rm.volumeDaMusica}
             onVolumeDaMusica={rm.definirVolumeDaMusica}
             onEu={atualizarEu}
+            atividade={atividade}
             email={sessao}
             onEmail={atualizarEmail}
             onRegistro={() => { setDevices(false); setRegistro(true); }}
@@ -1798,6 +1814,7 @@ export function App() {
             volumeDaMusica={rm.volumeDaMusica}
             onVolumeDaMusica={rm.definirVolumeDaMusica}
           onEu={atualizarEu}
+          atividade={atividade}
           email={sessao}
           onEmail={atualizarEmail}
           onRegistro={() => { setDevices(false); setRegistro(true); }}

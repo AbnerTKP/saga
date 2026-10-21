@@ -109,7 +109,8 @@ export function TelaDeAmigos({ onConversar, onMudou }: {
 
   const amigo = (p: Conta) => linha(
     p,
-    STATUS_SE_LE[(p.status ?? 'offline') as keyof typeof STATUS_SE_LE] ?? p.status,
+    // Jogando, o jogo diz mais que o status — como na lista de amigos do Discord.
+    p.atividade ? `Jogando ${p.atividade.nome}` : STATUS_SE_LE[(p.status ?? 'offline') as keyof typeof STATUS_SE_LE] ?? p.status,
     <>
       <button className="botao-miudo sim" disabled={ocupado} onClick={() => onConversar(p.id)}>
         Mandar mensagem

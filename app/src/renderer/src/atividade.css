@@ -1,0 +1,59 @@
+/* A atividade: o jogo aberto de cada um (prancheta de 20/10/2026, opções C e P1).
+   Prefixo atv-, arquivo próprio: nome curto de classe é variável global. */
+
+/* Lista de pessoas: o nome e, embaixo, o jogo. As duas linhas cabem na altura da foto — a
+   linha da pessoa não cresce. Sem jogo, a linha é a flex de sempre e o grupo das marcas nem
+   existe para o layout; com jogo, ela vira grade: foto nas duas linhas, nome e marcas em cima,
+   e o jogo embaixo, por baixo das marcas também — senão "você", Berserk e o ícone o espremem. */
+.atv-marcas { display: contents; }
+.membro-linha.atv-com-jogo {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; row-gap: 0; align-items: center;
+}
+.atv-com-jogo > :first-child { grid-row: 1 / 3; }
+.atv-com-jogo > .membro-nome { grid-column: 2; grid-row: 1; line-height: 1.2; }
+.atv-com-jogo > .atv-marcas { grid-column: 3; grid-row: 1; display: flex; align-items: center; gap: 10px; }
+.atv-jogando {
+  grid-column: 2 / 4; grid-row: 2; min-width: 0; line-height: 1.15;
+  font-size: var(--letra-legenda); font-weight: var(--peso-medio); color: var(--texto-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.atv-jogando b { font-weight: var(--peso-forte); color: var(--texto-2); }
+
+/* O ícone do jogo: o do Steam, ou o controle num quadrado NEUTRO. Neutro de propósito: o
+   controle azul ao lado do nome já é o da partida de xadrez, e aquele se clica. */
+.atv-icone { flex: none; display: block; border-radius: var(--raio-1); object-fit: cover; }
+.atv-sem-imagem { display: grid; place-items: center; background: var(--superficie-3); color: var(--texto-2); }
+
+/* O perfil: "Jogando agora", com a capa em pé como a caixa do jogo. */
+.atv-cartao {
+  margin-top: var(--e1); padding: var(--e3) 14px; display: grid; gap: 10px;
+  background: var(--superficie-0); border-radius: var(--raio-3);
+}
+.atv-cartao-titulo {
+  font-size: var(--letra-rotulo); font-weight: var(--peso-forte); color: var(--texto-3);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.atv-cartao-corpo { display: flex; align-items: center; gap: 14px; }
+.atv-capa { flex: none; width: 60px; height: 90px; border-radius: var(--raio-2); object-fit: cover; box-shadow: var(--sombra-2); }
+.atv-capa-vazia {
+  flex: none; width: 60px; height: 60px; border-radius: var(--raio-4); display: grid; place-items: center;
+  background: var(--superficie-3); color: var(--texto-2);
+}
+.atv-cartao-texto { min-width: 0; }
+.atv-cartao-jogo { font-size: 16px; font-weight: var(--peso-forte); color: var(--texto-forte); overflow-wrap: anywhere; }
+.atv-cartao-sub { margin-top: 3px; font-size: var(--letra-menu); color: var(--texto-2); }
+.atv-cartao-sub.apagado { color: var(--texto-3); }
+
+/* Configurações › Atividade */
+.atv-jogo { align-items: center; }
+.atv-jogo-quem { display: flex; align-items: center; gap: var(--e3); min-width: 0; }
+.atv-jogo[data-escondido] .atv-jogo-quem { opacity: .55; }
+.atv-jogo .atv-icone { border-radius: var(--raio-2); }
+.atv-janelas { display: grid; gap: var(--e0); max-height: 260px; overflow-y: auto; padding: var(--e1) 0; }
+.atv-janela { display: grid; gap: var(--e0); min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--raio-3); text-align: left; }
+.atv-janela:hover { background: var(--superficie-3); }
+.atv-janela-titulo {
+  font-size: var(--letra-painel); font-weight: var(--peso-semi); color: var(--texto-forte);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.atv-janela-exe { font-size: var(--letra-legenda); color: var(--texto-3); }

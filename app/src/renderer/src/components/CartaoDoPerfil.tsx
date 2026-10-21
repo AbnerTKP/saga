@@ -7,6 +7,7 @@ import { VerImagem } from './VerImagem';
 import type { PessoaNaCall } from './MenuDaPessoa';
 import { useFecharComEsc } from '../useFechar';
 import { COMO_SE_LE, PODE_CLICAR, type ComAPessoa } from '../amizade';
+import { capaDoJogo, haQuantoTempo, type Atividade } from '../atividade';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -112,6 +113,8 @@ export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onV
               {naVoz && <span className="perfil-selo ok"><Icon name="speaker" size={12} /> na call</span>}
             </div>
 
+            {pessoa.atividade && <JogandoAgora atividade={pessoa.atividade} />}
+
             <dl className="perfil-dados">
               {entrou && (
                 <div><dt>Em {servidorNome} desde</dt><dd>{entrou}</dd></div>
@@ -159,5 +162,30 @@ export function CartaoDoPerfil({ pessoa, servidorNome, naVoz, souEu, volume, onV
         <VerImagem url={imagemAberta} onClose={() => setImagemAberta(null)} />
       )}
     </>
+  );
+}
+
+/**
+ * "Jogando agora": a capa em pé do jogo, como a caixa dele (opção P1 da prancheta de
+ * 20/10/2026), o nome e há quanto tempo. Jogo de fora do Steam não tem capa: entra o controle.
+ * A capa que não carrega também vira o controle — a mesma regra da foto.
+ */
+function JogandoAgora({ atividade }: { atividade: Atividade }) {
+  const capa = capaDoJogo(atividade);
+  const [quebrou, setQuebrou] = useState<string | null>(null);
+  return (
+    <div className="atv-cartao">
+      <div className="atv-cartao-titulo">Jogando agora</div>
+      <div className="atv-cartao-corpo">
+        {capa && quebrou !== capa
+          ? <img className="atv-capa" src={capa} alt="" draggable={false} onError={() => setQuebrou(capa)} />
+          : <span className="atv-capa-vazia" aria-hidden="true"><Icon name="controle" size={30} /></span>}
+        <div className="atv-cartao-texto">
+          <div className="atv-cartao-jogo">{atividade.nome}</div>
+          <div className="atv-cartao-sub">{haQuantoTempo(atividade.desde, Date.now())}</div>
+          {atividade.steam && <div className="atv-cartao-sub apagado">pelo Steam</div>}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 import { registrarMusica } from './musica';
+import { registrarAtividade } from './atividade';
 import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu, podeAbrirComOSistema } from './inicio';
 import {
   ATALHO_PADRAO, atalhoAceito, encaixarNaTela, gravar as gravarOverlay, ler as lerOverlay,
@@ -456,6 +457,8 @@ app.whenReady().then(async () => {
    */
   // O bot de música: achar e baixar mora aqui (o yt-dlp é um programa) — ver musica.ts.
   registrarMusica();
+  // O jogo aberto neste computador, para o "Jogando…" do pessoal — ver atividade.ts.
+  registrarAtividade(() => principal);
 
   ipcMain.handle('presenca:ociosidade', () => {
     try { return powerMonitor.getSystemIdleTime(); } catch { return 0; }

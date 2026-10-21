@@ -268,6 +268,8 @@ const verMembro = (m) => m && ({
   donoDaSaga: !!m.dono,
   // O que vale AGORA: status guardado sem sinal recente é lembrança, não presença.
   status: presenca.statusDeVerdade(m.status, m.visto_em),
+  // O jogo aberto no computador dela, se ela está aqui e o app dela contou — ver presenca.mjs.
+  atividade: presenca.atividadeDe(m.id, m.visto_em),
   idExibido: m.id_exibido ?? null,
   banido: !!m.banido_em,
   banidoPor: m.banido_por ?? null,
@@ -354,6 +356,7 @@ const verConta = (u) => u && ({
   turbo: !!u.turbo,
   donoDaSaga: !!u.dono,
   status: presenca.statusDeVerdade(u.status, u.visto_em),
+  atividade: presenca.atividadeDe(u.id, u.visto_em),
   idExibido: null,
   banido: false,
   banidoPor: null,
@@ -1148,8 +1151,9 @@ const ROTAS = {
   // --- o que é da Saga, e não de um servidor ---------------------------------
   'POST /eu/presenca': async (req) => {
     const eu = exigirConta(req);
-    const { status } = await lerCorpo(req);
-    return { status: presenca.bater(db, eu.id, status) };
+    // `atividade` só vem do app de computador; o do navegador não a manda, e assim não a apaga.
+    const { status, atividade } = await lerCorpo(req);
+    return { status: presenca.bater(db, eu.id, status, atividade) };
   },
 
   /**

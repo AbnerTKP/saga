@@ -449,6 +449,17 @@ O que vale para quem mexe em `server/`: regras que não são óbvias no código.
 - **"Ocupado" não vira ausente sozinho.** É recado para os outros, não medição: quem se
   pôs ocupado continua ocupado mesmo saindo de perto. Já "online" vira ausente sozinho —
   um padrão que mente sobre você estar ali não serve para ninguém.
+- **A atividade ("Jogando Valheim") mora na MEMÓRIA, e vem no sinal de vida** (`presenca.mjs`).
+  Ela muda a cada jogo aberto e só vale enquanto o app de quem joga continua contando: guardar no
+  banco seria uma migração e uma escrita no SQLite por jogo, na VPS de um núcleo que já sofreu com
+  escrita demais (o `vista_em`). Reiniciar o servidor esquece todas, e o próximo sinal (30 s) devolve
+  cada uma. Vale a regra do status: offline não está jogando nada, e atividade que o app parou de
+  renovar some em 90 s. **Sem o campo, o sinal não mexe na atividade** — é o sinal da Saga do
+  navegador, que não vê programa nenhum e não pode apagar o jogo que o computador da mesma pessoa
+  contou; `null` apaga. E o número do Steam e o hash do ícone são conferidos à risca (inteiro, 40
+  letras hexadecimais): é com eles que o app de quem olha MONTA o endereço da imagem, e texto livre
+  ali faria a Saga de todo mundo buscar o que quem mandou quisesse. Atividade recusada recusa o sinal
+  inteiro, sem renovar nada pela metade (`presenca.test.mjs`, `api.test.mjs`).
 
 ## Administração da Saga
 

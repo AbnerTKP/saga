@@ -171,13 +171,13 @@ errado":
 | área | arquivo | carrega sozinho? |
 |---|---|---|
 | Servidor: cargos, permissões, contas e recuperação de senha, salas, arquivos, amizade, desempenho, notas, relatos, administração | `server/CLAUDE.md` | sim, ao abrir arquivo de `server/` |
-| Electron: janela, arranque, uma Saga por computador, captura de tela e som do sistema, assinatura no Mac, barra do Windows, overlay, CSP | `app/src/main/CLAUDE.md` | sim, ao abrir arquivo de `app/src/main/` |
+| Electron: janela, arranque, uma Saga por computador, captura de tela e som do sistema, assinatura no Mac, barra do Windows, overlay, CSP, o jogo aberto (atividade) | `app/src/main/CLAUDE.md` | sim, ao abrir arquivo de `app/src/main/` |
 | O Dragão Quadrado | `app/src/renderer/src/dragao/CLAUDE.md` | sim, ao abrir arquivo de `dragao/` |
 | Voz, call, live, palco, quadro flutuante, quem está falando, bot de música (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`, `useMusica`, `musica.mjs`, `main/musica.ts`) | `docs/decisoes/voz-e-live.md` | não — leia |
 | Microfone, supressão de ruído, soundboard, sons de aviso (`useMicrofone`, `sensibilidade`, `embutir`, `sons/`) | `docs/decisoes/som-e-microfone.md` | não — leia |
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
 | Xadrez, Dama, Urna, Catan e o menu de jogos, app e servidor (`xadrez`, `dama`, `TabuleiroDaDama`, `urna/`, `catan`, `desenhoDoCatan`, `jogos.mjs`, `dama.mjs`, `urnas.mjs`, `catan.mjs`, `catans.mjs`); a Fórmula 1, que saiu em 07/10/2026 | `docs/decisoes/jogos.md` | não — leia |
-| Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`) | `docs/decisoes/telas-e-visual.md` | não — leia |
+| Telas e visual: paleta, camadas, painéis, perfil e pessoas, cargos na tela, administração, relatar, o "Jogando…" (`styles.css`, `pessoas`, `listaDePessoas`, `Sidebar`, `atividade`) | `docs/decisoes/telas-e-visual.md` | não — leia |
 | A Saga no navegador e no celular: a ponte do navegador, o arranjo do celular, o entrar da página de download e a publicação no Pages (`web/`, `celular`, `BarraDoCelular`, `TelaDoVoce`, `site/`, `pages.yml`) | `docs/decisoes/navegador-e-celular.md` | não — leia |
 | O que foi medido e o que falta o dono confirmar | `docs/confirmar-com-o-dono.md` | não — leia antes de dizer "pronto" |
 | A reestruturação da interface (set/2026): o levantamento, as decisões do dono, o design system e o que falta (hub de comunidades, selo de verificado) | `docs/reestruturacao-da-interface.md` | não — leia antes de mexer em tela |

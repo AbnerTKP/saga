@@ -54,6 +54,20 @@ const desktop = {
   /** Segundos que a MÁQUINA está parada. É a única forma de saber que a pessoa saiu de
       perto: dentro da janela, ninguém vê teclado nem mouse fora do app. */
   ociosidade: (): Promise<number> => ipcRenderer.invoke('presenca:ociosidade'),
+  /**
+   * O jogo aberto neste computador (ver `main/atividade.ts`). Os ajustes moram na tela; até a
+   * tela mandá-los, nada é lido. `aoMudar` devolve como se desinscrever.
+   */
+  atividade: {
+    configurar: (ajustes: unknown): Promise<unknown> => ipcRenderer.invoke('atividade:configurar', ajustes),
+    agora: (): Promise<unknown> => ipcRenderer.invoke('atividade:agora'),
+    janelas: (): Promise<unknown> => ipcRenderer.invoke('atividade:janelas'),
+    aoMudar: (cb: (jogo: unknown) => void) => {
+      const ouvir = (_e: unknown, jogo: unknown) => cb(jogo);
+      ipcRenderer.on('atividade:mudou', ouvir);
+      return () => { ipcRenderer.off('atividade:mudou', ouvir); };
+    },
+  },
   /** Se a Saga abre junto com o sistema. `disponivel` é falso em desenvolvimento e no
       pacote da Microsoft Store (`loja`). */
   aberturaComOSistema: (): Promise<{ disponivel: boolean; loja: boolean; ligado: boolean }> =>

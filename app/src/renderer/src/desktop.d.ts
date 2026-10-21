@@ -73,6 +73,16 @@ declare global {
       aoAcordar: (cb: () => void) => () => void;
       /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
       ociosidade: () => Promise<number>;
+      /**
+       * O jogo aberto neste computador. Só existe no app de computador: a Saga do navegador
+       * não enxerga os programas abertos, e por isso o campo é opcional.
+       */
+      atividade?: {
+        configurar: (ajustes: AjustesDaAtividade) => Promise<JogoNoComputador | null>;
+        agora: () => Promise<JogoNoComputador | null>;
+        janelas: () => Promise<ProgramaAberto[]>;
+        aoMudar: (cb: (jogo: JogoNoComputador | null) => void) => () => void;
+      };
       /** Se a Saga abre junto com o sistema. */
       aberturaComOSistema: () => Promise<AberturaComOSistema>;
       /** Liga ou desliga, e devolve como FICOU no sistema — não o que foi pedido. */
@@ -102,6 +112,22 @@ declare global {
     readable: ReadableStream<VideoFrame>;
   }
 }
+
+/** O que a pessoa decidiu na página Atividade (o par de `AjustesDaAtividade` do processo principal). */
+export type AjustesDaAtividade = { mostrar: boolean; escondidos: string[]; meus: { exe: string; nome: string }[] };
+
+/** O jogo aberto neste computador, como o processo principal conta (ver main/jogoAberto.ts). */
+export type JogoNoComputador = {
+  chave: string;
+  nome: string;
+  steam: number | null;
+  icone: string | null;
+  origem: 'steam' | 'conhecido' | 'seu';
+  desde: number;
+};
+
+/** Um programa com janela, para apontar o jogo que a Saga não achou sozinha. */
+export type ProgramaAberto = { exe: string; titulo: string };
 
 /** O overlay está aberto? travado? e com qual atalho? */
 export type EstadoDoOverlay = { aberto: boolean; travado: boolean; atalho: string };

@@ -198,6 +198,7 @@
 }
 .cfg-selo[data-tom="acento"] { background: var(--acento-tenue); color: var(--acento-texto); }
 .cfg-selo[data-tom="aviso"] { background: var(--aviso-tenue); color: var(--aviso); }
+.cfg-selo[data-tom="ok"] { background: var(--ok-tenue); color: var(--ok-texto); }
 
 .cfg-alerta {
   display: flex; align-items: flex-start; gap: var(--e2); padding: var(--e2) var(--e3); margin-bottom: var(--e3);

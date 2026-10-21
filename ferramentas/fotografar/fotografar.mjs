@@ -176,6 +176,9 @@ function stub(plataforma) {
     salvarArquivo: () => Promise.resolve({ ok: false, erro: 'desligado nas fotos' }),
     aoAcordar: desinscrever,
     ociosidade: () => Promise.resolve(0),
+    // O jogo aberto: nada aberto, nenhum programa (ver main/atividade.ts).
+    atividade: { configurar: () => Promise.resolve(null), agora: () => Promise.resolve(null),
+      janelas: () => Promise.resolve([]), aoMudar: desinscrever },
     aberturaComOSistema: () => Promise.resolve({ disponivel: false, ligado: false }),
     definirAberturaComOSistema: () => Promise.resolve({ disponivel: false, ligado: false }),
     overlay: {

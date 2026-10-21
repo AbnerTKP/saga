@@ -29,6 +29,7 @@ export const verConta = (u) => ({
   enquadramento: lerEnquadramento(u.enquadramento),
   turbo: !!u.turbo,
   status: presenca.statusDeVerdade(u.status, u.visto_em),
+  atividade: presenca.atividadeDe(u.id, u.visto_em),
 });
 
 /** Somos amigos AGORA? É a pergunta que toda mensagem privada faz antes de sair. */

@@ -14,6 +14,7 @@ import type { LanceDaDama } from './dama';
 import type { IdDoCenario, IdDoLutador } from './dragao/tipos';
 import { PROTOCOLO_DA_LUTA } from './dragao/protocolo';
 import type { CorpoDoRelato } from './relato';
+import type { Atividade } from './atividade';
 
 // Em produção, pelo HTTPS (o Caddy na 443, ver server/Caddyfile.ip): até a v0.65 era a :3001 em
 // HTTP puro, com a senha e as mensagens abertas na rede. A :3001 fica de pé para quem ainda não
@@ -84,6 +85,8 @@ export type Membro = {
   donoDaSaga?: boolean;
   /** O que vale agora: 'online' | 'ausente' | 'ocupado' | 'offline'. */
   status?: string;
+  /** O jogo aberto no computador dela, se o app dela contou. Servidor antigo não manda. */
+  atividade?: Atividade | null;
   /** Identificador curto que aparece antes do nome. */
   idExibido: string | null;
   banido: boolean;
@@ -994,9 +997,15 @@ export const servidoresDaSaga = async () =>
 export const servidorDaSaga = async (id: number) =>
   (await pedir<{ servidor: DetalheDoServidorDaSaga }>('GET', `/saga/servidor?id=${id}`)).servidor;
 
-/** Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. */
-export const baterPresenca = async (status?: string) =>
-  (await pedir<{ status: string }>('POST', '/eu/presenca', status ? { status } : {})).status;
+/**
+ * Sinal de vida. Sem `status`, só renova o sinal sem mexer no que a pessoa escolheu. Sem
+ * `atividade` (a Saga do navegador), não mexe no jogo que o computador contou; `null` apaga.
+ */
+export const baterPresenca = async (status?: string, atividade?: Atividade | null) =>
+  (await pedir<{ status: string }>('POST', '/eu/presenca', {
+    ...(status ? { status } : {}),
+    ...(atividade !== undefined ? { atividade } : {}),
+  })).status;
 
 // --- amigos e conversas privadas --------------------------------------------
 //
@@ -1017,6 +1026,7 @@ export type Conta = {
   enquadramento: Enquadramentos;
   turbo: boolean;
   status: string;
+  atividade?: Atividade | null;
 };
 
 export type Pedido = Conta & { desde: number };

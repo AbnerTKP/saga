@@ -17,6 +17,8 @@ import { paginasDaConta, type Pagina, type PaginaDaConta } from '../paginasDeCon
 import { EscolherImagem } from './EscolherImagem';
 import { BlocoDoMicrofone } from './AjustesDoMicrofone';
 import type { MicrofoneDaCall } from '../useMicrofone';
+import type { AtividadeDaTela } from '../useAtividade';
+import { PaginaDaAtividade } from './PaginaDaAtividade';
 import type { AberturaComOSistema } from '../desktop';
 import { atalhoDoEvento, comoSeLe } from '../atalho';
 import { anotar } from '../registro';
@@ -236,7 +238,7 @@ function BlocoDoEmail({ estado, onEmail }: { estado: EstadoDoEmail; onEmail: (e:
  * A lógica de cada bloco veio de lá sem mudar (PainelDaConta, até a v0.61).
  */
 export function ConfiguracoesDaConta({
-  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, volumeDaMusica, onVolumeDaMusica, onEu, onRegistro, onAdministracao, onSair, onClose,
+  eu, room, microfone, servidorNome, souBerserk, donoDaSaga, volumeDoSoundboard, onVolumeDoSoundboard, volumeDaMusica, onVolumeDaMusica, onEu, atividade, onRegistro, onAdministracao, onSair, onClose,
   email, onEmail, inicial,
 }: {
   eu: Membro;
@@ -259,6 +261,8 @@ export function ConfiguracoesDaConta({
   onVolumeDaMusica: (v: number) => void;
   onVolumeDoSoundboard: (v: number) => void;
   onEu: (m: Membro) => void;
+  /** O jogo aberto neste computador e os ajustes dele — ver useAtividade.ts. */
+  atividade: AtividadeDaTela;
   onRegistro: () => void;
   /** Quem chamou fecha esta caixa e abre a administração: duas caixas empilhadas seriam dois Esc. */
   onAdministracao: () => void;
@@ -291,10 +295,11 @@ export function ConfiguracoesDaConta({
   return (
     <>
       <Configuracoes casa="Configurações" escopo={escopo} paginas={paginas} atual={pagina}
-        onIr={(id) => { if (id === 'perfil' || id === 'conta' || id === 'voz' || id === 'atalhos' || id === 'inicio') setPagina(id); }} onClose={onClose}>
+        onIr={(id) => { if (id === 'perfil' || id === 'conta' || id === 'voz' || id === 'atividade' || id === 'atalhos' || id === 'inicio') setPagina(id); }} onClose={onClose}>
         {pagina === 'perfil' && <PaginaPerfil eu={eu} servidorNome={servidorNome} onEu={onEu} />}
         {pagina === 'conta' && <PaginaConta eu={eu} email={email} onEmail={onEmail} />}
         {pagina === 'voz' && <PaginaVoz room={room} microfone={microfone} souBerserk={souBerserk} donoDaSaga={donoDaSaga} volumeDoSoundboard={volumeDoSoundboard} onVolumeDoSoundboard={onVolumeDoSoundboard} volumeDaMusica={volumeDaMusica} onVolumeDaMusica={onVolumeDaMusica} />}
+        {pagina === 'atividade' && <PaginaDaAtividade atividade={atividade} />}
         {pagina === 'atalhos' && <PaginaAtalhos />}
         {pagina === 'inicio' && <PaginaInicio />}
       </Configuracoes>

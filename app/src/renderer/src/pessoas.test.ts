@@ -124,4 +124,7 @@ test('o membro virado pessoa carrega o que o cartão desenha', () => {
   assert.equal(p.identity, 'u7');
   assert.equal(p.usuarioId, 7);
   assert.equal(p.entrouEm, 1757000000000);
+  assert.equal(p.atividade, null, 'sem jogo, null — e não undefined, que seria "não se sabe"');
+  const jogando = doMembro({ ...membro(7, 'Tava1'), atividade: { nome: 'Valheim', desde: 1, steam: 892970, icone: null } });
+  assert.equal(jogando.atividade?.nome, 'Valheim', 'o cartão aberto pela lista mostra o jogo');
 });

@@ -233,6 +233,30 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   **Nada disso foi exercido num Windows ainda**: microfone, câmera, captura de tela com som
   e o overlay dentro do pacote dependem de alguém instalar pela Store e conferir.
 
+- **A atividade ("Jogando Valheim") pergunta ao Steam primeiro, e à lista de programas o mínimo
+  possível** (`atividade.ts`, com a decisão pura e testada em `jogoAberto.ts`). O dono pediu "sem
+  comprometer o desempenho", e isto roda JUSTAMENTE enquanto a pessoa joga. Medido no Windows dele
+  em 20/10/2026, de dentro do Node:
+
+  | o quê | quanto | quando roda |
+  |---|---|---|
+  | `reg query HKCU\Software\Valve\Steam\Apps /s` | ~36 ms (quase tudo é abrir o `reg.exe`) | a cada 15 s |
+  | `tasklist /fo csv /nh` | ~280 ms de relógio, ~0,3–0,4 s de processador | a cada 60 s, e só sem jogo do Steam aberto |
+  | `tasklist /v` sem filtro | 5,3 s | nunca |
+  | `tasklist /v /fi "IMAGENAME eq javaw.exe"` | ~135 ms | só com o Java aberto (o Minecraft se reconhece pelo título) |
+  | PowerShell com as janelas abertas | ~280 ms | só no "Escolher" das configurações |
+
+  O Steam diz sozinho o que roda: `Running` = 1 na chave de cada jogo (no Mac, o mesmo no
+  `registry.vdf`). O nome vem dali ou do `appmanifest`, e o ícone é o `.jpg` de nome hexadecimal em
+  `appcache/librarycache/<id>/` — **o mesmo nome serve no CDN do Steam**, conferido byte a byte, e é
+  por isso que nenhuma imagem sobe para o nosso servidor. Ferramentas do Steam que ficam abertas
+  (Wallpaper Engine, Soundpad, Lossless Scaling…) são puladas, senão "Jogando Wallpaper Engine" ficaria
+  o dia inteiro. Fora do Steam vale o nome do programa do JOGO, nunca o do lançador: o cliente da
+  Riot aberto o dia todo não é partida. Tudo com `windowsHide`, senão cada leitura piscaria uma janela
+  de console na tela de quem joga. Exercido de verdade neste Windows com um Electron falso: o GTA SA
+  DE aberto apareceu em 63 ms pelo Steam e em 353 ms pelo nome do programa. **Não exercido**: a Saga
+  instalada, o Mac e o pacote da Microsoft Store — ver `docs/confirmar-com-o-dono.md`.
+
 ## A limitação que caiu sem ser atacada
 
 Numa das cinco máquinas (Windows 11 25H2, headset USB Logitech como único dispositivo de

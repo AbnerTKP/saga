@@ -12,6 +12,7 @@ import './dadosNoCopo.css';
 import './sobreOTabuleiro.css';
 import './conexao.css';
 import './celular.css';
+import './atividade.css';
 import { capturarErrosGlobais } from './registro';
 
 capturarErrosGlobais();
