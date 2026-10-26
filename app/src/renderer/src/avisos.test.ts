@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { podeTocar, criarAvisos, INTERVALO, VOLUME_DO_AVISO, VOLUME_DO_CHAMADO, volumeDo, type Aviso } from './avisos.ts';
+import { podeTocar, criarAvisos, INTERVALO, VOLUME_DO_AVISO, VOLUME_DO_CHAMADO, VOLUME_DA_ENTRADA, volumeDo, type Aviso } from './avisos.ts';
 
 test('o primeiro aviso sempre toca', () => {
   assert.equal(podeTocar(1000, undefined, false), true);
@@ -72,10 +72,17 @@ test('mensagem, convite e gente chegando na sua live chamam alto; o resto contin
   assert.equal(volumeDo('convite'), VOLUME_DO_CHAMADO);
   // Quem transmite está dentro de um jogo: foi para ouvir por cima dele que o dono pediu.
   assert.equal(volumeDo('plateia'), VOLUME_DO_CHAMADO);
-  // O lance toca a cada jogada do outro; entrar, sair e o microfone não são com você.
-  for (const baixo of ['lance', 'entrou', 'saiu', 'micLigou', 'micMutou', 'liveEntrou'] as const) {
+  // O lance toca a cada jogada do outro; sair e o microfone não são com você.
+  for (const baixo of ['lance', 'saiu', 'micLigou', 'micMutou', 'liveEntrou'] as const) {
     assert.equal(volumeDo(baixo), VOLUME_DO_AVISO, baixo);
   }
+});
+
+test('entrar na call toca mais alto que os avisos e abaixo dos chamados', () => {
+  // O dono pediu "mais alto" (26/10/2026); um chamado é o que é dirigido a você, e entrar não é.
+  assert.equal(volumeDo('entrou'), VOLUME_DA_ENTRADA);
+  assert.ok(VOLUME_DA_ENTRADA > VOLUME_DO_AVISO);
+  assert.ok(VOLUME_DA_ENTRADA < VOLUME_DO_CHAMADO);
 });
 
 test('o volume que chega a quem toca é o do aviso', () => {
@@ -83,5 +90,5 @@ test('o volume que chega a quem toca é o do aviso', () => {
   const avisar = criarAvisos(ARQUIVOS, (url, volume) => tocados.push([url, volume]));
   avisar('mensagem', false, 1000);
   avisar('entrou', false, 1000);
-  assert.deepEqual(tocados, [['e', VOLUME_DO_CHAMADO], ['a', VOLUME_DO_AVISO]]);
+  assert.deepEqual(tocados, [['e', VOLUME_DO_CHAMADO], ['a', VOLUME_DA_ENTRADA]]);
 });

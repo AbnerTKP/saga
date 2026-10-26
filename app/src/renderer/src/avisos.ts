@@ -21,16 +21,25 @@ export const VOLUME_DO_AVISO = 0.45;
  * jogo, e o pedido do dono foi justamente ouvir isso por cima dele. O dono pediu "um som mais evidente" (06/10/2026): no volume dos outros, eles se
  * perdiam embaixo do som de um jogo, que é justamente onde a pessoa está quando eles chegam.
  *
- * O resto continua baixo, e por um motivo cada: entrar e sair da call acontecem o tempo todo e
- * não são com você; mutar, desmutar e a live são confirmação do que a sua mão acabou de fazer; e
- * o LANCE do xadrez toca a cada jogada do outro — numa partida, dezenas de vezes —, então chamar
- * alto em cada um seria o aviso que a pessoa desliga. O Catan tem os seus em `somDoCatan.ts`.
+ * O resto continua baixo, e por um motivo cada: sair da call acontece o tempo todo e não é com
+ * você (entrar tem volume próprio, logo abaixo); mutar, desmutar e a live são confirmação do que
+ * a sua mão acabou de fazer; e o LANCE do xadrez toca a cada jogada do outro — numa partida,
+ * dezenas de vezes —, então chamar alto em cada um seria o aviso que a pessoa desliga. O Catan
+ * tem os seus em `somDoCatan.ts`.
  */
 export const CHAMADOS: ReadonlySet<Aviso> = new Set<Aviso>(['mensagem', 'convite', 'plateia']);
 export const VOLUME_DO_CHAMADO = 0.9;
 
-/** O volume de cada aviso: o dos chamados, ou o baixo de sempre. */
-export const volumeDo = (qual: Aviso) => (CHAMADOS.has(qual) ? VOLUME_DO_CHAMADO : VOLUME_DO_AVISO);
+/**
+ * ENTRAR na call (você ou outro) fica entre os dois. O dono pediu "mais alto" (26/10/2026): a 0,45
+ * e com o arquivo antigo, ele saía 11 dB abaixo da mensagem e 3,5 dB abaixo até do "saiu". Com o
+ * arquivo novo, a 0,8 ele sobe ~9 dB e fica ~3 dB abaixo da mensagem — alto, mas não um chamado.
+ */
+export const VOLUME_DA_ENTRADA = 0.8;
+
+/** O volume de cada aviso: o dos chamados, o da entrada, ou o baixo de sempre. */
+export const volumeDo = (qual: Aviso) =>
+  CHAMADOS.has(qual) ? VOLUME_DO_CHAMADO : qual === 'entrou' ? VOLUME_DA_ENTRADA : VOLUME_DO_AVISO;
 
 /**
  * Quando três pessoas entram no mesmo instante, o LiveKit avisa três vezes e o mesmo som

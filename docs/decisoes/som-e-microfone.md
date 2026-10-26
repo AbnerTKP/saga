@@ -171,6 +171,15 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
   na call (o grave) nem com a live começando (si5 → mi6). Feitas pelo caminho da família — ataque em
   cosseno, a nota durando 8/decaimento, PCM em float e o ganho medido —: pico −3 dB, −13,4 LUFS
   integrados (o `live-entrou` é −12,1). Tocam como chamado: ver `voz-e-live.md`.
+- **Entrar na call era o som mais baixo da Saga, e não por escolha** (26/10/2026, o dono: "mais
+  alto"). O `entrou.ogg` antigo (extraído de um vídeo do dono, como o `saiu` e o `live`) era um tom
+  de 330 Hz quase sem nada acima de 1 kHz: −15,6 LUFS de momentânea máxima, 4,5 dB abaixo do
+  `saiu`, e alto-falante de notebook mal reproduz abaixo de ~400 Hz. Refeito na família: a mesma
+  nota (mi4) e o mesmo "blup" subindo no começo, mas com a oitava e a duodécima fortes e um toque de
+  baqueta — −11,9 LUFS, pico −1 dB. E ganhou volume próprio, `VOLUME_DA_ENTRADA` = 0,8: somado ao
+  arquivo, ~9 dB acima do de antes e ~3 dB abaixo da mensagem. Não virou chamado: chamado é o que é
+  dirigido a você. Saiu de três opções numa prancheta de ouvir (o de hoje tratado, este, e um
+  "blup-blip" de duas notas); **não foi ouvido aqui** — de ouvido, quem confirma é o dono.
 - **A mensagem privada é um sino, e o convite de xadrez são duas notas.** Os dois chegam
   pelo canto da tela e precisam ser distinguíveis de ouvido, sem olhar. O **lance** do
   outro é madeira e não nota — estalo de ruído com um baque grave —, e fica 4 dB abaixo
