@@ -36,7 +36,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDoCatan, onCatan, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO, pessoaAbreACall = false }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDoCatan, onCatan, textoDaGaragem, onGaragem, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO, pessoaAbreACall = false }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   /**
    * No celular, tocar em quem está numa sala de voz ENTRA na call, como tocar na sala (pedido
@@ -83,6 +83,9 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** O subtítulo de cada jogo no menu de jogos, e o que ele faz. */
   textoDoCatan: string;
   onCatan: () => void;
+  /** A Garagem: "abrir a garagem" ou quantos já estão lá. */
+  textoDaGaragem: string;
+  onGaragem: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -416,6 +419,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       jogoDaMinha={jogoDaMinhaPartida}
       catan={textoDoCatan}
       onCatan={onCatan}
+      garagem={textoDaGaragem}
+      onGaragem={onGaragem}
       onXadrez={onXadrez}
       onDama={onDama}
       onClose={() => setMenuDeJogos(null)}

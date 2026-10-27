@@ -20,12 +20,13 @@ export const ondeEstou = () => onde;
 
 /** A tela em palavras, para quem vai ler o relato: "sala Geral", "Catan", "conversas". */
 export function descreverTela(o: {
-  logado: boolean; semServidor: boolean; jogo: 'xadrez' | 'catan' | null; conversas: boolean; sala: string | null;
+  logado: boolean; semServidor: boolean; jogo: 'xadrez' | 'catan' | 'garagem' | null; conversas: boolean; sala: string | null;
 }): string {
   if (!o.logado) return 'entrada';
   if (o.semServidor) return 'tela inicial';
   if (o.jogo === 'catan') return 'Catan';
   if (o.jogo === 'xadrez') return 'xadrez';
+  if (o.jogo === 'garagem') return 'Garagem';
   if (o.conversas) return 'conversas';
   return o.sala ? `sala ${o.sala}` : 'servidor';
 }

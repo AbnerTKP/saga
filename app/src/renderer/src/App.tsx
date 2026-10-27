@@ -88,6 +88,7 @@ import { TelaDoVoce } from './components/TelaDoVoce';
  */
 const TelaDoXadrez = lazy(() => import('./components/TelaDoXadrez').then((m) => ({ default: m.TelaDoXadrez })));
 const TelaDoCatan = lazy(() => import('./components/TelaDoCatan').then((m) => ({ default: m.TelaDoCatan })));
+const TelaDaGaragem = lazy(() => import('./components/TelaDaGaragem').then((m) => ({ default: m.TelaDaGaragem })));
 const comEspera = (tela: ReactNode) => <Suspense fallback={<div className="carregando">Abrindo o jogo…</div>}>{tela}</Suspense>;
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -173,6 +174,8 @@ export function App() {
   const [catan, setCatan] = useState<{ servidorId: number; mesas: ResumoDaMesaDoCatan[]; convites: ConviteParaOCatan[] } | null>(null);
   const [conviteDeCatanRespondido, setConviteDeCatanRespondido] = useState<number | null>(null);
   const [respondendoCatan, setRespondendoCatan] = useState(false);
+  /** Quem está na Garagem do servidor aberto, pela mesma carona — para o menu de jogos dizer quantos. */
+  const [naGaragem, setNaGaragem] = useState<{ servidorId: number; ids: number[] } | null>(null);
   /**
    * O jogo aberto na tela — a partida de xadrez ou de dama, ou a mesa do Catan —, com o
    * servidor DELE: é a ele que a tela do jogo pergunta. Um só por vez, porque todos tomam o palco inteiro.
@@ -180,6 +183,7 @@ export function App() {
   const [jogoAberto, setJogoAberto] = useState<
     | { tipo: 'xadrez'; mesaId: number; servidorId: number }
     | { tipo: 'catan'; mesaId: number; servidorId: number }
+    | { tipo: 'garagem'; servidorId: number }
     | null
   >(null);
   /** Convite já respondido: sai da tela na hora, sem esperar a busca seguinte confirmar. */
@@ -585,6 +589,7 @@ export function App() {
     setCatan(null);
     setConviteDeCatanRespondido(null);
     setRespondendoCatan(false);
+    setNaGaragem(null);
     setJogoAberto(null);
     setModoConversas(false);
     setVoceNoCelular(false);
@@ -654,6 +659,8 @@ export function App() {
         }));
         // As mesas do Catan, idem. Servidor antigo não manda: não há Catan.
         setCatan((a) => mesmoSeIgual(a, { servidorId, mesas: lista.catan?.mesas ?? [], convites: lista.catan?.convites ?? [] }));
+        // Quem está na Garagem. Servidor antigo não manda: ninguém está.
+        setNaGaragem((a) => mesmoSeIgual(a, { servidorId, ids: lista.garagem ?? [] }));
         // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
         // elas são da conta. Servidor antigo não manda o campo — aí não há conversa
         // nenhuma na tela e nada quebra, como o "está digitando".
@@ -1274,6 +1281,14 @@ export function App() {
     } catch (e) { notas.mostrarFalha(e, 'Catan'); }
   }, [sessao?.servidor?.id, minhaMesaCatan, partidaDeCatanAndando, notas]);
 
+  /** A Garagem não tem mesa: abrir é entrar, e o menu diz quantos já estão lá. */
+  const quantosNaGaragem = naGaragem?.servidorId === servidorAberto ? naGaragem.ids.filter((id) => id !== euIdAgora).length : 0;
+  const textoDaGaragem = quantosNaGaragem === 0 ? 'abrir a garagem' : quantosNaGaragem === 1 ? '1 pessoa lá' : `${quantosNaGaragem} pessoas lá`;
+  const abrirGaragem = useCallback(() => {
+    const servidorId = sessao?.servidor?.id;
+    if (servidorId) setJogoAberto({ tipo: 'garagem', servidorId });
+  }, [sessao?.servidor?.id]);
+
   const responderConviteDeCatan = useCallback(async (c: ConviteParaOCatan, sentar: boolean) => {
     const servidorId = c.servidor ?? catan?.servidorId;
     if (!servidorId) return;
@@ -1542,6 +1557,8 @@ export function App() {
         onDama={abrirDama}
         textoDoCatan={textoDoCatan}
         onCatan={abrirCatanDoMenu}
+        textoDaGaragem={textoDaGaragem}
+        onGaragem={abrirGaragem}
         // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
         // aqui" sobre um lugar que não é o que se está vendo.
         salaAbertaId={jogoAberto ? null : salaAbertaId}
@@ -1631,7 +1648,17 @@ export function App() {
         // A partida da dupla toma o palco. A live que você assiste vai junto, dentro da
         // coluna dela — flutuando no canto, taparia o tabuleiro. O Catan começado toma a JANELA:
         // a Saga sai da frente pelo CSS (`.app:has(.catan-mesa)`, no catan.css).
-        jogo={!recursos.jogos ? undefined : jogoAberto?.tipo === 'catan' ? (live) => comEspera(
+        jogo={!recursos.jogos ? undefined : jogoAberto?.tipo === 'garagem' ? () => comEspera(
+          <TelaDaGaragem
+            key={`garagem-${jogoAberto.servidorId}`}
+            servidorId={jogoAberto.servidorId}
+            euId={eu.id}
+            nome={eu.nome}
+            surdo={rm.deafened}
+            onFechar={() => setJogoAberto(null)}
+            onAviso={notas.mostrar}
+          />
+        ) : jogoAberto?.tipo === 'catan' ? (live) => comEspera(
           <TelaDoCatan
             key={`catan-${jogoAberto.mesaId}`}
             mesaId={jogoAberto.mesaId}

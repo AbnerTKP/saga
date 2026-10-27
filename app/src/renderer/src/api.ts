@@ -7,6 +7,7 @@
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
 import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
 import type { AcaoNaMesaDoCatan, CatanNoServidor, MesaDoCatan } from './catan';
+import type { BonecoNoServidor, LeituraDaGaragem } from './garagem';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { JogoDeMesa, ResumoDaMesa } from './jogos';
@@ -577,6 +578,8 @@ export const buscarSalas = async (lidas = '', servidorId?: number, lidasDeConver
     /** A hora do servidor na resposta. Servidor antigo não manda. */
     agora?: number;
     catan?: CatanNoServidor;
+    /** Os ids de quem está na Garagem agora. Servidor antigo não manda: ninguém está. */
+    garagem?: number[];
     conversas?: Conversa[]; amigos?: { pedidos: number; ids: number[] };
   }>('GET', `/rooms${comParametros({ lidas, lidasConversas: lidasDeConversa })}`, undefined, servidorId);
 
@@ -675,6 +678,19 @@ export const verMesaDoCatan = async (id: number, servidorId: number) =>
 /** Fechar não devolve mesa nenhuma: ela deixou de existir. */
 export const agirNaMesaDoCatan = async (id: number, a: AcaoNaMesaDoCatan, servidorId: number) =>
   (await pedir<{ mesa?: MesaDoCatan; ok?: true }>('POST', '/catan/mesa', { id, ...a }, servidorId)).mesa ?? null;
+
+// --- Garagem --------------------------------------------------------------------
+// O app manda o SEU boneco e recebe a garagem inteira — ver garagem.ts e server/garagem.mjs.
+
+export const estarNaGaragem = (eu: BonecoNoServidor, servidorId: number) =>
+  pedir<LeituraDaGaragem>('POST', '/garagem', { eu }, servidorId);
+
+export const sairDaGaragem = (servidorId: number) =>
+  pedir<{ ok: true }>('POST', '/garagem/sair', {}, servidorId);
+
+/** Só o dono da Saga: o servidor recusa os outros com 403. */
+export const cantarParabensNaGaragem = (servidorId: number) =>
+  pedir<LeituraDaGaragem>('POST', '/garagem/parabens', {}, servidorId);
 
 /**
  * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.

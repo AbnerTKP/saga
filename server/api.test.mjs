@@ -1955,6 +1955,44 @@ test('a Urna e o Dragão Quadrado saíram: o app de antes leva 404 e o /rooms n�
   assert.equal('lutas' in salas.corpo, false);
 });
 
+// --- Garagem ----------------------------------------------------------------------
+
+test('a Garagem pela rede: um vê o outro, e só o dono da Saga começa o parabéns', async () => {
+  const dono = await sessaoDe('abner');
+  const tava = (await cadastrar('tava1')).corpo;
+  const casa = tava.servidor.id;
+  const pos = (x, y) => ({ eu: { x, y, alvo: null, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0 } });
+  const estar = (quem, corpo) => chamar('POST', '/garagem', { sessao: quem.token, servidor: casa, corpo });
+
+  assert.equal((await chamar('POST', '/garagem', { servidor: casa, corpo: pos(10, 80) })).status, 401);
+  const a = await estar(tava, pos(100, 120));
+  assert.equal(a.status, 200);
+  assert.equal(a.corpo.podeCantar, false);
+  const d = await estar(dono, pos(160, 140));
+  assert.equal(d.corpo.podeCantar, true);
+  const visto = d.corpo.pessoas.find((p) => p.id === tava.eu.id);
+  assert.deepEqual([visto.x, visto.y, visto.moto], [100, 120, 'harley']);
+
+  // O botão não aparecer na tela dos outros é educação; quem recusa é o servidor.
+  assert.equal((await chamar('POST', '/garagem/parabens', { sessao: tava.token, servidor: casa, corpo: {} })).status, 403);
+  const festa = await chamar('POST', '/garagem/parabens', { sessao: dono.token, servidor: casa, corpo: {} });
+  assert.equal(festa.status, 200);
+  assert.ok(festa.corpo.parabens.inicio > 0);
+  assert.deepEqual((await estar(tava, pos(100, 120))).corpo.parabens, festa.corpo.parabens);
+
+  // O menu de jogos conta quem está lá.
+  const salas = await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa });
+  assert.deepEqual(salas.corpo.garagem, [dono.eu.id, tava.eu.id].sort((x, y) => x - y));
+
+  // Boneco torto é 400 (e não 500 com pilha no registro).
+  assert.equal((await estar(tava, { eu: { x: 'a', y: 1 } })).status, 400);
+  assert.equal((await estar(tava, null)).status, 400);
+
+  // Fechou a tela: sai da garagem dos outros na hora.
+  assert.equal((await chamar('POST', '/garagem/sair', { sessao: tava.token, servidor: casa, corpo: {} })).status, 200);
+  assert.equal((await estar(dono, pos(160, 140))).corpo.pessoas.some((p) => p.id === tava.eu.id), false);
+});
+
 // --- relatos -----------------------------------------------------------------------
 
 test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {

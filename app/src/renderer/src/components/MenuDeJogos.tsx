@@ -3,6 +3,7 @@ import { useFecharComEsc } from '../useFechar';
 import { Peca } from './Tabuleiro';
 import { CapaDoCatan } from './CapaDoCatan';
 import { CapaDaDama } from './ConviteDeXadrez';
+import { CapaDaGaragem } from './CapaDaGaragem';
 import type { JogoDeMesa } from '../jogos';
 
 /**
@@ -11,7 +12,7 @@ import type { JogoDeMesa } from '../jogos';
  * embaixo o que acontece ali; com uma partida ou mesa de pé, a frase fica azul e a capa ganha
  * o ponto, e clicar leva de volta a ela em vez de abrir outra.
  */
-export function MenuDeJogos({ em, minha, jogoDaMinha, catan, onXadrez, onDama, onCatan, onClose }: {
+export function MenuDeJogos({ em, minha, jogoDaMinha, catan, garagem, onXadrez, onDama, onCatan, onGaragem, onClose }: {
   /** Onde ele fica: acima do painel de voz, na largura da barra. */
   em: { left: number; bottom: number; width: number };
   /** A sua mesa de xadrez ou de dama, e de qual dos dois ela é. */
@@ -19,9 +20,12 @@ export function MenuDeJogos({ em, minha, jogoDaMinha, catan, onXadrez, onDama, o
   jogoDaMinha: JogoDeMesa | null;
   /** O que a capa do Catan diz embaixo do nome: abrir uma mesa, voltar à sua, ou assistir. */
   catan: string;
+  /** O que a capa da Garagem diz: abrir, ou quantos já estão lá. */
+  garagem: string;
   onXadrez: () => void;
   onDama: () => void;
   onCatan: () => void;
+  onGaragem: () => void;
   onClose: () => void;
 }) {
   useFecharComEsc(onClose);
@@ -51,6 +55,8 @@ export function MenuDeJogos({ em, minha, jogoDaMinha, catan, onXadrez, onDama, o
     // No lugar da Fórmula 1, que saiu no mesmo dia em que a dama chegou (07/10/2026).
     { nome: 'Dama', sub: daMesa('dama'), capa: <CapaDaDama />, fundo: 'var(--madeira-clara)', abrir: onDama },
     { nome: 'Catan', sub: catan, fundo: '#2a6aa3', abrir: onCatan, capa: <CapaDoCatan className="capa-do-catan" /> },
+    // A quarta capa, no lugar da Urna e do Dragão, que saíram no mesmo dia (26/10/2026).
+    { nome: 'Garagem', sub: garagem, fundo: '#43201a', abrir: onGaragem, capa: <CapaDaGaragem /> },
   ];
 
   return (

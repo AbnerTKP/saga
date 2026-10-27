@@ -25,6 +25,7 @@ import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import { criarMesasDoCatan } from './catans.mjs';
+import { criarGaragens } from './garagem.mjs';
 import { criarFilas } from './musica.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante, salaNoLiveKit, salaDoLiveKit, emCallPorSalaDe } from './participantes.mjs';
@@ -146,6 +147,8 @@ const digitando = criarRegistroDeDigitacao();
 const mesas = criarMesas();
 // As mesas do Catan, pelo mesmo motivo e com o mesmo preço — ver catans.mjs.
 const mesasDoCatan = criarMesasDoCatan();
+// A Garagem, também na memória: reiniciar o servidor esvazia a garagem por uma volta — ver garagem.mjs.
+const garagens = criarGaragens();
 // As filas do bot de música, uma por sala de voz. Também na memória: REINICIAR O SERVIDOR
 // ZERA AS FILAS — ver musica.mjs.
 const filas = criarFilas();
@@ -319,6 +322,22 @@ const naMesa = (sid, eu) => ({
   membroAtivo: (id) => {
     const m = membros.buscarMembro(db, sid, id);
     return !!m && !m.banido_em;
+  },
+});
+
+/**
+ * O pedido como a Garagem o enxerga: de que servidor é, quem pede, se é o dono da Saga, e como
+ * cada pessoa aparece — o nome exibido neste servidor e o apelido da CONTA, que é por onde se
+ * acha quem vai para trás da mesa no parabéns. Quem não é mais membro, ou foi banido, volta nulo
+ * e some da garagem.
+ */
+const naGaragem = (sid, eu) => ({
+  sid,
+  eu: eu.id,
+  donoDaSaga: plataforma.ehDonoDaSaga(db, eu.id),
+  pessoa: (id) => {
+    const m = membros.buscarMembro(db, sid, id);
+    return m && !m.banido_em ? { nome: m.nome, apelido: m.apelido } : null;
   },
 });
 
@@ -1068,6 +1087,9 @@ const ROTAS = {
       // As mesas do Catan vão pela mesma carona, e pelo mesmo motivo do xadrez: o convite tem de
       // chegar a quem está em qualquer tela — e a vez vai junto, para tocar o aviso a quem saiu dela.
       catan: mesasDoCatan.resumo(naMesa(sid, eu), foraDaqui(eu)),
+      // Quem está na Garagem agora, para o menu de jogos dizer quantos. Só ids: o nome já vem na
+      // lista de membros. App de antes da Garagem ignora o campo.
+      garagem: garagens.quemEsta(sid),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
       // o menu da pessoa oferecer "Mandar mensagem" a um amigo e "Adicionar amigo" a
@@ -1511,6 +1533,25 @@ const ROTAS = {
   'POST /catan/mesa': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return mesasDoCatan.agir(naMesa(sid, eu), await lerCorpo(req));
+  },
+
+  // --- Garagem ----------------------------------------------------------------
+  // O app manda o SEU boneco (onde está, para onde vai, quanto bebeu) de ~350 em 350 ms e recebe
+  // a garagem inteira de volta — ver garagem.mjs. O parabéns é só do dono da Saga, e é aqui que
+  // isso se confere, não na tela.
+  'POST /garagem': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.estar(naGaragem(sid, eu), await lerCorpo(req));
+  },
+
+  'POST /garagem/sair': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.sair(naGaragem(sid, eu));
+  },
+
+  'POST /garagem/parabens': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.cantarParabens(naGaragem(sid, eu));
   },
 
   // --- relatos -----------------------------------------------------------------

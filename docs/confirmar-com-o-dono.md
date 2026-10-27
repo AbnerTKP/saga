@@ -2,6 +2,14 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A Garagem e o parabéns (26/10/2026).** Medido numa bancada escondida e muda (a TelaDaGaragem de
+  verdade contra um servidor local, com quatro robôs andando pela rede): os bonecos dos outros andando
+  na sua tela, o botão só na conta do dono, o desmaio no sexto gole com a tela apagando 1 s, e o
+  parabéns inteiro, da mesa aparecendo à mesa sumindo. **Falta**: a **conta do Donis** — não existe
+  `donis` na produção (o `Tava1` existe); sem ela, ele não vai para trás da mesa; o **som** (a música
+  do parabéns, o gole, o desmaio, as motos), que é de ouvido; abrir pelo menu de jogos dentro de uma
+  call; e cinco pessoas de verdade ao mesmo tempo, no Windows e no Mac.
+
 - **A atividade na v0.74.1 (21/10/2026): o jogo que abre depois e o ícone de fora do Steam.** Medido:
   com a Saga compilada contra um servidor local e o LoL do dono aberto, o LoL apareceu em ~1 s com o
   ícone de verdade, que subiu e chegou à outra conta; e, com o `tasklist` de verdade e a lista de
