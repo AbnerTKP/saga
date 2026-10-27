@@ -21,7 +21,7 @@ import type { Recursos } from '../celular';
 
 const TUDO: Recursos = { transmitir: true, ligarCamera: true, soundboard: true, jogos: true };
 
-// As capas do menu de jogos são desenhadas pelo Dragão: o menu chega quando é aberto.
+// O menu de jogos chega quando é aberto, com as capas dele.
 const MenuDeJogos = lazy(() => import('./MenuDeJogos').then((m) => ({ default: m.MenuDeJogos })));
 
 type RM = ReturnType<typeof useRoom>;
@@ -36,7 +36,7 @@ function pontoDoClique(e: React.MouseEvent<HTMLElement>) {
   return { x: r.left + 24, y: r.bottom };
 }
 
-export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDaLuta, onLuta, textoDoCatan, onCatan, onUrna, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO, pessoaAbreACall = false }: {
+export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, onReordenar, onMenuDeSalas, onMenuDaSala, pollError, eu, servidor, rm, pessoas, onPessoa, onAbrir, lives, onAssistirLive, onAbrirPalco, jogando, nomeDoJogador, minhaPartida, jogoDaMinhaPartida, onPartida, onXadrez, onDama, textoDoCatan, onCatan, salaAbertaId, onShare, onSettings, onMenuDoServidor, onConfigurarServidor, onSoundboard, onLogout, statusEscolhido, onStatus, modoConversas, conversas, conversaAbertaId, emAmigos, pedidos, onAbrirConversa, onAbrirAmigos, podeMover, onMover, onBot, aCaminho, recursos = TUDO, pessoaAbreACall = false }: {
   rooms: RoomInfo[]; pollError: string | null; eu: Membro; servidor: Servidor; rm: RM;
   /**
    * No celular, tocar em quem está numa sala de voz ENTRA na call, como tocar na sala (pedido
@@ -81,11 +81,8 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
   /** O item Dama, idem. */
   onDama: () => void;
   /** O subtítulo de cada jogo no menu de jogos, e o que ele faz. */
-  textoDaLuta: string;
-  onLuta: () => void;
   textoDoCatan: string;
   onCatan: () => void;
-  onUrna: () => void;
   salaAbertaId: number | null; onShare: () => void; onSettings: () => void;
   pessoas: Map<string, PessoaNaCall>;
   /** Esquerdo abre o perfil; direito, as ações. */
@@ -417,13 +414,10 @@ export function Sidebar({ rooms, categorias, salasCarregadas, podeGerirSalas, on
       em={menuDeJogos}
       minha={minhaPartida}
       jogoDaMinha={jogoDaMinhaPartida}
-      luta={textoDaLuta}
       catan={textoDoCatan}
       onCatan={onCatan}
       onXadrez={onXadrez}
       onDama={onDama}
-      onLuta={onLuta}
-      onUrna={onUrna}
       onClose={() => setMenuDeJogos(null)}
     /></Suspense>
   );

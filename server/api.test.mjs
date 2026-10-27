@@ -1936,77 +1936,23 @@ test('/eu/senha pede a senha atual: errada é 403 sem derrubar ninguém, certa d
   semSegredo([errada, curta, certa, entrou]);
 });
 
-// --- Dragão Quadrado ------------------------------------------------------------
+// --- jogos que saíram -------------------------------------------------------------
 
-test('dragão quadrado pela rede: abrir, chamar, o convite no /rooms, sentar, começar, o passe só de dados e o número noutro servidor', async () => {
-  const tkp = (await cadastrar('dq_tkp')).corpo;
-  const juninho = (await cadastrar('dq_juninho')).corpo;
-  const tava = (await cadastrar('dq_tava')).corpo;
-  const casa = tkp.servidor.id;
-  const naArena = (sessao, corpo) => chamar('POST', '/lutas/arena', { sessao, servidor: casa, corpo });
-
-  // App velho não abre: abrir já é sentar.
-  assert.equal((await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: {} })).status, 409);
-  const aberta = await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { cenario: 'ilha', rounds: 1, protocolo: 7 } });
-  assert.equal(aberta.status, 200, JSON.stringify(aberta.corpo));
-  const { id } = aberta.corpo.arena;
-  assert.equal(aberta.corpo.arena.meuLado, 0);
-
-  assert.equal((await naArena(tkp.token, { id, acao: 'chamar', alvo: juninho.eu.id })).status, 200);
-  const doConvidado = (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa })).corpo.lutas;
-  assert.deepEqual(doConvidado.convites.map((c) => [c.arena, c.de.id, c.cenario]), [[id, tkp.eu.id, 'ilha']]);
-  assert.deepEqual(doConvidado.arenas.map((a) => a.id), [id]);
-
-  const sentou = await naArena(juninho.token, { id, acao: 'escolher', lutador: 'geladeira', protocolo: 7 });
-  assert.equal(sentou.corpo.arena.meuLado, 1);
-  assert.equal((await naArena(tava.token, { id, acao: 'escolher', lutador: 'vegetal', protocolo: 7 })).status, 409);
-
-  const comecou = await naArena(tkp.token, { id, acao: 'comecar' });
-  assert.equal(comecou.status, 200, JSON.stringify(comecou.corpo));
-  assert.equal(comecou.corpo.arena.estado, 'lutando');
-
-  // O passe da luta: sala própria, sem áudio nem vídeo; dados só de quem está de um lado.
-  const grantDe = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url')).video;
-  const doLutador = await chamar('POST', '/lutas/token', { sessao: juninho.token, servidor: casa, corpo: { id } });
-  assert.equal(doLutador.status, 200, JSON.stringify(doLutador.corpo));
-  const g = grantDe(doLutador.corpo.token);
-  assert.match(g.room, /^luta-[0-9a-f]+-1$/);
-  assert.equal(g.canPublish, false);
-  assert.equal(g.canPublishData, true);
-  const daPlateia = await chamar('POST', '/lutas/token', { sessao: tava.token, servidor: casa, corpo: { id } });
-  assert.equal(grantDe(daPlateia.corpo.token).room, g.room);
-  assert.equal(grantDe(daPlateia.corpo.token).canPublishData, false);
-  const vista = await chamar('GET', `/lutas/arena?id=${id}`, { sessao: tava.token, servidor: casa });
-  assert.deepEqual(vista.corpo.arena.plateia.map((p) => p.id), [tava.eu.id]);
-
-  const outro = (await chamar('POST', '/servidores/criar', { sessao: tava.token, corpo: { nome: 'Torneio' } })).corpo.servidor;
-  assert.equal((await chamar('GET', `/lutas/arena?id=${id}`, { sessao: tava.token, servidor: outro.id })).status, 404);
-  assert.equal((await chamar('POST', '/lutas/token', { sessao: tava.token, servidor: outro.id, corpo: { id } })).status, 404);
-
-  assert.equal((await naArena(tkp.token, { id, acao: 'fechar' })).status, 409);
-  const fim = await naArena(tkp.token, { id, acao: 'abandonar' });
-  assert.deepEqual([fim.corpo.arena.estado, fim.corpo.arena.vencedor], ['fim', 1]);
-  assert.deepEqual((await naArena(tkp.token, { id, acao: 'fechar' })).corpo, { ok: true });
-});
-
-test('dragão quadrado: a Saga antiga não recebe lutador que não conhece, pela versão no User-Agent', async () => {
-  const tkp = (await cadastrar('dqv_tkp')).corpo;
-  const juninho = (await cadastrar('dqv_juninho')).corpo;
-  const casa = tkp.servidor.id;
-  // O User-Agent de verdade do Electron: o `%s/%s Chrome/%s Electron/…` com o nome e a versão do app.
-  const saga = (v) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Saga/${v} Chrome/142.0.7444.265 Electron/39.8.10 Safari/537.36`;
-  const { id } = (await chamar('POST', '/lutas/abrir', { sessao: tkp.token, servidor: casa, corpo: { protocolo: 7 }, agente: saga('0.57.0') })).corpo.arena;
-  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'escolher', lutador: 'goteira', protocolo: 7 } });
-  assert.equal((await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'chamar', alvo: juninho.eu.id } })).status, 200);
-
-  const convite = async (agente) => (await chamar('GET', '/rooms', { sessao: juninho.token, servidor: casa, agente })).corpo.lutas.convites[0];
-  assert.equal((await convite(saga('0.56.2'))).oponente, null);
-  assert.equal((await convite(saga('0.57.0'))).oponente.lutador, 'goteira');
-  const vista = await chamar('GET', `/lutas/arena?id=${id}`, { sessao: juninho.token, servidor: casa, agente: saga('0.56.2') });
-  assert.equal(vista.status, 409);
-  assert.match(vista.corpo.error, /atualize/);
-  assert.equal((await chamar('GET', `/lutas/arena?id=${id}`, { sessao: juninho.token, servidor: casa, agente: saga('0.57.0') })).corpo.arena.lados[0].lutador, 'goteira');
-  await chamar('POST', '/lutas/arena', { sessao: tkp.token, servidor: casa, corpo: { id, acao: 'fechar' } });
+test('a Urna e o Dragão Quadrado saíram: o app de antes leva 404 e o /rooms não manda arena', async () => {
+  // Saíram em 26/10/2026. O app de antes ainda tem os botões: abrir dá 404, que ele mostra como a
+  // falha de sempre na tela, sem derrubar nada. As tabelas da Urna continuam no banco (migração não sai).
+  const quem = (await cadastrar('saiu_quem')).corpo;
+  const casa = quem.servidor.id;
+  assert.equal((await chamar('GET', '/urna', { sessao: quem.token })).status, 404);
+  assert.equal((await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 22 } })).status, 404);
+  assert.equal((await chamar('POST', '/lutas/abrir', { sessao: quem.token, servidor: casa, corpo: { protocolo: 7 } })).status, 404);
+  assert.equal((await chamar('GET', '/lutas/arena?id=1', { sessao: quem.token, servidor: casa })).status, 404);
+  assert.equal((await chamar('POST', '/lutas/arena', { sessao: quem.token, servidor: casa, corpo: { id: 1, acao: 'fechar' } })).status, 404);
+  assert.equal((await chamar('POST', '/lutas/token', { sessao: quem.token, servidor: casa, corpo: { id: 1 } })).status, 404);
+  // O campo `lutas` sempre foi opcional: o app de antes lê a falta dele como servidor sem luta.
+  const salas = await chamar('GET', '/rooms', { sessao: quem.token, servidor: casa });
+  assert.equal(salas.status, 200);
+  assert.equal('lutas' in salas.corpo, false);
 });
 
 // --- relatos -----------------------------------------------------------------------
@@ -2025,25 +1971,6 @@ test('relatar pela rede: com conta, sem conta, e o que se guarda', async () => {
 
   const invalido = await chamar('POST', '/relatos', { sessao: quem.token, corpo: { tipo: 'erro', texto: '' } });
   assert.equal(invalido.status, 400);
-});
-
-// --- urna ---------------------------------------------------------------------------
-
-test('urna pela rede: vota, soma e só devolve totais', async () => {
-  const quem = (await cadastrar('urna_quem')).corpo;
-  const antes = await chamar('GET', '/urna', { sessao: quem.token });
-  assert.equal(antes.status, 200, JSON.stringify(antes.corpo));
-  // A 80 era chapa no 1º turno: o app de antes do 2º ainda a mostra, e o servidor recusa dizendo por quê.
-  const velho = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 80 } });
-  assert.equal(velho.status, 400);
-  assert.match(velho.corpo.error, /2º turno/);
-  const votou = await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 22 } });
-  assert.equal(votou.status, 200, JSON.stringify(votou.corpo));
-  const chapa = votou.corpo.contagem.find((c) => c.numero === 22);
-  assert.equal(chapa.votos, (antes.corpo.contagem.find((c) => c.numero === 22)?.votos ?? 0) + 1);
-  assert.equal(votou.corpo.meus, 1);
-  assert.equal((await chamar('POST', '/urna/votos', { sessao: quem.token, corpo: { escolha: 22 } })).status, 429);
-  assert.equal((await chamar('POST', '/urna/votos', { corpo: { escolha: 22 } })).status, 401);
 });
 
 // --- e-mail, com o envio desligado ----------------------------------------------------

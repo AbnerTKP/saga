@@ -4,7 +4,7 @@
 // grupo virou só o convite, exigida uma vez, no cadastro. Sem isso não haveria como saber
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
-import { AccessToken, RoomServiceClient, TrackSource, DataPacket_Kind } from 'livekit-server-sdk';
+import { RoomServiceClient, TrackSource, DataPacket_Kind } from 'livekit-server-sdk';
 import { SignJWT } from 'jose';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,12 +21,10 @@ import * as presenca from './presenca.mjs';
 import * as mensagens from './mensagens.mjs';
 import * as amigos from './amigos.mjs';
 import { relatar } from './relatos.mjs';
-import * as urnas from './urnas.mjs';
 import * as conversas from './conversas.mjs';
 import { criarRegistroDeDigitacao } from './digitando.mjs';
 import { criarMesas } from './jogos.mjs';
 import { criarMesasDoCatan } from './catans.mjs';
-import { criarArenas } from './lutas.mjs';
 import { criarFilas } from './musica.mjs';
 import * as servidoresM from './servidores.mjs';
 import { verParticipante, salaNoLiveKit, salaDoLiveKit, emCallPorSalaDe } from './participantes.mjs';
@@ -158,9 +156,6 @@ const filas = criarFilas();
  */
 const movimentos = new Map();
 const VALE_UM_MOVIMENTO = 60_000;
-// As arenas do Dragão Quadrado, pelo mesmo motivo e com o mesmo preço: reiniciar encerra as lutas.
-// A luta em si anda pelo LiveKit, e a simulação roda nos dois computadores — ver lutas.mjs.
-const arenas = criarArenas();
 // O servidor semeado pelo .env. Continua existindo, mas deixou de ser o único: agora é
 // só o primeiro, e cada pedido diz de qual servidor fala pelo cabeçalho x-servidor.
 const SERVIDOR = garantirServidor(db, { nome: NOME_DO_SERVIDOR, salas: SALAS_INICIAIS });
@@ -326,15 +321,6 @@ const naMesa = (sid, eu) => ({
     return !!m && !m.banido_em;
   },
 });
-
-/**
- * A versão da Saga que fez o pedido, tirada do User-Agent, que o Electron monta com o nome e a
- * versão do app (`… Saga/0.57.0 Chrome/… Electron/…`). Null para quem não é a Saga. Serve para não
- * mandar a um app antigo o que ele não sabe desenhar — ver `LUTADOR_DESDE`, em lutas.mjs.
- */
-const versaoDoApp = (req) => /\bSaga\/(\d+\.\d+\.\d+)\b/.exec(req.headers['user-agent'] ?? '')?.[1] ?? null;
-/** O `naMesa` das arenas: com a versão do app, que diz que lutadores ele conhece. */
-const naArena = (req, sid, eu) => ({ ...naMesa(sid, eu), app: versaoDoApp(req) });
 
 /**
  * A pessoa vista sem servidor nenhum: só a conta.
@@ -1079,10 +1065,8 @@ const ROTAS = {
       // A dama mora nas mesmas mesas, mas vai num campo à parte: o app de antes dela leria uma
       // mesa de dama como xadrez e desenharia peças de xadrez no tabuleiro.
       damas: mesas.resumo(naMesa(sid, eu), foraDaqui(eu), 'dama'),
-      // As arenas do Dragão Quadrado vão pela mesma carona, e pelo mesmo motivo do xadrez: o
-      // convite tem de chegar a quem está em qualquer tela — inclusive olhando outro servidor.
-      lutas: arenas.resumo(naArena(req, sid, eu), foraDaqui(eu)),
-      // As mesas do Catan, idem — e a vez vai junto, para tocar o aviso a quem saiu da tela.
+      // As mesas do Catan vão pela mesma carona, e pelo mesmo motivo do xadrez: o convite tem de
+      // chegar a quem está em qualquer tela — e a vez vai junto, para tocar o aviso a quem saiu dela.
       catan: mesasDoCatan.resumo(naMesa(sid, eu), foraDaqui(eu)),
       conversas: conversas.minhas(db, eu, lidasDasConversas),
       // Os ids dos amigos vão junto porque o app precisa deles em toda tela: é o que faz
@@ -1535,50 +1519,6 @@ const ROTAS = {
   'POST /relatos': async (req) => {
     const usuario = usuarioDaSessao(db, req.headers['x-sessao']);
     return { relato: relatar(db, usuario, await lerCorpo(req)) };
-  },
-
-  // --- Urna --------------------------------------------------------------------
-  // A apuração é da Saga inteira, e só diz totais: o voto é secreto. Votar é num servidor.
-  'GET /urna': async (req) => urnas.apuracao(db, exigirConta(req).id),
-
-  'POST /urna/votos': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    const barrado = membros.impedimento(eu);
-    if (barrado) throw new ErroDeConta(barrado, 403);
-    const { escolha } = await lerCorpo(req);
-    return urnas.votar(db, sid, eu.id, escolha);
-  },
-
-  // --- Dragão Quadrado ---------------------------------------------------------
-  // A arena é do servidor do pedido, como a mesa. Os botões de cada quadro andam pelo LiveKit
-  // numa sala só dela; aqui ficam os lados, o começo e o resultado.
-  'POST /lutas/abrir': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    return { arena: arenas.abrir(naArena(req, sid, eu), await lerCorpo(req)) };
-  },
-
-  'GET /lutas/arena': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    const id = new URL(req.url, 'http://x').searchParams.get('id');
-    return { arena: arenas.ver(naArena(req, sid, eu), id) };
-  },
-
-  'POST /lutas/arena': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    return arenas.agir(naArena(req, sid, eu), await lerCorpo(req));
-  },
-
-  // O passe da sala da luta: só dados. Quem assiste entra para LER os botões;
-  // publicar é só de quem está de um lado — um terceiro mandando botão desencontraria a simulação.
-  'POST /lutas/token': async (req) => {
-    const { sid, membro: eu } = exigirMembro(req);
-    const barrado = membros.impedimento(eu);
-    if (barrado) throw new ErroDeConta(barrado, 403);
-    const { id } = await lerCorpo(req);
-    const { sala, lutador } = arenas.salaDaLuta(naMesa(sid, eu), id);
-    const at = new AccessToken(KEY, SECRET, { identity: identidadeDe(eu.id), name: eu.nome, ttl: '2h' });
-    at.addGrant({ room: sala, roomJoin: true, roomCreate: true, canPublish: false, canSubscribe: true, canPublishData: lutador });
-    return { url: urlDoLiveKit(req.headers), token: await at.toJwt(), identity: identidadeDe(eu.id) };
   },
 
   /**

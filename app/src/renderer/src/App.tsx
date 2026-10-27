@@ -10,7 +10,6 @@ import {
   type Cargo, type Categoria, type RoomInfo, type Sessao, type EstadoDoEmail, type Membro, type Servidor, type Mensagem,
   abrirMesa, agirNaMesa, type ConviteDeJogo,
   abrirCatan, agirNaMesaDoCatan,
-  agirNaArena, type ConviteDeLuta as ConviteParaLutar, type ResumoDaArena,
   abrirConversa, pedirAmizade, type Conversa, type ConversaAberta, type Onde, moverPessoa, acaoNoBot, podeSobre, conferirMovimento } from './api';
 import { ehMinhaVez, jogandoAgora, jogoDaMesa, minhaMesa, NOME_DO_JOGO, oQueTocarNaMesa, type JogoDeMesa, type ResumoDaMesa } from './jogos';
 import { criarAvisos } from './avisos';
@@ -82,17 +81,13 @@ import { BarraDoCelular, type AbaDoCelular } from './components/BarraDoCelular';
 import { TelaDoVoce } from './components/TelaDoVoce';
 
 /**
- * As telas dos jogos só chegam quando alguém abre um jogo. Elas são mais da metade do peso
- * do app — o Dragão sozinho tem as artes de pixel inteiras —, e no navegador do celular cada
+ * As telas dos jogos só chegam quando alguém abre um jogo. Elas pesam boa parte do app, e no
+ * navegador do celular cada
  * quilo é baixado pela rede de dados antes de a Saga abrir. No app instalado, a espera é a
  * de ler um arquivo do disco.
  */
 const TelaDoXadrez = lazy(() => import('./components/TelaDoXadrez').then((m) => ({ default: m.TelaDoXadrez })));
 const TelaDoCatan = lazy(() => import('./components/TelaDoCatan').then((m) => ({ default: m.TelaDoCatan })));
-const TelaDaLuta = lazy(() => import('./components/TelaDaLuta').then((m) => ({ default: m.TelaDaLuta })));
-const TelaDaUrna = lazy(() => import('./components/TelaDaUrna').then((m) => ({ default: m.TelaDaUrna })));
-// O convite do Dragão desenha a ficha em pixel, e por isso puxa o Dragão inteiro junto.
-const ConviteDeLuta = lazy(() => import('./components/ConviteDeLuta').then((m) => ({ default: m.ConviteDeLuta })));
 const comEspera = (tela: ReactNode) => <Suspense fallback={<div className="carregando">Abrindo o jogo…</div>}>{tela}</Suspense>;
 
 // Guardado só para preencher o campo na próxima vez; a sessão em si é o token.
@@ -105,7 +100,6 @@ const SEM_CATEGORIAS: Categoria[] = [];
 const SEM_CARGOS: Cargo[] = [];
 const SEM_MEMBROS: Membro[] = [];
 const SEM_MESAS: ResumoDaMesa[] = [];
-const SEM_ARENAS: ResumoDaArena[] = [];
 const SEM_MESAS_DO_CATAN: ResumoDaMesaDoCatan[] = [];
 
 /** Uma pessoa aberta num cartão ou num menu, com o servidor de que se está falando dela. */
@@ -175,22 +169,16 @@ export function App() {
    * servidor não vale no vizinho.
    */
   const [jogos, setJogos] = useState<{ servidorId: number; mesas: ResumoDaMesa[]; convites: ConviteDeJogo[] } | null>(null);
-  /** As arenas do Dragão Quadrado e os convites para lutar, pela mesma carona e com a mesma etiqueta. */
-  const [lutas, setLutas] = useState<{ servidorId: number; arenas: ResumoDaArena[]; convites: ConviteParaLutar[] } | null>(null);
-  const [conviteDeLutaRespondido, setConviteDeLutaRespondido] = useState<number | null>(null);
   /** As mesas do Catan e os convites para sentar, pela mesma carona e com a mesma etiqueta. */
   const [catan, setCatan] = useState<{ servidorId: number; mesas: ResumoDaMesaDoCatan[]; convites: ConviteParaOCatan[] } | null>(null);
   const [conviteDeCatanRespondido, setConviteDeCatanRespondido] = useState<number | null>(null);
   const [respondendoCatan, setRespondendoCatan] = useState(false);
   /**
-   * O jogo aberto na tela — a partida de xadrez, a arena, a urna ou a mesa do Catan —, com o
+   * O jogo aberto na tela — a partida de xadrez ou de dama, ou a mesa do Catan —, com o
    * servidor DELE: é a ele que a tela do jogo pergunta. Um só por vez, porque todos tomam o palco inteiro.
    */
   const [jogoAberto, setJogoAberto] = useState<
     | { tipo: 'xadrez'; mesaId: number; servidorId: number }
-    // sem arena é o título do Dragão Quadrado, que oferece abrir uma ou entrar na de alguém
-    | { tipo: 'luta'; arenaId: number | null; servidorId: number }
-    | { tipo: 'urna'; servidorId: number }
     | { tipo: 'catan'; mesaId: number; servidorId: number }
     | null
   >(null);
@@ -594,8 +582,6 @@ export function App() {
     setSalasDoServidor(null);
     setDadosDoServidor(null);
     setJogos(null);
-    setLutas(null);
-    setConviteDeLutaRespondido(null);
     setCatan(null);
     setConviteDeCatanRespondido(null);
     setRespondendoCatan(false);
@@ -666,8 +652,6 @@ export function App() {
           mesas: [...(lista.jogos?.mesas ?? []), ...(lista.damas?.mesas ?? [])],
           convites: [...(lista.jogos?.convites ?? []), ...(lista.damas?.convites ?? [])],
         }));
-        // As arenas do Dragão Quadrado, idem. Servidor antigo não manda: não há luta.
-        setLutas((a) => mesmoSeIgual(a, { servidorId, arenas: lista.lutas?.arenas ?? [], convites: lista.lutas?.convites ?? [] }));
         // As mesas do Catan, idem. Servidor antigo não manda: não há Catan.
         setCatan((a) => mesmoSeIgual(a, { servidorId, mesas: lista.catan?.mesas ?? [], convites: lista.catan?.convites ?? [] }));
         // As conversas privadas vêm na mesma resposta, e NÃO levam etiqueta de servidor:
@@ -996,7 +980,7 @@ export function App() {
   const abrirLugar = telaDoCelular.abrirLugar;
   /** O palco está mostrando a call (e não um chat, um jogo ou as conversas). */
   const palcoNaCall = !modoConversas && !jogoAberto && salaAberta?.tipo !== 'texto' && !!rm.salaDaVoz;
-  const semPessoas = modoConversas || jogoAberto?.tipo === 'luta' || jogoAberto?.tipo === 'urna' || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
+  const semPessoas = modoConversas || jogoAberto?.tipo === 'catan' || (palcoNaCall && !pessoasNaCall);
   const alternarPessoasNaCall = useCallback(() => setPessoasNaCall((v) => {
     try { localStorage.setItem('cantinho.pessoasNaCall', v ? '0' : '1'); } catch { /* vale até fechar */ }
     return !v;
@@ -1264,61 +1248,6 @@ export function App() {
   }, [jogos?.servidorId, notas, irAoServidorDoJogo]);
 
   const euIdAgora = sessao?.eu?.id ?? null;
-
-  /**
-   * O Dragão Quadrado visto da busca de salas: "a sua arena" é a que você
-   * abriu ou em que está lutando — preferindo a luta andando. Sem uma sua, o menu leva à arena
-   * que houver no servidor: é assim que se entra no lugar livre ou se assiste.
-   */
-  const lutasDaqui = lutas?.servidorId === servidorAberto ? lutas : null;
-  const arenas = lutasDaqui?.arenas ?? SEM_ARENAS;
-  const minhaArena = euIdAgora === null ? null
-    : [...arenas].sort((a, b) => Number(b.estado === 'lutando') - Number(a.estado === 'lutando'))
-      .find((a) => a.anfitriao === euIdAgora || a.lutadores.includes(euIdAgora)) ?? null;
-  const arenaDoServidor = minhaArena ?? arenas[0] ?? null;
-  const conviteDeLuta = lutas?.convites.find((c) => c.arena !== conviteDeLutaRespondido) ?? null;
-  const textoDaLuta = minhaArena
-    ? (minhaArena.estado === 'lutando' ? 'voltar à sua luta' : 'voltar à sua arena')
-    : arenaDoServidor
-      ? (arenaDoServidor.estado === 'lutando' ? `luta de ${nomeDoJogador(arenaDoServidor.anfitriao)} andando` : `arena de ${nomeDoJogador(arenaDoServidor.anfitriao)} aberta`)
-      : 'abrir uma arena';
-
-  /**
-   * O jogo abre no título — o dono pediu o Dragão Quadrado como um jogo completo, com início. Quem já
-   * tem arena (a sua, ou a luta em que está) volta direto a ela.
-   */
-  /** A Urna é de uma pessoa só: abre na porta da seção eleitoral do servidor aberto. */
-  const abrirUrna = useCallback(() => {
-    const servidorId = sessao?.servidor?.id;
-    if (servidorId) setJogoAberto({ tipo: 'urna', servidorId });
-  }, [sessao?.servidor?.id]);
-
-  const abrirLuta = useCallback(() => {
-    const servidorId = sessao?.servidor?.id;
-    if (!servidorId) return;
-    setJogoAberto({ tipo: 'luta', arenaId: minhaArena?.id ?? null, servidorId });
-  }, [sessao?.servidor?.id, minhaArena]);
-
-  const responderConviteDeLuta = useCallback(async (c: ConviteParaLutar, lutar: boolean) => {
-    const servidorId = c.servidor ?? lutas?.servidorId;
-    if (!servidorId) return;
-    setConviteDeLutaRespondido(c.arena);
-    // Lutar não responde nada ao servidor: abre a arena, e escolher o lutador é a resposta.
-    if (lutar) {
-      await irAoServidorDoJogo(servidorId);
-      setJogoAberto({ tipo: 'luta', arenaId: c.arena, servidorId });
-      return;
-    }
-    try { await agirNaArena(c.arena, { acao: 'recusar' }, servidorId); } catch (e) { notas.mostrarFalha(e, 'Dragão Quadrado'); }
-  }, [lutas?.servidorId, notas, irAoServidorDoJogo]);
-
-  const conviteDeLutaTocado = useRef<number | null>(null);
-  useEffect(() => {
-    if (!conviteDeLuta) { conviteDeLutaTocado.current = null; return; }
-    if (conviteDeLutaTocado.current === conviteDeLuta.arena) return;
-    conviteDeLutaTocado.current = conviteDeLuta.arena;
-    tocarAviso('convite', rm.deafened);
-  }, [conviteDeLuta?.arena, rm.deafened, tocarAviso]);
 
   /**
    * O Catan visto da busca de salas, no molde do xadrez: "a sua mesa" é a partida em que você
@@ -1611,11 +1540,8 @@ export function App() {
         onPartida={abrirPartida}
         onXadrez={abrirXadrez}
         onDama={abrirDama}
-        textoDaLuta={textoDaLuta}
-        onLuta={abrirLuta}
         textoDoCatan={textoDoCatan}
         onCatan={abrirCatanDoMenu}
-        onUrna={abrirUrna}
         // Com a partida na tela, nenhuma sala está aberta: acender uma diria "você está
         // aqui" sobre um lugar que não é o que se está vendo.
         salaAbertaId={jogoAberto ? null : salaAbertaId}
@@ -1721,30 +1647,6 @@ export function App() {
             onFechar={() => setJogoAberto(null)}
             onAviso={notas.mostrar}
           />
-        ) : jogoAberto?.tipo === 'urna' ? (live) => comEspera(
-          <TelaDaUrna
-            key={`urna-${jogoAberto.servidorId}`}
-            servidorId={jogoAberto.servidorId}
-            euId={eu.id}
-            apelido={eu.nome}
-            surdo={rm.deafened}
-            live={live}
-            onFechar={() => setJogoAberto(null)}
-          />
-        ) : jogoAberto?.tipo === 'luta' ? (live) => comEspera(
-          <TelaDaLuta
-            key={`luta-${jogoAberto.servidorId}`}
-            arenaId={jogoAberto.arenaId}
-            servidorId={jogoAberto.servidorId}
-            euId={eu.id}
-            membros={membrosDoServidor}
-            naCall={naMinhaCall}
-            arenas={lutas?.servidorId === jogoAberto.servidorId ? lutas.arenas : SEM_ARENAS}
-            surdo={rm.deafened}
-            live={live}
-            onArena={(id) => setJogoAberto((j) => (j?.tipo === 'luta' ? { ...j, arenaId: id } : j))}
-            onFechar={() => setJogoAberto(null)}
-          />
         ) : jogoAberto?.tipo === 'xadrez' ? (live) => comEspera(
           <TelaDoXadrez
             key={jogoAberto.mesaId}
@@ -1767,16 +1669,6 @@ export function App() {
             minhaVez={minhaMesaCatan.vez === eu.id || minhaMesaCatan.devem.includes(eu.id)}
             outroNome={minhaMesaCatan.vez !== null ? nomeDoJogador(minhaMesaCatan.vez) : null}
             onVoltar={() => setJogoAberto({ tipo: 'catan', mesaId: minhaMesaCatan.id, servidorId: servidor.id })}
-          />
-        ) : minhaArena && !jogoAberto ? (
-          <FaixaDaPartida
-            jogo="Dragão Quadrado"
-            estado={minhaArena.estado === 'arena' ? 'lobby' : minhaArena.estado === 'lutando' ? 'jogando' : 'fim'}
-            titulo={minhaArena.estado === 'arena' ? `arena de ${nomeDoJogador(minhaArena.anfitriao)}` : minhaArena.estado === 'lutando' ? 'luta andando' : 'luta acabou'}
-            minhaVez={false}
-            outroNome={null}
-            rotulo={minhaArena.estado === 'lutando' ? 'Voltar à luta' : 'Voltar à arena'}
-            onVoltar={() => setJogoAberto({ tipo: 'luta', arenaId: minhaArena.id, servidorId: servidor.id })}
           />
         ) : minhaMesaAgora && !jogoAberto ? (
           <FaixaDaPartida
@@ -2052,7 +1944,7 @@ export function App() {
         // O convite para jogar fica na mesma pilha, num cartão grande (a opção C do dono), e não
         // some sozinho: quem chamou está esperando a resposta.
         // No celular os jogos ficam para depois: o convite seria um "aceitar" que não leva a nada.
-        extra={recursos.jogos && (convite || conviteDeLuta || conviteDeCatan) && (
+        extra={recursos.jogos && (convite || conviteDeCatan) && (
           <>
             {conviteDeCatan && (
               <ConviteDeCatan
@@ -2062,16 +1954,6 @@ export function App() {
                 onSentar={() => responderConviteDeCatan(conviteDeCatan, true)}
                 onRecusar={() => responderConviteDeCatan(conviteDeCatan, false)}
               />
-            )}
-            {conviteDeLuta && (
-              <Suspense fallback={null}>
-                <ConviteDeLuta
-                  convite={conviteDeLuta}
-                  servidorAberto={servidorAberto}
-                  onLutar={() => responderConviteDeLuta(conviteDeLuta, true)}
-                  onRecusar={() => responderConviteDeLuta(conviteDeLuta, false)}
-                />
-              </Suspense>
             )}
             {convite && (
               <ConviteDeXadrez

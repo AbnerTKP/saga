@@ -1,6 +1,6 @@
-# Xadrez, Dama, Urna e Catan
+# Xadrez, Dama e Catan
 
-App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/CLAUDE.md`.
+App e servidor juntos. A Urna e o Dragão Quadrado saíram em 26/10/2026 — ver o fim das decisões.
 
 ## Decisões que não são óbvias no código
 
@@ -39,7 +39,7 @@ App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/C
   de tabuleiro com o cavalo), rótulo do jogo, quem chamou, o detalhe, quem
   já está sentado com o anel da cor da equipe, e "Agora não" e a ação escritos, da largura toda.
 - **O convite vem de TODOS os seus servidores, e diz de qual.** Só chegava o do servidor aberto,
-  e quem estava olhando outro não sabia que foi chamado. O `/rooms` junta as mesas e as arenas de
+  e quem estava olhando outro não sabia que foi chamado. O `/rooms` junta as mesas de
   qualquer servidor em que você é membro ativo (`resumo(ctx, fora)`), com `servidor` e
   `servidorNome`, e o cartão escreve "· em Paddock" quando não é o aberto. **Aceitar leva ao
   servidor do jogo** (`irAoServidorDoJogo`): a primeira versão abria a partida por cima do
@@ -72,6 +72,20 @@ App e servidor juntos. O Dragão Quadrado mora em `app/src/renderer/src/dragao/C
   e motor pelos alto-falantes do dono — com ele ao vivo na Saga, e a live levou o som junto:
   o `loopbackWithoutChrome` só exclui o processo da Saga dele, e o de teste é outro. A entrada
   do teste leva `mute-audio`.
+- **A Urna e o Dragão Quadrado saíram em 26/10/2026**, a pedido do dono: *"remova o minigame da urna
+  tambem, e do dragao quadrado"*. App (telas, convite da luta, capas do menu, sprites, sons, fonte em
+  pixel), servidor (`urnas.mjs`, `lutas.mjs`, as rotas `/urna` e `/lutas/*`, o resumo `lutas` no
+  `/rooms`) e testes saíram juntos; o código inteiro está no git até a versão `v0.74.1`, e as decisões
+  de cada um também: a Urna nesta página (`git show v0.74.1:docs/decisoes/jogos.md`) e o Dragão em
+  `git show v0.74.1:app/src/renderer/src/dragao/CLAUDE.md`. **As tabelas da Urna ficam no banco**
+  (`urna_votos` e `urna_eleitores`, migrações 54, 55 e 58): migração não sai, e os votos continuam
+  guardados como sempre — o total de cada opção e quantas vezes cada um votou, nunca em quem. As
+  arenas viviam na memória do servidor, e somem ao publicá-lo. O app de antes que abrir um dos dois
+  recebe 404 (`api.test.mjs` confere) e trata como qualquer falha do servidor — não exercido num app
+  velho de verdade —, e lê o `/rooms` sem `lutas` como servidor sem luta (o campo sempre foi opcional). **Para um jogo em tempo real de novo**, o caminho que já foi medido está no
+  arquivo do Dragão: o canal de dados do LiveKit numa sala só do jogo, o rollback com dois quadros de
+  atraso, o protocolo que impede o app velho de SENTAR mas não de LER, e que quem assiste não publica
+  nada na sala — e isso falha calado.
 
 ## A Dama (07/10/2026)
 
@@ -128,75 +142,6 @@ boteco. Ele escolheu **a A** e as **regras brasileiras** (contra a americana).
   Windows (`SAGA_RAIZ`, `SAGA_CHROME`). **Não foi exercido**: o Electron; duas pessoas de verdade;
   o menu de jogos (precisa de LiveKit local, que esta máquina não tem); a dama coroada na tela (só
   nos testes e na prancheta); nenhum som.
-
-## A Urna (17/09/2026)
-
-Pedido do dono: "um minigame de urna eletrônica, em pixel art: um bonequinho passa na mesa, dá o
-título fake e vai até a urna; na urna, primeira pessoa para votar", com os candidatos a Presidente de
-verdade; depois, "deixa votar várias vezes e faça um rank multiplayer do mais votado" e "reformule a
-escolha dos minigames para não ficar uma lista enorme". Ele viu as telas feitas pelo motor e escolheu
-o **menu em grade de capas** (opção A), a apuração por servidor com voto secreto, e aprovou o resto. Depois de
-publicado, corrigiu: **"o resultado deve ser para todo o Saga e não separado por servidor"** — a apuração soma
-todos os servidores. As tabelas seguem anotando o servidor de cada voto (já estavam na produção; tirar a
-coluna seria migração sem ganho), e a leitura soma; o freio de 3 s e o "você votou N vezes" também.
-
-- **Os candidatos são os do TSE em 17/09/2026** (`urna/candidatos.ts`): 13 chapas, conferidas por dois
-  levantamentos separados (a API do DivulgaCandContas e a imprensa) que bateram nome a nome. Pablo
-  Marçal foi indeferido e trocado por Leonardo Avalanche, com registro ainda pendente. **Se alguém sair
-  da disputa, sai de `candidatos.ts`, de `retratos.ts` e de `NUMEROS` em `server/urnas.mjs`** — o teste
-  do servidor confere que as duas listas de números são a mesma. A ordem é sempre a do número.
-- **Os rostos são as fotos oficiais do TSE em pixel** (`urna/retratos.ts`, 30x42 e 22x31, 16 e 14 tons
-  por k-means), porque a urna de verdade mostra a foto. Gerado por script, não à mão.
-- **O voto é secreto no BANCO, não só na tela.** `urna_votos` guarda o total de cada escolha por
-  servidor; `urna_eleitores` guarda quantas vezes cada pessoa votou, sem a escolha. Não existe linha
-  que ligue alguém a um candidato. Votar de novo pode, sem limite, com um freio de 3 s contra laço.
-- **A regra do jogo é pura e testada** (`urna/jogo.ts`): etapas da mesa (pede o documento → título da Saga
-  → libera), cabine, CORRIGE, BRANCO só com a tela vazia (como na urna), número inexistente vira NULO, e
-  a mesária repara em quem volta. A urna é a UE2020: teclado 3x3 com o 0 embaixo do 8 e a coluna
-  BRANCO/CORRIGE/CONFIRMA. Os sons são o arquivo que o dono mandou: o bipe da tecla e o som do FIM.
-- **O menu de jogos virou grade de capas** (`MenuDeJogos.tsx`): duas por linha, com a frase do que
-  acontece embaixo e um ponto azul quando há algo de pé. A classe `.menu-de-jogos-item` ficou nas capas
-  porque os roteiros da bancada procuram por ela.
-- **Medido** com a Saga escondida e muda contra servidor e LiveKit locais: menu, porta, mesa, título,
-  cabine, voto, FIM, apuração, votar de novo e fechar, por teclado e clique. Parada: seção 0 quadro/s e
-  0,3% de CPU; urna com o cursor piscando, 2 quadros/s e 0,5%. **Não foi ouvido** nenhum som (a bancada é
-  muda) nem visto no Windows.
-
-### O 2º turno (05/10/2026)
-
-Pedido do dono: "atualiza o jogo da urna para somente os 2 candidatos do segundo turno, aprimore a parte
-do jogo antes da votação também", e no meio, "melhore a mão do personagem na hora de votar". Ele viu as
-telas do motor e escolheu **digital + caderno** na mesa e a **apuração do zero**.
-
-- **13 Lula × 22 Flávio Bolsonaro**, como o TSE deu na madrugada de 05/10 (99,99% apuradas). Saíram de
-  `candidatos.ts`, de `retratos.ts` e de `NUMEROS`; as onze chapas do 1º turno estão no git.
-- **O 2º turno começa do zero, e o 1º fica guardado.** A migração 58 refaz `urna_votos` e
-  `urna_eleitores` com o `turno` na chave; tudo o que havia virou turno 1. A apuração, o "você votou N
-  vezes" e o freio leem só `TURNO` (2). O 1º turno da Saga, na produção: 13 com 51, 14 com 49, 22 com 19,
-  70 com 3, 16 com 1, branco 1. O voto continua secreto: o turno entrou nas duas tabelas e nenhuma ganhou
-  a coluna da outra.
-- **O app de antes vota numa chapa que saiu** e o servidor recusa com "Essa chapa não está no 2º turno.
-  Atualize a Saga para votar." — contar como nulo seria registrar em silêncio um voto que a pessoa viu
-  ir para alguém.
-- **A mesa ganhou duas etapas de SEGURAR ESPAÇO** (ou o botão do mouse) depois do título: o leitor de
-  digital, que na primeira leitura da abertura NÃO reconhece ("esfrega o dedo na camisa"), e soltar
-  antes do fim recomeça; e o caderno de votação, com a linha do jogador marcada e a caneta assinando
-  enquanto se segura — solta, ela para onde parou. Segurar e não só apertar porque apertar ESPAÇO já
-  era tudo o que a mesa fazia. Ao terminar uma etapa, o aperto seguinte só avança; a próxima pede outro
-  aperto, senão o mesmo ESPAÇO que fechou o leitor começaria a assinar. **Quem volta pula as duas**: o
-  mesário já conhece, e votar de novo é o jogo. O celular fica na mesa depois de liberado.
-- **O mural com as duas chapas** substituiu a janela da sala, porque a seção de verdade afixa os
-  candidatos; de perto (ESPAÇO), abre grande com foto, número, partido e vice. A lousa diz 2º turno, e
-  há santinhos no chão perto da porta, metade de cada cor.
-- **A apuração virou frente a frente**: a lista de treze ficava com duas linhas e muito vazio. Cada
-  chapa no seu lado, sempre na ordem do número; a porcentagem é dos VÁLIDOS, como a do TSE, e soma 100
-  (`porcentagens`, testada); quem está na frente em dourado; o cabo de guerra com o meio marcado.
-- **A mão da cabine é desenhada letra a letra** (`MAO`, em `cabine.ts`), como os glifos: em retângulos
-  ela era um bastão com um bloco embaixo. Vista por trás — indicador com unha e duas dobras, os outros
-  dedos fechados em degrau, polegar do lado —, com a manga azul da camisa do bonequinho vindo de baixo,
-  pela direita, e alargando ao descer. Uma tentativa de gerar a mão juntando peças arredondadas com
-  contorno automático deixou costuras no meio da palma e foi descartada.
-- A fonte ganhou `º` nos dois tamanhos e `%` na grande.
 
 ## O Catan (27/09/2026)
 
@@ -393,7 +338,7 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
 - **A mesa vive na MEMÓRIA do servidor, como as do xadrez**: publicar o servidor com gente jogando
   encerra a partida. Uma partida de Catan dura uma hora; se isso incomodar, é guardar no banco.
 - **Anda por HTTP, perguntando de 800 em 800 ms**, como o xadrez: é jogo de turno, poucas ações por
-  minuto — não precisa do canal de dados do LiveKit que o Dragão Quadrado usa.
+  minuto — não precisa do canal de dados do LiveKit que o Dragão Quadrado usava.
 - **O tabuleiro é desenhado por código, em texto SVG** (`desenhoDoCatan.ts`): o fundo (mar, portos,
   terrenos) é montado uma vez por partida e as peças uma vez por mudança; os alvos de clique ficam
   numa camada de JSX por cima. O que há dentro de cada terreno sai de um sorteio com semente pela
@@ -403,7 +348,7 @@ ficou recusada; o desenho das cartas era proposta única e entrou como estava.
   terrenos que renderam acendem, e o som é sintetizado na hora (`somDosDados.ts`):
   doze estalos filtrados, cada vez mais espaçados, e as duas batidas do fim. Fone desligado cala.
 - **O que está de fora desta versão**: 5–6 jogadores (o dono escolheu depois); o controle ao lado do
-  nome de quem joga (só o xadrez tem; o Dragão também não); o tabuleiro fixo do manual.
+  nome de quem joga (só o xadrez tem); o tabuleiro fixo do manual.
 - **Medido** no renderer de verdade, num Chrome headless e mudo contra servidor local, com partidas
   semeadas por robôs pela rede: a colocação clicando no cruzamento e na aresta, rolar e acender os
   terrenos, a troca com o banco (as taxas dos portos certas) e entre dois jogadores (oferta, aceite,

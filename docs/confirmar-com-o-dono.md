@@ -83,16 +83,6 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   o Electron e o Windows de verdade; a capa no menu de jogos (a bancada daqui não tem LiveKit); a dama
   coroada na tela; o som do lance e do convite (são os do xadrez).
 
-- **A Urna do 2º turno (05/10/2026): 13 × 22, a mesa com digital e caderno, o mural, a mão nova e a
-  apuração frente a frente.** O que está medido: a regra (`jogo.test.ts`: segurar e soltar no leitor,
-  a primeira leitura falhando, a caneta parando onde parou, o mural, quem volta pulando a mesa), a
-  porcentagem dos válidos (`apuracao.test.ts`), o servidor (`urnas.test.mjs`, `api.test.mjs`) e a
-  migração 58 contra dados do 1º turno (`banco.test.mjs`); as telas desenhadas pelo motor a partir do
-  estado de verdade da regra. **Não foi exercido**: a Saga aberta com o jogo — segurar ESPAÇO e o botão
-  do mouse no `TelaDaUrna.tsx` só foram conferidos no typecheck; o bipe do leitor (é o som da tecla da
-  urna, não foi ouvido); o Windows; o app de antes do 2º turno votando numa chapa que saiu (a recusa
-  está testada no servidor, a frase na tela dele é dedução).
-
 - **O relógio do Catan, os avisos e as cartas grandes (04/10/2026).** O que está medido: as regras do
   relógio (`catan.test.mjs`, inclusive 30 partidas de robôs que às vezes dormem e deixam o relógio
   jogar), as funções da tela (`catan.test.ts`) e a tela inteira no RENDERER pelo passo `19-catan` do
@@ -313,18 +303,3 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   o microfone escolhido continuar valendo depois de fechar e abrir a Saga (os ids dos aparelhos
   não mudam entre aberturas, medido; a escolha voltando numa call de verdade, não). Nem o volume
   de cada pessoa, a saída de som e a câmera voltando depois de fechar e abrir.
-- **O Dragão Quadrado entre duas pessoas de verdade.** O que está medido está na seção do
-  jogo. **Não foram exercidos**: dois computadores com gente no teclado, pela produção e com
-  a latência real entre as casas; o som (sintetizado em `sons.ts`, nunca ouvido — os testes
-  são mudos); o Windows e máquina fraca; a plateia com a tela do app (só com robô); a
-  reconexão depois de uma queda de verdade no meio da luta; e se a luta está equilibrada e
-  divertida, que é de mão e não de teste. Os sons gravados (grito, transformação, teletransporte,
-  raios) foram medidos em LUFS e nunca ouvidos aqui: o equilíbrio entre eles é de ouvido, e é do
-  dono. **Os três de 16/09/2026** (Goiaba e Vegetal da Super Feira, Goteira) só foram vistos em
-  imagem e simulados: a ficha de cada um — vida, velocidade, a bola lenta no especial — foi
-  conferida por dano medido contra um alvo parado, e nunca jogada. O mesmo vale para o **Gotinha e o
-  Tronco**, e a fileira de nove retratos só foi vista na prévia, nunca no app aberto. **As telas de
-  jogo em pixel (17/09/2026)** — título, escolha, convite, opções, VS, desistir, fim e o cartão —
-  foram percorridas pela Saga escondida contra servidor e LiveKit locais, por teclado e por clique,
-  com o amigo respondendo pela rede. **Não foram exercidos**: duas pessoas de verdade, o Windows, os
-  bipes de menu (nunca ouvidos) e a tela numa janela pequena.

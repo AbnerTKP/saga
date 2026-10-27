@@ -1646,10 +1646,6 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
   background: var(--accent-claro); box-shadow: 0 0 0 2px var(--bg2); }
 .capa-de-xadrez { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px;
   background: repeating-conic-gradient(#b58863 0 25%, #f0d9b5 0 50%) 0 0 / 28px 28px; }
-.capa-de-luta { width: 48px; height: 48px; }
-.capa-de-urna { width: 96px; height: 64px; }
-.tela-da-urna { display: flex; flex: 1; min-height: 0; gap: var(--e3); padding: var(--e3); background: #000; }
-.tela-da-urna .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
 
 /* O convite para jogar, na pilha dos avisos — mas ele não some sozinho: quem chamou espera. */
 /* O convite para jogar: o cartão grande no canto (a opção C do dono), o mesmo para todos os jogos.
@@ -2052,28 +2048,6 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 @media (max-width: 640px) {
   .adm-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* ---- Dragão Quadrado ----------------------------------------------------------------------
-   O jogo inteiro é uma canvas de 384x216 ampliada sem suavizar, e em múltiplo inteiro quando cabe:
-   título, escolha de lutador, convite, opções, luta e fim são desenhados no motor do jogo
-   (`dragao/interface.ts`), sem HTML da Saga por cima — o dono pediu um jogo completo dentro. */
-.tela-da-luta { display: flex; flex: 1; min-height: 0; gap: var(--e3); padding: var(--e3); background: #000; }
-.luta-palco { position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; background: #000; }
-.luta-canvas { display: block; image-rendering: pixelated; }
-.tela-da-luta .xadrez-live { width: 260px; flex: none; align-self: flex-start; }
-/* O Dragão Quadrado no menu de jogos: o rosto do Goiaba no quadrado. */
-.luta-no-quadrado { width: 34px; height: 34px; flex: none; border-radius: 8px; background: #6fa8dc; display: grid; place-items: center; overflow: hidden; }
-.luta-icone { width: 32px; height: 32px; }
-/* O convite para lutar, em pixel (184x72 ampliado 2x), na pilha dos avisos. Os botões de verdade ficam
-   escondidos da vista, para o teclado e o leitor de tela. */
-.convite-em-pixel { pointer-events: auto; position: relative; width: 368px; filter: drop-shadow(0 12px 24px rgba(0,0,0,.55));
-  animation: aviso-entra .18s ease-out; }
-.convite-em-pixel canvas { display: block; width: 368px; height: 144px; image-rendering: pixelated; }
-.convite-em-pixel-botao { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
-.convite-em-pixel-botao:focus-visible { width: auto; height: auto; clip: auto; margin: 0; left: 8px; bottom: 8px; padding: 4px 8px;
-  background: var(--bg1); color: var(--white); border-radius: 6px; outline: 2px solid var(--accent); }
-@media (prefers-reduced-motion: reduce) { .convite-em-pixel { animation: none; } }
 
 /* ---- Bot de música ----
    O desenho é a opção A que o dono escolheu na prancheta (22/09/2026): o bot fala no chat com

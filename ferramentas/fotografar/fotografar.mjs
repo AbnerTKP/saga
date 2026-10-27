@@ -735,7 +735,7 @@ async function roteiro(dados) {
     await moverMouse(640, 20);
     await clicar({ sel: '[data-abre-jogos]' });
     await esperar('.menu-de-jogos .menu-de-jogos-item');
-    await foto('09b-menu-de-jogos', 'Menu de jogos (botão do painel da voz, só existe dentro de uma call): Xadrez, Dragão Quadrado, Catan, Urna.');
+    await foto('09b-menu-de-jogos', 'Menu de jogos (botão do painel da voz, só existe dentro de uma call): Xadrez, Dama, Catan.');
     await tecla('Escape');
     if (await existe('.menu-de-jogos')) await clicar({ sel: '[data-abre-jogos]' });
     await clicar({ sel: '.voice-actions button', texto: 'Soundboard' });
