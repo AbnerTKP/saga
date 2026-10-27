@@ -1,12 +1,11 @@
 // Os avisos vão dentro do app, não no servidor: somam uns 95 KB, e um aviso que precisa
 // ser baixado chega depois do fato que ele anuncia. O Vite troca cada import pela URL.
-// ENTRAR NA CALL (26/10/2026, o dono pediu "mais alto"): o blup em mi4 de antes, que era um
-// tom de 330 Hz quase sem nada acima de 1 kHz — alto-falante de notebook mal toca isso, e ele
-// era o mais baixo da família (−15,6 LUFS de momentânea máxima). Refeito pelo caminho dos outros:
-// a mesma nota, subindo de 0,86× a 1× nos primeiros 55 ms, com a oitava, a duodécima e a
-// segunda oitava (1 · 0,75 · 0,4 · 0,12) e um toque de baqueta (4× e 6,3×, morrendo em 160 ms);
-// ataque em cosseno, decaimento 7/s, PCM em float, pico −1 dB: −11,9 LUFS. Volume próprio em
-// `VOLUME_DA_ENTRADA` (avisos.ts).
+// ENTRAR NA CALL (26/10/2026, o dono pediu "mais alto"): a mesma gravação de antes, o blup em
+// mi4, que era o mais baixo da família (−15,6 LUFS de momentânea máxima). Das três opções da
+// prancheta de ouvir, o dono escolheu esta (27/10): a gravação tratada, não refeita. `highpass=f=140`,
+// `asoftclip=type=tanh:threshold=0.5`, `equalizer=f=1300:t=q:w=1.2:g=3`,
+// `acompressor=threshold=-24dB:ratio=3:attack=4:release=90`, pico −1 dB, Opus 96k: −12,8 LUFS.
+// Volume próprio em `VOLUME_DA_ENTRADA` (avisos.ts).
 import entrou from './entrou.ogg';
 import saiu from './saiu.ogg';
 import live from './live.ogg';

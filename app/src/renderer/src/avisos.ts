@@ -33,7 +33,7 @@ export const VOLUME_DO_CHAMADO = 0.9;
 /**
  * ENTRAR na call (você ou outro) fica entre os dois. O dono pediu "mais alto" (26/10/2026): a 0,45
  * e com o arquivo antigo, ele saía 11 dB abaixo da mensagem e 3,5 dB abaixo até do "saiu". Com o
- * arquivo novo, a 0,8 ele sobe ~9 dB e fica ~3 dB abaixo da mensagem — alto, mas não um chamado.
+ * arquivo tratado, a 0,8 ele sobe ~8 dB e fica ~4 dB abaixo da mensagem — alto, mas não um chamado.
  */
 export const VOLUME_DA_ENTRADA = 0.8;
 

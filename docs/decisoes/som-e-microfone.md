@@ -174,12 +174,15 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
 - **Entrar na call era o som mais baixo da Saga, e não por escolha** (26/10/2026, o dono: "mais
   alto"). O `entrou.ogg` antigo (extraído de um vídeo do dono, como o `saiu` e o `live`) era um tom
   de 330 Hz quase sem nada acima de 1 kHz: −15,6 LUFS de momentânea máxima, 4,5 dB abaixo do
-  `saiu`, e alto-falante de notebook mal reproduz abaixo de ~400 Hz. Refeito na família: a mesma
-  nota (mi4) e o mesmo "blup" subindo no começo, mas com a oitava e a duodécima fortes e um toque de
-  baqueta — −11,9 LUFS, pico −1 dB. E ganhou volume próprio, `VOLUME_DA_ENTRADA` = 0,8: somado ao
-  arquivo, ~9 dB acima do de antes e ~3 dB abaixo da mensagem. Não virou chamado: chamado é o que é
-  dirigido a você. Saiu de três opções numa prancheta de ouvir (o de hoje tratado, este, e um
-  "blup-blip" de duas notas); **não foi ouvido aqui** — de ouvido, quem confirma é o dono.
+  `saiu`, e alto-falante de notebook mal reproduz abaixo de ~400 Hz. Foram três opções numa
+  prancheta de ouvir: **A**, a mesma gravação tratada (corte abaixo de 140 Hz, saturação leve, +3 dB
+  em 1,3 kHz e compressão 3:1 — a receita está em `sons/index.ts`); **B**, o blup refeito na família,
+  com a oitava, a duodécima e um toque de baqueta; **C**, um "blup-blip" de duas notas (mi4 → lá4).
+  Eu recomendei a B e ela chegou a ir para o commit; **o dono escolheu a A** (27/10/2026) — o som
+  que todo mundo já conhece, só que mais alto. Ela fica em −12,8 LUFS, pico −1 dB, e ganhou volume
+  próprio, `VOLUME_DA_ENTRADA` = 0,8: somado ao arquivo, ~8 dB acima do de antes e ~4 dB abaixo da
+  mensagem. Não virou chamado: chamado é o que é dirigido a você. O timbre continua o abafado de
+  antes; se reclamarem que some no alto-falante do notebook, a B é o caminho.
 - **A mensagem privada é um sino, e o convite de xadrez são duas notas.** Os dois chegam
   pelo canto da tela e precisam ser distinguíveis de ouvido, sem olhar. O **lance** do
   outro é madeira e não nota — estalo de ruído com um baque grave —, e fica 4 dB abaixo
