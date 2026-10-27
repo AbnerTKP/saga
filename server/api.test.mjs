@@ -1961,13 +1961,19 @@ test('a Garagem pela rede: um vê o outro, e só o dono da Saga começa o parab�
   const dono = await sessaoDe('abner');
   const tava = (await cadastrar('tava1')).corpo;
   const casa = tava.servidor.id;
-  const pos = (x, y) => ({ eu: { x, y, alvo: null, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0 } });
+  const pos = (x, y, papel = 'outro') => ({ eu: { x, y, alvo: null, papel, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0 } });
   const estar = (quem, corpo) => chamar('POST', '/garagem', { sessao: quem.token, servidor: casa, corpo });
 
   assert.equal((await chamar('POST', '/garagem', { servidor: casa, corpo: pos(10, 80) })).status, 401);
-  const a = await estar(tava, pos(100, 120));
+  const a = await estar(tava, pos(100, 120, 'tavao'));
   assert.equal(a.status, 200);
   assert.equal(a.corpo.podeCantar, false);
+  // Da porta, o dono vê que o Tavão já foi pego — e espiar não o põe na garagem.
+  const porta = await chamar('GET', '/garagem', { sessao: dono.token, servidor: casa });
+  assert.deepEqual(porta.corpo.pessoas.map((p) => [p.id, p.papel]), [[tava.eu.id, 'tavao']]);
+  // Só um Tavão por vez.
+  const segundo = await estar(dono, pos(160, 140, 'tavao'));
+  assert.equal(segundo.status, 409);
   const d = await estar(dono, pos(160, 140));
   assert.equal(d.corpo.podeCantar, true);
   const visto = d.corpo.pessoas.find((p) => p.id === tava.eu.id);

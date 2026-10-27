@@ -327,9 +327,8 @@ const naMesa = (sid, eu) => ({
 
 /**
  * O pedido como a Garagem o enxerga: de que servidor é, quem pede, se é o dono da Saga, e como
- * cada pessoa aparece — o nome exibido neste servidor e o apelido da CONTA, que é por onde se
- * acha quem vai para trás da mesa no parabéns. Quem não é mais membro, ou foi banido, volta nulo
- * e some da garagem.
+ * cada pessoa aparece — o nome exibido neste servidor. Quem não é mais membro, ou foi banido, volta
+ * nulo e some da garagem.
  */
 const naGaragem = (sid, eu) => ({
   sid,
@@ -337,7 +336,7 @@ const naGaragem = (sid, eu) => ({
   donoDaSaga: plataforma.ehDonoDaSaga(db, eu.id),
   pessoa: (id) => {
     const m = membros.buscarMembro(db, sid, id);
-    return m && !m.banido_em ? { nome: m.nome, apelido: m.apelido } : null;
+    return m && !m.banido_em ? { nome: m.nome } : null;
   },
 });
 
@@ -1542,6 +1541,12 @@ const ROTAS = {
   'POST /garagem': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return garagens.estar(naGaragem(sid, eu), await lerCorpo(req));
+  },
+
+  // A garagem vista da porta, sem entrar: a escolha de quem você é mostra o Tavão e o Donis já pegos.
+  'GET /garagem': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.espiar(naGaragem(sid, eu));
   },
 
   'POST /garagem/sair': async (req) => {

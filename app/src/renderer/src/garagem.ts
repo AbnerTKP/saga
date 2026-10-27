@@ -26,10 +26,16 @@ export type Ponto = { x: number; y: number };
 export type Retangulo = { x1: number; y1: number; x2: number; y2: number };
 export type Moto = 'harley' | 'sahara';
 export type Consumo = 'beber' | 'comer';
+/**
+ * Quem você é na garagem, escolhido na porta (o dono, 26/10/2026: "deixa 3 opções de players,
+ * donis, tavao e outras pessoas, só pode ter 1 donis e 1 tavao"). O servidor recusa o segundo.
+ */
+export type Papel = 'tavao' | 'donis' | 'outro';
+export const MOTO_DO_PAPEL: Record<Papel, Moto | null> = { tavao: 'harley', donis: 'sahara', outro: null };
 
 /** O que o servidor guarda de cada boneco (`conferirBoneco` em garagem.mjs). */
 export type BonecoNoServidor = {
-  x: number; y: number; alvo: Ponto | null; dir: Direcao;
+  x: number; y: number; alvo: Ponto | null; papel: Papel; dir: Direcao;
   /** Quantos goles e mordidas desde o último desmaio. */
   cheio: number;
   /** Contadores que só sobem: é pela diferença que a tela dos outros sabe que você bebeu ou caiu. */
@@ -246,8 +252,9 @@ const CALCAS = ['#2b3a55', '#3b3742', '#4a3b2a', '#2f3e2f'];
 const misturar = (n: number, k: number) => Math.abs(Math.imul(n * 2654435761 + k * 40503, 2246822519) >> 3);
 
 /**
- * A cara do boneco sai da CONTA, e ninguém escolhe (o dono, 26/10/2026): a Harley e a Sahara vestem
- * o Tavão e o Donis, e o resto sai do id — a mesma em toda tela, e a mesma de um dia para o outro.
+ * A cara do boneco. Ninguém escolhe roupa nem cor (o dono, 26/10/2026): a Harley veste quem entrou
+ * como o Tavão, a Sahara quem entrou como o Donis, e o resto sai do id da conta — a mesma em toda
+ * tela, e a mesma de um dia para o outro.
  */
 export function aparenciaDe(id: number, moto: Moto | null): Aparencia {
   if (moto === 'harley') return { pele: '#c98b62', cabelo: '#2a1d16', camisa: '#1d1d22', calca: '#2b3a55', estilo: 'harley' };
@@ -290,7 +297,16 @@ export type Ocorrencia =
   | { tipo: 'ratimbum' }
   | { tipo: 'fimDoCanto' };
 
-function novoBoneco(id: number, nome: string, moto: Moto | null, onde: Ponto): Boneco {
+/**
+ * Quem já pegou o Tavão e o Donis (o nome de quem pegou), sem contar você: é o que a porta mostra
+ * apagado. O servidor confere de novo na entrada — aqui é só para não oferecer o que vai ser recusado.
+ */
+export function papeisOcupados(pessoas: PessoaNaGaragem[], euId: number): Record<'tavao' | 'donis', string | null> {
+  const de = (papel: Papel) => pessoas.find((p) => p.id !== euId && p.papel === papel)?.nome ?? null;
+  return { tavao: de('tavao'), donis: de('donis') };
+}
+
+export function novoBoneco(id: number, nome: string, moto: Moto | null, onde: Ponto): Boneco {
   return {
     id, nome, moto, aparencia: aparenciaDe(id, moto),
     x: onde.x, y: onde.y, dir: 'baixo',
@@ -304,6 +320,9 @@ function novoBoneco(id: number, nome: string, moto: Moto | null, onde: Ponto): B
 export class Garagem {
   readonly bonecos = new Map<number, Boneco>();
   readonly euId: number;
+  /** Com que papel você entrou; `null` enquanto está na porta, olhando — aí o seu boneco não existe. */
+  papel: Papel | null = null;
+  private readonly meu: Boneco;
   podeCantar = false;
   parabensInicio: number | null = null;
   /** O relógio do servidor menos o daqui, da última leitura. */
@@ -320,10 +339,28 @@ export class Garagem {
   /** Sem `onde`, chega pela porta — cada conta num ponto dela, senão dois entrando juntos ficam com o nome um em cima do outro. */
   constructor(euId: number, nome: string, onde: Ponto = { x: PORTA.x + (euId * 37 % 61) - 30, y: PORTA.y }) {
     this.euId = euId;
-    this.bonecos.set(euId, novoBoneco(euId, nome, null, onde));
+    this.meu = novoBoneco(euId, nome, null, onde);
   }
 
-  get eu(): Boneco { return this.bonecos.get(this.euId)!; }
+  get eu(): Boneco { return this.meu; }
+  get dentro() { return this.papel !== null; }
+
+  /** Escolheu na porta: o boneco aparece, com a roupa do papel. */
+  entrar(papel: Papel) {
+    this.papel = papel;
+    this.meu.moto = MOTO_DO_PAPEL[papel];
+    this.meu.aparencia = aparenciaDe(this.euId, this.meu.moto);
+    this.bonecos.set(this.euId, this.meu);
+    this.mudouMeuAlvo = true;
+    return this;
+  }
+
+  /** O servidor recusou o papel (outro pegou primeiro): de volta à porta, sem boneco. */
+  voltarParaAPorta() {
+    this.papel = null;
+    this.bonecos.delete(this.euId);
+    this.meu.rota = [];
+  }
   /** Juntando ou cantando: quem anda os bonecos é a festa, de todo mundo, em toda tela. */
   get festaAndando() { return this.festa?.fase === 'reunindo' || this.festa?.fase === 'cantando'; }
   get mesaNaTela() { return this.festa !== null; }
@@ -336,6 +373,7 @@ export class Garagem {
     return {
       x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10,
       alvo: fim ? { x: Math.round(fim.x * 10) / 10, y: Math.round(fim.y * 10) / 10 } : null,
+      papel: this.papel ?? 'outro',
       dir: b.dir, cheio: b.cheio, goles: b.goles, ultimo: b.ultimo, quedas: b.quedas,
     };
   }
@@ -354,10 +392,11 @@ export class Garagem {
     const vistos = new Set<number>([this.euId]);
     for (const p of l.pessoas) {
       vistos.add(p.id);
+      // Na porta, o servidor ainda pode lembrar de você por uns segundos (`SUMIU`): o seu boneco não volta por isso.
+      if (p.id === this.euId) { this.meu.nome = p.nome; continue; }
       let b = this.bonecos.get(p.id);
       if (b && p.moto !== b.moto) b.aparencia = aparenciaDe(p.id, p.moto);
       if (b) { b.nome = p.nome; b.moto = p.moto; }
-      if (p.id === this.euId) continue;
       if (!b) {
         // Chegou agora: aparece onde está, com a história dele, sem tocar os goles de antes.
         b = novoBoneco(p.id, p.nome, p.moto, { x: p.x, y: p.y });
@@ -387,7 +426,7 @@ export class Garagem {
 
   // --- o que o SEU boneco faz -------------------------------------------------------------
 
-  private podeMexer() { return !this.festaAndando && this.eu.caido <= 0 && this.eu.vaiCair <= 0; }
+  private podeMexer() { return this.dentro && !this.festaAndando && this.eu.caido <= 0 && this.eu.vaiCair <= 0; }
 
   /** Clicou na garagem: no isopor, vai beber; na mesa de salgados, comer; no chão, andar. */
   clicar(q: Ponto) {

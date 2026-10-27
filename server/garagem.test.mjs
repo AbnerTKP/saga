@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ANIVERSARIANTES, DURACAO_DO_PARABENS, LIMITES, SUMIU, conferirBoneco, criarGaragens,
+  DURACAO_DO_PARABENS, LIMITES, PAPEIS, SUMIU, conferirBoneco, criarGaragens,
 } from './garagem.mjs';
 
 const PESSOAS = {
@@ -46,12 +46,39 @@ test('quem para de mandar sai da garagem; quem fecha a tela sai na hora', () => 
   assert.deepEqual(v.pessoas.map((p) => p.id), [2]);
 });
 
-test('quem vai para trás da mesa é achado pela CONTA, sem diferenciar maiúscula', () => {
+test('quem entra como o Tavão vem de Harley, o Donis de Sahara, e o resto com a própria cara', () => {
   const { g } = montar();
-  for (const id of [1, 2, 3, 4]) g.estar(ctx(id), boneco());
+  g.estar(ctx(2), boneco(100, 120, { papel: 'tavao' }));
+  g.estar(ctx(3), boneco(100, 120, { papel: 'donis' }));
+  g.estar(ctx(4), boneco(100, 120, { papel: 'outro' }));
   const v = g.estar(ctx(1), boneco());
-  assert.deepEqual(Object.fromEntries(v.pessoas.map((p) => [p.nome, p.moto])), { TKP: null, Tavão: 'harley', Donis: 'sahara', Blankito: null });
-  assert.deepEqual(ANIVERSARIANTES, { tava1: 'harley', donis: 'sahara' });
+  assert.deepEqual(Object.fromEntries(v.pessoas.map((p) => [p.nome, [p.papel, p.moto]])), {
+    TKP: ['outro', null], Tavão: ['tavao', 'harley'], Donis: ['donis', 'sahara'], Blankito: ['outro', null],
+  });
+  assert.deepEqual(PAPEIS, { tavao: 'harley', donis: 'sahara', outro: null });
+});
+
+test('só um Tavão e um Donis por vez: o segundo leva 409, e o papel vaga quando o primeiro sai', () => {
+  const { g, passar } = montar();
+  g.estar(ctx(2), boneco(100, 120, { papel: 'tavao' }));
+  assert.throws(() => g.estar(ctx(4), boneco(100, 120, { papel: 'tavao' })), (e) => e.status === 409 && /Tavão já está/.test(e.message));
+  // o mesmo Tavão continua mandando a posição sem esbarrar em si mesmo
+  assert.doesNotThrow(() => g.estar(ctx(2), boneco(110, 120, { papel: 'tavao' })));
+  // outro papel continua livre
+  assert.doesNotThrow(() => g.estar(ctx(4), boneco(100, 120, { papel: 'donis' })));
+  g.sair(ctx(2));
+  assert.doesNotThrow(() => g.estar(ctx(1), boneco(100, 120, { papel: 'tavao' })));
+  // e quem some sem fechar a tela também solta o papel
+  passar(SUMIU + 1);
+  assert.doesNotThrow(() => g.estar(ctx(3), boneco(100, 120, { papel: 'donis' })));
+});
+
+test('da porta, sem entrar: a escolha vê quem já pegou cada papel, e espiar não põe ninguém na garagem', () => {
+  const { g } = montar();
+  g.estar(ctx(2), boneco(100, 120, { papel: 'tavao' }));
+  const v = g.espiar(ctx(1));
+  assert.deepEqual(v.pessoas.map((p) => [p.id, p.papel]), [[2, 'tavao']]);
+  assert.deepEqual(g.quemEsta(7), [2]);
 });
 
 test('só o dono da Saga começa o parabéns, e só ele fica sabendo que pode', () => {
@@ -85,11 +112,11 @@ test('quem saiu do servidor (ou foi banido) some da garagem', () => {
 });
 
 test('o boneco é conferido: fora da sala volta para a borda, lixo vira o padrão, não-número é recusado', () => {
-  assert.deepEqual(conferirBoneco({ x: -50, y: 999, alvo: { x: 1000, y: 0 }, dir: 'voando', cheio: 40, goles: -3, ultimo: 'fumar', quedas: 2.5 }), {
-    x: LIMITES.x1, y: LIMITES.y2, alvo: { x: LIMITES.x2, y: LIMITES.y1 }, dir: 'baixo', cheio: 6, goles: 0, ultimo: null, quedas: 0,
+  assert.deepEqual(conferirBoneco({ x: -50, y: 999, alvo: { x: 1000, y: 0 }, papel: 'toString', dir: 'voando', cheio: 40, goles: -3, ultimo: 'fumar', quedas: 2.5 }), {
+    x: LIMITES.x1, y: LIMITES.y2, alvo: { x: LIMITES.x2, y: LIMITES.y1 }, papel: 'outro', dir: 'baixo', cheio: 6, goles: 0, ultimo: null, quedas: 0,
   });
-  assert.deepEqual(conferirBoneco({ x: 100, y: 100, dir: 'esq', cheio: 3, goles: 9, ultimo: 'comer', quedas: 1 }), {
-    x: 100, y: 100, alvo: null, dir: 'esq', cheio: 3, goles: 9, ultimo: 'comer', quedas: 1,
+  assert.deepEqual(conferirBoneco({ x: 100, y: 100, papel: 'donis', dir: 'esq', cheio: 3, goles: 9, ultimo: 'comer', quedas: 1 }), {
+    x: 100, y: 100, alvo: null, papel: 'donis', dir: 'esq', cheio: 3, goles: 9, ultimo: 'comer', quedas: 1,
   });
   for (const ruim of [null, 5, [], { x: '10', y: 10 }, { x: 10 }, { x: 10, y: Infinity }, { x: 10, y: 10, alvo: { x: 'a', y: 1 } }]) {
     assert.throws(() => conferirBoneco(ruim), (e) => e.status === 400, JSON.stringify(ruim));

@@ -11,8 +11,9 @@
 // guarda, confere e devolve — e se decide quem pode começar o parabéns.
 //
 // O parabéns é SURPRESA, pedido do dono em 26/10/2026: para todo mundo a garagem é um minigame
-// comum, e só o dono da Saga tem o botão. Quem vai para trás da mesa é decidido pela CONTA
-// (`ANIVERSARIANTES`), e não pelo nome exibido, que cada servidor escolhe.
+// comum, e só o dono da Saga tem o botão. Quem vai para trás da mesa é quem ENTROU como o Tavão ou
+// como o Donis: na porta da garagem cada um escolhe um dos três `PAPEIS`, e só pode haver um Tavão e
+// um Donis por vez — quem confere é aqui. Era pela conta, e a do Donis não se chama Donis.
 import { ErroDeConta } from './contas.mjs';
 
 /** Sem notícia há isto, a pessoa saiu da garagem (o app manda a posição de ~350 em 350 ms). */
@@ -23,8 +24,12 @@ export const SUMIU = 6000;
  * isto só serve para não começar outro no meio e para parar de mandar o `parabens` depois.
  */
 export const DURACAO_DO_PARABENS = 40_000;
-/** As contas que vão para trás da mesa, e a moto de cada uma (é a roupa do boneco). */
-export const ANIVERSARIANTES = { tava1: 'harley', donis: 'sahara' };
+/**
+ * Os três jeitos de entrar na garagem, e a moto de cada um (é a roupa do boneco). O Tavão e o Donis
+ * são um só cada; "outro" é todo mundo, com a cara que sai da própria conta.
+ */
+export const PAPEIS = { tavao: 'harley', donis: 'sahara', outro: null };
+const NOME_DO_PAPEL = { tavao: 'O Tavão', donis: 'O Donis' };
 /** A sala, nas medidas do desenho (320×180): os pés de ninguém saem daqui. */
 export const LIMITES = { x1: 8, x2: 312, y1: 72, y2: 176 };
 /** No sexto gole ou mordida, desmaia (o app zera a conta ao cair). */
@@ -59,6 +64,7 @@ export function conferirBoneco(eu) {
   }
   return {
     x, y, alvo,
+    papel: Object.hasOwn(PAPEIS, eu.papel) ? eu.papel : 'outro',
     dir: DIRECOES.has(eu.dir) ? eu.dir : 'baixo',
     cheio: Number.isInteger(eu.cheio) ? dentro(eu.cheio, 0, LIMITE_DA_BARRIGA) : 0,
     goles: contador(eu.goles),
@@ -71,8 +77,7 @@ export function conferirBoneco(eu) {
  * Uma garagem por servidor. É fábrica, como as mesas, para cada teste ter a sua.
  *
  * Quem chama entrega o pedido já resolvido (`naGaragem` em `index.mjs`): de que servidor é,
- * quem pede, se ele é o dono da Saga, e como cada pessoa aparece — com o apelido da conta, que é
- * por onde se acha quem vai para trás da mesa.
+ * quem pede, se ele é o dono da Saga, e como cada pessoa aparece.
  */
 export function criarGaragens({ relogio = Date.now } = {}) {
   /** sid -> { gente: Map<id, { boneco, visto }>, parabens: { inicio } | null } */
@@ -95,8 +100,7 @@ export function criarGaragens({ relogio = Date.now } = {}) {
       const quem = ctx.pessoa(id);
       // Quem foi banido ou saiu do servidor some da garagem na hora, sem esperar o `SUMIU`.
       if (!quem) { g.gente.delete(id); continue; }
-      const moto = ANIVERSARIANTES[String(quem.apelido ?? '').toLowerCase()] ?? null;
-      pessoas.push({ id, nome: quem.nome, moto, ...p.boneco });
+      pessoas.push({ id, nome: quem.nome, moto: PAPEIS[p.boneco.papel], ...p.boneco });
     }
     pessoas.sort((a, b) => a.id - b.id);
     return {
@@ -109,13 +113,32 @@ export function criarGaragens({ relogio = Date.now } = {}) {
   }
 
   return {
-    /** Anota onde o seu boneco está e devolve a garagem inteira, você incluído. */
+    /**
+     * Anota onde o seu boneco está e devolve a garagem inteira, você incluído. Quem entra como o
+     * Tavão ou o Donis com outro já lá dentro leva 409: o papel é de quem chegou primeiro, até ele
+     * sair (ou sumir por `SUMIU`).
+     */
     estar(ctx, corpo) {
       const boneco = conferirBoneco(corpo?.eu);
       const agora = relogio();
       const g = daGaragem(ctx.sid);
       faxina(g, agora);
+      if (boneco.papel !== 'outro') {
+        for (const [id, p] of g.gente) {
+          if (id !== ctx.eu && p.boneco.papel === boneco.papel && ctx.pessoa(id)) {
+            throw new ErroDeConta(`${NOME_DO_PAPEL[boneco.papel]} já está na garagem.`, 409);
+          }
+        }
+      }
       g.gente.set(ctx.eu, { boneco, visto: agora });
+      return vista(ctx, g, agora);
+    },
+
+    /** A garagem vista da porta, sem entrar: quem está, e com que papel — para a escolha mostrar o que já foi pego. */
+    espiar(ctx) {
+      const agora = relogio();
+      const g = daGaragem(ctx.sid);
+      faxina(g, agora);
       return vista(ctx, g, agora);
     },
 

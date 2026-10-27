@@ -13,7 +13,7 @@
  */
 import {
   ALTURA, APAGAO, BALCOES, HARLEY, LARGURA, MESA, ROTEIRO, SAHARA, TONTO,
-  legendaEm, type Boneco, type Garagem, type Ocorrencia, type Ponto,
+  legendaEm, novoBoneco, type Aparencia, type Boneco, type Garagem, type Ocorrencia, type Ponto,
 } from './garagem';
 
 const W = LARGURA, H = ALTURA;
@@ -49,6 +49,88 @@ export type Desenho = {
   /** O ponto da cena (320×180) debaixo do mouse. */
   pontoDe(e: { clientX: number; clientY: number }): Ponto;
 };
+
+/** Um boneco em pé, com os pés em (x0, y0), em qualquer contexto: a cena, o rascunho do deitado e o retrato da porta. */
+function pintarEmPe(ctx: CanvasRenderingContext2D, b: Boneco, x0: number, y0: number, relogio: number) {
+  const px = (x: number, y: number, w: number, h: number, cor: string) => { ctx.fillStyle = cor; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+  const a = b.aparencia;
+  const roupa = a.estilo === 'harley' ? { calca: '#2b3a55', bota: '#3a2418' }
+    : a.estilo === 'sahara' ? { calca: '#555a66', bota: '#e6e6e6' } : { calca: a.calca, bota: '#18181c' };
+  const tonto = b.cheio >= TONTO && b.andando ? Math.round(Math.sin(relogio * 7 + b.id) * 1.2) : 0;
+  const x = Math.round(x0) - 5 + tonto;
+  const y = Math.round(y0) - 20 - (b.pulo ? 1 : 0);
+  const passo = b.andando ? Math.floor(relogio * 8 + b.id) % 2 : -1;
+  px(x + 2, y + 14, 2, passo === 0 ? 4 : 5, roupa.calca);
+  px(x + 6, y + 14, 2, passo === 1 ? 4 : 5, roupa.calca);
+  px(x + 2, y + (passo === 0 ? 17 : 18), 2, 1, roupa.bota);
+  px(x + 6, y + (passo === 1 ? 17 : 18), 2, 1, roupa.bota);
+  if (a.estilo === 'sahara') { px(x + 2, y + 16, 2, 2, roupa.bota); px(x + 6, y + 16, 2, 2, roupa.bota); }
+  px(x + 1, y + 8, 8, 7, a.camisa);
+  if (a.estilo === 'harley') {
+    if (b.dir === 'baixo') px(x + 4, y + 8, 2, 7, '#e8e8e8');
+    px(x + 1, y + 11, 8, 1, COR.laranja);
+    if (b.dir === 'cima') { px(x + 3, y + 9, 4, 4, COR.laranja); px(x + 4, y + 10, 2, 2, COR.preto); }
+  }
+  if (a.estilo === 'sahara') {
+    px(x + 1, y + 8, 8, 2, COR.vermelho); px(x + 1, y + 12, 8, 1, COR.vermelho);
+    if (b.dir === 'cima') { px(x + 4, y + 10, 1, 2, COR.vermelho); px(x + 5, y + 10, 1, 1, COR.vermelho); }
+  }
+  const manga = a.estilo === 'sahara' ? COR.vermelho : a.camisa;
+  const naBoca = !!b.acao && b.acao.t < 0.8;
+  if (b.bracos) {
+    px(x, y + 4, 1, 6, manga); px(x + 9, y + 4, 1, 6, manga);
+    px(x, y + 3, 1, 1, a.pele); px(x + 9, y + 3, 1, 1, a.pele);
+  } else {
+    px(x, y + 9, 1, 5, manga); px(x, y + 14, 1, 1, a.pele);
+    if (naBoca) px(x + 9, y + 7, 1, 4, manga); else { px(x + 9, y + 9, 1, 5, manga); px(x + 9, y + 14, 1, 1, a.pele); }
+  }
+  px(x + 1, y + 1, 8, 7, a.pele);
+  const topo = a.estilo === 'harley' ? COR.laranja : a.estilo === 'sahara' ? COR.vermelho : a.cabelo;
+  if (b.dir === 'cima') {
+    px(x + 1, y, 8, 7, a.cabelo); px(x + 1, y, 8, 2, topo);
+    if (a.estilo === 'harley') px(x + 4, y + 2, 2, 2, COR.laranja);
+  } else {
+    px(x + 1, y, 8, 2, topo);
+    const olhoY = y + 4;
+    if (b.dir === 'baixo') {
+      px(x + 1, y + 2, 1, 2, a.cabelo); px(x + 8, y + 2, 1, 2, a.cabelo);
+      if (a.estilo === 'harley') { px(x + 2, olhoY - 1, 6, 2, '#0e0e10'); px(x + 3, olhoY - 1, 1, 1, '#4a4a55'); }
+      else if (b.cheio >= 4) {
+        px(x + 3, olhoY + 1, 1, 1, '#1a1a1a'); px(x + 6, olhoY + 1, 1, 1, '#1a1a1a');
+        px(x + 2, olhoY + 2, 1, 1, '#e88a8a'); px(x + 7, olhoY + 2, 1, 1, '#e88a8a');
+      } else { px(x + 3, olhoY, 1, 2, '#1a1a1a'); px(x + 6, olhoY, 1, 2, '#1a1a1a'); }
+      if (a.estilo === 'sahara') px(x, y + 2, 10, 1, COR.vermelho);
+    } else {
+      const frente = b.dir === 'dir';
+      px(frente ? x + 1 : x + 5, y + 2, 4, 3, a.cabelo);
+      if (a.estilo === 'harley') px(frente ? x + 5 : x + 1, olhoY - 1, 4, 2, '#0e0e10');
+      else px(frente ? x + 7 : x + 2, olhoY, 1, 2, '#1a1a1a');
+      if (a.estilo === 'sahara') px(frente ? x + 5 : x - 1, y + 2, 5, 1, COR.vermelho);
+    }
+    if (a.estilo === 'harley') px(x + 2, y + 6, 6, 2, '#3a2418');
+    if (b.boca) px(x + 4, y + 6, 2, 1, '#6e1f24');
+  }
+  if (naBoca && !b.bracos && b.acao) {
+    if (b.acao.tipo === 'beber') { px(x + 8, y + 4, 2, 3, COR.ambar); px(x + 8, y + 4, 2, 1, '#fff6df'); }
+    else { px(x + 8, y + 5, 2, 2, COR.coxinha); px(x + 8, y + 4, 1, 1, COR.coxinha); }
+  }
+  if (b.chapeu) {
+    const cores = [[COR.laranja, COR.preto], [COR.vermelho, COR.branco], ['#3f7fe0', '#ffd27a'], ['#2ea36a', '#ffffff'], ['#a855f7', '#ffd27a']];
+    const [c1, c2] = a.estilo === 'harley' ? cores[0] : a.estilo === 'sahara' ? cores[1] : cores[2 + (b.id % 3)];
+    px(x + 4, y - 6, 2, 1, '#ffffff');
+    px(x + 4, y - 5, 2, 1, c1); px(x + 3, y - 4, 4, 1, c2); px(x + 3, y - 3, 4, 1, c1);
+    px(x + 2, y - 2, 6, 1, c2); px(x + 2, y - 1, 6, 1, c1);
+  }
+}
+
+/** O retrato de um boneco parado, de frente, para a escolha da porta: 14×30, ampliado sem suavizar pelo CSS. */
+export function pintarRetrato(canvas: HTMLCanvasElement, aparencia: Aparencia, id: number) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  canvas.width = 14; canvas.height = 30;
+  ctx.clearRect(0, 0, 14, 30);
+  pintarEmPe(ctx, { ...novoBoneco(id, '', aparencia.estilo, { x: 7, y: 28 }), aparencia }, 7, 28, 0);
+}
 
 export function criarDesenho(tela: HTMLCanvasElement): Desenho {
   const c = tela.getContext('2d')!;
@@ -334,76 +416,7 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
   }
 
   // --- os bonecos -----------------------------------------------------------------------
-  function emPe(b: Boneco, x0: number, y0: number) {
-    const a = b.aparencia;
-    const roupa = a.estilo === 'harley' ? { calca: '#2b3a55', bota: '#3a2418' }
-      : a.estilo === 'sahara' ? { calca: '#555a66', bota: '#e6e6e6' } : { calca: a.calca, bota: '#18181c' };
-    const tonto = b.cheio >= TONTO && b.andando ? Math.round(Math.sin(relogio * 7 + b.id) * 1.2) : 0;
-    const x = Math.round(x0) - 5 + tonto;
-    const y = Math.round(y0) - 20 - (b.pulo ? 1 : 0);
-    const passo = b.andando ? Math.floor(relogio * 8 + b.id) % 2 : -1;
-    px(x + 2, y + 14, 2, passo === 0 ? 4 : 5, roupa.calca);
-    px(x + 6, y + 14, 2, passo === 1 ? 4 : 5, roupa.calca);
-    px(x + 2, y + (passo === 0 ? 17 : 18), 2, 1, roupa.bota);
-    px(x + 6, y + (passo === 1 ? 17 : 18), 2, 1, roupa.bota);
-    if (a.estilo === 'sahara') { px(x + 2, y + 16, 2, 2, roupa.bota); px(x + 6, y + 16, 2, 2, roupa.bota); }
-    px(x + 1, y + 8, 8, 7, a.camisa);
-    if (a.estilo === 'harley') {
-      if (b.dir === 'baixo') px(x + 4, y + 8, 2, 7, '#e8e8e8');
-      px(x + 1, y + 11, 8, 1, COR.laranja);
-      if (b.dir === 'cima') { px(x + 3, y + 9, 4, 4, COR.laranja); px(x + 4, y + 10, 2, 2, COR.preto); }
-    }
-    if (a.estilo === 'sahara') {
-      px(x + 1, y + 8, 8, 2, COR.vermelho); px(x + 1, y + 12, 8, 1, COR.vermelho);
-      if (b.dir === 'cima') { px(x + 4, y + 10, 1, 2, COR.vermelho); px(x + 5, y + 10, 1, 1, COR.vermelho); }
-    }
-    const manga = a.estilo === 'sahara' ? COR.vermelho : a.camisa;
-    const naBoca = !!b.acao && b.acao.t < 0.8;
-    if (b.bracos) {
-      px(x, y + 4, 1, 6, manga); px(x + 9, y + 4, 1, 6, manga);
-      px(x, y + 3, 1, 1, a.pele); px(x + 9, y + 3, 1, 1, a.pele);
-    } else {
-      px(x, y + 9, 1, 5, manga); px(x, y + 14, 1, 1, a.pele);
-      if (naBoca) px(x + 9, y + 7, 1, 4, manga); else { px(x + 9, y + 9, 1, 5, manga); px(x + 9, y + 14, 1, 1, a.pele); }
-    }
-    px(x + 1, y + 1, 8, 7, a.pele);
-    const topo = a.estilo === 'harley' ? COR.laranja : a.estilo === 'sahara' ? COR.vermelho : a.cabelo;
-    if (b.dir === 'cima') {
-      px(x + 1, y, 8, 7, a.cabelo); px(x + 1, y, 8, 2, topo);
-      if (a.estilo === 'harley') px(x + 4, y + 2, 2, 2, COR.laranja);
-    } else {
-      px(x + 1, y, 8, 2, topo);
-      const olhoY = y + 4;
-      if (b.dir === 'baixo') {
-        px(x + 1, y + 2, 1, 2, a.cabelo); px(x + 8, y + 2, 1, 2, a.cabelo);
-        if (a.estilo === 'harley') { px(x + 2, olhoY - 1, 6, 2, '#0e0e10'); px(x + 3, olhoY - 1, 1, 1, '#4a4a55'); }
-        else if (b.cheio >= 4) {
-          px(x + 3, olhoY + 1, 1, 1, '#1a1a1a'); px(x + 6, olhoY + 1, 1, 1, '#1a1a1a');
-          px(x + 2, olhoY + 2, 1, 1, '#e88a8a'); px(x + 7, olhoY + 2, 1, 1, '#e88a8a');
-        } else { px(x + 3, olhoY, 1, 2, '#1a1a1a'); px(x + 6, olhoY, 1, 2, '#1a1a1a'); }
-        if (a.estilo === 'sahara') px(x, y + 2, 10, 1, COR.vermelho);
-      } else {
-        const frente = b.dir === 'dir';
-        px(frente ? x + 1 : x + 5, y + 2, 4, 3, a.cabelo);
-        if (a.estilo === 'harley') px(frente ? x + 5 : x + 1, olhoY - 1, 4, 2, '#0e0e10');
-        else px(frente ? x + 7 : x + 2, olhoY, 1, 2, '#1a1a1a');
-        if (a.estilo === 'sahara') px(frente ? x + 5 : x - 1, y + 2, 5, 1, COR.vermelho);
-      }
-      if (a.estilo === 'harley') px(x + 2, y + 6, 6, 2, '#3a2418');
-      if (b.boca) px(x + 4, y + 6, 2, 1, '#6e1f24');
-    }
-    if (naBoca && !b.bracos && b.acao) {
-      if (b.acao.tipo === 'beber') { px(x + 8, y + 4, 2, 3, COR.ambar); px(x + 8, y + 4, 2, 1, '#fff6df'); }
-      else { px(x + 8, y + 5, 2, 2, COR.coxinha); px(x + 8, y + 4, 1, 1, COR.coxinha); }
-    }
-    if (b.chapeu) {
-      const cores = [[COR.laranja, COR.preto], [COR.vermelho, COR.branco], ['#3f7fe0', '#ffd27a'], ['#2ea36a', '#ffffff'], ['#a855f7', '#ffd27a']];
-      const [c1, c2] = a.estilo === 'harley' ? cores[0] : a.estilo === 'sahara' ? cores[1] : cores[2 + (b.id % 3)];
-      px(x + 4, y - 6, 2, 1, '#ffffff');
-      px(x + 4, y - 5, 2, 1, c1); px(x + 3, y - 4, 4, 1, c2); px(x + 3, y - 3, 4, 1, c1);
-      px(x + 2, y - 2, 6, 1, c2); px(x + 2, y - 1, 6, 1, c1);
-    }
-  }
+  const emPe = (b: Boneco, x0: number, y0: number) => pintarEmPe(G, b, x0, y0, relogio);
 
   function boneco(b: Boneco) {
     if (b.caido > 0) {

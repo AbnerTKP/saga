@@ -685,6 +685,10 @@ export const agirNaMesaDoCatan = async (id: number, a: AcaoNaMesaDoCatan, servid
 export const estarNaGaragem = (eu: BonecoNoServidor, servidorId: number) =>
   pedir<LeituraDaGaragem>('POST', '/garagem', { eu }, servidorId);
 
+/** A garagem vista da porta, sem entrar: quem está e quem já pegou o Tavão e o Donis. */
+export const espiarAGaragem = (servidorId: number) =>
+  pedir<LeituraDaGaragem>('GET', '/garagem', undefined, servidorId);
+
 export const sairDaGaragem = (servidorId: number) =>
   pedir<{ ok: true }>('POST', '/garagem/sair', {}, servidorId);
 

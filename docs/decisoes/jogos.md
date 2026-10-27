@@ -107,13 +107,16 @@ https://claude.ai/artifact/LwLfue36SZ5CRFTaPofhX5 ("está ótimo").
   outros, `api.test.mjs`). O botão aparecer só para ele vem de `podeCantar` na leitura — nenhum outro
   app fica sabendo que o botão existe. Apertar de novo no meio não recomeça: dois cliques não cortam a
   música de todo mundo.
-- **Quem vai para trás da mesa é decidido pela CONTA**, em `ANIVERSARIANTES` (`garagem.mjs`): `tava1`
-  de Harley e `donis` de Sahara, sem diferenciar maiúscula. Conferido na produção em 26/10/2026:
-  **`Tava1` existe (id 24); `donis` NÃO** — nem com "don" no apelido ou no nome exibido. Até o dono
-  dizer qual é a conta dele, o Donis entra como qualquer um e ninguém fica do lado direito do bolo.
-- **A roupa sai da conta, e ninguém escolhe** (`aparenciaDe`): a Harley veste o Tava1 (jaqueta,
-  bandana, óculos e barba), a Sahara veste o Donis (camisa de trilha, boné, pele mais escura), e o
-  resto sai do id — a mesma cara em toda tela e todo dia.
+- **Quem vai para trás da mesa é quem ENTROU como o Tavão ou o Donis.** Na porta da garagem cada um
+  escolhe um dos três (`PAPEIS`): o Tavão, de Harley; o Donis, de Sahara; ou outra pessoa. Só um Tavão
+  e um Donis por vez: o servidor recusa o segundo com 409 ("O Tavão já está na garagem."), o papel é de
+  quem chegou primeiro até ele sair ou sumir, e a porta mostra apagado quem já pegou cada um
+  (`GET /garagem`, que espia sem entrar). Nasceu pela CONTA (`tava1` e `donis`), e na produção não
+  havia conta `donis`: o Donis é o "juninho ruindade pura" — e foi aí que o dono pediu a escolha.
+- **Ninguém escolhe roupa nem cor** (`aparenciaDe`): o papel decide — a Harley veste o Tavão (jaqueta,
+  bandana, óculos e barba), a Sahara veste o Donis (camisa de trilha, boné, pele mais escura) —, e a
+  outra pessoa tem a cara que sai do id da conta, a mesma em toda tela e todo dia. Até escolher, você
+  só olha: na porta o seu boneco não existe, e a garagem segue viva atrás do véu.
 - **Ninguém manda posição de quadro em quadro.** Cada app manda, de 350 em 350 ms, onde o SEU boneco
   está e para onde vai (`alvo`), e cada tela anda os outros até lá com o MESMO `planejar`
   (`garagem.ts`). O boneco dos outros anda liso, e o servidor guarda meia dúzia de números por pessoa.
@@ -143,7 +146,8 @@ https://claude.ai/artifact/LwLfue36SZ5CRFTaPofhX5 ("está ótimo").
   teste do parabéns põe o Tava1 no canto oposto de propósito.
 - **Visto** numa bancada no Chrome headless e mudo, com a `TelaDaGaragem` de verdade, o CSS de verdade
   e um servidor local, e quatro robôs que usam a própria classe `Garagem` mandando a posição pela rede:
-  os quatro andando na tela do TKP, o botão só na dele (na do Tava1, nada de festa), o sexto gole
+  a porta com o Tavão e o Donis já pegos ("com Tava1", "com juninho") e só "Outra pessoa" livre, os
+  quatro andando na tela do TKP, o botão só na dele (na da Bia, nada de festa), o sexto gole
   apagando a tela e deitando o boneco, e o parabéns inteiro — a mesa aparecendo, os dois atrás dela, a
   luz apagando com a legenda, o confete, a mesa sumindo e o telão voltando à moto. Nenhum erro no
   console. **Não foi exercido**: o som (a bancada é muda), o menu de jogos de dentro de uma call (sem

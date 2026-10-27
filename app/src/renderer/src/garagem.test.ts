@@ -2,12 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   APAGAO, ATE_CAIR, BALCOES, CAIDO, DURACAO_DA_FESTA, Garagem, LIMITE_DA_BARRIGA, MESA, REUNIR, ROTEIRO,
-  aparenciaDe, bloqueado, faseDaFesta, lugaresDaFesta, obstaculosDa, planejar, soltar,
+  aparenciaDe, bloqueado, faseDaFesta, lugaresDaFesta, obstaculosDa, papeisOcupados, planejar, soltar,
   type LeituraDaGaragem, type PessoaNaGaragem,
 } from './garagem.ts';
 
 const pessoa = (id: number, x: number, y: number, extra: Partial<PessoaNaGaragem> = {}): PessoaNaGaragem => ({
-  id, nome: `p${id}`, moto: null, x, y, alvo: null, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0, ...extra,
+  id, nome: `p${id}`, moto: null, x, y, alvo: null, papel: 'outro', dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0, ...extra,
 });
 const leitura = (agora: number, pessoas: PessoaNaGaragem[], parabens: number | null = null): LeituraDaGaragem => ({
   agora, podeCantar: false, parabens: parabens === null ? null : { inicio: parabens }, pessoas,
@@ -77,7 +77,7 @@ test('ninguém escolhe o boneco: a cara sai da conta, a mesma toda vez', () => {
 });
 
 test('beber até o sexto: a sua tela apaga 1 s, o boneco cai e a barriga zera', () => {
-  const g = new Garagem(1, 'TKP', { x: BALCOES[0].para.x, y: BALCOES[0].para.y });
+  const g = new Garagem(1, 'TKP', { x: BALCOES[0].para.x, y: BALCOES[0].para.y }).entrar('outro');
   let t = 0;
   for (let i = 0; i < LIMITE_DA_BARRIGA; i++) {
     g.clicar({ x: 30, y: 80 });
@@ -126,10 +126,10 @@ test('longe demais da posição que chegou, o boneco dos outros pula para ela', 
 });
 
 test('o parabéns: todo mundo chega no lugar até a luz apagar, e a música começa na hora certa', () => {
-  const g = new Garagem(1, 'TKP', { x: 30, y: 170 });
+  const g = new Garagem(1, 'TKP', { x: 30, y: 170 }).entrar('outro');
   const inicio = 50_000;
   // o relógio daqui está 2 s atrás do servidor: quem manda é o do servidor
-  g.receber(leitura(inicio + 100, [pessoa(1, 30, 170), pessoa(24, 300, 175, { moto: 'harley' }), pessoa(30, 20, 110, { moto: 'sahara' })], inicio), inicio + 100 - 2000);
+  g.receber(leitura(inicio + 100, [pessoa(1, 30, 170), pessoa(24, 300, 175, { moto: 'harley', papel: 'tavao' }), pessoa(30, 20, 110, { moto: 'sahara', papel: 'donis' })], inicio), inicio + 100 - 2000);
   let t = andarPor(g, REUNIR - 0.2, inicio - 1900);
   const ocorreu = g.colher().map((o) => o.tipo);
   assert.ok(ocorreu.includes('mesa'));
@@ -159,10 +159,10 @@ test('o parabéns: todo mundo chega no lugar até a luz apagar, e a música come
 });
 
 test('quem abre a garagem com a música tocando já aparece no lugar', () => {
-  const g = new Garagem(1, 'TKP', { x: 30, y: 170 });
+  const g = new Garagem(1, 'TKP', { x: 30, y: 170 }).entrar('outro');
   const inicio = 10_000;
   const agora = inicio + (REUNIR + 5) * 1000;
-  g.receber(leitura(agora, [pessoa(1, 30, 170), pessoa(24, 300, 175, { moto: 'harley' })], inicio), agora);
+  g.receber(leitura(agora, [pessoa(1, 30, 170), pessoa(24, 300, 175, { moto: 'harley', papel: 'tavao' })], inicio), agora);
   g.passo(1 / 60, agora);
   const canto = g.colher().find((o) => o.tipo === 'canto');
   assert.ok(canto && canto.tipo === 'canto' && Math.abs(canto.aPartirDe - 5) < 0.1, 'a música começa do meio');
@@ -172,11 +172,33 @@ test('quem abre a garagem com a música tocando já aparece no lugar', () => {
 });
 
 test('o que o app manda do seu boneco: onde está, para onde vai e a barriga', () => {
-  const g = new Garagem(1, 'TKP', { x: 160, y: 168 });
+  const g = new Garagem(1, 'TKP', { x: 160, y: 168 }).entrar('outro');
   g.clicar({ x: 200, y: 130 });
   assert.equal(g.mudouMeuAlvo, true);
   const meu = g.meuBoneco();
   assert.deepEqual([meu.x, meu.y], [160, 168]);
   assert.deepEqual(meu.alvo, { x: 200, y: 130 });
   assert.equal(meu.cheio, 0);
+  assert.equal(meu.papel, 'outro');
+});
+
+test('na porta você só olha: sem boneco e sem clique, até escolher quem é', () => {
+  const g = new Garagem(1, 'Juninho');
+  g.receber(leitura(1000, [pessoa(1, 50, 120), pessoa(5, 100, 120)]), 0);
+  assert.equal(g.bonecos.has(1), false, 'o servidor ainda lembrava de você, e o boneco não voltou');
+  assert.ok(g.bonecos.has(5));
+  g.clicar({ x: 200, y: 130 });
+  assert.equal(g.eu.rota.length, 0);
+  g.entrar('donis');
+  assert.ok(g.bonecos.has(1));
+  assert.equal(g.eu.aparencia.estilo, 'sahara');
+  assert.equal(g.meuBoneco().papel, 'donis');
+  g.voltarParaAPorta();
+  assert.equal(g.bonecos.has(1), false);
+});
+
+test('a porta mostra quem já pegou o Tavão e o Donis — sem contar você', () => {
+  const gente = [pessoa(2, 1, 1, { papel: 'tavao', nome: 'Tava1' }), pessoa(3, 1, 1, { papel: 'outro' }), pessoa(1, 1, 1, { papel: 'donis', nome: 'eu' })];
+  assert.deepEqual(papeisOcupados(gente, 1), { tavao: 'Tava1', donis: null });
+  assert.deepEqual(papeisOcupados([], 1), { tavao: null, donis: null });
 });

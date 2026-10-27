@@ -1,12 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
-import { BALCOES, Garagem, HARLEY, LIMITE_DA_BARRIGA, SAHARA, type Ocorrencia, type Ponto } from '../garagem';
-import { criarDesenho, type Desenho } from '../desenhoDaGaragem';
+import {
+  BALCOES, Garagem, HARLEY, LIMITE_DA_BARRIGA, SAHARA, aparenciaDe, papeisOcupados,
+  type Aparencia, type Ocorrencia, type Papel, type Ponto,
+} from '../garagem';
+import { criarDesenho, pintarRetrato, type Desenho } from '../desenhoDaGaragem';
 import { cantarParabens, tocarNaGaragem } from '../somDaGaragem';
-import { cantarParabensNaGaragem, estarNaGaragem, sairDaGaragem } from '../api';
+import { cantarParabensNaGaragem, espiarAGaragem, estarNaGaragem, sairDaGaragem } from '../api';
 
 /** De quanto em quanto o seu boneco vai ao servidor (e volta a garagem inteira). */
 const INTERVALO = 350;
+/** Na porta, só olhando: basta saber quem está e quem já pegou o Tavão e o Donis. */
+const INTERVALO_NA_PORTA = 1000;
 /** Andando com as setas, o alvo muda a cada quadro: manda no máximo isto por segundo. */
 const MENOR_ENTRE_ENVIOS = 120;
 
@@ -15,11 +20,21 @@ const TECLAS: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1],
 };
 
+function Retrato({ aparencia, id }: { aparencia: Aparencia; id: number }) {
+  const tela = useRef<HTMLCanvasElement>(null);
+  useEffect(() => { if (tela.current) pintarRetrato(tela.current, aparencia, id); }, [aparencia, id]);
+  return <canvas ref={tela} aria-hidden="true" />;
+}
+
 /**
  * A Garagem na tela: a cena de pixel no palco, como a partida de xadrez, e na barra de cima o que se
  * faz com a mão — a barriga, as luzes, sair e, só para o dono da Saga, o parabéns. A regra é do
  * `garagem.ts`, o desenho do `desenhoDaGaragem.ts`, o som do `somDaGaragem.ts`; aqui só se liga um
- * ao outro: o laço de quadros, a ida ao servidor e o mouse e o teclado.
+ * ao outro: a porta, o laço de quadros, a ida ao servidor e o mouse e o teclado.
+ *
+ * Na PORTA, cada um escolhe quem é: o Tavão, o Donis ou outra pessoa (o dono, 26/10/2026). A garagem
+ * aparece atrás, viva, e quem já pegou o Tavão ou o Donis aparece na escolha — o servidor recusa o
+ * segundo com 409 e a escolha volta, dizendo por quê.
  */
 export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso }: {
   servidorId: number;
@@ -48,8 +63,11 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
   const avisar = useRef(onAviso);
   avisar.current = onAviso;
 
+  const [papel, setPapel] = useState<Papel | null>(null);
+  const [ocupados, setOcupados] = useState<Record<'tavao' | 'donis', string | null>>({ tavao: null, donis: null });
+  const [recusa, setRecusa] = useState<string | null>(null);
   const [luzes, setLuzes] = useState(false);
-  const [barra, setBarra] = useState({ podeCantar: false, festa: false, cheio: 0, quantos: 1 });
+  const [barra, setBarra] = useState({ podeCantar: false, festa: false, cheio: 0, quantos: 0 });
   const [falhou, setFalhou] = useState<string | null>(null);
   const [tamanho, setTamanho] = useState({ w: 640, h: 360 });
 
@@ -59,8 +77,9 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
   // A letra de pixel da cena: o canvas não espera a fonte carregar sozinho.
   useEffect(() => { void document.fonts?.load('700 16px "Pixelify Sans"').catch(() => undefined); }, []);
 
-  // A ida ao servidor: o seu boneco vai, a garagem inteira volta.
+  // A ida ao servidor: na porta, só espiando; dentro, o seu boneco vai e a garagem inteira volta.
   useEffect(() => {
+    const naPorta = papel === null;
     let vivo = true;
     let indo = false;
     let deNovo = false;
@@ -71,17 +90,28 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
       garagem.mudouMeuAlvo = false;
       ultimoEnvio.current = performance.now();
       try {
-        const l = await estarNaGaragem(garagem.meuBoneco(), servidorId);
+        const l = naPorta ? await espiarAGaragem(servidorId) : await estarNaGaragem(garagem.meuBoneco(), servidorId);
         if (!vivo) return;
         garagem.receber(l);
+        const agora = papeisOcupados(l.pessoas, euId);
+        setOcupados((a) => (a.tavao === agora.tavao && a.donis === agora.donis ? a : agora));
         setFalhou(null);
       } catch (e) {
         if (!vivo) return;
+        const status = (e as { status?: number }).status;
         // Servidor de antes da Garagem: a rota não existe.
-        if ((e as { status?: number }).status === 404) {
+        if (status === 404) {
           vivo = false;
           avisar.current('erro', 'A Garagem ainda não chegou a este servidor.');
           fechar.current();
+          return;
+        }
+        // Outro pegou o Tavão (ou o Donis) primeiro: de volta à porta, dizendo por quê.
+        if (status === 409 && !naPorta) {
+          vivo = false;
+          garagem.voltarParaAPorta();
+          setRecusa((e as Error).message);
+          setPapel(null);
           return;
         }
         setFalhou((e as Error).message);
@@ -90,16 +120,16 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
         if (deNovo && vivo) { deNovo = false; void ir(); }
       }
     };
-    enviar.current = () => { void ir(); };
+    enviar.current = naPorta ? null : () => { void ir(); };
     void ir();
-    const id = setInterval(() => void ir(), INTERVALO);
+    const id = setInterval(() => void ir(), naPorta ? INTERVALO_NA_PORTA : INTERVALO);
     return () => {
       vivo = false;
       clearInterval(id);
       enviar.current = null;
-      void sairDaGaragem(servidorId).catch(() => undefined);
+      if (!naPorta) void sairDaGaragem(servidorId).catch(() => undefined);
     };
-  }, [garagem, servidorId]);
+  }, [garagem, servidorId, papel, euId]);
 
   // A cena cabe no palco inteiro, sempre em 16:9.
   useLayoutEffect(() => {
@@ -134,7 +164,7 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
     };
     let antes = performance.now();
     let id = 0;
-    const mostrado = { podeCantar: false, festa: false, cheio: 0, quantos: 1 };
+    const mostrado = { podeCantar: false, festa: false, cheio: 0, quantos: 0 };
     const quadro = (agora: number) => {
       const dt = Math.min(0.05, (agora - antes) / 1000);
       antes = agora;
@@ -160,6 +190,13 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
       pararCanto.current = null;
     };
   }, [garagem]);
+
+  const entrar = (p: Papel) => {
+    garagem.entrar(p);
+    setRecusa(null);
+    setPapel(p);
+    tela.current?.focus({ preventScroll: true });
+  };
 
   const clicar = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const d = desenho.current;
@@ -192,21 +229,30 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
       .catch((e) => avisar.current('erro', (e as Error).message));
   };
 
+  const quantos = barra.quantos === 0 ? 'ninguém aqui ainda' : barra.quantos === 1 && papel ? 'só você aqui' : `${barra.quantos} aqui`;
+  const naPorta: { papel: Papel; nome: string; sub: string; ocupado: boolean; aparencia: Aparencia }[] = [
+    { papel: 'tavao', nome: 'Tavão', sub: ocupados.tavao ? `com ${ocupados.tavao}` : 'de Harley', ocupado: !!ocupados.tavao, aparencia: aparenciaDe(euId, 'harley') },
+    { papel: 'donis', nome: 'Donis', sub: ocupados.donis ? `com ${ocupados.donis}` : 'de Sahara', ocupado: !!ocupados.donis, aparencia: aparenciaDe(euId, 'sahara') },
+    { papel: 'outro', nome: 'Outra pessoa', sub: 'você mesmo', ocupado: false, aparencia: aparenciaDe(euId, null) },
+  ];
+
   return (
     <div className="tela-da-garagem">
       <header className="stage-head">
         <Icon name="controle" />
         <span className="strong">Garagem</span>
-        <span className="garagem-quantos">{barra.quantos === 1 ? 'só você aqui' : `${barra.quantos} aqui`}</span>
+        <span className="garagem-quantos">{quantos}</span>
         <div className="garagem-acoes">
-          <span className="garagem-barriga" title="No sexto gole ou mordida, o boneco desmaia.">
-            Barriga
-            <span className="gomos">
-              {Array.from({ length: LIMITE_DA_BARRIGA }, (_, i) => (
-                <i key={i} className={i < barra.cheio ? (barra.cheio >= LIMITE_DA_BARRIGA - 1 ? 'cheio quase' : 'cheio') : ''} />
-              ))}
+          {papel && (
+            <span className="garagem-barriga" title="No sexto gole ou mordida, o boneco desmaia.">
+              Barriga
+              <span className="gomos">
+                {Array.from({ length: LIMITE_DA_BARRIGA }, (_, i) => (
+                  <i key={i} className={i < barra.cheio ? (barra.cheio >= LIMITE_DA_BARRIGA - 1 ? 'cheio quase' : 'cheio') : ''} />
+                ))}
+              </span>
             </span>
-          </span>
+          )}
           <button type="button" className="secundario sm garagem-luzes" aria-pressed={luzes}
             onClick={() => { luzesRef.current = !luzes; setLuzes(!luzes); }}>Luzes</button>
           {barra.podeCantar && (
@@ -216,22 +262,42 @@ export function TelaDaGaragem({ servidorId, euId, nome, surdo, onFechar, onAviso
         </div>
       </header>
       <div className="garagem-area" ref={area}>
-        <canvas
-          ref={tela}
-          className="garagem-tela"
-          style={{ width: tamanho.w, height: tamanho.h }}
-          tabIndex={0}
-          aria-label="A garagem: as motos, o isopor, a mesa de salgados e os bonecos de quem está aqui"
-          onPointerDown={clicar}
-          onPointerMove={cursor}
-          onKeyDown={(e) => tecla(e, true)}
-          onKeyUp={(e) => tecla(e, false)}
-          onBlur={() => teclas.current.clear()}
-        />
+        <div className="garagem-moldura" style={{ width: tamanho.w, height: tamanho.h }}>
+          <canvas
+            ref={tela}
+            className="garagem-tela"
+            tabIndex={0}
+            aria-label="A garagem: as motos, o isopor, a mesa de salgados e os bonecos de quem está aqui"
+            onPointerDown={clicar}
+            onPointerMove={cursor}
+            onKeyDown={(e) => tecla(e, true)}
+            onKeyUp={(e) => tecla(e, false)}
+            onBlur={() => teclas.current.clear()}
+          />
+          {!papel && (
+            <div className="garagem-porta">
+              <div className="garagem-porta-cartao" role="dialog" aria-label="Quem é você na garagem?">
+                <h3>Quem é você na garagem?</h3>
+                <div className="garagem-papeis">
+                  {naPorta.map((p) => (
+                    <button key={p.papel} type="button" className="garagem-papel" disabled={p.ocupado} onClick={() => entrar(p.papel)}>
+                      <Retrato aparencia={p.aparencia} id={euId} />
+                      <span className="nome">{p.nome}</span>
+                      <span className="sub">{p.sub}</span>
+                    </button>
+                  ))}
+                </div>
+                {recusa && <p className="garagem-porta-recusa">{recusa} Escolha outro.</p>}
+              </div>
+            </div>
+          )}
+        </div>
         <p className={`garagem-dica ${falhou ? 'erro' : ''}`}>
           {falhou
             ? `Sem resposta do servidor (${falhou}). Tentando de novo…`
-            : 'Clique no chão para andar (ou use as setas). No isopor você bebe, na mesa de salgados você come — no sexto, desmaia. Clique numa moto para acelerar.'}
+            : !papel
+              ? 'Só pode haver um Tavão e um Donis na garagem.'
+              : 'Clique no chão para andar (ou use as setas). No isopor você bebe, na mesa de salgados você come — no sexto, desmaia. Clique numa moto para acelerar.'}
         </p>
       </div>
     </div>
