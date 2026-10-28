@@ -2,14 +2,17 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
-- **A Garagem e o parabéns (26/10/2026).** Medido numa bancada escondida e muda (a TelaDaGaragem de
-  verdade contra um servidor local, com quatro robôs andando pela rede): a porta com o Tavão e o Donis
-  já pegos, os bonecos dos outros andando na sua tela, o botão só na conta do dono, o desmaio no sexto
-  gole com a tela apagando 1 s, e o parabéns inteiro, da mesa aparecendo à mesa sumindo. **Falta**: o
-  **som** (a música do parabéns, o gole, o desmaio, as motos), que é de ouvido; abrir pelo menu de
-  jogos dentro de uma call; dois tentando pegar o Tavão no mesmo instante (só o servidor foi testado);
-  e cinco pessoas de verdade ao mesmo tempo, no Windows e no Mac. **No dia**: o Tavão e o Juninho têm
-  de escolher "Tavão" e "Donis" na porta — senão ninguém vai para trás da mesa.
+- **A Garagem refeita: a festa do dono, os temas e a Navinha (27/10/2026).** Medido numa bancada
+  escondida e muda (o servidor de verdade num banco novo, a TelaDaGaragem de verdade, quatro robôs pela
+  rede): sem porta; o botão Festa só na conta do dono; o painel guardando no servidor quem faz
+  aniversário, o nome no telão e o tema; a outra conta recebendo o tema e nenhum nome até o canto; o
+  parabéns com os dois atrás da mesa, vestidos do tema e de coroa; e a Navinha jogada até o fim, com os
+  pontos indo para o placar do banco. Na prancheta, os cinco temas dos dois lados e as peças clicadas.
+  **Falta**: o **som** (o parabéns, o gole, o desmaio, as peças de cada tema e a Navinha), que é de
+  ouvido; jogar a Navinha com a mão (a bancada só segurou o tiro); abrir pelo menu de jogos dentro de
+  uma call; e cinco pessoas de verdade ao mesmo tempo, no Windows e no Mac. **No dia**: escolher no
+  painel da festa quem faz aniversário ANTES — o tema aparece na hora para todo mundo, os nomes só no
+  canto.
 
 - **A atividade na v0.74.1 (21/10/2026): o jogo que abre depois e o ícone de fora do Steam.** Medido:
   com a Saga compilada contra um servidor local e o LoL do dono aberto, o LoL apareceu em ~1 s com o

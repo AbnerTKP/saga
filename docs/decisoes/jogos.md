@@ -87,36 +87,77 @@ App e servidor juntos. A Urna e o Dragão Quadrado saíram em 26/10/2026 — ver
   atraso, o protocolo que impede o app velho de SENTAR mas não de LER, e que quem assiste não publica
   nada na sala — e isso falha calado.
 
-## A Garagem (26/10/2026)
+## A Garagem (26/10/2026, refeita em 27/10/2026)
 
 Pedido do dono, em três tempos no mesmo dia: um minigame de aniversário "com o tema de moto harley e
 sahara, do tavao que usa harley e donis que usa sahara", com salinha, bolo, luz, bonecos andando e um
 botão de parabéns; depois "que pareça um minigame normal sem aniversario nem nada" e que só a conta
 dele começasse o parabéns; e, por fim, bebida e comida "até desmaiar por 1 segundo apagar a tela e
 voltar", o telão "passando só um videozinho pixelado de moto andando", o Donis "mais escurinho" e
-"ninguém pode escolher o estilo do boneco". Prancheta jogável:
-https://claude.ai/artifact/LwLfue36SZ5CRFTaPofhX5 ("está ótimo").
+"ninguém pode escolher o estilo do boneco". Saiu na v0.75.0 com uma porta em que cada um escolhia ser
+o Tavão, o Donis ou outra pessoa. No dia seguinte: *"adapte só pra minha conta escolher um nome de uma
+ou 2 pessoas caso seja 2 aniversarios no mesmo dia, pra hora do parabens, o tema adicione mais, moto,
+carro, mecanica, jogos, pc gamer, adicione uns video games fixos independente do tema fliperamas no
+caso com minigame de navizinha simples, e adicione comida e etc"*. Prancheta jogável, com a
+`TelaDaGaragem` de verdade e um servidor falso dentro da página:
+https://claude.ai/artifact/5mmMnBvLxVv9C3MuacWjAb (a de 26/10, da v0.75.0:
+https://claude.ai/artifact/LwLfue36SZ5CRFTaPofhX5).
 
 - **É SURPRESA, e isso decide o que aparece onde.** Para todo mundo, a Garagem é um minigame comum: o
-  telão passa uma moto, há isopor e mesa de salgados, e o menu diz "abrir a garagem". A mesa com o
-  bolo, as bandeirinhas, o chapéu e o "PARABÉNS · TAVÃO & DONIS" no telão só existem durante a festa.
-  **As linhas `Nota:` de quem mexer aqui não podem contar o parabéns** — elas viram a nota da versão
-  que os aniversariantes leem. O repositório é público e esta página conta tudo; ninguém do grupo lê
-  isto, mas é bom saber.
-- **Só o dono da Saga começa, e quem confere é o servidor** (`POST /garagem/parabens`, 403 para os
-  outros, `api.test.mjs`). O botão aparecer só para ele vem de `podeCantar` na leitura — nenhum outro
-  app fica sabendo que o botão existe. Apertar de novo no meio não recomeça: dois cliques não cortam a
-  música de todo mundo.
-- **Quem vai para trás da mesa é quem ENTROU como o Tavão ou o Donis.** Na porta da garagem cada um
-  escolhe um dos três (`PAPEIS`): o Tavão, de Harley; o Donis, de Sahara; ou outra pessoa. Só um Tavão
-  e um Donis por vez: o servidor recusa o segundo com 409 ("O Tavão já está na garagem."), o papel é de
-  quem chegou primeiro até ele sair ou sumir, e a porta mostra apagado quem já pegou cada um
-  (`GET /garagem`, que espia sem entrar). Nasceu pela CONTA (`tava1` e `donis`), e na produção não
-  havia conta `donis`: o Donis é o "juninho ruindade pura" — e foi aí que o dono pediu a escolha.
-- **Ninguém escolhe roupa nem cor** (`aparenciaDe`): o papel decide — a Harley veste o Tavão (jaqueta,
-  bandana, óculos e barba), a Sahara veste o Donis (camisa de trilha, boné, pele mais escura) —, e a
-  outra pessoa tem a cara que sai do id da conta, a mesma em toda tela e todo dia. Até escolher, você
-  só olha: na porta o seu boneco não existe, e a garagem segue viva atrás do véu.
+  telão passa o vídeo do tema, há fliperamas, isopor, salgados e bebedouro, e o menu diz "abrir a
+  garagem". A mesa com o bolo, as bandeirinhas, as coroas e o "PARABÉNS · TAVÃO & DONIS" no telão só
+  existem durante a festa. **As linhas `Nota:` de quem mexer aqui não podem contar o parabéns** — elas
+  viram a nota da versão que os aniversariantes leem. O repositório é público e esta página conta tudo;
+  ninguém do grupo lê isto, mas é bom saber.
+- **Quem faz aniversário é o dono que escolhe, no painel da festa — e a porta saiu** (27/10/2026, as
+  escolhas do dono na prancheta). Só a conta dele tem o botão "Festa": até duas pessoas DESTE servidor,
+  o nome de cada uma no telão (até 14 letras) e o tema de cada uma. A porta Tavão/Donis/outra pessoa
+  existia só para saber quem ia para trás da mesa, e pedia ao aniversariante que se escolhesse — o que
+  entregava a surpresa ao primeiro que perguntasse "por que tem Tavão?". Hoje cada um entra como é.
+- **O tema vai para todo mundo na hora; os nomes só saem do servidor quando o dono manda cantar.** O
+  tema é decoração e não conta nada (escolha do dono: "na hora em que escolho", e não só no parabéns).
+  O servidor manda `temas` para todos, `preparo` (a lista) só para o dono da Saga, e os nomes vão em
+  `parabens.aniversariantes` a partir do canto — e a lista é fotografada ali: mexer no painel no meio
+  da música não troca o nome que está no telão. `api.test.mjs` procura "Tavão" na leitura de outra
+  conta antes do canto e não acha. **Quem confere tudo é o servidor**: `POST /garagem/festa` e
+  `POST /garagem/parabens` respondem 403 para quem não é dono da Saga, e o parabéns sem ninguém escolhido
+  é 400. O botão só aparecer na tela dele vem de `podeCantar` — nenhum outro app sabe que ele existe.
+- **Cada aniversariante é dono de um lado da garagem.** O esquerdo é do primeiro e o direito do segundo
+  (`temasDa`); com um só, a garagem inteira é dele. Cada tema (`temasDaGaragem.ts`) desenha as DUAS
+  versões de cada coisa — o quadro na parede, a peça grande do chão, o vídeo do telão, o andar do bolo
+  (o de baixo é do lado esquerdo, o de cima do direito) e a roupa de festa —, como a Harley e a Sahara
+  eram o tema moto antes de haver temas. As peças trocam de desenho mas cabem nas mesmas caixas
+  (`PECAS`), com o mesmo chão bloqueado embaixo: trocar de tema não mexe no caminho nem no servidor.
+  Clicar na peça faz ela fazer alguma coisa (o V8 ronca, o elevador sobe o carro, o esmeril solta
+  faísca, a TV mostra "GG!", a máquina de dança acende, o RGB acelera, o ring light acende).
+- **Ninguém escolhe roupa nem cor** (`aparenciaDe`): pele, cabelo e roupa saem do id da conta, a mesma
+  em toda tela e todo dia. Na festa, e só com a mesa na tela, quem faz aniversário veste a roupa do tema
+  dele por cima e ganha coroa no lugar do chapéu de todo mundo; a cara continua a da pessoa.
+- **Os dois fliperamas são fixos, em qualquer tema, e o jogo é a Navinha** (`navinha.ts`, regra pura e
+  testada; `desenhoDaNavinha.ts`). Clicar num deles leva o boneco até ele e troca a cena pela tela do
+  fliperama; `jogando` (0, 1 ou nulo) vai no boneco, e os outros veem a pessoa de costas para o gabinete,
+  com a tela piscando. Ocupado, quem chega ouve "ocupado!". A festa tira todo mundo do fliperama, e
+  desmaiar também. Quem bebeu demais joga com a nave escorregando (`tonto`). O "fim de jogo" fica pelo
+  menos 1 s na tela, e quem morreu segurando o tiro não recomeça sem soltar.
+- **O placar fica no banco, só os cinco maiores de cada servidor** (escolha do dono: "guardar de vez").
+  `garagem_recordes`, migração 59: ao anotar, o que cai para fora do placar é apagado, e a tabela nunca
+  passa de cinco linhas por servidor. Só quem está na garagem anota, e a pontuação tem de ser um inteiro
+  entre 1 e 999.999 — é um grupo de amigos, não há como impedir quem quiser forjar pelo console, e a
+  conferência só tira o lixo. O nome é o deste servidor; quem saiu dele fica no placar pelo apelido.
+- **A festa preparada também fica no banco** (`garagem_festas`, a mesma migração 59). O resto da garagem
+  continua na memória, mas a decoração e os nomes preparados com um dia de antecedência não podem sumir
+  porque uma versão do servidor subiu no meio do caminho. A garagem lê as duas tabelas uma vez, na
+  primeira volta depois do arranque, e escreve só quando o dono prepara ou alguém entra no placar.
+- **Comida tem cardápio, e a água esvazia** (`COMIDAS`). O isopor e a mesinha dão cerveja, refri ou suco;
+  a estufa de salgados, coxinha, pizza, pastel, dogão ou brigadeiro — sorteado a cada pegada, e o que
+  saiu vai em `ultimo`, para os outros verem a mão e o grito certos. O bebedouro tira um gomo da barriga
+  ("ahh!"), e é o jeito de não desmaiar. Depois do canto, a mesa serve bolo. O app de antes mandava só
+  "beber" e "comer", e o servidor continua aceitando os dois.
+- **A letra de pixel só nas palavras grandes que nós escrevemos** ("PARABÉNS", "NAVINHA", "Você
+  apagou!"); nomes, letreiros, placar e legendas vão na Figtree. Na Pixelify o "C" maiúsculo é um "O" com
+  um entalhe e o "G" quase um "B": medido pixel a pixel, de 8 a 40 px e em qualquer peso, o "C" e o "O"
+  diferem em 1 a 19 pixels. Na v0.75.0 o Gustavo aparecia como "Bustavo" em cima do boneco, e "CORRIDA"
+  saía "OORRIDA". Não é tamanho nem peso: é o desenho da letra.
 - **Ninguém manda posição de quadro em quadro.** Cada app manda, de 350 em 350 ms, onde o SEU boneco
   está e para onde vai (`alvo`), e cada tela anda os outros até lá com o MESMO `planejar`
   (`garagem.ts`). O boneco dos outros anda liso, e o servidor guarda meia dúzia de números por pessoa.
@@ -127,31 +168,32 @@ https://claude.ai/artifact/LwLfue36SZ5CRFTaPofhX5 ("está ótimo").
   não ouve a história de ninguém. **Só quem caiu vê a tela apagar** (1 s de preto, `APAGAO`); os outros
   veem o boneco deitado por 2,2 s. Cai no sexto gole ou mordida (`LIMITE_DA_BARRIGA`), e a barriga zera.
 - **O parabéns anda pelo relógio do SERVIDOR** (`parabens.inicio`), e cada tela calcula a fase sozinha
-  (`faseDaFesta`): 4,5 s juntando, o canto (a melodia, "é pique", "é hora", rá-tim-bum, "TAVÃO!
-  DONIS!"), a mesa montada por 8 s e o fim. O lugar de cada um sai da ordem dos ids
-  (`lugaresDaFesta`), então dá igual em toda tela; quem chega atrasado ou abre a garagem com a música
-  tocando aparece no lugar, e a música começa dali. O servidor espera 40 s para aceitar outro
-  parabéns, mais que a festa (`garagem.test.ts` confere).
-- **A garagem vive na MEMÓRIA do servidor**, como as mesas: publicar o servidor esvazia a garagem por
-  uma volta, e cada app a enche de novo na leitura seguinte. Quem não manda notícia há 6 s saiu.
+  (`faseDaFesta`): 4,5 s juntando, o canto (a melodia, "é pique", "é hora", rá-tim-bum, o grito com os
+  nomes), a mesa montada por 8 s e o fim. O lugar de cada um sai da ordem dos ids (`lugaresDaFesta`),
+  então dá igual em toda tela; aniversariante que não está na garagem não ocupa lugar, e o telão diz o
+  nome do mesmo jeito. Quem chega atrasado aparece no lugar, e a música começa dali. O servidor espera
+  40 s para aceitar outro parabéns, mais que a festa (`garagem.test.ts` confere).
+- **Quem anda pela garagem vive na MEMÓRIA do servidor**, como as mesas: publicar o servidor esvazia a
+  garagem por uma volta, e cada app a enche de novo na leitura seguinte. Quem não manda notícia há 6 s
+  saiu. O `GET /garagem` ficou para o app de antes (v0.75), que ainda pergunta da porta.
 - **Anda por HTTP, não pelo LiveKit.** São cinco pessoas andando de clique em clique, não uma luta em
   tempo real: o caminho medido do Dragão (canal de dados, rollback) seria peso sem motivo. Cinco
-  pessoas a ~3 pedidos por segundo cabem na VPS de um núcleo.
-- **O desenho é o da prancheta**, em canvas de 320×180 sem suavizar (`desenhoDaGaragem.ts`), com as
-  cores no código como as do Catan; o CSS (`garagem.css`) só tem a moldura e os tokens. A letra é a
-  **Pixelify Sans** (OFL, `fontes/pixelify.woff2`, 12 KB), dentro do pacote pelo mesmo motivo da
-  Figtree. O som é sintetizado (`somDaGaragem.ts`), e quem está de fone desligado não ouve nada.
+  pessoas a ~3 pedidos por segundo cabem na VPS de um núcleo. A Navinha roda só na tela de quem joga.
+- **O desenho é em canvas de 320×180 sem suavizar** (`desenhoDaGaragem.ts` e `temasDaGaragem.ts`), com as
+  cores no código como as do Catan; o CSS (`garagem.css`) só tem a moldura, o painel da festa e os
+  tokens. O som é sintetizado (`somDaGaragem.ts`), e quem está de fone desligado não ouve nada.
 - **O caminho conferia só o primeiro móvel, e o Tava1 chegava atrasado à festa** — contornava a Sahara
   e ficava preso embaixo da toalha. Hoje cada trecho do desvio é conferido de novo (`planejar`), e o
   teste do parabéns põe o Tava1 no canto oposto de propósito.
-- **Visto** numa bancada no Chrome headless e mudo, com a `TelaDaGaragem` de verdade, o CSS de verdade
-  e um servidor local, e quatro robôs que usam a própria classe `Garagem` mandando a posição pela rede:
-  a porta com o Tavão e o Donis já pegos ("com Tava1", "com juninho") e só "Outra pessoa" livre, os
-  quatro andando na tela do TKP, o botão só na dele (na da Bia, nada de festa), o sexto gole
-  apagando a tela e deitando o boneco, e o parabéns inteiro — a mesa aparecendo, os dois atrás dela, a
-  luz apagando com a legenda, o confete, a mesa sumindo e o telão voltando à moto. Nenhum erro no
-  console. **Não foi exercido**: o som (a bancada é muda), o menu de jogos de dentro de uma call (sem
-  LiveKit nesta máquina), o Electron, o Mac, a Saga do navegador e cinco pessoas de verdade.
+- **Visto (27/10/2026)**: numa bancada escondida e muda — o servidor de verdade num banco novo, a
+  `TelaDaGaragem` de verdade pelo Vite, quatro robôs da própria classe `Garagem` pela rede e o Chrome
+  `--headless --mute-audio` —: a garagem abrindo sem porta, o botão Festa só na conta do dono, o painel
+  gravando "TAVÃO" de Mecânica e "DONIS" de PC gamer no servidor, a Bia recebendo os temas e nenhum nome,
+  o parabéns com os dois atrás da mesa vestidos do tema e de coroa, e a Navinha jogada até o fim de jogo
+  com os pontos entrando no placar do banco. Nenhum erro no console. E, na prancheta, os cinco temas
+  dos dois lados, as peças clicadas e a festa com temas misturados. **Não foi exercido**: o som (a
+  bancada é muda), o menu de jogos de dentro de uma call (sem LiveKit nesta máquina), o Electron, o Mac,
+  a Saga do navegador e cinco pessoas de verdade.
 
 ## A Dama (07/10/2026)
 
