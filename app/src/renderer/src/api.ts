@@ -7,7 +7,7 @@
 // significaria mexer no servidor de produção, onde o pessoal está conversando.
 import type { Enquadramento, Enquadramentos, Papel } from './enquadramento';
 import type { AcaoNaMesaDoCatan, CatanNoServidor, MesaDoCatan } from './catan';
-import type { BonecoNoServidor, LeituraDaGaragem } from './garagem';
+import type { Aniversariante, BonecoNoServidor, LeituraDaGaragem, Recorde } from './garagem';
 import { lerResposta } from './resposta';
 import type { CorEscolhida, Lado, LanceLegal, MotivoDoFim, Promocao, Relogio } from './xadrez';
 import type { JogoDeMesa, ResumoDaMesa } from './jogos';
@@ -685,16 +685,20 @@ export const agirNaMesaDoCatan = async (id: number, a: AcaoNaMesaDoCatan, servid
 export const estarNaGaragem = (eu: BonecoNoServidor, servidorId: number) =>
   pedir<LeituraDaGaragem>('POST', '/garagem', { eu }, servidorId);
 
-/** A garagem vista da porta, sem entrar: quem está e quem já pegou o Tavão e o Donis. */
-export const espiarAGaragem = (servidorId: number) =>
-  pedir<LeituraDaGaragem>('GET', '/garagem', undefined, servidorId);
-
 export const sairDaGaragem = (servidorId: number) =>
   pedir<{ ok: true }>('POST', '/garagem/sair', {}, servidorId);
 
 /** Só o dono da Saga: o servidor recusa os outros com 403. */
 export const cantarParabensNaGaragem = (servidorId: number) =>
   pedir<LeituraDaGaragem>('POST', '/garagem/parabens', {}, servidorId);
+
+/** Só o dono da Saga: quem faz aniversário, o nome no telão e o tema de cada um (vazio desfaz). */
+export const prepararFestaNaGaragem = (aniversariantes: Aniversariante[], servidorId: number) =>
+  pedir<LeituraDaGaragem>('POST', '/garagem/festa', { aniversariantes }, servidorId);
+
+/** A partida do fliperama que entrou no placar. Devolve o placar de agora. */
+export const recordeNaGaragem = (pontos: number, servidorId: number) =>
+  pedir<{ recordes: Recorde[] }>('POST', '/garagem/recorde', { pontos }, servidorId);
 
 /**
  * O passe de uma sala de voz, pedido ao servidor DELA e pelo id.

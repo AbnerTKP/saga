@@ -367,6 +367,11 @@ export function App() {
   const dadosDaqui = dadosDoServidor?.servidorId === servidorAberto ? dadosDoServidor : null;
   const cargos = dadosDaqui?.cargos ?? SEM_CARGOS;
   const membrosDoServidor = dadosDaqui?.membros ?? SEM_MEMBROS;
+  // Quem pode ser escolhido para o parabéns da Garagem: quem é deste servidor e não está banido.
+  const pessoasDaGaragem = useMemo(
+    () => membrosDoServidor.filter((m) => !m.banido).map((m) => ({ id: m.id, nome: m.nome, foto: m.foto })),
+    [membrosDoServidor],
+  );
 
   // A última sala de texto de cada servidor: guardada ao abrir, devolvida ao voltar (ultimaSala.ts).
   const contaId = sessao?.eu?.id ?? null;
@@ -1654,6 +1659,7 @@ export function App() {
             servidorId={jogoAberto.servidorId}
             euId={eu.id}
             nome={eu.nome}
+            pessoas={pessoasDaGaragem}
             surdo={rm.deafened}
             onFechar={() => setJogoAberto(null)}
             onAviso={notas.mostrar}

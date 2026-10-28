@@ -8,11 +8,17 @@
  * - desmaio: o assobio caindo e o baque no chão;
  * - as motos: a Harley no "batata-batata" grave, a Sahara no ronco mais fino de monocilíndrica.
  *
+ * E, desde os temas (27/10/2026, ainda não ouvidos pelo dono): o V8 rosnando e o jipe a diesel, o
+ * hidráulico do elevador e a parafusadeira, a musiquinha do console e a batida da máquina de dança,
+ * o teclado e o "plim" da live; a água do bebedouro; e os da Navinha — o tiro, o acerto, a explosão,
+ * a nave caindo, a onda nova, o fim de jogo e a ficha entrando.
+ *
  * Quem decide o que tocar é a tela (`TelaDaGaragem.tsx`), a partir das ocorrências do `garagem.ts`;
  * quem está de fone desligado não ouve nada daqui. Se ficou bom é de ouvido, e isso é do dono: a
  * bancada de teste é muda.
  */
 import { ROTEIRO } from './garagem';
+import type { SomDaPeca } from './temasDaGaragem';
 
 let contexto: AudioContext | null = null;
 const VOLUME = 0.2;
@@ -65,7 +71,10 @@ function estalo(c: AudioContext, saida: AudioNode, ini: number, freq: number, du
   n.stop(ini + dur + 0.02);
 }
 
-export type SomDaGaragem = 'gole' | 'mordida' | 'soluco' | 'desmaio' | 'harley' | 'sahara';
+export type SomDaGaragem =
+  | 'gole' | 'mordida' | 'soluco' | 'desmaio' | 'agua'
+  | SomDaPeca
+  | 'tiro' | 'acertou' | 'explodiu' | 'morreu' | 'onda' | 'fim' | 'comecou';
 
 /** Um som curto. `forca` abaixa o dos OUTROS (o seu gole é mais perto que o do vizinho). */
 export function tocarNaGaragem(som: SomDaGaragem, forca = 1) {
@@ -82,11 +91,49 @@ export function tocarNaGaragem(som: SomDaGaragem, forca = 1) {
     tom(c, saida, 'sine', 950, 210, t, 0.5, 0.35);
     tom(c, saida, 'sine', 95, 38, t + 0.5, 0.25, 0.9);
     estalo(c, saida, t + 0.5, 300, 0.18, 0.6);
-  } else ronco(c, saida, som, t);
+  } else if (som === 'agua') {
+    for (let k = 0; k < 2; k++) tom(c, saida, 'sine', 420 - k * 40, 260, t + k * 0.12, 0.08, 0.4);
+    tom(c, saida, 'triangle', 330, 220, t + 0.3, 0.35, 0.2);
+  } else if (som === 'harley' || som === 'sahara' || som === 'v8' || som === 'jipe') ronco(c, saida, som, t);
+  else if (som === 'elevador') {
+    chiado(c, saida, t, 0.9, 2400, 0.25);
+    tom(c, saida, 'sawtooth', 55, 70, t, 1.0, 0.18);
+  } else if (som === 'parafusadeira') {
+    for (let k = 0; k < 14; k++) estalo(c, saida, t + k * 0.045, 3200, 0.03, 0.55);
+    tom(c, saida, 'square', 380, 520, t, 0.65, 0.08);
+  } else if (som === 'console') {
+    [523, 659, 784, 1047].forEach((f, k) => tom(c, saida, 'square', f, f, t + k * 0.09, 0.12, 0.18));
+  } else if (som === 'danca') {
+    for (let k = 0; k < 4; k++) { tom(c, saida, 'sine', 140, 45, t + k * 0.25, 0.16, 0.9); estalo(c, saida, t + k * 0.25 + 0.125, 6000, 0.04, 0.4); }
+    [659, 784, 988, 784].forEach((f, k) => tom(c, saida, 'square', f, f, t + k * 0.25, 0.1, 0.12));
+  } else if (som === 'teclado') {
+    for (let k = 0; k < 9; k++) estalo(c, saida, t + k * 0.07 + Math.random() * 0.02, 4200, 0.025, 0.5);
+  } else if (som === 'live') {
+    tom(c, saida, 'sine', 880, 880, t, 0.25, 0.3); tom(c, saida, 'sine', 1320, 1320, t + 0.12, 0.35, 0.25);
+  } else if (som === 'tiro') tom(c, saida, 'square', 1200, 260, t, 0.09, 0.12);
+  else if (som === 'acertou') tom(c, saida, 'square', 600, 900, t, 0.05, 0.12);
+  else if (som === 'explodiu') { chiado(c, saida, t, 0.25, 900, 0.5); tom(c, saida, 'square', 180, 60, t, 0.2, 0.12); }
+  else if (som === 'morreu') { chiado(c, saida, t, 0.8, 500, 0.6); tom(c, saida, 'sawtooth', 400, 40, t, 0.8, 0.2); }
+  else if (som === 'onda') [523, 659, 784, 1047, 1319].forEach((f, k) => tom(c, saida, 'square', f, f, t + k * 0.07, 0.1, 0.14));
+  else if (som === 'fim') [784, 659, 523, 392, 262].forEach((f, k) => tom(c, saida, 'square', f, f * 0.98, t + k * 0.16, 0.18, 0.16));
+  else if (som === 'comecou') { tom(c, saida, 'square', 988, 988, t, 0.08, 0.15); tom(c, saida, 'square', 1319, 1319, t + 0.08, 0.3, 0.15); }
   setTimeout(() => saida.disconnect(), 2500);
 }
 
-function ronco(c: AudioContext, saida: AudioNode, moto: 'harley' | 'sahara', t: number) {
+/** Ruído passando num filtro: o chiado do hidráulico e o estouro da explosão. */
+function chiado(c: AudioContext, saida: AudioNode, ini: number, dur: number, freq: number, vol: number) {
+  const n = c.createBufferSource(); n.buffer = ruido(c); n.loop = true;
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 0.6;
+  const env = c.createGain();
+  env.gain.setValueAtTime(0.001, ini);
+  env.gain.linearRampToValueAtTime(vol, ini + 0.02);
+  env.gain.exponentialRampToValueAtTime(0.001, ini + dur);
+  n.connect(bp).connect(env).connect(saida);
+  n.start(ini); n.stop(ini + dur + 0.05);
+}
+
+/** O ronco: a Harley no "batata-batata" grave, a Sahara mais fina, o V8 rosnando e o jipe a diesel. */
+function ronco(c: AudioContext, saida: AudioNode, moto: 'harley' | 'sahara' | 'v8' | 'jipe', t: number) {
   const o = c.createOscillator();
   o.type = 'sawtooth';
   const lp = c.createBiquadFilter();
@@ -96,7 +143,16 @@ function ronco(c: AudioContext, saida: AudioNode, moto: 'harley' | 'sahara', t: 
   const lfo = c.createOscillator();
   lfo.type = 'square';
   const prof = c.createGain();
-  if (moto === 'harley') {
+  if (moto === 'v8') {
+    lp.frequency.value = 650;
+    o.frequency.setValueAtTime(42, t); o.frequency.linearRampToValueAtTime(95, t + 0.3); o.frequency.linearRampToValueAtTime(60, t + 0.55);
+    o.frequency.linearRampToValueAtTime(110, t + 0.8); o.frequency.linearRampToValueAtTime(45, t + 1.3);
+    lfo.frequency.value = 11; prof.gain.value = 0.18;
+  } else if (moto === 'jipe') {
+    lp.frequency.value = 420;
+    o.frequency.setValueAtTime(48, t); o.frequency.linearRampToValueAtTime(75, t + 0.4); o.frequency.linearRampToValueAtTime(50, t + 1.3);
+    lfo.frequency.value = 6; prof.gain.value = 0.25;
+  } else if (moto === 'harley') {
     lp.frequency.value = 520;
     o.frequency.setValueAtTime(36, t); o.frequency.linearRampToValueAtTime(68, t + 0.35); o.frequency.linearRampToValueAtTime(40, t + 1.3);
     lfo.frequency.setValueAtTime(8, t); lfo.frequency.linearRampToValueAtTime(15, t + 0.35); lfo.frequency.linearRampToValueAtTime(7, t + 1.3);

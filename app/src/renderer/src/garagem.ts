@@ -1,16 +1,20 @@
 /**
- * A Garagem: o minigame de andar pela garagem, beber no isopor e comer na mesa de salgados — e o
- * parabéns surpresa do Tavão e do Donis (pedido do dono em 26/10/2026).
+ * A Garagem: o minigame de andar pela garagem, beber, comer e jogar fliperama — e o parabéns
+ * surpresa (pedido do dono em 26/10/2026, refeito em 27/10/2026).
  *
- * Para todo mundo é um minigame comum, sem nada de aniversário: o telão passa uma moto andando, e
- * só o dono da Saga tem o botão do parabéns. Apertado, a mesa com o bolo aparece, as contas
- * `tava1` e `donis` vão para trás dela, o resto da turma para a frente, a luz apaga e todo mundo
- * canta — na tela de todos ao mesmo tempo, porque a hora é a do SERVIDOR (`parabens.inicio`).
+ * Para todo mundo é um minigame comum, sem nada de aniversário: a garagem tem um tema (moto, carro,
+ * mecânica, videogame ou PC gamer) e só o dono da Saga prepara a festa — escolhe uma ou duas pessoas,
+ * o nome de cada uma no telão e o tema de cada uma. O lado ESQUERDO da garagem é do primeiro
+ * aniversariante e o DIREITO, do segundo; com um só, a garagem inteira é dele. Quando o dono manda
+ * cantar, a mesa com o bolo aparece, os aniversariantes vão para trás dela vestidos do tema, o resto
+ * da turma para a frente, a luz apaga e todo mundo canta — na tela de todos ao mesmo tempo, porque a
+ * hora é a do SERVIDOR (`parabens.inicio`).
  *
  * Aqui mora a regra, sem tela e sem som, e é isto que tem teste: o caminho em volta dos móveis, o
- * roteiro do parabéns, o lugar de cada um na festa, o beber até cair, e como a posição dos outros
- * que chega do servidor vira boneco andando. O desenho é do `desenhoDaGaragem.ts`, o som do
- * `somDaGaragem.ts`, e a tela, da `TelaDaGaragem.tsx`.
+ * roteiro do parabéns, o lugar de cada um na festa, o beber até cair, o fliperama, e como a posição
+ * dos outros que chega do servidor vira boneco andando. O desenho é do `desenhoDaGaragem.ts` (e dos
+ * temas, `temasDaGaragem.ts`), o som do `somDaGaragem.ts`, o jogo do fliperama do `navinha.ts`, e a
+ * tela, da `TelaDaGaragem.tsx`.
  *
  * Ninguém manda posição de quadro em quadro. Cada app manda onde o SEU boneco está e para onde vai
  * (`alvo`), de ~350 em 350 ms, e cada tela anda os outros até lá com o mesmo `planejar`: o boneco
@@ -24,30 +28,64 @@ export const ALTURA = 180;
 export type Direcao = 'baixo' | 'cima' | 'esq' | 'dir';
 export type Ponto = { x: number; y: number };
 export type Retangulo = { x1: number; y1: number; x2: number; y2: number };
-export type Moto = 'harley' | 'sahara';
-export type Consumo = 'beber' | 'comer';
-/**
- * Quem você é na garagem, escolhido na porta (o dono, 26/10/2026: "deixa 3 opções de players,
- * donis, tavao e outras pessoas, só pode ter 1 donis e 1 tavao"). O servidor recusa o segundo.
- */
-export type Papel = 'tavao' | 'donis' | 'outro';
-export const MOTO_DO_PAPEL: Record<Papel, Moto | null> = { tavao: 'harley', donis: 'sahara', outro: null };
 
-/** O que o servidor guarda de cada boneco (`conferirBoneco` em garagem.mjs). */
-export type BonecoNoServidor = {
-  x: number; y: number; alvo: Ponto | null; papel: Papel; dir: Direcao;
-  /** Quantos goles e mordidas desde o último desmaio. */
-  cheio: number;
-  /** Contadores que só sobem: é pela diferença que a tela dos outros sabe que você bebeu ou caiu. */
-  goles: number; ultimo: Consumo | null; quedas: number;
+// --- os temas e a festa ---------------------------------------------------------------------
+
+/** Os temas da garagem (o dono, 27/10/2026: "moto, carro, mecânica, jogos, pc gamer"). */
+export type Tema = 'moto' | 'carro' | 'mecanica' | 'jogos' | 'pc';
+export const TEMAS: readonly { tema: Tema; nome: string }[] = [
+  { tema: 'moto', nome: 'Moto' },
+  { tema: 'carro', nome: 'Carro' },
+  { tema: 'mecanica', nome: 'Mecânica' },
+  { tema: 'jogos', nome: 'Videogame' },
+  { tema: 'pc', nome: 'PC gamer' },
+];
+export const eTema = (v: unknown): v is Tema => TEMAS.some((t) => t.tema === v);
+/** 0 é o lado esquerdo da garagem, 1 o direito. */
+export type Lado = 0 | 1;
+
+/** Quem faz aniversário: a conta (é ela que vai para trás da mesa), o nome no telão e o tema. */
+export type Aniversariante = { id: number; nome: string; tema: Tema };
+export const MAX_ANIVERSARIANTES = 2;
+/** O nome no telão cabe nisto (o telão tem 120 px de pixel e a letra é grande). */
+export const MAX_NOME_NO_TELAO = 14;
+
+/** O tema de cada lado: o esquerdo do primeiro aniversariante, o direito do segundo — ou do mesmo, se for um só. */
+export function temasDa(aniversariantes: readonly Aniversariante[] | null | undefined): [Tema, Tema] {
+  const a = aniversariantes ?? [];
+  if (!a.length) return ['moto', 'moto'];
+  return [a[0].tema, (a[1] ?? a[0]).tema];
+}
+
+/** "TAVÃO & DONIS", no telão. */
+export const nomesNoTelao = (a: readonly Aniversariante[]) => a.map((p) => p.nome.toUpperCase()).join(' & ');
+/** "TAVÃO! DONIS!", no grito depois do rá-tim-bum. */
+export const nomesNoGrito = (a: readonly Aniversariante[]) => a.map((p) => `${p.nome.toUpperCase()}!`).join(' ');
+
+// --- o que se come e se bebe ----------------------------------------------------------------
+
+export type Comida =
+  | 'cerveja' | 'refri' | 'suco' | 'agua'
+  | 'coxinha' | 'pizza' | 'pastel' | 'cachorro' | 'brigadeiro' | 'bolo';
+/**
+ * Cada coisa: se é de beber ou de comer (o som e a mão), o que sai escrito em cima da cabeça, e quanto
+ * enche a barriga. A ÁGUA esvazia: é o jeito de não desmaiar.
+ */
+export const COMIDAS: Record<Comida, { tipo: 'beber' | 'comer'; grito: string; barriga: number }> = {
+  cerveja: { tipo: 'beber', grito: 'glup!', barriga: 1 },
+  refri: { tipo: 'beber', grito: 'glup!', barriga: 1 },
+  suco: { tipo: 'beber', grito: 'glup!', barriga: 1 },
+  agua: { tipo: 'beber', grito: 'ahh!', barriga: -1 },
+  coxinha: { tipo: 'comer', grito: 'coxinha!', barriga: 1 },
+  pizza: { tipo: 'comer', grito: 'pizza!', barriga: 1 },
+  pastel: { tipo: 'comer', grito: 'pastel!', barriga: 1 },
+  cachorro: { tipo: 'comer', grito: 'dogão!', barriga: 1 },
+  brigadeiro: { tipo: 'comer', grito: 'brigadeiro!', barriga: 1 },
+  bolo: { tipo: 'comer', grito: 'bolo!', barriga: 1 },
 };
-export type PessoaNaGaragem = BonecoNoServidor & { id: number; nome: string; moto: Moto | null };
-export type LeituraDaGaragem = {
-  agora: number;
-  podeCantar: boolean;
-  parabens: { inicio: number } | null;
-  pessoas: PessoaNaGaragem[];
-};
+export const eComida = (v: unknown): v is Comida => typeof v === 'string' && Object.hasOwn(COMIDAS, v);
+/** O app de antes mandava só "beber" e "comer". */
+export const comidaDe = (v: unknown): Comida | null => (eComida(v) ? v : v === 'beber' ? 'cerveja' : v === 'comer' ? 'coxinha' : null);
 
 // --- a sala ---------------------------------------------------------------------------------
 
@@ -55,19 +93,37 @@ export type LeituraDaGaragem = {
 export const LIMITES: Retangulo = { x1: 8, y1: 72, x2: 312, y2: 176 };
 /** A mesa do bolo, que só existe na festa: o tampo em `topo`–`frente`, a toalha até `base`. */
 export const MESA = { x1: 126, x2: 194, topo: 84, frente: 96, base: 108 };
-export const HARLEY = { x1: 8, x2: 98, y1: 96, y2: 153, base: 150 };
-export const SAHARA = { x1: 224, x2: 308, y1: 88, y2: 153, base: 150 };
-/** Onde se clica para pegar, e onde o boneco para para pegar. */
-export const BALCOES = [
-  { tipo: 'beber' as const, x1: 14, x2: 70, y1: 64, y2: 96, base: 94, para: { x: 46, y: 101 } },
-  { tipo: 'comer' as const, x1: 250, x2: 286, y1: 60, y2: 96, base: 94, para: { x: 268, y: 101 } },
+/**
+ * As duas peças grandes do tema, uma de cada lado (eram a Harley e a Sahara). O desenho de cada tema
+ * cabe nestas caixas, e o chão que os pés não pisam é a faixa de baixo delas (`MOVEIS`).
+ */
+export const PECAS: readonly (Retangulo & { base: number })[] = [
+  { x1: 8, x2: 98, y1: 96, y2: 153, base: 150 },
+  { x1: 224, x2: 308, y1: 88, y2: 153, base: 150 },
 ];
-/** Por onde os pés não passam: as duas motos, o isopor com a mesinha e a mesinha dos salgados. */
+/** Onde se clica para pegar, onde o boneco para para pegar, e o que se pega ali. */
+export const BALCOES = [
+  { id: 'bebidas', itens: ['cerveja', 'refri', 'suco'] as Comida[], x1: 14, x2: 70, y1: 64, y2: 96, base: 94, para: { x: 46, y: 101 } },
+  { id: 'salgados', itens: ['coxinha', 'pizza', 'pastel', 'cachorro', 'brigadeiro'] as Comida[], x1: 250, x2: 286, y1: 60, y2: 96, base: 94, para: { x: 268, y: 101 } },
+  { id: 'agua', itens: ['agua'] as Comida[], x1: 288, x2: 307, y1: 62, y2: 96, base: 94.5, para: { x: 298, y: 101 } },
+] as const;
+export type Balcao = (typeof BALCOES)[number];
+/** Os dois fliperamas, fixos em qualquer tema, um de cada lado do telão. */
+export const FLIPERAMAS = [
+  { x1: 74, x2: 95, y1: 50, y2: 96, base: 94.2, para: { x: 84.5, y: 101 } },
+  { x1: 225, x2: 246, y1: 50, y2: 96, base: 94.2, para: { x: 235.5, y: 101 } },
+] as const;
+/** O bolo, depois do canto: a mesa vira mais um balcão, e dá para comer um pedaço. */
+export const PEDACO_DE_BOLO = { x1: MESA.x1, x2: MESA.x2, y1: 64, y2: MESA.base, para: { x: 160, y: 116 } };
+/** Por onde os pés não passam: as peças do tema, os balcões, os fliperamas. */
 const MOVEIS: Retangulo[] = [
   { x1: 12, y1: 136, x2: 98, y2: 156 },
   { x1: 222, y1: 132, x2: 308, y2: 156 },
   { x1: 14, y1: 86, x2: 70, y2: 96 },
   { x1: 250, y1: 86, x2: 286, y2: 96 },
+  { x1: 289, y1: 88, x2: 306, y2: 96 },
+  { x1: 74, y1: 86, x2: 95, y2: 96 },
+  { x1: 225, y1: 86, x2: 246, y2: 96 },
 ];
 const PES_DA_MESA: Retangulo = { x1: 122, y1: 94, x2: 198, y2: 112 };
 export const obstaculosDa = (comMesa: boolean) => (comMesa ? [...MOVEIS, PES_DA_MESA] : MOVEIS);
@@ -93,6 +149,7 @@ const TELETRANSPORTE = 28;
 export const dentroDe = (x: number, y: number, o: Retangulo) => x > o.x1 && x < o.x2 && y > o.y1 && y < o.y2;
 export const bloqueado = (x: number, y: number, obst: Retangulo[]) => obst.some((o) => dentroDe(x, y, o));
 const naSala = (x: number, y: number) => x >= LIMITES.x1 && x <= LIMITES.x2 && y >= LIMITES.y1 && y <= LIMITES.y2;
+export const naCaixa = (q: Ponto, k: { x1: number; x2: number; y1: number; y2: number }) => q.x >= k.x1 && q.x <= k.x2 && q.y >= k.y1 && q.y <= k.y2;
 
 function cruza(a: Ponto, b: Ponto, o: Retangulo) {
   const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 2);
@@ -121,7 +178,7 @@ const comprimento = (de: Ponto, pts: Ponto[]) =>
  * O caminho de `a` a `b`: reto quando dá, e pelos cantos do móvel que estiver no meio quando não dá
  * — e cada trecho do desvio é conferido de novo, porque contornar a Sahara pode dar de cara com a
  * mesa (era o Tava1 chegando atrasado à festa, preso embaixo da toalha). Não é um planejador de
- * verdade: a sala tem cinco móveis, longe uns dos outros, e o que sobrar `andar` resolve deslizando
+ * verdade: a sala tem poucos móveis, longe uns dos outros, e o que sobrar `andar` resolve deslizando
  * pela beira ou planejando de novo.
  */
 export function planejar(a: Ponto, b: Ponto, obst: Retangulo[], fundo = 0): Ponto[] {
@@ -164,7 +221,8 @@ const LINHAS: [string, [Nota, number][]][] = [
   ['muitas felicidades', [['G4', 0.75], ['G4', 0.25], ['G5', 1], ['E5', 1], ['C5', 1], ['B4', 1], ['A4', 2]]],
   ['muitos anos de vida!', [['F5', 0.75], ['F5', 0.25], ['E5', 1], ['C5', 1], ['D5', 1], ['C5', 2]]],
 ];
-export type Legenda = { ini: number; fim: number; texto: string; grito: boolean };
+/** `nomes`: a legenda é o grito com o nome de quem faz aniversário, que só se sabe na hora. */
+export type Legenda = { ini: number; fim: number; texto: string; grito: boolean; nomes?: true };
 
 /** A linha do tempo do canto, a partir da luz apagando: legendas, notas, palmas e o rá-tim-bum. */
 export const ROTEIRO = (() => {
@@ -187,7 +245,7 @@ export const ROTEIRO = (() => {
   legendas.push({ ini: t, fim: t + 1.5, texto: 'Rá-tim-bum!', grito: true });
   for (let k = 0; k < 3; k++) palmas.push(t + k * 0.32);
   t += 1.5;
-  legendas.push({ ini: t, fim: t + 2.2, texto: 'TAVÃO! DONIS!', grito: true });
+  legendas.push({ ini: t, fim: t + 2.2, texto: '', grito: true, nomes: true });
   t += 2.2;
   legendas.push({ ini: t, fim: t + 2.6, texto: 'Feliz aniversário!', grito: false });
   t += 2.6;
@@ -210,23 +268,30 @@ export function faseDaFesta(decorrido: number | null): FaseDaFesta {
   if (decorrido < DURACAO_DA_FESTA) return { fase: 'montada', t: decorrido - REUNIR - ROTEIRO.fim };
   return null;
 }
-export const legendaEm = (t: number) => ROTEIRO.legendas.find((l) => t >= l.ini && t < l.fim) ?? null;
+/** A legenda daquele instante, com o nome de quem faz aniversário já no grito. */
+export function legendaEm(t: number, aniversariantes: readonly Aniversariante[] = []): Legenda | null {
+  const l = ROTEIRO.legendas.find((k) => t >= k.ini && t < k.fim);
+  if (!l) return null;
+  if (!l.nomes) return l;
+  return { ...l, texto: aniversariantes.length ? nomesNoGrito(aniversariantes) : 'Parabéns!' };
+}
 
 /**
- * Onde cada um fica no parabéns: a Harley atrás da mesa à esquerda do bolo, a Sahara à direita, e o
- * resto na frente, em fila de até sete, pela ordem do id — a MESMA em toda tela, porque cada tela
- * anda todo mundo sozinha e as contas têm de dar igual.
+ * Onde cada um fica no parabéns: o primeiro aniversariante atrás da mesa à esquerda do bolo, o
+ * segundo à direita (um só fica no meio, atrás do bolo), e o resto na frente, em fila de até sete,
+ * pela ordem do id — a MESMA em toda tela, porque cada tela anda todo mundo sozinha e as contas têm
+ * de dar igual. Aniversariante que não está na garagem não ocupa lugar: o telão diz o nome do mesmo jeito.
  */
-export function lugaresDaFesta(pessoas: { id: number; moto: Moto | null }[]): Map<number, { ponto: Ponto; olhar: Direcao }> {
+export function lugaresDaFesta(pessoas: { id: number }[], aniversariantes: readonly { id: number }[]): Map<number, { ponto: Ponto; olhar: Direcao }> {
   const lugares = new Map<number, { ponto: Ponto; olhar: Direcao }>();
-  const ordem = [...pessoas].sort((a, b) => a.id - b.id);
-  const atras: Record<Moto, Ponto> = { harley: { x: 138, y: 92 }, sahara: { x: 182, y: 92 } };
-  const usadas = new Set<Moto>();
-  const frente: number[] = [];
-  for (const p of ordem) {
-    if (p.moto && !usadas.has(p.moto)) { usadas.add(p.moto); lugares.set(p.id, { ponto: atras[p.moto], olhar: 'baixo' }); }
-    else frente.push(p.id);
-  }
+  const ids = new Set(pessoas.map((p) => p.id));
+  const atras = aniversariantes.filter((a) => ids.has(a.id));
+  const sozinho = aniversariantes.length === 1;
+  atras.forEach((a) => {
+    const lado = aniversariantes.findIndex((k) => k.id === a.id);
+    lugares.set(a.id, { ponto: { x: sozinho ? 160 : lado === 0 ? 138 : 182, y: 92 }, olhar: 'baixo' });
+  });
+  const frente = [...pessoas].sort((a, b) => a.id - b.id).filter((p) => !lugares.has(p.id)).map((p) => p.id);
   const POR_FILA = 7;
   frente.forEach((id, i) => {
     const fila = Math.floor(i / POR_FILA);
@@ -244,7 +309,9 @@ export function lugaresDaFesta(pessoas: { id: number; moto: Moto | null }[]): Ma
 
 // --- a cara de cada um ----------------------------------------------------------------------
 
-export type Aparencia = { pele: string; cabelo: string; camisa: string; calca: string; estilo: Moto | null };
+/** A roupa de festa de quem faz aniversário: a do tema dele, numa das duas versões (a do lado dele). */
+export type Roupa = { tema: Tema; lado: Lado };
+export type Aparencia = { pele: string; cabelo: string; camisa: string; calca: string; roupa: Roupa | null };
 const PELES = ['#f0c09a', '#e8b48e', '#e3ad84', '#c98b62', '#a86b4a', '#8d5a3b'];
 const CABELOS = ['#1b1b1f', '#2a1d16', '#5b3a29', '#7a4a2a', '#c9a24a', '#141414', '#8a3324'];
 const CAMISAS = ['#3f7fe0', '#2ea36a', '#a855f7', '#e0a233', '#14b8a6', '#ec4899', '#64748b', '#e04852'];
@@ -252,36 +319,60 @@ const CALCAS = ['#2b3a55', '#3b3742', '#4a3b2a', '#2f3e2f'];
 const misturar = (n: number, k: number) => Math.abs(Math.imul(n * 2654435761 + k * 40503, 2246822519) >> 3);
 
 /**
- * A cara do boneco. Ninguém escolhe roupa nem cor (o dono, 26/10/2026): a Harley veste quem entrou
- * como o Tavão, a Sahara quem entrou como o Donis, e o resto sai do id da conta — a mesma em toda
- * tela, e a mesma de um dia para o outro.
+ * A cara do boneco. Ninguém escolhe roupa nem cor (o dono, 26/10/2026): a pele, o cabelo e a roupa
+ * saem do id da conta — a mesma em toda tela, e a mesma de um dia para o outro. Na festa, quem faz
+ * aniversário veste a roupa do tema dele por cima (a cara continua a dele).
  */
-export function aparenciaDe(id: number, moto: Moto | null): Aparencia {
-  if (moto === 'harley') return { pele: '#c98b62', cabelo: '#2a1d16', camisa: '#1d1d22', calca: '#2b3a55', estilo: 'harley' };
-  // O Donis é mais escurinho (o dono, 26/10/2026).
-  if (moto === 'sahara') return { pele: '#8a5a3c', cabelo: '#16100c', camisa: '#f2f2f2', calca: '#555a66', estilo: 'sahara' };
+export function aparenciaDe(id: number, roupa: Roupa | null = null): Aparencia {
   return {
     pele: PELES[misturar(id, 1) % PELES.length],
     cabelo: CABELOS[misturar(id, 2) % CABELOS.length],
     camisa: CAMISAS[misturar(id, 3) % CAMISAS.length],
     calca: CALCAS[misturar(id, 4) % CALCAS.length],
-    estilo: null,
+    roupa,
   };
 }
 
 // --- a garagem andando ----------------------------------------------------------------------
 
+/** O que o servidor guarda de cada boneco (`conferirBoneco` em garagem.mjs). */
+export type BonecoNoServidor = {
+  x: number; y: number; alvo: Ponto | null; dir: Direcao;
+  /** Quanto a barriga está cheia desde o último desmaio. */
+  cheio: number;
+  /** Contadores que só sobem: é pela diferença que a tela dos outros sabe que você bebeu ou caiu. */
+  goles: number; ultimo: Comida | null; quedas: number;
+  /** Em que fliperama você está jogando (0 ou 1), ou nenhum. */
+  jogando: number | null;
+};
+export type PessoaNaGaragem = BonecoNoServidor & { id: number; nome: string };
+export type Recorde = { nome: string; pontos: number };
+export type LeituraDaGaragem = {
+  agora: number;
+  podeCantar: boolean;
+  /** O tema de cada lado da garagem. Vem para todo mundo: é a decoração, sem nada de aniversário. */
+  temas?: [Tema, Tema];
+  /** O que o dono preparou — só vem para ele, e é o que o painel da festa mostra. */
+  preparo?: Aniversariante[];
+  /** A festa: começou quando, e de quem. Os nomes só saem do servidor depois de o dono mandar cantar. */
+  parabens: { inicio: number; aniversariantes?: Aniversariante[] } | null;
+  pessoas: PessoaNaGaragem[];
+  /** O placar do fliperama, do maior para o menor. */
+  recordes?: Recorde[];
+};
+
 export type Boneco = {
-  id: number; nome: string; moto: Moto | null; aparencia: Aparencia;
+  id: number; nome: string; aparencia: Aparencia;
   x: number; y: number; dir: Direcao;
   rota: Ponto[]; olhar: Direcao | null; vel: number | null; replanos: number; aoChegar: (() => void) | null;
   andando: boolean;
-  cheio: number; goles: number; ultimo: Consumo | null; quedas: number;
+  cheio: number; goles: number; ultimo: Comida | null; quedas: number;
   /** O gole ou a mordida acontecendo, e há quanto tempo. */
-  acao: { tipo: Consumo; t: number } | null;
+  acao: { comida: Comida; t: number } | null;
   /** Segundos que faltam deitado; e, para o SEU boneco, quanto falta para cair depois do sexto. */
   caido: number; vaiCair: number;
   hic: number;
+  jogando: number | null;
   /** O último `alvo` dos outros que virou caminho aqui, para não planejar de novo a cada leitura. */
   alvoVisto: string | null;
   chapeu: boolean; boca: boolean; pulo: boolean; bracos: boolean;
@@ -289,42 +380,42 @@ export type Boneco = {
 
 /** O que aconteceu no passo, para a tela tocar o som e o desenho soltar o confete. */
 export type Ocorrencia =
-  | { tipo: 'gole' | 'mordida' | 'soluco'; id: number; meu: boolean; x: number; y: number }
+  | { tipo: 'consumo'; comida: Comida; id: number; meu: boolean; x: number; y: number }
+  | { tipo: 'soluco'; id: number; meu: boolean; x: number; y: number }
   | { tipo: 'desmaio'; id: number; meu: boolean }
+  | { tipo: 'ocupado'; x: number; y: number }
+  | { tipo: 'fliperama'; qual: number | null }
   | { tipo: 'mesa' }
   | { tipo: 'canto'; aPartirDe: number }
   | { tipo: 'nota'; x: number; y: number }
   | { tipo: 'ratimbum' }
   | { tipo: 'fimDoCanto' };
 
-/**
- * Quem já pegou o Tavão e o Donis (o nome de quem pegou), sem contar você: é o que a porta mostra
- * apagado. O servidor confere de novo na entrada — aqui é só para não oferecer o que vai ser recusado.
- */
-export function papeisOcupados(pessoas: PessoaNaGaragem[], euId: number): Record<'tavao' | 'donis', string | null> {
-  const de = (papel: Papel) => pessoas.find((p) => p.id !== euId && p.papel === papel)?.nome ?? null;
-  return { tavao: de('tavao'), donis: de('donis') };
-}
-
-export function novoBoneco(id: number, nome: string, moto: Moto | null, onde: Ponto): Boneco {
+export function novoBoneco(id: number, nome: string, onde: Ponto): Boneco {
   return {
-    id, nome, moto, aparencia: aparenciaDe(id, moto),
+    id, nome, aparencia: aparenciaDe(id),
     x: onde.x, y: onde.y, dir: 'baixo',
     rota: [], olhar: null, vel: null, replanos: 0, aoChegar: null, andando: false,
     cheio: 0, goles: 0, ultimo: null, quedas: 0,
-    acao: null, caido: 0, vaiCair: 0, hic: 2 + (id % 3), alvoVisto: null,
+    acao: null, caido: 0, vaiCair: 0, hic: 2 + (id % 3), jogando: null, alvoVisto: null,
     chapeu: false, boca: false, pulo: false, bracos: false,
   };
 }
 
+const mesmaRoupa = (a: Roupa | null, b: Roupa | null) => a === b || (!!a && !!b && a.tema === b.tema && a.lado === b.lado);
+
 export class Garagem {
   readonly bonecos = new Map<number, Boneco>();
   readonly euId: number;
-  /** Com que papel você entrou; `null` enquanto está na porta, olhando — aí o seu boneco não existe. */
-  papel: Papel | null = null;
   private readonly meu: Boneco;
   podeCantar = false;
+  temas: [Tema, Tema] = ['moto', 'moto'];
+  /** O que o dono preparou (só chega para ele). */
+  preparo: Aniversariante[] = [];
   parabensInicio: number | null = null;
+  /** De quem é a festa que está acontecendo: só se sabe quando ela começa. */
+  aniversariantes: Aniversariante[] = [];
+  recordes: Recorde[] = [];
   /** O relógio do servidor menos o daqui, da última leitura. */
   diferenca = 0;
   festa: FaseDaFesta = null;
@@ -335,36 +426,28 @@ export class Garagem {
   mudouMeuAlvo = false;
   ocorrencias: Ocorrencia[] = [];
   private ultimoAgora = 0;
+  /** O sorteio do que se pega no balcão: trocável no teste. */
+  sortear: (n: number) => number = (n) => Math.floor(Math.random() * n);
 
   /** Sem `onde`, chega pela porta — cada conta num ponto dela, senão dois entrando juntos ficam com o nome um em cima do outro. */
   constructor(euId: number, nome: string, onde: Ponto = { x: PORTA.x + (euId * 37 % 61) - 30, y: PORTA.y }) {
     this.euId = euId;
-    this.meu = novoBoneco(euId, nome, null, onde);
+    this.meu = novoBoneco(euId, nome, onde);
+    this.bonecos.set(euId, this.meu);
   }
 
   get eu(): Boneco { return this.meu; }
-  get dentro() { return this.papel !== null; }
-
-  /** Escolheu na porta: o boneco aparece, com a roupa do papel. */
-  entrar(papel: Papel) {
-    this.papel = papel;
-    this.meu.moto = MOTO_DO_PAPEL[papel];
-    this.meu.aparencia = aparenciaDe(this.euId, this.meu.moto);
-    this.bonecos.set(this.euId, this.meu);
-    this.mudouMeuAlvo = true;
-    return this;
-  }
-
-  /** O servidor recusou o papel (outro pegou primeiro): de volta à porta, sem boneco. */
-  voltarParaAPorta() {
-    this.papel = null;
-    this.bonecos.delete(this.euId);
-    this.meu.rota = [];
-  }
   /** Juntando ou cantando: quem anda os bonecos é a festa, de todo mundo, em toda tela. */
   get festaAndando() { return this.festa?.fase === 'reunindo' || this.festa?.fase === 'cantando'; }
   get mesaNaTela() { return this.festa !== null; }
+  /** Depois do canto, com a mesa ainda montada: dá para comer o bolo. */
+  get boloServido() { return this.festa?.fase === 'montada'; }
   obstaculos() { return obstaculosDa(this.mesaNaTela); }
+  /** Quem está jogando em cada fliperama (o id), ou ninguém. */
+  noFliperama(qual: number): number | null {
+    for (const b of this.bonecos.values()) if (b.jogando === qual) return b.id;
+    return null;
+  }
 
   /** O seu boneco do jeito que o servidor guarda. */
   meuBoneco(): BonecoNoServidor {
@@ -373,14 +456,13 @@ export class Garagem {
     return {
       x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10,
       alvo: fim ? { x: Math.round(fim.x * 10) / 10, y: Math.round(fim.y * 10) / 10 } : null,
-      papel: this.papel ?? 'outro',
-      dir: b.dir, cheio: b.cheio, goles: b.goles, ultimo: b.ultimo, quedas: b.quedas,
+      dir: b.dir, cheio: b.cheio, goles: b.goles, ultimo: b.ultimo, quedas: b.quedas, jogando: b.jogando,
     };
   }
 
   /**
    * A leitura do servidor. Resposta mais velha que a última aplicada não entra (a regra das mesas).
-   * Do seu boneco vem só o nome e a moto — onde ele está é você quem sabe; dos outros, a posição vira
+   * Do seu boneco vem só o nome — onde ele está é você quem sabe; dos outros, a posição vira
    * caminho, o gole vira gole e a queda vira queda, cada um uma vez só.
    */
   receber(l: LeituraDaGaragem, agoraLocal = Date.now()) {
@@ -388,28 +470,32 @@ export class Garagem {
     this.ultimoAgora = l.agora;
     this.diferenca = l.agora - agoraLocal;
     this.podeCantar = l.podeCantar;
+    if (l.temas && eTema(l.temas[0]) && eTema(l.temas[1])) this.temas = [l.temas[0], l.temas[1]];
+    this.preparo = l.preparo ?? [];
     this.parabensInicio = l.parabens?.inicio ?? null;
+    if (l.parabens?.aniversariantes) this.aniversariantes = l.parabens.aniversariantes;
+    if (l.recordes) this.recordes = l.recordes;
     const vistos = new Set<number>([this.euId]);
     for (const p of l.pessoas) {
       vistos.add(p.id);
-      // Na porta, o servidor ainda pode lembrar de você por uns segundos (`SUMIU`): o seu boneco não volta por isso.
       if (p.id === this.euId) { this.meu.nome = p.nome; continue; }
       let b = this.bonecos.get(p.id);
-      if (b && p.moto !== b.moto) b.aparencia = aparenciaDe(p.id, p.moto);
-      if (b) { b.nome = p.nome; b.moto = p.moto; }
+      if (b) b.nome = p.nome;
+      const ultimo = comidaDe(p.ultimo);
       if (!b) {
         // Chegou agora: aparece onde está, com a história dele, sem tocar os goles de antes.
-        b = novoBoneco(p.id, p.nome, p.moto, { x: p.x, y: p.y });
-        Object.assign(b, { dir: p.dir, cheio: p.cheio, goles: p.goles, ultimo: p.ultimo, quedas: p.quedas });
+        b = novoBoneco(p.id, p.nome, { x: p.x, y: p.y });
+        Object.assign(b, { dir: p.dir, cheio: p.cheio, goles: p.goles, ultimo, quedas: p.quedas, jogando: p.jogando ?? null });
         this.bonecos.set(p.id, b);
         if (p.alvo && !this.festaAndando) this.ir(b, p.alvo);
         continue;
       }
       b.cheio = p.cheio;
+      b.jogando = this.festaAndando ? null : p.jogando ?? null;
       if (p.quedas > b.quedas) { b.quedas = p.quedas; this.cair(b); }
       if (p.goles > b.goles) {
-        b.goles = p.goles; b.ultimo = p.ultimo;
-        if (b.caido <= 0) this.consumiu(b, p.ultimo ?? 'beber');
+        b.goles = p.goles; b.ultimo = ultimo;
+        if (b.caido <= 0) this.consumiu(b, ultimo ?? 'cerveja');
       }
       if (this.festaAndando || b.caido > 0) continue;
       const longe = Math.hypot(b.x - p.x, b.y - p.y);
@@ -426,55 +512,93 @@ export class Garagem {
 
   // --- o que o SEU boneco faz -------------------------------------------------------------
 
-  private podeMexer() { return this.dentro && !this.festaAndando && this.eu.caido <= 0 && this.eu.vaiCair <= 0; }
+  private podeMexer() { return !this.festaAndando && this.eu.caido <= 0 && this.eu.vaiCair <= 0; }
 
-  /** Clicou na garagem: no isopor, vai beber; na mesa de salgados, comer; no chão, andar. */
-  clicar(q: Ponto) {
-    if (!this.podeMexer()) return;
-    const balcao = BALCOES.find((k) => q.x >= k.x1 && q.x <= k.x2 && q.y >= k.y1 && q.y <= k.y2);
-    if (balcao) { this.irPegar(this.eu, balcao); return; }
+  /**
+   * Clicou na garagem: num balcão, vai pegar; num fliperama, vai jogar; na mesa, depois do canto,
+   * pega um pedaço do bolo; no chão, anda. Devolve o que o clique virou, para a tela saber.
+   */
+  clicar(q: Ponto): 'balcao' | 'fliperama' | 'andar' | null {
+    if (!this.podeMexer()) return null;
+    if (this.eu.jogando !== null) this.sairDoFliperama();
+    const balcao = BALCOES.find((k) => naCaixa(q, k));
+    if (balcao) { this.irPegar(this.eu, balcao.para, () => balcao.itens[this.sortear(balcao.itens.length)]); return 'balcao'; }
+    if (this.boloServido && naCaixa(q, PEDACO_DE_BOLO)) { this.irPegar(this.eu, PEDACO_DE_BOLO.para, () => 'bolo'); return 'balcao'; }
+    const qual = FLIPERAMAS.findIndex((k) => naCaixa(q, k));
+    if (qual >= 0) { this.irJogar(qual); return 'fliperama'; }
     this.ir(this.eu, q);
     this.mudouMeuAlvo = true;
+    return 'andar';
   }
 
   /** Setas ou WASD: um passinho por quadro na direção apertada. */
   andarComTeclas(vx: number, vy: number) {
-    if (!this.podeMexer() || (!vx && !vy)) return;
+    if (!this.podeMexer() || (!vx && !vy) || this.eu.jogando !== null) return;
     const n = Math.hypot(vx, vy);
     this.ir(this.eu, { x: this.eu.x + vx / n * 6, y: this.eu.y + vy / n * 6 });
     this.mudouMeuAlvo = true;
   }
 
-  private irPegar(b: Boneco, balcao: (typeof BALCOES)[number]) {
-    const perto = Math.abs(b.x - balcao.para.x) <= 16 && b.y >= balcao.para.y - 2 && b.y <= balcao.para.y + 10;
-    if (perto) { this.pegar(b, balcao.tipo); return; }
+  private irPegar(b: Boneco, para: Ponto, oQue: () => Comida) {
+    const perto = Math.abs(b.x - para.x) <= 16 && b.y >= para.y - 2 && b.y <= para.y + 10;
+    if (perto) { this.pegar(b, oQue()); return; }
     // Cada um para num dos quatro pontos em volta, em duas fileiras: na bancada, três no mesmo isopor
     // ficavam com os nomes um em cima do outro.
     const vaga = b.id % 4;
-    const ponto = { x: balcao.para.x + (vaga % 2 ? 14 : -14), y: balcao.para.y + (vaga < 2 ? 0 : 8) };
-    this.ir(b, ponto, 'cima', () => this.pegar(b, balcao.tipo));
+    const ponto = { x: para.x + (vaga % 2 ? 14 : -14), y: para.y + (vaga < 2 ? 0 : 8) };
+    this.ir(b, ponto, 'cima', () => this.pegar(b, oQue()));
     this.mudouMeuAlvo = true;
   }
 
-  private pegar(b: Boneco, tipo: Consumo) {
+  private pegar(b: Boneco, comida: Comida) {
     if (b.caido > 0 || b.vaiCair > 0 || (b.acao && b.acao.t < 0.9)) return;
-    b.cheio += 1; b.goles += 1; b.ultimo = tipo;
-    this.consumiu(b, tipo);
+    b.cheio = Math.max(0, b.cheio + COMIDAS[comida].barriga);
+    b.goles += 1; b.ultimo = comida;
+    this.consumiu(b, comida);
     if (b.cheio >= LIMITE_DA_BARRIGA) b.vaiCair = ATE_CAIR;
     this.mudouMeuAlvo = true;
   }
 
-  private consumiu(b: Boneco, tipo: Consumo) {
+  private consumiu(b: Boneco, comida: Comida) {
     b.dir = 'baixo';
-    b.acao = { tipo, t: 0 };
-    this.ocorrencias.push({ tipo: tipo === 'beber' ? 'gole' : 'mordida', id: b.id, meu: b.id === this.euId, x: b.x, y: b.y });
+    b.acao = { comida, t: 0 };
+    this.ocorrencias.push({ tipo: 'consumo', comida, id: b.id, meu: b.id === this.euId, x: b.x, y: b.y });
   }
 
   private cair(b: Boneco) {
     b.caido = CAIDO; b.rota = []; b.acao = null; b.aoChegar = null; b.vaiCair = 0;
     const meu = b.id === this.euId;
-    if (meu) { b.cheio = 0; b.quedas += 1; this.apagao = 0; this.mudouMeuAlvo = true; }
+    if (meu) {
+      if (b.jogando !== null) this.sairDoFliperama();
+      b.cheio = 0; b.quedas += 1; this.apagao = 0; this.mudouMeuAlvo = true;
+    }
     this.ocorrencias.push({ tipo: 'desmaio', id: b.id, meu });
+  }
+
+  // --- o fliperama --------------------------------------------------------------------------
+
+  /** Vai até o fliperama e, chegando, começa a jogar — se ninguém chegou antes. */
+  private irJogar(qual: number) {
+    const k = FLIPERAMAS[qual];
+    const comecar = () => {
+      const quem = this.noFliperama(qual);
+      if (quem !== null && quem !== this.euId) { this.ocorrencias.push({ tipo: 'ocupado', x: k.para.x, y: k.para.y - 28 }); return; }
+      this.eu.jogando = qual;
+      this.eu.dir = 'cima';
+      this.mudouMeuAlvo = true;
+      this.ocorrencias.push({ tipo: 'fliperama', qual });
+    };
+    const perto = Math.abs(this.eu.x - k.para.x) <= 3 && Math.abs(this.eu.y - k.para.y) <= 3;
+    if (perto) comecar();
+    else { this.ir(this.eu, k.para, 'cima', comecar); this.mudouMeuAlvo = true; }
+  }
+
+  /** Largou o fliperama (Esc, clicou fora, desmaiou ou a festa começou). */
+  sairDoFliperama() {
+    if (this.eu.jogando === null) return;
+    this.eu.jogando = null;
+    this.mudouMeuAlvo = true;
+    this.ocorrencias.push({ tipo: 'fliperama', qual: null });
   }
 
   // --- andar --------------------------------------------------------------------------------
@@ -519,11 +643,11 @@ export class Garagem {
 
   /** Leva todo mundo ao seu lugar a tempo da luz apagar — com a velocidade que dá, igual em toda tela. */
   private reunir(faltam: number) {
-    const lugares = lugaresDaFesta([...this.bonecos.values()]);
+    const lugares = lugaresDaFesta([...this.bonecos.values()], this.aniversariantes);
     for (const b of this.bonecos.values()) {
       const l = lugares.get(b.id);
       if (!l) continue;
-      b.caido = 0; b.vaiCair = 0; b.acao = null; b.aoChegar = null;
+      b.caido = 0; b.vaiCair = 0; b.acao = null; b.aoChegar = null; b.jogando = null;
       this.ir(b, l.ponto, l.olhar);
       b.vel = Math.max(VELOCIDADE, comprimento(b, b.rota) / Math.max(0.5, faltam - 0.3));
     }
@@ -531,12 +655,19 @@ export class Garagem {
 
   /** Quem chegou atrasado (ou entrou na garagem com a música tocando) aparece no lugar. */
   private noLugar() {
-    const lugares = lugaresDaFesta([...this.bonecos.values()]);
+    const lugares = lugaresDaFesta([...this.bonecos.values()], this.aniversariantes);
     for (const b of this.bonecos.values()) {
       const l = lugares.get(b.id);
       if (!l) continue;
       b.x = l.ponto.x; b.y = l.ponto.y; b.dir = l.olhar; b.rota = []; b.vel = null; b.andando = false;
     }
+  }
+
+  /** A roupa de festa de cada um: só quem faz aniversário, e só com a mesa na tela. */
+  roupaDe(id: number): Roupa | null {
+    if (!this.mesaNaTela) return null;
+    const i = this.aniversariantes.findIndex((a) => a.id === id);
+    return i < 0 ? null : { tema: this.aniversariantes[i].tema, lado: i as Lado };
   }
 
   // --- o passo ------------------------------------------------------------------------------
@@ -550,6 +681,7 @@ export class Garagem {
     if (agora && !antes) {
       this.velas = true;
       this.ocorrencias.push({ tipo: 'mesa' });
+      if (this.eu.jogando !== null) this.sairDoFliperama();
       if (agora.fase === 'reunindo') this.reunir(REUNIR - agora.t);
     }
     if (agora?.fase === 'cantando' && antes?.fase !== 'cantando') {
@@ -563,9 +695,10 @@ export class Garagem {
     const tocando = cantando === null ? undefined : ROTEIRO.notas.find((n) => cantando >= n.t && cantando < n.t + n.dur);
     const palma = cantando !== null && ROTEIRO.palmas.some((k) => cantando >= k && cantando < k + 0.12);
     const depois = cantando !== null && cantando >= ROTEIRO.ratimbum;
+    const festeiros = new Set(this.aniversariantes.map((a) => a.id));
     if (cantando !== null) {
       if (depois && this.velas) { this.velas = false; this.ocorrencias.push({ tipo: 'ratimbum' }); }
-      const quem = [...this.bonecos.values()].filter((b) => !b.moto);
+      const quem = [...this.bonecos.values()].filter((b) => !festeiros.has(b.id));
       for (const n of ROTEIRO.notas) {
         if (n.t > cantando - dt && n.t <= cantando && quem.length) {
           const b = quem[Math.floor(Math.random() * quem.length)];
@@ -575,6 +708,8 @@ export class Garagem {
     }
 
     for (const b of this.bonecos.values()) {
+      const roupa = this.roupaDe(b.id);
+      if (!mesmaRoupa(roupa, b.aparencia.roupa)) b.aparencia = aparenciaDe(b.id, roupa);
       b.chapeu = this.festaAndando;
       b.boca = !!tocando || palma || (depois && cantando! < ROTEIRO.ratimbum + 3.7);
       b.pulo = (!!tocando && cantando! - tocando.t < 0.14) || palma;

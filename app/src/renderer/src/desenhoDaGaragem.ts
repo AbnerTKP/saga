@@ -1,81 +1,99 @@
 /**
  * O desenho da Garagem, em pixel: a cena inteira num canvas de 320×180 ampliado sem suavizar, e por
- * cima, na resolução da tela, o que tem de ler bem — os nomes, a legenda do parabéns, o telão na
- * festa — e a luz (o escuro com buracos onde há lâmpada, vela e farol).
+ * cima, na resolução da tela, o que tem de ler bem — os nomes, os letreiros, a legenda do parabéns, o
+ * telão na festa — e a luz (o escuro com buracos onde há lâmpada, vela, farol e tela de fliperama).
  *
- * É o desenho da prancheta que o dono aprovou em 26/10/2026, sem tirar nem pôr: a parede de tijolo,
- * o varal de luz, os quadros da Harley e da Sahara, o telão passando uma moto, o isopor e a mesa de
- * salgados, as duas motos e o chão xadrez. As cores do jogo moram aqui, como as do Catan moram no
- * desenho dele — o CSS fica com os tokens da Saga.
+ * A sala é a da prancheta que o dono aprovou em 26/10/2026 — a parede de tijolo, o varal de luz, o
+ * telão, o isopor, a mesa de salgados e o chão xadrez — e o que muda com o tema (os quadros, as duas
+ * peças grandes, o vídeo do telão, o bolo e a roupa de festa) vem do `temasDaGaragem.ts`. Os dois
+ * fliperamas, o bebedouro e a comida são de toda garagem, em qualquer tema.
  *
  * Quem anda e quando é do `garagem.ts`; aqui só se olha para ele e se pinta, e se guardam os efeitos
- * que não interessam a ninguém mais: confete, fumaça, as notinhas, o "glup!", a moto tremendo.
+ * que não interessam a ninguém mais: confete, fumaça, as notinhas, o "glup!", a peça tremendo.
  */
 import {
-  ALTURA, APAGAO, BALCOES, HARLEY, LARGURA, MESA, ROTEIRO, SAHARA, TONTO,
-  legendaEm, novoBoneco, type Aparencia, type Boneco, type Garagem, type Ocorrencia, type Ponto,
+  ALTURA, APAGAO, BALCOES, FLIPERAMAS, LARGURA, MESA, ROTEIRO, TONTO,
+  legendaEm, nomesNoTelao, novoBoneco,
+  type Aparencia, type Boneco, type Comida, type Garagem, type Lado, type Ocorrencia, type Ponto, type Tema,
 } from './garagem';
+import { COMIDAS } from './garagem';
+import { TEMA, TELA, mistura, trajeDe, type AcaoDaPeca, type Pincel, type Rotulo } from './temasDaGaragem';
 
 const W = LARGURA, H = ALTURA;
 const COR = {
   laranja: '#f28c28', preto: '#1d1d22', vermelho: '#d7263d', branco: '#f2f2f2',
-  cromo: '#c9ced6', cromo2: '#9aa1ab', cromo3: '#6d737c', pneu: '#18181c',
   madeira: '#7a5232', madeira2: '#5a3a22', ambar: '#e8a33a', coxinha: '#d98a2b',
 };
-const FONTE = '"Pixelify Sans", Figtree, sans-serif';
+/**
+ * Duas letras. A de pixel (Pixelify Sans) só nas palavras grandes que nós escrevemos e conferimos:
+ * "PARABÉNS" no telão e "Você apagou!". Todo o resto — os nomes, os letreiros, a legenda, os gritos —
+ * vai na Figtree, a letra da Saga: na Pixelify o "C" maiúsculo é um "O" com um entalhe e o "G" quase
+ * um "B", e em tamanho de nome não há como separá-los (medido em 27/10/2026, pixel a pixel, de 8 a
+ * 40 px: o "C" e o "O" diferem em 1 a 19 pixels, em qualquer peso). O Gustavo aparecia como
+ * "Bustavo" em cima do boneco.
+ */
+const PIXEL = '"Pixelify Sans", Figtree, sans-serif';
+const TEXTO = 'Figtree, sans-serif';
 const hash = (a: number, b: number) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
 const volta = (v: number, n: number) => ((v % n) + n) % n;
 const hex = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
-const mistura = (a: string, b: string, k: number) => {
-  const [r1, g1, b1] = hex(a), [r2, g2, b2] = hex(b);
-  return `rgb(${Math.round(r1 + (r2 - r1) * k)},${Math.round(g1 + (g2 - g1) * k)},${Math.round(b1 + (b2 - b1) * k)})`;
-};
 const yVaral = (x: number) => 14 + 7 * (1 - ((x - 160) / 160) ** 2);
 const LAMPADAS = Array.from({ length: 23 }, (_, i) => {
   const x = 7 + i * 14;
   return { x, y: yVaral(x) + 2, cor: ['#ffd27a', '#ff8a5c', '#ff5d8f', '#7ec8ff', '#9bff9b'][i % 5] };
 });
-const TELA = { x: 100, y: 27, w: 120, h: 31 };
+/** As cores de cada fliperama: o corpo, a arte do lado e o letreiro aceso. */
+const GABINETES = [
+  { corpo: '#2a1446', arte: '#ff4fd8', letreiro: '#ff2e88', tela: '#ff9be8' },
+  { corpo: '#0e2440', arte: '#3ad1ff', letreiro: '#0090e0', tela: '#9be8ff' },
+];
 
-type Particula = { tipo: 'confete' | 'fumaca' | 'brilho'; cor: string; x: number; y: number; vx: number; vy: number; vida: number; tam: number; chao: number; fase: number };
+type Particula = { tipo: 'confete' | 'fumaca' | 'brilho' | 'faisca'; cor: string; x: number; y: number; vx: number; vy: number; vida: number; tam: number; chao: number; fase: number };
 type Texto = { texto: string; x: number; y: number; vy: number; vida: number; cor: string; tam: number };
 
 export type Desenho = {
   redimensionar(): void;
   desenhar(g: Garagem, dt: number, luzes: boolean): void;
   ocorreu(o: Ocorrencia): void;
-  /** Clicou na moto: treme, solta fumaça e grita "VRUM!". Falso se ela já estava acelerando. */
-  acelerar(moto: 'harley' | 'sahara'): boolean;
+  /** Clicou na peça do tema: treme, solta fumaça e grita. Nulo se ela já estava tremendo. */
+  acelerar(lado: Lado, tema: Tema): AcaoDaPeca | null;
   /** O ponto da cena (320×180) debaixo do mouse. */
   pontoDe(e: { clientX: number; clientY: number }): Ponto;
 };
 
-/** Um boneco em pé, com os pés em (x0, y0), em qualquer contexto: a cena, o rascunho do deitado e o retrato da porta. */
+/** A comida na mão, perto da boca. */
+function naMao(px: (x: number, y: number, w: number, h: number, c: string) => void, comida: Comida, x: number, y: number) {
+  switch (comida) {
+    case 'cerveja': px(x + 8, y + 4, 2, 3, COR.ambar); px(x + 8, y + 4, 2, 1, '#fff6df'); break;
+    case 'refri': px(x + 8, y + 4, 2, 3, '#d7263d'); px(x + 8, y + 4, 2, 1, '#cfd6df'); break;
+    case 'suco': px(x + 8, y + 4, 2, 3, '#ff9f2e'); px(x + 8, y + 4, 2, 1, '#ffd27a'); break;
+    case 'agua': px(x + 8, y + 3, 2, 4, '#9fd8ff'); px(x + 8, y + 3, 2, 1, '#3a6fd1'); break;
+    case 'pizza': px(x + 8, y + 4, 3, 1, '#c8853a'); px(x + 8, y + 5, 3, 1, '#f2b544'); px(x + 8, y + 6, 2, 1, '#f2b544'); px(x + 9, y + 5, 1, 1, '#b8322a'); break;
+    case 'pastel': px(x + 8, y + 5, 3, 2, '#e8c27a'); px(x + 8, y + 5, 3, 1, '#d9a85a'); break;
+    case 'cachorro': px(x + 7, y + 5, 4, 2, '#d9a05a'); px(x + 7, y + 5, 4, 1, '#b8322a'); break;
+    case 'brigadeiro': px(x + 8, y + 5, 2, 2, '#4a2a1a'); px(x + 8, y + 5, 1, 1, '#a0613a'); break;
+    case 'bolo': px(x + 8, y + 4, 3, 3, '#f4efe6'); px(x + 8, y + 5, 3, 1, '#ff8cc0'); break;
+    default: px(x + 8, y + 5, 2, 2, COR.coxinha); px(x + 8, y + 4, 1, 1, COR.coxinha);
+  }
+}
+
+/** Um boneco em pé, com os pés em (x0, y0), em qualquer contexto: a cena, o rascunho do deitado e o retrato. */
 function pintarEmPe(ctx: CanvasRenderingContext2D, b: Boneco, x0: number, y0: number, relogio: number) {
   const px = (x: number, y: number, w: number, h: number, cor: string) => { ctx.fillStyle = cor; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
   const a = b.aparencia;
-  const roupa = a.estilo === 'harley' ? { calca: '#2b3a55', bota: '#3a2418' }
-    : a.estilo === 'sahara' ? { calca: '#555a66', bota: '#e6e6e6' } : { calca: a.calca, bota: '#18181c' };
+  const tr = a.roupa ? trajeDe(a.roupa) : null;
+  const calca = tr?.calca ?? a.calca, bota = tr?.bota ?? '#18181c', camisa = tr?.camisa ?? a.camisa, manga = tr?.manga ?? camisa;
   const tonto = b.cheio >= TONTO && b.andando ? Math.round(Math.sin(relogio * 7 + b.id) * 1.2) : 0;
   const x = Math.round(x0) - 5 + tonto;
   const y = Math.round(y0) - 20 - (b.pulo ? 1 : 0);
   const passo = b.andando ? Math.floor(relogio * 8 + b.id) % 2 : -1;
-  px(x + 2, y + 14, 2, passo === 0 ? 4 : 5, roupa.calca);
-  px(x + 6, y + 14, 2, passo === 1 ? 4 : 5, roupa.calca);
-  px(x + 2, y + (passo === 0 ? 17 : 18), 2, 1, roupa.bota);
-  px(x + 6, y + (passo === 1 ? 17 : 18), 2, 1, roupa.bota);
-  if (a.estilo === 'sahara') { px(x + 2, y + 16, 2, 2, roupa.bota); px(x + 6, y + 16, 2, 2, roupa.bota); }
-  px(x + 1, y + 8, 8, 7, a.camisa);
-  if (a.estilo === 'harley') {
-    if (b.dir === 'baixo') px(x + 4, y + 8, 2, 7, '#e8e8e8');
-    px(x + 1, y + 11, 8, 1, COR.laranja);
-    if (b.dir === 'cima') { px(x + 3, y + 9, 4, 4, COR.laranja); px(x + 4, y + 10, 2, 2, COR.preto); }
-  }
-  if (a.estilo === 'sahara') {
-    px(x + 1, y + 8, 8, 2, COR.vermelho); px(x + 1, y + 12, 8, 1, COR.vermelho);
-    if (b.dir === 'cima') { px(x + 4, y + 10, 1, 2, COR.vermelho); px(x + 5, y + 10, 1, 1, COR.vermelho); }
-  }
-  const manga = a.estilo === 'sahara' ? COR.vermelho : a.camisa;
+  px(x + 2, y + 14, 2, passo === 0 ? 4 : 5, calca);
+  px(x + 6, y + 14, 2, passo === 1 ? 4 : 5, calca);
+  px(x + 2, y + (passo === 0 ? 17 : 18), 2, 1, bota);
+  px(x + 6, y + (passo === 1 ? 17 : 18), 2, 1, bota);
+  if (tr?.botaAlta) { px(x + 2, y + 16, 2, 2, bota); px(x + 6, y + 16, 2, 2, bota); }
+  px(x + 1, y + 8, 8, 7, camisa);
+  tr?.corpo?.(px, x, y, b.dir, relogio);
   const naBoca = !!b.acao && b.acao.t < 0.8;
   if (b.bracos) {
     px(x, y + 4, 1, 6, manga); px(x + 9, y + 4, 1, 6, manga);
@@ -85,51 +103,52 @@ function pintarEmPe(ctx: CanvasRenderingContext2D, b: Boneco, x0: number, y0: nu
     if (naBoca) px(x + 9, y + 7, 1, 4, manga); else { px(x + 9, y + 9, 1, 5, manga); px(x + 9, y + 14, 1, 1, a.pele); }
   }
   px(x + 1, y + 1, 8, 7, a.pele);
-  const topo = a.estilo === 'harley' ? COR.laranja : a.estilo === 'sahara' ? COR.vermelho : a.cabelo;
+  const topo = tr?.topo ?? a.cabelo;
   if (b.dir === 'cima') {
     px(x + 1, y, 8, 7, a.cabelo); px(x + 1, y, 8, 2, topo);
-    if (a.estilo === 'harley') px(x + 4, y + 2, 2, 2, COR.laranja);
   } else {
     px(x + 1, y, 8, 2, topo);
     const olhoY = y + 4;
     if (b.dir === 'baixo') {
       px(x + 1, y + 2, 1, 2, a.cabelo); px(x + 8, y + 2, 1, 2, a.cabelo);
-      if (a.estilo === 'harley') { px(x + 2, olhoY - 1, 6, 2, '#0e0e10'); px(x + 3, olhoY - 1, 1, 1, '#4a4a55'); }
+      if (tr?.oculos) { px(x + 2, olhoY - 1, 6, 2, '#0e0e10'); px(x + 3, olhoY - 1, 1, 1, '#4a4a55'); }
       else if (b.cheio >= 4) {
         px(x + 3, olhoY + 1, 1, 1, '#1a1a1a'); px(x + 6, olhoY + 1, 1, 1, '#1a1a1a');
         px(x + 2, olhoY + 2, 1, 1, '#e88a8a'); px(x + 7, olhoY + 2, 1, 1, '#e88a8a');
       } else { px(x + 3, olhoY, 1, 2, '#1a1a1a'); px(x + 6, olhoY, 1, 2, '#1a1a1a'); }
-      if (a.estilo === 'sahara') px(x, y + 2, 10, 1, COR.vermelho);
     } else {
       const frente = b.dir === 'dir';
       px(frente ? x + 1 : x + 5, y + 2, 4, 3, a.cabelo);
-      if (a.estilo === 'harley') px(frente ? x + 5 : x + 1, olhoY - 1, 4, 2, '#0e0e10');
+      if (tr?.oculos) px(frente ? x + 5 : x + 1, olhoY - 1, 4, 2, '#0e0e10');
       else px(frente ? x + 7 : x + 2, olhoY, 1, 2, '#1a1a1a');
-      if (a.estilo === 'sahara') px(frente ? x + 5 : x - 1, y + 2, 5, 1, COR.vermelho);
     }
-    if (a.estilo === 'harley') px(x + 2, y + 6, 6, 2, '#3a2418');
+    if (tr?.barba) px(x + 2, y + 6, 6, 2, '#3a2418');
     if (b.boca) px(x + 4, y + 6, 2, 1, '#6e1f24');
   }
-  if (naBoca && !b.bracos && b.acao) {
-    if (b.acao.tipo === 'beber') { px(x + 8, y + 4, 2, 3, COR.ambar); px(x + 8, y + 4, 2, 1, '#fff6df'); }
-    else { px(x + 8, y + 5, 2, 2, COR.coxinha); px(x + 8, y + 4, 1, 1, COR.coxinha); }
-  }
+  tr?.cabeca?.(px, x, y, b.dir, relogio);
+  if (naBoca && !b.bracos && b.acao) naMao(px, b.acao.comida, x, y);
   if (b.chapeu) {
-    const cores = [[COR.laranja, COR.preto], [COR.vermelho, COR.branco], ['#3f7fe0', '#ffd27a'], ['#2ea36a', '#ffffff'], ['#a855f7', '#ffd27a']];
-    const [c1, c2] = a.estilo === 'harley' ? cores[0] : a.estilo === 'sahara' ? cores[1] : cores[2 + (b.id % 3)];
-    px(x + 4, y - 6, 2, 1, '#ffffff');
-    px(x + 4, y - 5, 2, 1, c1); px(x + 3, y - 4, 4, 1, c2); px(x + 3, y - 3, 4, 1, c1);
-    px(x + 2, y - 2, 6, 1, c2); px(x + 2, y - 1, 6, 1, c1);
+    if (a.roupa) {
+      // quem faz aniversário ganha coroa, e não o chapéu de todo mundo
+      px(x + 2, y - 3, 6, 2, '#f2c230'); px(x + 2, y - 5, 1, 2, '#f2c230'); px(x + 4, y - 6, 2, 3, '#f2c230'); px(x + 7, y - 5, 1, 2, '#f2c230');
+      px(x + 4, y - 3, 2, 1, '#d7263d'); px(x + 2, y - 2, 6, 1, '#c9962a');
+    } else {
+      const cores = [['#3f7fe0', '#ffd27a'], ['#2ea36a', '#ffffff'], ['#a855f7', '#ffd27a'], [COR.laranja, COR.preto], [COR.vermelho, COR.branco]];
+      const [c1, c2] = cores[b.id % cores.length];
+      px(x + 4, y - 6, 2, 1, '#ffffff');
+      px(x + 4, y - 5, 2, 1, c1); px(x + 3, y - 4, 4, 1, c2); px(x + 3, y - 3, 4, 1, c1);
+      px(x + 2, y - 2, 6, 1, c2); px(x + 2, y - 1, 6, 1, c1);
+    }
   }
 }
 
-/** O retrato de um boneco parado, de frente, para a escolha da porta: 14×30, ampliado sem suavizar pelo CSS. */
+/** O retrato de um boneco parado, de frente: 14×30, ampliado sem suavizar pelo CSS. */
 export function pintarRetrato(canvas: HTMLCanvasElement, aparencia: Aparencia, id: number) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   canvas.width = 14; canvas.height = 30;
   ctx.clearRect(0, 0, 14, 30);
-  pintarEmPe(ctx, { ...novoBoneco(id, '', aparencia.estilo, { x: 7, y: 28 }), aparencia }, 7, 28, 0);
+  pintarEmPe(ctx, { ...novoBoneco(id, '', { x: 7, y: 28 }), aparencia }, 7, 28, 0);
 }
 
 export function criarDesenho(tela: HTMLCanvasElement): Desenho {
@@ -147,7 +166,13 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
   let mesaA = 0;
   let modoDoTelao: string | null = null;
   let chiadoAte = 0;
-  const motos = { harley: 0, sahara: 0 };
+  /** Os temas com que o fundo foi pintado, e os letreiros dos quadros deles. */
+  let temasDoFundo = '';
+  let rotulos: Rotulo[] = [];
+  const agito: [number, number] = [0, 0];
+  let fumacaDe: [Ponto | null, Ponto | null] = [null, null];
+  let brilhoDe: [Ponto | null, Ponto | null] = [null, null];
+  let faiscaDe: [Ponto | null, Ponto | null] = [null, null];
   let particulas: Particula[] = [];
   let textos: Texto[] = [];
 
@@ -157,9 +182,10 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
     for (let i = 0; i <= n; i++) px(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, esp, esp, cor);
   };
+  const pincel: Pincel = { px, linha, get ctx() { return G; }, get relogio() { return relogio; } };
 
-  // --- o fundo, uma vez ------------------------------------------------------------------
-  {
+  // --- o fundo: a sala, e os quadros do tema -----------------------------------------------
+  function pintarFundo(temas: [Tema, Tema]) {
     const f = fundo.getContext('2d')!;
     const p = (x: number, y: number, w: number, h: number, cor: string) => { f.fillStyle = cor; f.fillRect(x, y, w, h); };
     p(0, 0, W, 64, '#43201a');
@@ -181,108 +207,22 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     const gr = f.createLinearGradient(0, 66, 0, H);
     gr.addColorStop(0, 'rgba(10,5,10,.45)'); gr.addColorStop(0.35, 'rgba(10,5,10,.12)'); gr.addColorStop(1, 'rgba(10,5,10,0)');
     f.fillStyle = gr; f.fillRect(0, 66, W, H - 66);
-    // quadro da Harley: roda com asas, preto e laranja
-    p(17, 25, 54, 35, '#2a1a14'); p(18, 26, 52, 33, '#121215');
-    p(18, 26, 52, 1, COR.laranja); p(18, 58, 52, 1, COR.laranja);
-    for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) {
-      const d = Math.hypot(x, y);
-      if ((d <= 6.3 && d > 4.2) || d <= 1.5) p(44 + x, 41 + y, 1, 1, COR.laranja);
-      else if (d <= 4.2 && (x === 0 || y === 0)) p(44 + x, 41 + y, 1, 1, '#8a4c14');
-    }
-    for (let i = 0; i < 4; i++) {
-      p(23 + i * 2, 37 + i * 2, 13 - i * 2, 1, i % 2 ? '#c96f1c' : COR.laranja);
-      p(52, 37 + i * 2, 13 - i * 2, 1, i % 2 ? '#c96f1c' : COR.laranja);
-    }
-    // quadro da Sahara: sol sobre as dunas
-    p(249, 25, 54, 35, '#2a1a14');
-    const ceu = f.createLinearGradient(0, 26, 0, 58);
-    ceu.addColorStop(0, '#ffe3a6'); ceu.addColorStop(1, '#f39a45');
-    f.fillStyle = ceu; f.fillRect(250, 26, 52, 33);
-    for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) if (Math.hypot(x, y) <= 5.2) p(289 + x, 40 + y, 1, 1, '#fff4cf');
-    for (let x = 250; x < 302; x++) {
-      const d1 = Math.round(48 + Math.sin((x - 250) / 9) * 3);
-      const d2 = Math.round(52 + Math.sin((x - 240) / 6) * 2);
-      p(x, d1, 1, 59 - d1, '#d9883a');
-      p(x, d2, 1, 59 - d2, '#b8652a');
-    }
+    // os quadros: cada lado, o do seu tema
+    G = f;
+    rotulos = [...TEMA[temas[0]].quadro(pincel, 0), ...TEMA[temas[1]].quadro(pincel, 1)];
+    G = g;
     // a moldura do telão (o vídeo roda por cima, a cada quadro)
     p(97, 24, 126, 36, '#0b0b0e'); p(98, 25, 124, 34, '#1c1c22'); p(98, 25, 124, 1, '#34343c');
     p(214, 58, 3, 1, '#ff3b3b');
     for (let x = 0; x <= W; x++) p(x, Math.round(yVaral(x)), 1, 1, '#2b2b2b');
+    temasDoFundo = temas.join(',');
   }
 
   // --- o telão --------------------------------------------------------------------------
-  function rodinha(cx: number, cy: number, r: number) {
-    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
-      const d = Math.hypot(x, y);
-      if (d <= r + 0.2 && d > r - 1.2) px(cx + x, cy + y, 1, 1, '#111114');
-    }
-    if (Math.floor(relogio * 14) % 2) { px(cx - 1, cy, 3, 1, '#9aa1ab'); px(cx, cy - 1, 1, 3, '#9aa1ab'); }
-    else {
-      for (const [dx, dy] of [[-1, -1], [1, 1], [1, -1], [-1, 1]]) px(cx + dx, cy + dy, 1, 1, '#9aa1ab');
-      px(cx, cy, 1, 1, '#c9ced6');
-    }
-  }
-
-  function video(trilha: boolean) {
-    const { x: X, y: Y, w: L } = TELA;
-    const t = relogio;
-    const vel = trilha ? 46 : 62;
-    const ceu = trilha ? ['#ffe6b0', '#ffae66'] : ['#2e2556', '#ff8a5c'];
-    for (let i = 0; i < 6; i++) px(X, Y + i * 4, L, 4, mistura(ceu[0], ceu[1], i / 5));
-    for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (Math.hypot(x, y) <= 4.2) px(X + 92 + x, Y + 12 + y, 1, 1, trilha ? '#fff4cf' : '#ffd27a');
-    for (let x = X; x < X + L; x++) {
-      const u = x + t * vel * 0.15;
-      const h = Math.round(Y + 15 + Math.sin(u / 11) * 3 + Math.sin(u / 5.3) * 1.2);
-      px(x, h, 1, Y + 22 - h, trilha ? '#e3a05a' : '#5a3a6e');
-      const u2 = x + t * vel * 0.45;
-      const h2 = Math.round(Y + 19 + Math.sin(u2 / 7) * 1.6);
-      px(x, h2, 1, Y + 22 - h2, trilha ? '#c77c3a' : '#2f2a40');
-    }
-    if (trilha) {
-      px(X, Y + 22, L, 9, '#b07a45'); px(X, Y + 22, L, 1, '#c99460');
-      for (let k = 0; k < 16; k++) px(X + volta(k * 29 - t * vel, L), Y + 24 + (k % 4) * 2, 1 + (k % 2), 1, '#8a5a30');
-      for (let k = 0; k < 3; k++) {
-        const cx = X + volta(k * 55 + 20 - t * vel * 0.45, L + 20) - 10;
-        px(cx, Y + 15, 2, 7, '#3f7a3a'); px(cx - 2, Y + 17, 2, 1, '#3f7a3a'); px(cx - 2, Y + 15, 1, 2, '#3f7a3a');
-        px(cx + 2, Y + 18, 2, 1, '#3f7a3a'); px(cx + 3, Y + 16, 1, 2, '#3f7a3a');
-      }
-    } else {
-      px(X, Y + 22, L, 9, '#2b2b31'); px(X, Y + 22, L, 1, '#5c6168');
-      for (let k = -1; k < L / 12 + 1; k++) px(X + k * 12 - volta(t * vel, 12), Y + 26, 6, 1, '#f2e6a0');
-      for (let k = 0; k < 5; k++) { const x = X + volta(k * 30 - t * vel, L + 10) - 5; px(x, Y + 18, 1, 4, '#8d949e'); px(x, Y + 18, 1, 1, '#f28c28'); }
-    }
-    const bx = X + 46;
-    const by = Y + 28 + (trilha && Math.floor(t * 10) % 3 === 0 ? -1 : 0);
-    for (let k = 0; k < 6; k++) {
-      const d = volta(t * vel * 0.6 + k * 7, 30);
-      g.globalAlpha = Math.max(0, 0.7 - d / 34);
-      px(bx - 12 - d, by - 1 - (k % 2) - Math.floor(d / 10), 2, 1, trilha ? '#e8c08a' : '#9aa1ab');
-    }
-    g.globalAlpha = 1;
-    if (!trilha) {
-      rodinha(bx - 7, by, 3); rodinha(bx + 8, by, 3);
-      px(bx - 9, by - 1, 10, 1, '#c9ced6'); px(bx - 2, by - 3, 5, 3, '#9aa1ab');
-      px(bx - 10, by - 4, 4, 1, '#1d1d22'); px(bx - 6, by - 5, 6, 1, '#3b2a20');
-      px(bx, by - 6, 6, 2, '#1d1d22'); px(bx + 1, by - 6, 4, 1, '#f28c28');
-      linha(bx + 6, by - 7, bx + 8, by, 1, '#c9ced6'); px(bx + 5, by - 9, 3, 1, '#c9ced6'); px(bx + 8, by - 6, 1, 2, '#fff3b0');
-      px(bx - 3, by - 7, 3, 2, '#2b3a55'); px(bx - 4, by - 12, 4, 5, '#1d1d22'); px(bx - 4, by - 10, 4, 1, '#f28c28');
-      px(bx, by - 11, 5, 1, '#1d1d22'); px(bx - 4, by - 15, 4, 3, '#1d1d22'); px(bx - 1, by - 14, 1, 1, '#7a8090');
-    } else {
-      rodinha(bx - 8, by, 3); rodinha(bx + 8, by, 3);
-      px(bx - 3, by - 5, 5, 3, '#2b2b31'); px(bx - 6, by - 2, 4, 1, '#3a3a44');
-      px(bx - 11, by - 9, 7, 1, '#f2f2f2'); px(bx - 12, by - 10, 2, 1, '#d7263d');
-      px(bx - 7, by - 9, 8, 1, '#1b1b1f'); px(bx - 1, by - 8, 6, 2, '#d7263d'); px(bx + 1, by - 7, 2, 1, '#f2f2f2');
-      linha(bx + 5, by - 10, bx + 8, by, 1, '#d4a73a'); px(bx + 6, by - 6, 4, 1, '#f2f2f2'); px(bx + 5, by - 12, 2, 2, '#7fb2d6');
-      px(bx - 3, by - 10, 3, 2, '#555a66'); px(bx - 4, by - 15, 4, 5, '#f2f2f2'); px(bx - 4, by - 15, 4, 1, '#d7263d');
-      px(bx, by - 14, 5, 1, '#d7263d'); px(bx - 4, by - 18, 4, 3, '#d7263d'); px(bx - 3, by - 17, 2, 1, '#f2f2f2');
-    }
-    for (let y = Y; y < Y + TELA.h; y += 2) px(X, y, L, 1, 'rgba(0,0,0,.16)');
-  }
-
-  /** O telão: a Harley na estrada e a Sahara na trilha, trocando a cada 12 s com chiado; na festa, o parabéns. */
-  function telao(festa: boolean) {
-    const modo = festa ? 'festa' : Math.floor(relogio / 12) % 2 ? 'trilha' : 'estrada';
+  /** O telão: o vídeo de cada lado, trocando a cada 12 s com chiado; na festa, o parabéns. */
+  function telao(festa: boolean, temas: [Tema, Tema]) {
+    const lado: Lado = Math.floor(relogio / 12) % 2 ? 1 : 0;
+    const modo = festa ? 'festa' : `${temas[lado]}-${lado}`;
     if (modo !== modoDoTelao) { if (modoDoTelao) chiadoAte = relogio + 0.35; modoDoTelao = modo; }
     const { x: X, y: Y, w: L, h: A } = TELA;
     g.save(); g.beginPath(); g.rect(X, Y, L, A); g.clip();
@@ -294,12 +234,12 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
         px(X + volta(i * 37, L), Y + volta(i * 13 + Math.floor(relogio * 12) + i * 5, A), 1, 1, [COR.laranja, COR.vermelho, '#ffffff', '#ffd27a'][i % 4]);
       }
       for (let y = Y; y < Y + A; y += 2) px(X, y, L, 1, 'rgba(0,0,0,.16)');
-    } else video(modo === 'trilha');
+    } else TEMA[temas[lado]].video(pincel, lado);
     g.restore();
   }
 
   // --- os móveis ------------------------------------------------------------------------
-  function mesaDoBolo(velas: boolean) {
+  function mesaDoBolo(velas: boolean, temas: [Tema, Tema]) {
     if (mesaA <= 0) return;
     g.globalAlpha = mesaA;
     px(MESA.x1, 109, MESA.x2 - MESA.x1, 2, 'rgba(0,0,0,.3)');
@@ -307,19 +247,21 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     px(MESA.x1, MESA.topo, MESA.x2 - MESA.x1, 1, '#fffaf2');
     px(MESA.x1, MESA.frente, MESA.x2 - MESA.x1, 12, '#e3dbcc');
     px(MESA.x1, MESA.frente, MESA.x2 - MESA.x1, 1, '#c9bfae');
+    const [v0, v1] = [TEMA[temas[0]].velas[0], TEMA[temas[1]].velas[1]];
     for (let i = 0, x = MESA.x1; x < MESA.x2; i++, x += 6) {
-      const cor = i % 2 ? COR.laranja : COR.vermelho;
+      const cor = i % 2 ? v0[0] : v1[0];
       px(x, 104, 6, 3, cor); px(x + 1, 107, 4, 1, cor);
     }
-    px(130, 88, 6, 2, '#cfd6df'); px(184, 88, 6, 2, '#cfd6df');
-    px(137, 86, 3, 4, '#7ec8ff'); px(180, 86, 3, 4, '#ff8a5c');
-    // o bolo: o andar de baixo da Harley, o de cima da Sahara
+    // os docinhos e os salgadinhos da festa, dos dois lados do bolo
+    px(130, 88, 9, 2, '#cfd6df'); px(181, 88, 9, 2, '#cfd6df');
+    for (const x of [131, 134, 137]) { px(x, 86, 2, 2, '#4a2a1a'); px(x, 86, 1, 1, '#a0613a'); }
+    for (const x of [182, 185, 188]) { px(x, 86, 2, 2, COR.coxinha); px(x, 86, 1, 1, '#f0a845'); }
+    px(141, 85, 2, 4, '#7ec8ff'); px(177, 85, 2, 4, '#ff8a5c');
+    // o bolo: o andar de baixo é do lado esquerdo, o de cima do direito
     px(146, 91, 28, 2, '#cfd6df');
-    px(149, 82, 22, 9, COR.preto); px(149, 82, 22, 2, COR.laranja);
-    for (let x = 150; x < 171; x += 3) px(x, 84, 1, 1 + (x % 2), COR.laranja);
-    px(149, 87, 22, 1, '#3a3a44');
-    px(153, 75, 14, 7, COR.branco); px(153, 75, 14, 1, '#ffffff'); px(153, 79, 14, 2, COR.vermelho);
-    for (const [x, c1, c2] of [[157, COR.laranja, COR.preto], [162, COR.vermelho, COR.branco]] as const) {
+    TEMA[temas[0]].andarDoBolo(pincel, 0);
+    TEMA[temas[1]].andarDoBolo(pincel, 1);
+    for (const [x, [c1, c2]] of [[157, v0], [162, v1]] as const) {
       for (let y = 69; y < 75; y++) px(x, y, 2, 1, (y % 2) ? c1 : c2);
       if (velas) {
         const f = Math.floor(relogio * 10 + x) % 2;
@@ -342,77 +284,64 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     mesinha(40);
     px(43, 67, 2, 7, '#2f7a3a'); px(43, 65, 2, 2, '#245e2d');
     px(47, 66, 2, 8, '#6b3a1a'); px(47, 64, 2, 2, '#4e2a12');
-    px(52, 68, 2, 6, '#2f7a3a'); px(52, 66, 2, 2, '#245e2d');
-    px(57, 70, 3, 4, COR.ambar); px(57, 69, 3, 1, '#fff6df');
-    px(62, 70, 3, 4, COR.ambar); px(62, 69, 3, 1, '#fff6df');
+    px(51, 70, 3, 4, COR.ambar); px(51, 69, 3, 1, '#fff6df');
+    // a jarra de suco
+    px(56, 67, 5, 7, '#ff9f2e'); px(56, 67, 5, 1, '#ffd27a'); px(55, 66, 7, 1, '#cfe6f5'); px(61, 68, 1, 4, '#cfe6f5');
+    px(64, 70, 3, 4, '#ff9f2e'); px(64, 69, 3, 1, '#ffd27a');
   }
   function salgados() {
     px(250, 93, 36, 2, 'rgba(0,0,0,.28)');
     mesinha(254);
+    // a caixa de pizza aberta
     px(255, 63, 15, 10, '#c89a5a'); px(255, 63, 15, 1, '#d8ad70'); px(257, 66, 11, 4, '#b48548');
     px(255, 72, 15, 2, '#b48548');
     px(256, 71, 13, 3, '#f2b544'); px(256, 71, 13, 1, '#e39b2b');
     for (const x of [258, 262, 266]) px(x, 72, 1, 1, '#b8322a');
-    px(271, 73, 11, 1, '#cfd6df');
-    for (const x of [272, 275, 278]) { px(x, 70, 2, 3, COR.coxinha); px(x, 70, 1, 1, '#f0a845'); }
-    px(273, 68, 2, 2, COR.coxinha);
-    px(283, 64, 2, 10, '#c22a2a'); px(283, 63, 2, 1, '#e8e8e8');
+    // a estufa de salgados: coxinha e pastel em cima, dogão e esfiha embaixo, com a luzinha quente
+    px(271, 58, 15, 16, '#8d949e'); px(272, 59, 13, 14, 'rgba(255,214,150,.35)'); px(272, 59, 13, 1, '#ffd27a');
+    px(272, 65, 13, 1, '#8d949e');
+    for (const x of [273, 276]) { px(x, 62, 2, 3, COR.coxinha); px(x, 62, 1, 1, '#f0a845'); }
+    px(279, 63, 4, 2, '#e8c27a'); px(279, 63, 4, 1, '#d9a85a');
+    px(273, 69, 5, 2, '#d9a05a'); px(273, 69, 5, 1, '#b8322a');
+    px(280, 69, 3, 3, '#d98a3a'); px(281, 69, 1, 1, '#b8322a');
+    px(271, 73, 15, 1, '#6d737c');
+    // os brigadeiros na frente
+    for (const x of [257, 260, 263, 266]) { px(x, 74, 2, 1, '#4a2a1a'); }
   }
-
-  function roda(cx: number, cy: number, r: number, cravos = false) {
-    for (let y = -r - 1; y <= r + 1; y++) for (let x = -r - 1; x <= r + 1; x++) {
-      const d = Math.hypot(x, y);
-      let cor: string | null = null;
-      if (d <= r + 0.3) {
-        if (d > r - 2.5) cor = COR.pneu;
-        else if (d > r - 3.6) cor = COR.cromo2;
-        else if (d < 1.6) cor = COR.cromo;
-        else if (x === 0 || y === 0 || Math.abs(x) === Math.abs(y)) cor = COR.cromo3;
-      } else if (cravos && d <= r + 1.2 && Math.round(Math.atan2(y, x) * 8 / Math.PI) % 2 === 0) cor = COR.pneu;
-      if (cor) px(cx + x, cy + y, 1, 1, cor);
+  function bebedouro() {
+    px(289, 93, 18, 2, 'rgba(0,0,0,.28)');
+    px(292, 63, 10, 11, 'rgba(159,216,255,.85)'); px(293, 63, 2, 10, 'rgba(255,255,255,.5)'); px(294, 61, 6, 2, '#3a6fd1'); px(292, 66, 10, 1, '#7ec2f0');
+    px(291, 74, 12, 19, '#e8ecf0'); px(291, 74, 12, 1, '#ffffff'); px(302, 75, 1, 18, '#c5ccd4');
+    px(293, 78, 2, 2, '#3a6fd1'); px(299, 78, 2, 2, '#d7263d');
+    px(292, 82, 10, 1, '#9aa1ab'); px(293, 86, 8, 4, '#cfd6df');
+    px(304, 76, 3, 10, '#cfd6df'); px(304, 76, 3, 1, '#ffffff');
+  }
+  function fliperama(i: number, ocupado: boolean) {
+    const k = FLIPERAMAS[i], cor = GABINETES[i];
+    const x0 = k.x1, w = k.x2 - k.x1;
+    px(x0, 93, w, 2, 'rgba(0,0,0,.3)');
+    px(x0, 52, w, 42, cor.corpo);
+    px(x0, 52, 1, 42, cor.arte); px(x0 + w - 1, 52, 1, 42, cor.arte);
+    // o letreiro, aceso
+    px(x0 + 1, 52, w - 2, 6, cor.letreiro); px(x0 + 1, 52, w - 2, 1, mistura(cor.letreiro, '#ffffff', 0.4));
+    // a tela, com o jogo esperando ficha (ou alguém jogando)
+    px(x0 + 2, 59, w - 4, 13, '#0b0b0e');
+    px(x0 + 3, 60, w - 6, 11, '#05050a');
+    const sw = w - 6;
+    for (let s = 0; s < 6; s++) px(x0 + 3 + volta(s * 5 + i * 3, sw), 60 + volta(Math.floor(relogio * (ocupado ? 18 : 6)) + s * 4, 11), 1, 1, '#c9d6ff');
+    if (ocupado) {
+      for (let c2 = 0; c2 < 4; c2++) px(x0 + 4 + c2 * 3 + Math.round(Math.sin(relogio * 3) * 1), 62, 2, 1, cor.tela);
+      px(x0 + 3 + volta(Math.floor(relogio * 9), sw - 2), 69, 3, 1, '#ffffff');
+      if (Math.floor(relogio * 6) % 2) px(x0 + 8, 66, 1, 2, '#ffd23f');
+    } else if (Math.floor(relogio * 2) % 2) {
+      px(x0 + 8, 68, 5, 1, cor.tela);
     }
-  }
-  function harley() {
-    g.save(); g.translate(motos.harley > 0 ? Math.floor(relogio * 30) % 2 : 0, 0);
-    px(16, 149, 84, 3, 'rgba(0,0,0,.32)');
-    px(14, 135, 40, 2, COR.cromo); px(16, 138, 36, 2, COR.cromo2); px(11, 134, 4, 4, COR.cromo3); px(13, 137, 4, 4, COR.cromo3);
-    roda(32, 140, 10); roda(84, 140, 10);
-    for (let a = Math.PI; a <= 2 * Math.PI; a += 0.05) px(32 + Math.cos(a) * 12, 140 + Math.sin(a) * 12, 2, 2, COR.preto);
-    for (let a = Math.PI * 1.1; a <= 1.9 * Math.PI; a += 0.05) px(84 + Math.cos(a) * 12, 140 + Math.sin(a) * 12, 2, 1, COR.preto);
-    linha(32, 140, 50, 131, 2, '#26262b');
-    linha(72, 118, 60, 136, 2, '#26262b');
-    px(47, 128, 18, 10, COR.cromo2);
-    for (let i = 0; i < 4; i++) { px(46 + i, 126 - i * 2, 7, 2, i % 2 ? COR.cromo3 : COR.cromo); px(58 - i, 126 - i * 2, 7, 2, i % 2 ? COR.cromo3 : COR.cromo); }
-    px(53, 131, 6, 4, '#5c6168');
-    px(34, 117, 20, 5, '#3b2a20'); px(34, 117, 20, 1, '#5a4030'); px(31, 115, 4, 4, '#3b2a20');
-    px(56, 112, 14, 1, COR.preto); px(52, 113, 22, 6, COR.preto); px(54, 119, 18, 2, COR.preto);
-    px(54, 115, 18, 2, COR.laranja); px(58, 113, 8, 1, '#3a3a44');
-    linha(77, 110, 84, 139, 2, COR.cromo);
-    px(76, 101, 2, 10, COR.cromo); px(70, 100, 9, 2, COR.cromo); px(68, 100, 3, 2, '#111');
-    for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (Math.hypot(x, y) <= 3.2) px(84 + x, 113 + y, 1, 1, Math.hypot(x, y) < 2 ? '#fff3b0' : COR.cromo);
-    g.restore();
-  }
-  function sahara() {
-    g.save(); g.translate(motos.sahara > 0 ? Math.floor(relogio * 34) % 2 : 0, 0);
-    px(224, 149, 84, 3, 'rgba(0,0,0,.32)');
-    roda(239, 139, 11, true); roda(292, 140, 10, true);
-    linha(272, 127, 292, 140, 2, '#3a3a44');
-    px(258, 116, 18, 13, '#2b2b31');
-    for (let y = 118; y < 128; y += 2) px(260, y, 14, 1, '#8d949e');
-    px(256, 129, 21, 3, COR.cromo2);
-    linha(268, 104, 260, 126, 2, COR.vermelho);
-    px(278, 108, 22, 4, '#26262b'); px(298, 108, 4, 4, COR.cromo2);
-    px(272, 106, 26, 8, COR.branco); px(272, 110, 26, 2, COR.vermelho);
-    px(294, 100, 11, 4, COR.vermelho); px(300, 98, 6, 2, COR.vermelho);
-    px(264, 102, 34, 4, '#1b1b1f'); px(264, 102, 34, 1, '#34343a');
-    px(252, 104, 20, 10, COR.vermelho); px(256, 107, 10, 3, COR.branco); px(254, 104, 14, 1, '#ef5468');
-    linha(247, 104, 239, 138, 2, '#d4a73a');
-    px(232, 112, 16, 3, COR.branco); px(232, 115, 14, 1, COR.vermelho);
-    px(240, 97, 12, 14, COR.branco); px(240, 104, 12, 2, COR.vermelho);
-    px(242, 100, 4, 4, '#fff3b0');
-    px(243, 91, 7, 6, 'rgba(126,178,214,.85)'); px(243, 91, 7, 1, '#cfe6f5');
-    px(250, 97, 10, 2, '#111'); px(256, 93, 1, 4, '#111'); px(255, 92, 3, 2, '#2a2a2a');
-    g.restore();
+    // o painel: a alavanca e os dois botões
+    px(x0, 72, w, 2, mistura(cor.corpo, '#000000', 0.4)); px(x0 + 1, 74, w - 2, 3, '#1a1a22');
+    px(x0 + 6, 71, 1, 3, '#9aa1ab'); px(x0 + 5, 70, 3, 2, '#e04852');
+    px(x0 + 11, 74, 2, 1, '#ffd23f'); px(x0 + 15, 74, 2, 1, cor.arte);
+    // a portinha da ficha
+    px(x0 + 7, 81, 7, 9, '#151520'); px(x0 + 9, 83, 1, 3, '#ff8a2e'); px(x0 + 11, 83, 1, 3, '#ff8a2e');
   }
 
   // --- os bonecos -----------------------------------------------------------------------
@@ -458,9 +387,17 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
   }
 
   function atualizarEfeitos(dt: number) {
-    for (const k of ['harley', 'sahara'] as const) motos[k] = Math.max(0, motos[k] - dt);
-    if (motos.harley > 0 && Math.random() < dt * 14) fumaca(10, 137, 1);
-    if (motos.sahara > 0 && Math.random() < dt * 14) fumaca(303, 109, 1);
+    for (const lado of [0, 1] as const) {
+      agito[lado] = Math.max(0, agito[lado] - dt);
+      const f = fumacaDe[lado];
+      if (agito[lado] > 0 && f && Math.random() < dt * 14) fumaca(f.x, f.y, 1);
+      const k = faiscaDe[lado];
+      if (agito[lado] > 0 && k) {
+        for (let i = 0; i < 2; i++) {
+          particulas.push({ tipo: 'faisca', cor: Math.random() < 0.5 ? '#ffd23f' : '#ff8a2e', x: k.x, y: k.y, vx: (Math.random() - 0.3) * 60, vy: -20 - Math.random() * 30, vida: 0.35 + Math.random() * 0.3, tam: 1, chao: 0, fase: 0 });
+        }
+      }
+    }
     particulas = particulas.filter((q) => (q.vida -= dt) > 0);
     for (const q of particulas) {
       if (q.tipo === 'confete') {
@@ -468,7 +405,7 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
           q.vy = Math.min(38, q.vy + 160 * dt); q.vx *= 1 - dt * 1.6;
           q.x += (q.vx + Math.sin(relogio * 6 + q.fase) * 10) * dt; q.y += q.vy * dt;
         }
-      } else { q.x += q.vx * dt; q.y += q.vy * dt; if (q.tipo === 'fumaca') q.tam += dt * 2; }
+      } else { q.x += q.vx * dt; q.y += q.vy * dt; if (q.tipo === 'fumaca') q.tam += dt * 2; if (q.tipo === 'faisca') q.vy += 120 * dt; }
     }
     textos = textos.filter((k) => (k.vida -= dt) > 0);
     for (const k of textos) k.y += k.vy * dt;
@@ -478,6 +415,8 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
   function desenhar(gar: Garagem, dt: number, luzes: boolean) {
     relogio += dt;
     atualizarEfeitos(dt);
+    const temas = gar.temas;
+    if (temas.join(',') !== temasDoFundo) pintarFundo(temas);
     const festa = gar.festa;
     mesaA += ((gar.mesaNaTela ? 1 : 0) - mesaA) * Math.min(1, dt * 5);
     if (!gar.mesaNaTela && mesaA < 0.02) mesaA = 0;
@@ -487,11 +426,11 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     luz += (alvoLuz - luz) * Math.min(1, dt * 2.2);
 
     g.drawImage(fundo, 0, 0);
-    telao(gar.mesaNaTela);
+    telao(gar.mesaNaTela, temas);
     if (mesaA > 0) {
       // as bandeirinhas descem junto com a mesa
       g.globalAlpha = mesaA;
-      const bandeira = [COR.laranja, COR.preto, COR.vermelho, COR.branco];
+      const bandeira = [TEMA[temas[0]].velas[0][0], TEMA[temas[0]].velas[0][1], TEMA[temas[1]].velas[1][0], TEMA[temas[1]].velas[1][1]];
       for (let x = 0; x <= W; x++) px(x, 3 + 4 * (1 - ((x - 160) / 160) ** 2), 1, 1, '#2b2b2b');
       for (let i = 0, x = 2; x < W; i++, x += 10) {
         const y0 = Math.round(4 + 4 * (1 - ((x + 4 - 160) / 160) ** 2));
@@ -500,20 +439,24 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
       g.globalAlpha = 1;
     }
     for (const l of LAMPADAS) { px(l.x, l.y - 1, 2, 1, '#2b2b2b'); px(l.x, l.y, 2, 3, l.cor); }
+    const ocupado = [gar.noFliperama(0) !== null, gar.noFliperama(1) !== null];
     const coisas: { y: number; f: () => void }[] = [
       ...[...gar.bonecos.values()].map((b) => ({ y: b.y, f: () => boneco(b) })),
-      { y: MESA.base, f: () => mesaDoBolo(gar.velas) },
+      { y: MESA.base, f: () => mesaDoBolo(gar.velas, temas) },
       { y: BALCOES[0].base, f: bebidas },
       { y: BALCOES[1].base, f: salgados },
-      { y: HARLEY.base, f: harley },
-      { y: SAHARA.base + 0.1, f: sahara },
+      { y: BALCOES[2].base, f: bebedouro },
+      { y: FLIPERAMAS[0].base, f: () => fliperama(0, ocupado[0]) },
+      { y: FLIPERAMAS[1].base, f: () => fliperama(1, ocupado[1]) },
+      { y: 150, f: () => TEMA[temas[0]].peca(pincel, 0, agito[0]) },
+      { y: 150.1, f: () => TEMA[temas[1]].peca(pincel, 1, agito[1]) },
     ];
     coisas.sort((a, b) => a.y - b.y).forEach((k) => k.f());
     for (const q of particulas) {
       if (q.tipo === 'confete') {
         g.globalAlpha = Math.min(1, q.vida / 1.5);
         px(q.x, q.y, (Math.floor(relogio * 8 + q.fase) % 2) + 1, 1 + (Math.floor(relogio * 8 + q.fase + 1) % 2), q.cor);
-      } else if (q.tipo === 'brilho') {
+      } else if (q.tipo === 'brilho' || q.tipo === 'faisca') {
         g.globalAlpha = Math.min(1, q.vida * 2); px(q.x, q.y, 1, 1, q.cor);
       } else {
         g.globalAlpha = Math.min(0.55, q.vida * 0.5); const s = Math.round(q.tam); px(q.x - s / 2, q.y - s / 2, s, s, q.cor);
@@ -524,13 +467,15 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     c.imageSmoothingEnabled = false;
     c.drawImage(low, 0, 0, tela.width, tela.height);
 
-    const fonte = (tam: number) => `700 ${Math.round(tam * S)}px ${FONTE}`;
+    const fonte = (tam: number, pixel = false) => (pixel ? `500 ${Math.round(tam * S)}px ${PIXEL}` : `750 ${Math.round(tam * S)}px ${TEXTO}`);
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = fonte(4.2); c.fillStyle = '#f2f2f2'; c.fillText('HARLEY', 44 * S, 31 * S);
-    c.font = fonte(5.5); c.fillStyle = COR.laranja; c.fillText('ESTRADA', 44 * S, 53 * S);
-    c.font = fonte(4.2); c.fillStyle = '#b3122e'; c.fillText('SAHARA', 276 * S, 31 * S);
-    c.font = fonte(5.5); c.lineWidth = Math.max(1, 0.8 * S); c.strokeStyle = '#5a1a10'; c.strokeText('TRILHA', 276 * S, 53 * S);
-    c.fillStyle = '#ffffff'; c.fillText('TRILHA', 276 * S, 53 * S);
+    for (const r of rotulos) {
+      c.font = fonte(r.tam);
+      if (r.contorno) { c.lineWidth = Math.max(1, 0.8 * S); c.strokeStyle = r.contorno; c.strokeText(r.texto, r.x * S, r.y * S); }
+      c.fillStyle = r.cor; c.fillText(r.texto, r.x * S, r.y * S);
+    }
+    c.font = fonte(3.4); c.fillStyle = '#ffffff';
+    for (const k of FLIPERAMAS) c.fillText('NAVINHA', (k.x1 + k.x2) / 2 * S, 55.3 * S);
 
     // o escuro, com buracos onde há luz
     if (luz > 0.01) {
@@ -547,8 +492,8 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
       if (gar.mesaNaTela && gar.velas) { furo(160, 70, 44, 0.95); furo(160, 92, 60, 0.5); }
       if (festa?.fase === 'cantando') furo(160, 112, 96, 0.45);
       for (const l of LAMPADAS) furo(l.x + 1, l.y + 1, 9, 0.5);
-      if (motos.harley > 0) furo(96, 118, 30, 0.7);
-      if (motos.sahara > 0) furo(230, 104, 30, 0.7);
+      for (const k of FLIPERAMAS) furo((k.x1 + k.x2) / 2, 64, 16, 0.6);
+      for (const lado of [0, 1] as const) { const b = brilhoDe[lado]; if (agito[lado] > 0 && b) furo(b.x, b.y, 30, 0.7); }
       c.drawImage(sombra, 0, 0);
     }
 
@@ -564,24 +509,29 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
       const [r, gg, b] = hex(l.cor);
       brilho(l.x + 1, l.y + 1.5, 6, `rgba(${r},${gg},${b},A)`, (0.15 + luz * 0.5) * (piscando ? 0.55 + 0.45 * Math.sin(relogio * 3 + i * 1.7) : 1));
     });
+    FLIPERAMAS.forEach((k, i) => {
+      const [r, gg, b] = hex(GABINETES[i].letreiro);
+      brilho((k.x1 + k.x2) / 2, 56, 12, `rgba(${r},${gg},${b},A)`, 0.12 + luz * 0.35);
+      brilho((k.x1 + k.x2) / 2, 65, 10, 'rgba(160,190,255,A)', (0.06 + luz * 0.3) * (ocupado[i] ? 1.4 : 1));
+    });
     if (gar.mesaNaTela && gar.velas) brilho(160, 67, 22 * (1 + Math.sin(relogio * 23) * 0.06), 'rgba(255,170,60,A)', (0.25 + luz * 0.55) * mesaA);
     if (luzes && !gar.festaAndando) {
       ['rgba(255,93,143,A)', 'rgba(126,200,255,A)', 'rgba(242,140,40,A)', 'rgba(155,255,155,A)'].forEach((cor, i) => {
         brilho(160 + Math.sin(relogio * 0.7 + i * 1.6) * 120, 124 + Math.cos(relogio * 0.9 + i * 2.1) * 40, 26, cor, 0.22);
       });
     }
-    if (motos.harley > 0) brilho(92, 113, 26, 'rgba(255,243,176,A)', 0.35);
-    if (motos.sahara > 0) brilho(236, 102, 26, 'rgba(255,243,176,A)', 0.35);
+    for (const lado of [0, 1] as const) { const b = brilhoDe[lado]; if (agito[lado] > 0 && b) brilho(b.x, b.y, 26, 'rgba(255,243,176,A)', 0.35); }
     c.restore();
 
     // o telão na festa: o parabéns no lugar do vídeo
     if (modoDoTelao === 'festa' && relogio >= chiadoAte) {
       c.save();
-      c.font = fonte(10.5); c.shadowColor = '#ff4f9a'; c.shadowBlur = 6 * S;
+      c.font = fonte(10.5, true); c.shadowColor = '#ff4f9a'; c.shadowBlur = 6 * S;
       c.fillStyle = Math.floor(relogio * 3) % 9 === 0 ? 'rgba(255,120,180,.6)' : '#ff8cc0';
       c.fillText('PARABÉNS', 160 * S, 38 * S);
-      c.font = fonte(5.6); c.shadowColor = '#ffb347'; c.shadowBlur = 4 * S; c.fillStyle = '#ffd9a0';
-      c.fillText('TAVÃO & DONIS', 160 * S, 51 * S);
+      const nomes = nomesNoTelao(gar.aniversariantes);
+      c.font = fonte(nomes.length > 16 ? 4.6 : 5.6); c.shadowColor = '#ffb347'; c.shadowBlur = 4 * S; c.fillStyle = '#ffd9a0';
+      c.fillText(nomes, 160 * S, 51 * S);
       c.restore();
     }
 
@@ -605,7 +555,7 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
 
     // a legenda da música
     if (festa?.fase === 'cantando') {
-      const leg = legendaEm(festa.t);
+      const leg = legendaEm(festa.t, gar.aniversariantes);
       if (leg) {
         c.font = fonte(leg.grito ? 11 : 8.5);
         const w = c.measureText(leg.texto).width + 12 * S, h = (leg.grito ? 16 : 13) * S;
@@ -623,7 +573,7 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
       c.fillStyle = `rgba(0,0,0,${preto})`; c.fillRect(0, 0, tela.width, tela.height);
       if (a > 0.15 + APAGAO - 0.05) {
         c.globalAlpha = Math.max(0, 1 - (a - 0.15 - APAGAO) / 0.4);
-        c.font = fonte(8); c.fillStyle = '#ffd27a'; c.fillText('Você apagou!', 160 * S, 90 * S);
+        c.font = fonte(8, true); c.fillStyle = '#ffd27a'; c.fillText('Você apagou!', 160 * S, 90 * S);
         c.globalAlpha = 1;
       }
     }
@@ -640,10 +590,13 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
     },
     desenhar,
     ocorreu(o) {
-      if (o.tipo === 'gole' || o.tipo === 'mordida') {
-        textos.push({ texto: o.tipo === 'gole' ? 'glup!' : 'nhac!', x: o.x + 6, y: o.y - 24, vy: -10, vida: 1, cor: o.tipo === 'gole' ? '#ffd27a' : '#ffb36b', tam: 5 });
+      if (o.tipo === 'consumo') {
+        const k = COMIDAS[o.comida];
+        textos.push({ texto: k.grito, x: o.x + 6, y: o.y - 24, vy: -10, vida: 1, cor: k.tipo === 'beber' ? (o.comida === 'agua' ? '#9fd8ff' : '#ffd27a') : '#ffb36b', tam: 5 });
       } else if (o.tipo === 'soluco') {
         textos.push({ texto: 'hic!', x: o.x - 6, y: o.y - 24, vy: -8, vida: 0.9, cor: '#cfe6f5', tam: 4.5 });
+      } else if (o.tipo === 'ocupado') {
+        textos.push({ texto: 'ocupado!', x: o.x, y: o.y, vy: -8, vida: 1.2, cor: '#ff9be8', tam: 5 });
       } else if (o.tipo === 'nota') {
         textos.push({ texto: '♪', x: o.x + (Math.random() - 0.5) * 6, y: o.y - 26, vy: -14, vida: 1.4, cor: '#ffd27a', tam: 6 });
       } else if (o.tipo === 'mesa') {
@@ -655,11 +608,15 @@ export function criarDesenho(tela: HTMLCanvasElement): Desenho {
         confete();
       }
     },
-    acelerar(moto) {
-      if (motos[moto] > 0) return false;
-      motos[moto] = 1.3;
-      textos.push({ texto: 'VRUM!', x: moto === 'harley' ? 54 : 266, y: moto === 'harley' ? 100 : 90, vy: -10, vida: 1.2, cor: moto === 'harley' ? COR.laranja : '#ff5d6f', tam: 8 });
-      return true;
+    acelerar(lado, tema) {
+      if (agito[lado] > 0) return null;
+      const acao = TEMA[tema].acao(lado);
+      agito[lado] = 1.3;
+      fumacaDe = lado === 0 ? [acao.fumaca, fumacaDe[1]] : [fumacaDe[0], acao.fumaca];
+      brilhoDe = lado === 0 ? [acao.brilho, brilhoDe[1]] : [brilhoDe[0], acao.brilho];
+      faiscaDe = lado === 0 ? [acao.faiscas ?? null, faiscaDe[1]] : [faiscaDe[0], acao.faiscas ?? null];
+      textos.push({ texto: acao.grito, x: lado === 0 ? 54 : 266, y: lado === 0 ? 100 : 90, vy: -10, vida: 1.2, cor: acao.cor, tam: 8 });
+      return acao;
     },
     pontoDe(e) {
       const r = tela.getBoundingClientRect();
