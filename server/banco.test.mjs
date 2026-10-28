@@ -70,6 +70,7 @@ const IMPRESSOES = [
   '515a01a2c443',  // 56 enquadramento da foto e da capa do servidor
   '93906f078740',  // 57 mensagens.bot: o cartão do bot de música
   '6fe331481858',  // 58 urna_votos e urna_eleitores ganham o turno (a tabela é refeita)
+  '21d03fa19595',  // 59 garagem_festas e garagem_recordes: a festa preparada e o placar da Navinha
 ];
 
 const digital = (sql) => createHash('sha256').update(sql).digest('hex').slice(0, 12);
@@ -89,7 +90,7 @@ test('toda migração nova precisa ser registrada aqui', () => {
 test('o banco sobe com todas as tabelas', () => {
   const db = abrirBanco(':memory:');
   const tabelas = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  assert.deepEqual(tabelas, ['amizades', 'cargos', 'categorias', 'conversa_pessoas', 'conversas', 'convites', 'emails_pendentes', 'membros', 'mensagens', 'migracoes', 'recuperacoes', 'relatos', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'urna_eleitores', 'urna_votos', 'usuarios']);
+  assert.deepEqual(tabelas, ['amizades', 'cargos', 'categorias', 'conversa_pessoas', 'conversas', 'convites', 'emails_pendentes', 'garagem_festas', 'garagem_recordes', 'membros', 'mensagens', 'migracoes', 'recuperacoes', 'relatos', 'sala_cargos', 'salas', 'servidores', 'sessoes', 'sons', 'urna_eleitores', 'urna_votos', 'usuarios']);
 });
 
 test('refazer a tabela de mensagens não perde o que já foi dito', () => {

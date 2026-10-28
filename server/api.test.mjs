@@ -52,8 +52,14 @@ before(async () => {
   throw new Error('o servidor não subiu');
 });
 
-after(() => {
-  processo?.kill();
+after(async () => {
+  // Espera o servidor morrer antes de apagar o banco: no Windows o arquivo continua aberto por um
+  // instante depois do kill, e o rmSync dava EBUSY (27/10/2026, quando a Garagem passou a escrever nele).
+  if (processo && processo.exitCode === null) {
+    const saiu = new Promise((r) => processo.once('exit', r));
+    processo.kill();
+    await Promise.race([saiu, new Promise((r) => setTimeout(r, 5000))]);
+  }
   rmSync(pasta, { recursive: true, force: true });
 });
 
@@ -1957,34 +1963,49 @@ test('a Urna e o Dragão Quadrado saíram: o app de antes leva 404 e o /rooms n�
 
 // --- Garagem ----------------------------------------------------------------------
 
-test('a Garagem pela rede: um vê o outro, e só o dono da Saga começa o parabéns', async () => {
+test('a Garagem pela rede: um vê o outro, e só o dono da Saga prepara e começa o parabéns', async () => {
   const dono = await sessaoDe('abner');
   const tava = (await cadastrar('tava1')).corpo;
   const casa = tava.servidor.id;
-  const pos = (x, y, papel = 'outro') => ({ eu: { x, y, alvo: null, papel, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0 } });
+  const pos = (x, y, extra = {}) => ({ eu: { x, y, alvo: null, dir: 'baixo', cheio: 0, goles: 0, ultimo: null, quedas: 0, jogando: null, ...extra } });
   const estar = (quem, corpo) => chamar('POST', '/garagem', { sessao: quem.token, servidor: casa, corpo });
+  const festa = [{ id: tava.eu.id, nome: 'Tavão', tema: 'carro' }];
 
   assert.equal((await chamar('POST', '/garagem', { servidor: casa, corpo: pos(10, 80) })).status, 401);
-  const a = await estar(tava, pos(100, 120, 'tavao'));
+  const a = await estar(tava, pos(100, 120));
   assert.equal(a.status, 200);
   assert.equal(a.corpo.podeCantar, false);
-  // Da porta, o dono vê que o Tavão já foi pego — e espiar não o põe na garagem.
+  // O app de antes (com a porta) ainda espia, e espiar não põe ninguém na garagem.
   const porta = await chamar('GET', '/garagem', { sessao: dono.token, servidor: casa });
-  assert.deepEqual(porta.corpo.pessoas.map((p) => [p.id, p.papel]), [[tava.eu.id, 'tavao']]);
-  // Só um Tavão por vez.
-  const segundo = await estar(dono, pos(160, 140, 'tavao'));
-  assert.equal(segundo.status, 409);
+  assert.deepEqual(porta.corpo.pessoas.map((p) => p.id), [tava.eu.id]);
   const d = await estar(dono, pos(160, 140));
   assert.equal(d.corpo.podeCantar, true);
   const visto = d.corpo.pessoas.find((p) => p.id === tava.eu.id);
-  assert.deepEqual([visto.x, visto.y, visto.moto], [100, 120, 'harley']);
+  assert.deepEqual([visto.x, visto.y], [100, 120]);
 
-  // O botão não aparecer na tela dos outros é educação; quem recusa é o servidor.
+  // O painel da festa: o botão não aparecer na tela dos outros é educação; quem recusa é o servidor.
+  assert.equal((await chamar('POST', '/garagem/festa', { sessao: tava.token, servidor: casa, corpo: { aniversariantes: festa } })).status, 403);
+  assert.equal((await chamar('POST', '/garagem/festa', { sessao: dono.token, servidor: casa, corpo: { aniversariantes: [{ id: 999999, nome: 'X', tema: 'moto' }] } })).status, 400);
+  const preparada = await chamar('POST', '/garagem/festa', { sessao: dono.token, servidor: casa, corpo: { aniversariantes: festa } });
+  assert.equal(preparada.status, 200);
+  assert.deepEqual(preparada.corpo.preparo, festa);
+  // O Tava1 vê a decoração do tema dele e nada que diga que é para ele.
+  const doTava = (await estar(tava, pos(100, 120))).corpo;
+  assert.deepEqual(doTava.temas, ['carro', 'carro']);
+  assert.equal(JSON.stringify(doTava).includes('Tavão'), false);
+
   assert.equal((await chamar('POST', '/garagem/parabens', { sessao: tava.token, servidor: casa, corpo: {} })).status, 403);
-  const festa = await chamar('POST', '/garagem/parabens', { sessao: dono.token, servidor: casa, corpo: {} });
-  assert.equal(festa.status, 200);
-  assert.ok(festa.corpo.parabens.inicio > 0);
-  assert.deepEqual((await estar(tava, pos(100, 120))).corpo.parabens, festa.corpo.parabens);
+  const parabens = await chamar('POST', '/garagem/parabens', { sessao: dono.token, servidor: casa, corpo: {} });
+  assert.equal(parabens.status, 200);
+  assert.ok(parabens.corpo.parabens.inicio > 0);
+  assert.deepEqual(parabens.corpo.parabens.aniversariantes, festa);
+  assert.deepEqual((await estar(tava, pos(100, 120))).corpo.parabens, parabens.corpo.parabens);
+
+  // O placar da Navinha.
+  assert.equal((await chamar('POST', '/garagem/recorde', { sessao: tava.token, servidor: casa, corpo: { pontos: 'muito' } })).status, 400);
+  const recorde = await chamar('POST', '/garagem/recorde', { sessao: tava.token, servidor: casa, corpo: { pontos: 1500 } });
+  assert.equal(recorde.status, 200);
+  assert.deepEqual(recorde.corpo.recordes[0].pontos, 1500);
 
   // O menu de jogos conta quem está lá.
   const salas = await chamar('GET', '/rooms', { sessao: tava.token, servidor: casa });

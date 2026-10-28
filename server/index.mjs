@@ -148,7 +148,8 @@ const mesas = criarMesas();
 // As mesas do Catan, pelo mesmo motivo e com o mesmo preço — ver catans.mjs.
 const mesasDoCatan = criarMesasDoCatan();
 // A Garagem, também na memória: reiniciar o servidor esvazia a garagem por uma volta — ver garagem.mjs.
-const garagens = criarGaragens();
+// A festa que o dono preparou e o placar da Navinha, esses, vão para o banco.
+const garagens = criarGaragens({ db });
 // As filas do bot de música, uma por sala de voz. Também na memória: REINICIAR O SERVIDOR
 // ZERA AS FILAS — ver musica.mjs.
 const filas = criarFilas();
@@ -1543,7 +1544,7 @@ const ROTAS = {
     return garagens.estar(naGaragem(sid, eu), await lerCorpo(req));
   },
 
-  // A garagem vista da porta, sem entrar: a escolha de quem você é mostra o Tavão e o Donis já pegos.
+  // A garagem vista sem entrar: era a porta do app de antes da festa (v0.75), que ainda pergunta.
   'GET /garagem': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return garagens.espiar(naGaragem(sid, eu));
@@ -1557,6 +1558,18 @@ const ROTAS = {
   'POST /garagem/parabens': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     return garagens.cantarParabens(naGaragem(sid, eu));
+  },
+
+  // O painel da festa, só do dono da Saga: quem faz aniversário, o nome no telão e o tema de cada um.
+  'POST /garagem/festa': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.preparar(naGaragem(sid, eu), await lerCorpo(req));
+  },
+
+  // Uma partida da Navinha que acabou: o placar guarda os cinco maiores de cada servidor.
+  'POST /garagem/recorde': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    return garagens.recorde(naGaragem(sid, eu), await lerCorpo(req));
   },
 
   // --- relatos -----------------------------------------------------------------

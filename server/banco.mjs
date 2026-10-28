@@ -415,6 +415,25 @@ export const MIGRACOES = [
         SELECT 1, servidor_id, usuario_id, votos, ultimo_em FROM urna_eleitores;
    DROP TABLE urna_eleitores;
    ALTER TABLE urna_eleitores_nova RENAME TO urna_eleitores`,
+
+  // A Garagem guarda duas coisas no banco (27/10/2026, o dono): o parabéns que o dono da Saga
+  // preparou — quem faz aniversário, o nome no telão e o tema, uma linha por servidor —, para um
+  // reinício no meio do caminho não desfazer a festa nem a decoração; e o placar da Navinha, só os
+  // cinco maiores de cada servidor (os que caem para fora são apagados ao anotar). O resto da
+  // garagem continua na memória. 27/10/2026: a produção na 58; esta é a 59.
+  `CREATE TABLE garagem_festas (
+     servidor_id     INTEGER PRIMARY KEY REFERENCES servidores(id) ON DELETE CASCADE,
+     aniversariantes TEXT    NOT NULL,
+     atualizado_em   INTEGER NOT NULL
+   );
+   CREATE TABLE garagem_recordes (
+     id          INTEGER PRIMARY KEY,
+     servidor_id INTEGER NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
+     usuario_id  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+     pontos      INTEGER NOT NULL,
+     criado_em   INTEGER NOT NULL
+   );
+   CREATE INDEX garagem_recordes_placar ON garagem_recordes(servidor_id, pontos DESC)`,
 ];
 
 export function abrirBanco(caminho) {

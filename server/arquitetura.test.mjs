@@ -93,6 +93,8 @@ test('cada repositório é de UMA tabela', () => {
     // Conversa e participantes nascem juntos: uma conversa sem ninguém dentro é uma linha
     // quebrada, e criar as duas coisas em lugares diferentes é abrir essa porta.
     'conversas.mjs': ['conversa_pessoas'],
+    // O placar da Navinha junta o apelido da conta: quem saiu do servidor continua no placar.
+    'garagem_recordes.mjs': ['usuarios'],
   };
   const escrevendoFora = [];
   for (const arquivo of readdirSync(join(AQUI, 'repositorios')).filter((f) => f.endsWith('.mjs'))) {
