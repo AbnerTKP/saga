@@ -359,13 +359,15 @@ ao vivo, com o Blankito transmitindo para o Bagre (diagnóstico em `/root/diagno
 
 ## O bot de música (23/09/2026)
 
-> **Desligado desde 01/10/2026, em todas as versões, a pedido do dono — até haver um jeito
-> seguro.** O motivo imediato foi a Microsoft Store (baixar e executar um programa que não
-> veio no pacote é motivo de recusa), mas o dono quis fora "de tudo". O código ficou: duas
-> chaves, `LIGADO` em `main/musica.ts` (quem deixa de baixar e executar o `yt-dlp`) e
-> `BOT_DE_MUSICA_LIGADO` em `comandos.ts` (o menu some e o `/tocar` responde "desligado" só
-> para quem digitou). Pular, parar e fila continuam, para parar música posta por uma Saga
-> antiga. O `yt-dlp` já baixado na pasta da Saga de quem usou fica lá, sem ser executado.
+> **Ficou desligado de 01/10 a 01/11/2026 e voltou a pedido do dono, do mesmo jeito de antes.**
+> O desligamento dizia "até haver um jeito seguro", e esse jeito novo não apareceu: quem toca
+> continua sendo o app, com o `yt-dlp` baixado para a pasta da Saga, e o que protege é o que
+> está em "Processo principal", mais abaixo (a soma conferida protege de arquivo corrompido, não
+> de o próprio projeto `yt-dlp` ser invadido, porque ela vem do mesmo lugar que o programa).
+> Segue desligado só onde não dá: no **pacote da Microsoft Store** (`LIGADO`, em `main/musica.ts`:
+> baixar e executar um programa que não veio no pacote é motivo de recusa) e no **navegador**, que
+> não roda programa nenhum. Ali `/tocar` explica e sai do menu; ouvir, pular, parar e ver a fila
+> valem em qualquer lugar.
 
 Pedido do dono: colar um link do YouTube ou do Spotify e tocar na call, como os bots do
 Discord — chamado por comando no chat (`/tocar`, `/pular`, `/parar`, `/fila`). Desenho
@@ -471,9 +473,24 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
     velhas apagadas só na abertura; prazo em todo pedido à internet; áudios limpos de hora em
     hora; o yt-dlp morre junto com a Saga.
   - **Ficou para depois, de propósito**: o áudio atravessa inteiro para a tela por IPC (o teto
-    de 2 h limita a ~130 MB; servir por protocolo próprio é a saída); o anfitrião herdado pode
-    ser alguém de app antigo, que não toca (aí a fila anda pelo tempo); e a trava de transmitir
+    de 2 h limita a ~130 MB; servir por protocolo próprio é a saída); e a trava de transmitir
     não segura um app modificado que declare a tela como câmera.
+- **A vez de tocar só passa a quem consegue tocar (01/11/2026).** A Saga no navegador nasceu com
+  o bot desligado, e a regra antiga passava a vez ao primeiro da call, fosse quem fosse. O app que
+  não toca responde "não deu" e o servidor entende "não consegui tocar — pulei": lido no código, e
+  não reproduzido numa call de verdade, uma pessoa no celular herdando a vez esvaziaria a fila, com
+  uma mensagem por música. Hoje cada app ANUNCIA que toca (`tocaMusica`, um atributo como o `surdo`,
+  e por isso vale também para o aparelho que está na call agora, e não para a conta) e só quem se
+  anuncia herda. Quem não diz nada fica de fora sem ninguém mexer nele: navegador, pacote da Store
+  e as Sagas da v0.66 à v0.76, que têm o bot desligado. Três consequências:
+  - **Sem ninguém capaz na call, a vez fica onde está e a fila anda pelo tempo, em silêncio**, com a
+    barra ainda dizendo "tocando". Quem chegar com a Saga do computador assume do ponto.
+  - **Quem troca o computador pelo celular na mesma call perde a vez em 10 s** (`AUSENTE`): a conta
+    continua lá, mas o app que está nela já não toca.
+  - **Uma Saga de antes da v0.66 ainda põe música, mas não se anuncia**: perde a vez em 10 s se houver
+    quem toque. Já são versões de mais de um mês, e o custo é a música mudar de computador.
+  `api-livekit.test.mjs` exercita o caminho inteiro contra um LiveKit de mentira, e falha sem a regra
+  (a vez ia para quem estava no celular). **Com um LiveKit e dois apps de verdade, não foi exercido.**
 
 ## O bot como pessoa, e mover gente entre calls (23/09/2026)
 

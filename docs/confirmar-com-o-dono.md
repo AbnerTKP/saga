@@ -179,11 +179,13 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   cargos que devem poder. **A pessoa movida sumindo para quem moveu** foi consertada e medida
   na bancada (aparece na sala nova em 30 ms, confirmada em 1,5 s); na produção, com a internet
   do dono, não foi exercido.
-- **O bot de música com os amigos (23/09/2026).** Medido na bancada muda: comandos, fila, cartão,
-  a música chegando a um robô na call. Falta: ouvir de verdade (volume, qualidade, se corta),
-  **o primeiro `/tocar` no Windows** (baixa o `yt-dlp_win.zip` e abre com o `tar.exe` do
-  sistema — nada disso rodou num Windows), e quem pediu sair da call com a música tocando (a
-  música tem de seguir no app de outra pessoa, do mesmo ponto). **Depois de atualizar, ligue
+- **O bot de música com os amigos (23/09/2026; religado em 01/11/2026).** Medido na bancada muda:
+  comandos, fila, cartão, a música chegando a um robô na call. Falta: ouvir de verdade (volume,
+  qualidade, se corta), **o primeiro `/tocar` no Windows** (baixa o `yt-dlp_win.zip` e abre com o
+  `tar.exe` do sistema — nada disso rodou num Windows), e quem pediu sair da call com a música
+  tocando (a música tem de seguir no app de outra pessoa, do mesmo ponto, e nunca no de quem está
+  no celular). Ao religar, nada disso rodou de novo: só os testes, o typecheck e o build.
+  **Depois de atualizar, ligue
   "Tocar música" nos cargos** (Configurações do servidor › Cargos › Na call): nasce desligada
   para todo cargo, como a de transmitir.
 - **Mutar e desligar o fone, numa call de verdade (22/09/2026).** Medido na bancada: o fone

@@ -226,6 +226,9 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
     veria e a leitura de volta poderia dizer "ligado". O jeito da Store é a tarefa de
     arranque declarada no pacote (`addAutoLaunchExtension`), que abre SEM o `--ao-iniciar`
     — a janela viria na cara —, e não foi exercida num Windows.
+  - **O bot de música não toca.** Ele baixa e executa o `yt-dlp`, um programa que não veio no
+    pacote, e isso é motivo de recusa (`LIGADO`, em `musica.ts`). Com `musica.disponivel` falso, o
+    `/tocar` sai do menu e o app não se anuncia para herdar a vez; ouvir, pular e parar valem.
   - Quem monta é o `loja.yml` (só Windows tem `makeappx`), e o envio é à mão no Partner
     Center. **No Mac, `electron-builder --win appx` tenta LIGAR O PARALLELS** desta
     máquina para montar lá dentro — e liga os serviços dele mesmo com a licença vencida.

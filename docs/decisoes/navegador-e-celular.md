@@ -27,7 +27,7 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
   sabe fazer — copiar pelo `navigator.clipboard` (aqui não há porteiro de permissões), baixar
   o anexo como arquivo, "acordar" quando a aba volta para a frente, registro de erros na
   memória da aba — e responde "não há" no resto (transmitir, overlay, atualizar, abrir com o
-  sistema, bot de música). A tela esconde os botões pelo `platform: 'web'`
+  sistema, tocar o bot de música — ouvir, pular e parar valem). A tela esconde os botões pelo `platform: 'web'`
   (`recursosDaTela`, em `celular.ts`). É o mesmo truque do preload de mentira do
   `ferramentas/fotografar`, que sempre rodou a tela num navegador comum.
 - **A ponte tem de carregar ANTES do app** (`web/entrada.ts`): há módulos que leem
