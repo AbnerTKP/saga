@@ -27,14 +27,12 @@ import {
  */
 
 /**
- * Desligado em 01/10/2026, a pedido do dono, em TODAS as versões — não só na da Microsoft
- * Store, onde baixar e executar um programa que não veio no pacote é motivo de recusa. Fica
- * desligado até haver um jeito seguro. Desligado, nada aqui baixa nem executa o `yt-dlp`:
- * achar e preparar respondem o aviso, e ler não devolve nada. O código fica para religar.
- * O par desta chave na tela é `BOT_DE_MUSICA_LIGADO`, em `comandos.ts`.
+ * Fora do pacote da Microsoft Store: lá, baixar e executar um programa que não veio no pacote
+ * é motivo de recusa. Ali nada aqui baixa nem executa o `yt-dlp` — achar e preparar respondem
+ * o aviso, e ler não devolve nada. A tela sabe disso por `musica.disponivel`, no preload.
  */
-const LIGADO = false;
-const DESLIGADO = 'O bot de música está desligado por enquanto.';
+const LIGADO = !process.windowsStore;
+const DESLIGADO = 'O bot de música não funciona na versão da Microsoft Store.';
 
 const ASSET: Record<string, string | undefined> = {
   darwin: 'yt-dlp_macos.zip',

@@ -210,7 +210,7 @@ export function Chat({
 }) {
   const [texto, setTexto] = useState('');
   // O menu dos comandos do bot, enquanto se digita "/nome". Só onde o bot atende.
-  const menuDeComandos = estadoDaMusica ? comandosParaOMenu(texto) : [];
+  const menuDeComandos = estadoDaMusica ? comandosParaOMenu(texto, !!window.desktop?.musica?.disponivel) : [];
   const [escolhido, setEscolhido] = useState(0);
   useEffect(() => { setEscolhido(0); }, [menuDeComandos.length]);
   const completar = (nome: string) => { setTexto(`/${nome} `); campo.current?.focus(); };

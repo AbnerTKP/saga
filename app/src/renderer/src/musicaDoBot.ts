@@ -1,5 +1,5 @@
 import { comandoDeMusica, type EstadoDaMusica, type Mensagem } from './api';
-import { BOT_DE_MUSICA_LIGADO, type NomeDoComando } from './comandos';
+import type { NomeDoComando } from './comandos';
 import { anotar } from './registro';
 
 /**
@@ -51,6 +51,7 @@ export const definirContextoDoBot = (c: Contexto | null) => { contexto = c; };
 
 export const FORA_DA_CALL = 'Entre numa sala de voz primeiro: eu toco na call em que você está.';
 export const SEM_PERMISSAO = 'Seu cargo não pode pôr música. Peça ao dono do servidor a permissão "Tocar música".';
+export const NAO_TOCA_AQUI = 'O /tocar só funciona na Saga baixada do site, no computador. Daqui dá para pular, parar e ver a fila.';
 
 let serie = 0;
 /** Uma resposta do bot que só quem pediu vê: não vai ao servidor, e some ao trocar de sala. */
@@ -73,14 +74,13 @@ export async function executarComando(
   c: { nome: NomeDoComando; arg: string },
   aoProcurar?: () => void,
 ): Promise<Mensagem> {
-  // Antes de "fora da call" e de "sem permissão": desligado é a resposta para todo mundo.
-  if (c.nome === 'tocar' && !BOT_DE_MUSICA_LIGADO) throw new Error('O bot de música está desligado por enquanto.');
+  // Antes de "fora da call" e de "sem permissão": entrar na call não resolveria nada aqui.
+  if (c.nome === 'tocar' && !window.desktop?.musica?.disponivel) throw new Error(NAO_TOCA_AQUI);
   if (contexto && !contexto.naCall()) throw new Error(FORA_DA_CALL);
   if (contexto && c.nome !== 'fila' && !contexto.podeTocar()) throw new Error(SEM_PERMISSAO);
 
   let musica;
   if (c.nome === 'tocar') {
-    if (!window.desktop?.musica) throw new Error('Esta Saga é antiga para o bot de música. Atualize.');
     aoProcurar?.();
     for (const f of aoIrTocar) f();
     const inicio = performance.now();
