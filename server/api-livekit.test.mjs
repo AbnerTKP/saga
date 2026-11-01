@@ -13,6 +13,8 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { AUSENTE } from './musica.mjs';
+import { ATRIBUTO_TOCA_MUSICA } from './participantes.mjs';
 
 let processo, base, pasta, livekit;
 /** O que o LiveKit de mentira responde: as salas (com a contagem) e quem está em cada uma. */
@@ -109,6 +111,38 @@ test('o bot acha a call de quem acabou de entrar numa sala vazia', async () => {
   });
   // Achando a call, a fila vazia responde isto; sem achar, "Entre numa sala de voz primeiro".
   assert.match(r.corpo.error ?? '', /Não tem nada tocando/, `o bot não achou a call: ${JSON.stringify(r.corpo)}`);
+});
+
+test('o anfitrião saiu: a vez vai a quem consegue tocar, e não ao primeiro da lista', async () => {
+  const { eu, sala } = await donoAcabouDeEntrarEm('Geral');
+  const noLiveKit = `sala-${sala.id}`;
+  const chat = (await chamar('POST', '/salas/criar', { sessao: eu.token, corpo: { nome: 'pedidos', tipo: 'texto' } })).corpo.sala;
+  const { codigo } = (await chamar('POST', '/servidores/convite', { sessao: eu.token, corpo: {} })).corpo.convite;
+  const amigo = async (apelido) => {
+    const c = (await chamar('POST', '/cadastrar', { corpo: { apelido, senha: 'segredo123', senhaRepetida: 'segredo123' } })).corpo;
+    await chamar('POST', '/servidores/entrar', { sessao: c.token, corpo: { codigo } });
+    return c.eu.id;
+  };
+  const noCelular = await amigo('celular'), noComputador = await amigo('computador');
+
+  const tocar = await chamar('POST', '/musica', {
+    sessao: eu.token,
+    corpo: { sala: chat.id, comando: 'tocar', musica: { id: 'dQw4w9WgXcQ', titulo: 'uma música', autor: 'alguém', duracao: 200, origem: 'youtube' } },
+  });
+  assert.equal(tocar.status, 200, JSON.stringify(tocar.corpo));
+
+  // O dono sai. Quem está no navegador vem primeiro na lista e não anuncia nada.
+  mundo.gente = { [noLiveKit]: [
+    { identity: `u${noCelular}`, name: 'celular', state: 'ACTIVE', tracks: [] },
+    { identity: `u${noComputador}`, name: 'computador', state: 'ACTIVE', tracks: [], attributes: { [ATRIBUTO_TOCA_MUSICA]: '1' } },
+  ] };
+  const vez = async () => {
+    await new Promise((r) => setTimeout(r, 1100));
+    return (await chamar('GET', `/musica?sala=${sala.id}`, { sessao: eu.token })).corpo.musica.anfitriao;
+  };
+  assert.equal(await vez(), `u${eu.eu.id}`, 'sumiu agora: ainda pode ser a internet piscando');
+  await new Promise((r) => setTimeout(r, AUSENTE));
+  assert.equal(await vez(), `u${noComputador}`);
 });
 
 test('quem chega pelo HTTPS recebe o LiveKit cifrado; o app antigo, o endereço de sempre', async () => {

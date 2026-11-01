@@ -1,13 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  verParticipante, FONTE, ATRIBUTO_SURDO, ATRIBUTO_ASSISTINDO,
+  verParticipante, FONTE, ATRIBUTO_SURDO, ATRIBUTO_ASSISTINDO, ATRIBUTO_TOCA_MUSICA,
   salaNoLiveKit, salaDoLiveKit, emCallPorSalaDe,
 } from './participantes.mjs';
 
 // Monta um participante como o LiveKit devolve, só com o que a função lê.
 const pessoa = (nome, faixas) => ({ identity: `${nome}#a1b2`, name: nome, tracks: faixas });
 const faixa = (source, muted = false) => ({ source, muted });
+
+test('só toca o bot de música quem se anuncia: quem não diz nada, não toca', () => {
+  assert.equal(verParticipante({ ...pessoa('Abner', []), attributes: { [ATRIBUTO_TOCA_MUSICA]: '1' } }).tocaMusica, true);
+  assert.equal(verParticipante({ ...pessoa('Abner', []), attributes: { [ATRIBUTO_TOCA_MUSICA]: '' } }).tocaMusica, false);
+  assert.equal(verParticipante(pessoa('Abner', [])).tocaMusica, false);
+});
 
 test('alguém só com microfone ligado não aparece nem mudo nem compartilhando', () => {
   const v = verParticipante(pessoa('Abner', [faixa(FONTE.MICROFONE)]));

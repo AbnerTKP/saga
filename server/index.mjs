@@ -718,16 +718,20 @@ function anunciarQueComecou(sid, voz, item) {
  *
  * Duas precauções. Com o LiveKit sem responder, a lista de gente é a última que se conseguiu, e
  * a conferência espera — "ninguém na call" ali seria mentira, e apagaria a fila de quem ouve
- * (achado na revisão). E quem pode herdar a música, se o anfitrião sair, é primeiro quem tem
- * "Tocar música": o anfitrião avisa o fim de cada uma, e isso é mexer na fila.
+ * (achado na revisão). E quem pode herdar a música, se o anfitrião sair, é só quem tem um app
+ * capaz de tocar (`ATRIBUTO_TOCA_MUSICA`) — primeiro quem tem "Tocar música": o anfitrião avisa
+ * o fim de cada uma, e isso é mexer na fila.
  */
 function musicaDaSala(sid, voz) {
   if (!memoria.salas.falhou) {
-    const presentes = voz.participants
+    const gente = voz.participants
       .filter((p) => p.usuarioId)
-      .sort((a, b) => Number(temPermissao(b.cargo, 'tocarMusica')) - Number(temPermissao(a.cargo, 'tocarMusica')))
-      .map((p) => p.usuarioId);
-    const comecou = filas.conferir(voz.id, presentes);
+      .sort((a, b) => Number(temPermissao(b.cargo, 'tocarMusica')) - Number(temPermissao(a.cargo, 'tocarMusica')));
+    const comecou = filas.conferir(
+      voz.id,
+      gente.map((p) => p.usuarioId),
+      gente.filter((p) => p.tocaMusica).map((p) => p.usuarioId),
+    );
     if (comecou) anunciarQueComecou(sid, voz, comecou);
   }
   return verMusica(voz.id);

@@ -41,6 +41,8 @@ declare global {
       version: () => Promise<string>;
       /** O bot de música: achar (e baixar) pelo yt-dlp, e ler o áudio. Ver main/musica.ts. */
       musica: {
+        /** Se ESTE app consegue tocar: falso no navegador e no pacote da Microsoft Store. */
+        disponivel: boolean;
         achar: (texto: string) => Promise<{ ok: true; musica: MusicaAchada } | { ok: false; erro: string }>;
         preparar: (id: string) => Promise<{ ok: boolean; erro?: string }>;
         ler: (id: string) => Promise<{ bytes: Uint8Array; tipo: string } | null>;

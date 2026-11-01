@@ -114,6 +114,7 @@ window.desktop = {
   // Fora do build da web (o servidor de fotos, por exemplo) a versão não foi carimbada.
   version: () => Promise.resolve(typeof __VERSAO__ === 'string' ? __VERSAO__ : 'dev'),
   musica: {
+    disponivel: false,
     achar: () => Promise.resolve({ ok: false, erro: NAO_TEM }),
     preparar: () => Promise.resolve({ ok: false, erro: NAO_TEM }),
     ler: () => Promise.resolve(null),

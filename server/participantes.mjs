@@ -32,6 +32,14 @@ export const ATRIBUTO_SURDO = 'surdo';
  */
 export const ATRIBUTO_ASSISTINDO = 'assistindo';
 
+/**
+ * Que o app desta pessoa consegue tocar o bot de música (`musica.mjs`, a vez de tocar). É ele
+ * quem se anuncia, e não o servidor que adivinha: quem não diz nada — navegador, celular,
+ * pacote da Microsoft Store, versão de quando o bot estava desligado — não toca. Sem o
+ * anúncio, a vez cairia num app desses, que a recusaria música a música até esvaziar a fila.
+ */
+export const ATRIBUTO_TOCA_MUSICA = 'tocaMusica';
+
 export function verParticipante(p) {
   const faixas = p.tracks ?? [];
   const microfones = faixas.filter((t) => t.source === FONTE.MICROFONE);
@@ -47,6 +55,7 @@ export function verParticipante(p) {
     // A quem esta pessoa está assistindo, ou null. Vazio e ausente são a mesma coisa:
     // "ninguém".
     assistindo: p.attributes?.[ATRIBUTO_ASSISTINDO] || null,
+    tocaMusica: p.attributes?.[ATRIBUTO_TOCA_MUSICA] === '1',
   };
 }
 

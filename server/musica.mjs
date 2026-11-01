@@ -159,16 +159,19 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
     },
 
     /**
-     * Conferida a cada busca de salas, com quem está na call agora (ids das contas).
+     * Conferida a cada busca de salas, com quem está na call agora (ids das contas) e, entre
+     * esses, quem tem um app capaz de tocar (`capazes`, na ordem de quem deve herdar).
      *
      * - ninguém na call por `VAZIA`: a fila some — tocar para sala vazia é gastar a banda de alguém;
-     * - o anfitrião saiu (por `AUSENTE`): passa a quem ficou, e a música continua de onde estava (o app novo
-     *   calcula pela hora em que ela começou);
+     * - o anfitrião saiu (por `AUSENTE`): passa a quem ficou e consegue tocar, e a música continua de onde
+     *   estava (o app novo calcula pela hora em que ela começou);
+     * - ninguém ali consegue tocar (só gente no celular, digamos): a vez fica onde está, a fila anda pelo
+     *   tempo em silêncio, e o primeiro que chegar com um app capaz assume do ponto;
      * - passou da hora e ninguém avisou: o app do anfitrião morreu no meio — anda sozinha.
      *
      * Devolve a música que começou por causa disso, ou null.
      */
-    conferir(salaVoz, presentes) {
+    conferir(salaVoz, presentes, capazes = presentes) {
       const s = salas.get(salaVoz);
       if (!s) return null;
       if (presentes.length === 0) {
@@ -177,10 +180,10 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
         return null;
       }
       s.vaziaDesde = null;
-      if (presentes.includes(s.anfitriao)) s.ausenteDesde = null;
+      if (capazes.includes(s.anfitriao)) s.ausenteDesde = null;
       else {
         s.ausenteDesde ??= relogio();
-        if (relogio() - s.ausenteDesde >= AUSENTE) { s.anfitriao = presentes[0]; s.ausenteDesde = null; }
+        if (relogio() - s.ausenteDesde >= AUSENTE && capazes.length > 0) { s.anfitriao = capazes[0]; s.ausenteDesde = null; }
       }
       if (relogio() > s.comecouEm + s.itens[0].duracao * 1000 + FOLGA) return andar(salaVoz);
       return null;

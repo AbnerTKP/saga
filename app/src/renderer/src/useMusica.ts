@@ -212,7 +212,10 @@ export function useMusica({ room, conectado, euId, salaVozId, servidorDaVoz, fil
 
   const noticiaDaMinhaSala = salaVozId !== null ? noticias.get(salaVozId) ?? null : null;
   const estado = noticiaDaMinhaSala?.estado ?? null;
-  const souAnfitriao = conectado && !!estado && estado.anfitriao === room.localParticipant.identity;
+  // O servidor só passa a vez a quem se anuncia, mas o app que não toca não pode nem tentar: a
+  // recusa viraria "não consegui tocar — pulei", música a música, até a fila acabar.
+  const souAnfitriao = conectado && !!estado && estado.anfitriao === room.localParticipant.identity
+    && !!window.desktop.musica?.disponivel;
   const uidQueToca = souAnfitriao ? estado!.tocando.uid : null;
   souAnfitriaoRef.current = souAnfitriao;
 

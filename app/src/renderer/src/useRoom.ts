@@ -8,7 +8,7 @@ import { mudo } from './audivel';
 import type { TipoDeAviso } from './avisosDeTela';
 import { ARQUIVOS } from './sons';
 import { falando, nivelDe, LIMIAR } from './niveis';
-import { porTransmissao, quemChegou, ASSISTINDO, SURDO } from './espectadores';
+import { porTransmissao, quemChegou, ASSISTINDO, SURDO, TOCA_MUSICA } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { ESPERAS_PARA_REABRIR_MS, deveReabrirMicrofone } from './microfoneCaido';
 import { podeTransmitir } from './transmitir';
@@ -484,25 +484,26 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const jaContei = useRef(false);
 
   /**
-   * Conta à sala o que só este app sabe de mim: que transmissão estou assistindo e se
-   * desliguei o fone.
+   * Conta à sala o que só este app sabe de mim: que transmissão estou assistindo, se
+   * desliguei o fone e se consigo tocar o bot de música.
    *
-   * Nenhuma das duas dá para deduzir de fora. O LiveKit não conta a quem publica quem se
+   * Nenhuma delas dá para deduzir de fora. O LiveKit não conta a quem publica quem se
    * inscreveu na faixa dele, e surdez não é faixa nenhuma — é decisão local. O atributo é
    * do participante, então o servidor guarda e entrega até para quem chegar depois.
    *
-   * Manda sempre os DOIS, mesmo quando só um mudou: assim nada depende de o servidor
+   * Manda sempre TODAS, mesmo quando só uma mudou: assim nada depende de o servidor
    * juntar o que veio agora com o que veio antes.
    *
    * Falhar aqui não pode atrapalhar quem só quer conversar: crachá velho, emitido antes
    * de o servidor passar a permitir o anúncio, faz o pedido ser recusado — e o que se
-   * perde são as duas marcas, mais nada.
+   * perde são as marcas, mais nada.
    */
   const anunciar = useCallback(() => {
     if (room.state !== 'connected') return;
     room.localParticipant.setAttributes({
       [ASSISTINDO]: assistindoRef.current ?? '',
       [SURDO]: deafenedRef.current ? '1' : '',
+      [TOCA_MUSICA]: window.desktop.musica?.disponivel ? '1' : '',
     }).catch((e: Error) => {
       if (jaContei.current) return;
       jaContei.current = true;

@@ -31,9 +31,10 @@ const desktop = {
   openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
   /**
    * O bot de música: quem pede acha (e já baixa) pelo `yt-dlp`, e quem toca lê o áudio daqui.
-   * Ver `main/musica.ts`.
+   * Ver `main/musica.ts`. `disponivel` é falso no pacote da Microsoft Store.
    */
   musica: {
+    disponivel: !process.windowsStore,
     achar: (texto: string): Promise<{ ok: true; musica: { id: string; titulo: string; autor: string; duracao: number; origem: 'youtube' | 'spotify' | 'busca' } } | { ok: false; erro: string }> =>
       ipcRenderer.invoke('musica:achar', texto),
     preparar: (id: string): Promise<{ ok: boolean; erro?: string }> => ipcRenderer.invoke('musica:preparar', id),

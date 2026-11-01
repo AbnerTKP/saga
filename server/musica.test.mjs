@@ -137,6 +137,38 @@ test('cada sala de voz tem a sua fila', () => {
   assert.equal(filas.ver(GERAL), null);
 });
 
+test('a vez não passa a quem não consegue tocar', () => {
+  const { filas, passar } = montar();
+  filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });
+  // O Gustavo está no celular; o Tava, na Saga do computador.
+  filas.conferir(GERAL, [GUSTAVO.id, TAVA.id], [TAVA.id]);
+  passar(AUSENTE);
+  filas.conferir(GERAL, [GUSTAVO.id, TAVA.id], [TAVA.id]);
+  assert.equal(filas.ver(GERAL).anfitriao, TAVA.id);
+});
+
+test('sem ninguém capaz de tocar, a vez espera e a fila não some', () => {
+  const { filas, passar } = montar();
+  filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });
+  filas.conferir(GERAL, [GUSTAVO.id], []);
+  passar(Math.max(AUSENTE, VAZIA));
+  filas.conferir(GERAL, [GUSTAVO.id], []);
+  assert.equal(filas.ver(GERAL).anfitriao, TKP.id, 'ninguém ali toca: a vez fica onde está');
+  // A ausência já venceu: quem chega com um app capaz assume na hora.
+  filas.conferir(GERAL, [GUSTAVO.id, TAVA.id], [TAVA.id]);
+  assert.equal(filas.ver(GERAL).anfitriao, TAVA.id);
+});
+
+test('o anfitrião que trocou o computador pelo celular perde a vez', () => {
+  const { filas, passar } = montar();
+  filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });
+  // A mesma conta segue na call, mas o app que está nela já não toca.
+  filas.conferir(GERAL, [TKP.id, GUSTAVO.id], [GUSTAVO.id]);
+  passar(AUSENTE);
+  filas.conferir(GERAL, [TKP.id, GUSTAVO.id], [GUSTAVO.id]);
+  assert.equal(filas.ver(GERAL).anfitriao, GUSTAVO.id);
+});
+
 test('o anfitrião que caiu e voltou dentro do prazo continua tocando', () => {
   const { filas, passar } = montar();
   filas.tocar(GERAL, musica(), { pediu: TKP, salaDoChat: CHAT });

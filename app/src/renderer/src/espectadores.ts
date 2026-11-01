@@ -26,6 +26,12 @@ export const ASSISTINDO = 'assistindo';
  */
 export const SURDO = 'surdo';
 
+/**
+ * Que este app consegue tocar o bot de música. É por isto que o servidor escolhe quem herda a
+ * vez quando o anfitrião sai da call (`ATRIBUTO_TOCA_MUSICA`, em `participantes.mjs`).
+ */
+export const TOCA_MUSICA = 'tocaMusica';
+
 export type NaCall = { identity: string; nome: string; assistindo: string | null };
 export type Espectador = { identity: string; nome: string };
 

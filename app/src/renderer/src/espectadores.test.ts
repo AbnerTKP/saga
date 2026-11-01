@@ -1,8 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { porTransmissao, quemChegou, REPETIR_O_APITO, type NaCall } from './espectadores.ts';
+import { readFileSync } from 'node:fs';
+import { porTransmissao, quemChegou, REPETIR_O_APITO, TOCA_MUSICA, type NaCall } from './espectadores.ts';
 
-const gente = (...linhas: [string, string, string | null][]): NaCall[] =>
+test('o anúncio de quem toca tem o mesmo nome aqui e no servidor', () => {
+  // Nomes diferentes não dão erro: a vez de tocar só nunca mais passaria a ninguém.
+  const doServidor = readFileSync(new URL('../../../../server/participantes.mjs', import.meta.url), 'utf8');
+  assert.equal(/ATRIBUTO_TOCA_MUSICA = '([^']+)'/.exec(doServidor)?.[1], TOCA_MUSICA);
+});
+
+const gente =(...linhas: [string, string, string | null][]): NaCall[] =>
   linhas.map(([identity, nome, assistindo]) => ({ identity, nome, assistindo }));
 
 test('agrupa quem assiste por transmissão', () => {
