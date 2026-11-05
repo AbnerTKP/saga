@@ -47,7 +47,14 @@ export type AjustesDaAtividade = {
 /** Um programa aberto com janela, para a pessoa apontar o jogo que a Saga não achou. */
 export type ProgramaAberto = { exe: string; titulo: string };
 
-type JogoConhecido = { nome: string; exe: string[]; titulo?: RegExp };
+type JogoConhecido = {
+  nome: string;
+  exe: string[];
+  /** O título da janela DO PROGRAMA, pelo `tasklist /v`. Janela escondida também responde. */
+  titulo?: RegExp;
+  /** Uma janela visível na tela com esse título. Não diz de quem ela é; o programa aberto diz. */
+  naTela?: RegExp;
+};
 
 /**
  * Jogos que não passam pelo Steam, reconhecidos pelo nome do programa (em minúsculas).
@@ -57,13 +64,21 @@ type JogoConhecido = { nome: string; exe: string[]; titulo?: RegExp };
  * Java roda como `javaw.exe`, que é o Java de qualquer programa — por isso ele exige o título
  * da janela ("Minecraft 1.21.4", "Minecraft* 1.21.4 - Multiplayer").
  *
+ * O Roblox no Windows exige a janela NA TELA: ele se põe no arranque com `--launch-to-tray` e
+ * fica ao lado do relógio o dia inteiro, com o MESMO programa do jogo e nenhuma janela (medido em
+ * 05/11/2026). Por isso `naTela`, e não `titulo`: o `tasklist /v` responde também o título de
+ * janela escondida (`OleMainThreadWndName`, `VanguardTrayContextMenuHost`), e é o que um programa
+ * de bandeja tem. O Mac não lista janelas (`janelasAgora`), e o nome de lá fica sem a exigência:
+ * com ela, nunca seria reconhecido.
+ *
  * Os nomes do Mac (sem `.exe`) não foram conferidos num Mac: errar aqui só deixa de reconhecer.
  */
 export const JOGOS_CONHECIDOS: JogoConhecido[] = [
   { nome: 'VALORANT', exe: ['valorant-win64-shipping.exe'] },
   { nome: 'League of Legends', exe: ['league of legends.exe', 'league of legends', 'leagueoflegends'] },
   { nome: 'Fortnite', exe: ['fortniteclient-win64-shipping.exe'] },
-  { nome: 'Roblox', exe: ['robloxplayerbeta.exe', 'robloxplayer'] },
+  { nome: 'Roblox', exe: ['robloxplayerbeta.exe'], naTela: /^Roblox$/ },
+  { nome: 'Roblox', exe: ['robloxplayer'] },
   { nome: 'Minecraft', exe: ['minecraft.windows.exe'] },
   { nome: 'Minecraft', exe: ['javaw.exe'], titulo: /^Minecraft\*?\s/ },
   { nome: 'Grand Theft Auto V', exe: ['gta5.exe', 'gta5_enhanced.exe'] },
@@ -305,12 +320,14 @@ export function precisamDeTitulo(programas: readonly string[]): string[] {
 
 /**
  * O jogo entre os programas abertos: primeiro os que a PESSOA apontou (ela sabe mais que a
- * lista), depois os conhecidos. O que ela escondeu não vale em nenhum dos dois.
+ * lista), depois os conhecidos. O que ela escondeu não vale em nenhum dos dois. `naTela` são os
+ * títulos das janelas visíveis agora; a minimizada não entra, e aí o jogo volta junto com ela.
  */
 export function jogoDosProgramas(
   programas: readonly string[],
   titulos: ReadonlyMap<string, readonly string[]>,
   ajustes: AjustesDaAtividade,
+  naTela: readonly string[] = [],
 ): JogoAberto | null {
   const abertos = new Set(programas);
   const escondidos = new Set(ajustes.escondidos);
@@ -324,6 +341,7 @@ export function jogoDosProgramas(
     const chave = `exe:${exe}`;
     if (escondidos.has(chave)) continue;
     if (j.titulo && !(titulos.get(exe) ?? []).some((t) => j.titulo!.test(t))) continue;
+    if (j.naTela && !naTela.some((t) => j.naTela!.test(t))) continue;
     return { chave, nome: j.nome, steam: null, icone: null, origem: 'conhecido' };
   }
   return null;

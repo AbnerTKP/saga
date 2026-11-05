@@ -2,6 +2,11 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **"Jogando Roblox" só com a janela na tela (05/11/2026).** Medido no Windows dele, com o Roblox de verdade
+  rodando escondido pelo arranque (`--launch-to-tray`) e o `tasklist` de verdade: o código de antes dizia
+  "Roblox", o de agora, nenhum jogo. A janela do Roblox foi simulada, porque não se abriu o jogo nesta
+  máquina. **Falta**: abrir o Roblox de verdade com a Saga aberta e ver o "Jogando" aparecer e, ao fechar,
+  sumir e não voltar. É isso que confere o título "Roblox" e o que o programa faz ao voltar para a bandeja.
 - **Playlist e álbum no bot de música (04/11/2026).** Medido no Windows dele, sem janela nem som (o
   `musica.ts` e o `musicaDoBot.ts` de verdade, com `yt-dlp` e internet de verdade, contra o servidor e um
   LiveKit de mentira): vídeo com e sem `https://`; playlist do YouTube (50 de 125 em 2,4 s, e a primeira

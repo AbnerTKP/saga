@@ -204,9 +204,9 @@ async function titulosDe(exes: string[]): Promise<Map<string, string[]>> {
   return titulos;
 }
 
-async function jogoNosProgramas(): Promise<JogoAberto | null> {
+async function jogoNosProgramas(naTela: readonly string[]): Promise<JogoAberto | null> {
   const programas = await medido('programas', programasAbertos);
-  return jogoDosProgramas(programas, await titulosDe(precisamDeTitulo(programas)), ajustes);
+  return jogoDosProgramas(programas, await titulosDe(precisamDeTitulo(programas)), ajustes, naTela);
 }
 
 // --- a volta -----------------------------------------------------------------
@@ -239,7 +239,7 @@ async function volta() {
       const prazo = ids || process.platform !== 'win32' ? PROGRAMAS_A_CADA : PROGRAMAS_SEM_JANELAS;
       if (abriuOuFechou || Date.now() - programasEm >= prazo) {
         programasEm = Date.now();
-        doUltimoPrograma = await jogoNosProgramas();
+        doUltimoPrograma = await jogoNosProgramas(janelas?.map((f) => f.name) ?? []);
       }
       jogo = doUltimoPrograma && { ...doUltimoPrograma, iconeLocal: await iconeDoPrograma(doUltimoPrograma) };
     }

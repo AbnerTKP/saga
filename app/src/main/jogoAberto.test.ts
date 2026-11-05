@@ -152,6 +152,21 @@ test('o java só é Minecraft com o título da janela de Minecraft', () => {
   assert.equal(jogoDosProgramas(['javaw.exe'], new Map([['javaw.exe', ['Minecraft 1.21.4']]]), AJUSTES)?.nome, 'Minecraft');
 });
 
+test('o Roblox em segundo plano não é jogo: só conta com a janela na tela', () => {
+  const exe = 'robloxplayerbeta.exe';
+  // Aberto pelo arranque com `--launch-to-tray`: o programa está lá, e janela nenhuma.
+  assert.equal(jogoDosProgramas([exe], new Map(), AJUSTES), null);
+  assert.equal(jogoDosProgramas([exe], new Map(), AJUSTES, ['Saga', 'YouTube - Google Chrome']), null);
+  assert.equal(jogoDosProgramas([exe], new Map(), AJUSTES, ['Saga', 'Roblox'])?.nome, 'Roblox');
+  // O Studio e a pasta com esse nome não são o jogo; e a janela sozinha, sem o programa, também não.
+  assert.equal(jogoDosProgramas([exe], new Map(), AJUSTES, ['Roblox Studio', 'Roblox - Explorador de Arquivos']), null);
+  assert.equal(jogoDosProgramas(['chrome.exe'], new Map(), AJUSTES, ['Roblox']), null);
+  // A prova é a lista de janelas, que já foi lida: nada de `tasklist /v` a mais.
+  assert.deepEqual(precisamDeTitulo([exe]), []);
+  // No Mac não se listam janelas: exigir lá seria nunca mais reconhecer.
+  assert.equal(jogoDosProgramas(['robloxplayer'], new Map(), AJUSTES)?.nome, 'Roblox');
+});
+
 test('o que a pessoa apontou vem antes da lista, e o escondido não aparece', () => {
   const meus = { ...AJUSTES, meus: [{ exe: 'valorant-win64-shipping.exe', nome: 'Valorzinho' }, { exe: 'meujogo.exe', nome: 'Meu Jogo' }] };
   assert.equal(jogoDosProgramas(['valorant-win64-shipping.exe'], new Map(), meus)?.nome, 'Valorzinho');

@@ -269,6 +269,21 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   que abre abre janela. A volta longa ficou em 5 min, só de garantia. Medido com o `tasklist` de
   verdade e a lista de janelas simulada: aparece em 12 s e some 7,5 s depois de fechar. No Mac listar
   janelas pede a permissão de gravar a tela (sem ela, lança), e lá o `ps` é barato: roda a cada 15 s.
+- **O Roblox só conta com a janela na tela: o programa do jogo também é o que fica ao lado do relógio.**
+  O dono reportou em 05/11/2026 "Jogando Roblox" com o Roblox fechado. Medido no Windows dele: o Roblox
+  se põe no arranque (`HKCU\…\Run`) com `RobloxPlayerBeta.exe --launch-to-tray`, 172 MB e nenhuma janela
+  visível. A regra "o programa do jogo, nunca o do lançador" supunha dois programas, e aqui é um só.
+  **"Tem título no `tasklist /v`" não prova janela na tela**, e foi o primeiro conserto que escrevi: dos
+  processos desta máquina, 16 respondem o título de uma janela ESCONDIDA (`OleMainThreadWndName` da
+  própria Saga, `VanguardTrayContextMenuHost`). Hoje o Roblox da bandeja responde `N/A`, mas nada garante
+  o mesmo depois de abrir e fechar uma partida. A prova é o `desktopCapturer`, lido a cada volta de
+  qualquer jeito, e portanto sem custo a mais: medido, zero títulos escondidos na lista. Daí `naTela`:
+  o programa aberto E uma janela visível chamada exatamente "Roblox" (o Studio e a pasta não contam).
+  **Limites**: ele não lista janela minimizada (medido: Spotify, Riot Client e Battle.net minimizados
+  ficaram de fora), então Roblox minimizado some da atividade e o tempo recomeça ao voltar; e o aplicativo
+  na tela inicial, sem partida, tem a mesma janela e conta como jogando. No Mac não se listam janelas, e
+  lá nada mudou. **O título "Roblox" não foi medido**: a janela não foi aberta nesta máquina; se estiver
+  errado, o Roblox deixa de aparecer em vez de aparecer a mais.
 - **O ícone do jogo de fora do Steam sai da JANELA dele, e não do arquivo do programa.** Medido com o
   LoL aberto: o caminho do `League of Legends.exe` vem VAZIO pelo `Get-Process` e pelo
   `Win32_Process` (o anticheat da Riot protege o processo), e o `appIcon` da janela "League of
