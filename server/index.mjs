@@ -699,6 +699,15 @@ const salaDoBot = (voz) => ({ id: voz.id, nome: voz.privada ? null : voz.nome })
 const naSala = (voz) => (voz.privada ? 'na call' : `na ${voz.nome}`);
 
 /**
+ * O que o bot diz ao pular. Se a próxima é de uma playlist, o cartão dela já mostra a troca, e
+ * outro cartão a cada pulo só encheria o chat.
+ */
+const botDoPulo = (pulou, agora, sala) => {
+  if (agora && !agora.lote) return { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala };
+  return { tipo: 'texto', cmd: 'pular', texto: agora ? `Pulei "${pulou.titulo}".` : `Pulei "${pulou.titulo}". A fila acabou.` };
+};
+
+/**
  * A fila andou sozinha (acabou, ou passou da hora): o chat fica sabendo o que começou. Em nome
  * de quem pediu — e não de quem foi banido ou está de castigo, que não fala mais ali.
  */
@@ -706,6 +715,15 @@ function anunciarQueComecou(sid, voz, item) {
   const fila = filas.ver(voz.id);
   const quem = membros.buscarMembro(db, sid, item.pediu.id);
   if (!fila || !quem || membros.impedimento(quem)) return;
+  // Numa playlist o cartão dela acompanha a música (decisão do dono, 04/11/2026): um cartão a
+  // cada uma seriam 50 no chat. O bot só avisa quando ela começa, depois de esperar a vez.
+  if (item.lote) {
+    if (item.lote.n === 1) {
+      const aviso = `♪ Começou a playlist "${filas.nomeDaPlaylist(voz.id, item.lote.id) ?? 'Playlist'}" ${naSala(voz)}.`;
+      falarDoBot(sid, quem, fila.salaDoChat, { tipo: 'texto', texto: aviso }, aviso);
+    }
+    return;
+  }
   falarDoBot(sid, quem, fila.salaDoChat,
     { tipo: 'tocando', item, sala: salaDoBot(voz) },
     `♪ Tocando agora ${naSala(voz)}: ${linhaDaMusica(item)}`);
@@ -1595,14 +1613,14 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const barrado = membros.impedimento(eu);
     if (barrado) throw new ErroDeConta(barrado, 403);
-    const { sala: salaDoChat, comando, musica, uid } = await lerCorpo(req);
+    const { sala: salaDoChat, comando, musica, uid, lista, playlist: qualPlaylist } = await lerCorpo(req);
     // A sala é uma das que a pessoa VÊ: a privada que ela não vê responde como a que não existe,
     // igual a todo o resto — e isso vem ANTES de qualquer outra resposta, senão "esse comando
     // não existe" já contava que a sala estava lá (achado na revisão). A de notas é da Saga.
     const vista = salasDoServidor(sid, eu).find((s) => s.id === Number(salaDoChat));
     if (!vista) throw new ErroDeConta('Essa sala não existe.', 404);
     if (vista.tipo !== 'texto' || vista.papel === 'notas') throw new ErroDeConta('Os comandos do bot são numa sala de texto.', 400);
-    if (!['tocar', 'pular', 'parar', 'fila'].includes(comando)) throw new ErroDeConta('Esse comando não existe.', 400);
+    if (!['tocar', 'pular', 'parar', 'fila', 'tirar'].includes(comando)) throw new ErroDeConta('Esse comando não existe.', 400);
     // Ver a fila não mexe no que ninguém ouve: é de qualquer um.
     if (comando !== 'fila' && !temPermissao(eu.cargo, 'tocarMusica')) {
       throw new ErroDeConta('Seu cargo não pode pôr música. Peça ao dono do servidor a permissão "Tocar música".', 403, 'musica');
@@ -1611,9 +1629,21 @@ const ROTAS = {
     const sala = salaDoBot(voz);
     const na = naSala(voz);
     const pediu = { id: eu.id, nome: eu.nome };
-    let bot, texto;
+    let bot, texto, playlistNova = null;
 
-    if (comando === 'tocar') {
+    if (comando === 'tocar' && lista) {
+      // Vai como `texto`, com o cartão num campo à parte: uma Saga de antes desta versão não
+      // conhece outro tipo e quebraria a sala ao desenhar. Ela lê o texto; a nova, o cartão.
+      const p = filas.tocarPlaylist(voz.id, lista, { pediu, salaDoChat: vista.id });
+      playlistNova = p.id;
+      texto = `♪ Playlist "${p.nome}" na fila ${na}: ${p.quantas} ${p.quantas === 1 ? 'música' : 'músicas'}.`;
+      bot = { tipo: 'texto', cmd: 'tocar', texto, playlist: { ...p, sala, pediu } };
+    } else if (comando === 'tirar') {
+      const r = filas.tirarPlaylist(voz.id, String(qualPlaylist ?? ''));
+      const fim = !filas.ver(voz.id) ? ' A fila acabou.' : r.agora ? ` Agora: ${linhaDaMusica(r.agora)}.` : '';
+      texto = `Tirei a playlist "${r.nome}" da fila.${fim}`;
+      bot = { tipo: 'texto', cmd: 'tirar', texto };
+    } else if (comando === 'tocar') {
       const { item, posicao } = filas.tocar(voz.id, musica, { pediu, salaDoChat: vista.id });
       bot = posicao === 0
         ? { tipo: 'tocando', cmd: 'tocar', item, sala }
@@ -1627,10 +1657,8 @@ const ROTAS = {
       const agoraToca = filas.ver(voz.id)?.tocando.uid;
       if (uid && agoraToca && uid !== agoraToca) throw new ErroDeConta('Essa música já tinha acabado — não pulei a seguinte.', 409, 'musica');
       const { pulou, agora } = filas.pular(voz.id);
-      bot = agora
-        ? { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala }
-        : { tipo: 'texto', cmd: 'pular', texto: `Pulei "${pulou.titulo}". A fila acabou.` };
-      texto = agora ? `♪ Tocando agora ${na}: ${linhaDaMusica(agora)}` : bot.texto;
+      bot = botDoPulo(pulou, agora, sala);
+      texto = agora && !agora.lote ? `♪ Tocando agora ${na}: ${linhaDaMusica(agora)}` : bot.texto;
     } else if (comando === 'parar') {
       filas.parar(voz.id);
       bot = { tipo: 'texto', cmd: 'parar', texto: 'Parei a música e limpei a fila.' };
@@ -1643,7 +1671,26 @@ const ROTAS = {
       texto = `♪ Fila ${voz.privada ? 'da call' : `da ${voz.nome}`}: ${[f.tocando, ...f.fila.slice(0, 20)].map(linhaDaMusica).join(' · ')}`;
     }
     const mensagem = mensagens.enviarDoBot(db, sid, eu, vista.id, { texto, bot });
-    return { mensagem, musica: verMusica(voz.id), sala: { id: voz.id }, agora: Date.now() };
+    return { mensagem, musica: verMusica(voz.id), sala: { id: voz.id }, agora: Date.now(), playlist: playlistNova };
+  },
+
+  /**
+   * As próximas músicas de uma playlist do Spotify, que o app de quem pediu vai achando no YouTube.
+   * Sem mensagem no chat: o cartão da playlist já está lá. Sala privada responde como a
+   * inexistente, igual às outras rotas do bot.
+   */
+  'POST /musica/playlist': async (req) => {
+    const { sid, membro: eu } = exigirMembro(req);
+    const barrado = membros.impedimento(eu);
+    if (barrado) throw new ErroDeConta(barrado, 403);
+    const { sala: salaVoz, playlist, musicas } = await lerCorpo(req);
+    const voz = salasDoServidor(sid, eu).find((s) => s.id === Number(salaVoz) && s.tipo === 'voz');
+    if (!voz) throw new ErroDeConta('Essa sala não existe.', 404);
+    if (!temPermissao(eu.cargo, 'tocarMusica')) {
+      throw new ErroDeConta('Seu cargo não pode pôr música. Peça ao dono do servidor a permissão "Tocar música".', 403, 'musica');
+    }
+    const r = filas.acrescentar(voz.id, String(playlist ?? ''), musicas, eu.id);
+    return { ...r, musica: verMusica(voz.id), agora: Date.now() };
   },
 
   /**
@@ -1714,10 +1761,8 @@ const ROTAS = {
     if (acao === 'pular') {
       if (uid && uid !== antes.tocando.uid) throw new ErroDeConta('Essa música já tinha acabado — não pulei a seguinte.', 409, 'musica');
       const { pulou, agora } = filas.pular(voz.id);
-      bot = agora
-        ? { tipo: 'tocando', cmd: 'pular', item: agora, pulou: pulou.titulo, sala: salaDoBot(voz) }
-        : { tipo: 'texto', cmd: 'pular', texto: `Pulei "${pulou.titulo}". A fila acabou.` };
-      texto = agora ? `♪ Tocando agora ${naSala(voz)}: ${linhaDaMusica(agora)}` : bot.texto;
+      bot = botDoPulo(pulou, agora, salaDoBot(voz));
+      texto = agora && !agora.lote ? `♪ Tocando agora ${naSala(voz)}: ${linhaDaMusica(agora)}` : bot.texto;
     } else {
       filas.parar(voz.id);
       bot = { tipo: 'texto', cmd: 'parar', texto: `${eu.nome} tirou o bot da call e limpou a fila.` };

@@ -15,8 +15,17 @@
 // do anfitrião fechou no meio) anda sozinha, e a sala que esvaziou perde a fila.
 import { ErroDeConta } from './contas.mjs';
 
-/** Uma fila de cinco amigos não passa disso; mais é alguém colando uma playlist à mão. */
-export const MAXIMO_NA_FILA = 50;
+/**
+ * O dobro do que uma playlist põe (`MAXIMO_POR_PLAYLIST`): era 50, e uma playlist de 50 deixava
+ * os amigos sem lugar. A fila inteira vai na busca de salas, sem compressão, a cada 4 s por
+ * pessoa: medidos 13,5 KB com 50 músicas de verdade (04/11/2026), logo uns 27 KB com a fila cheia.
+ */
+export const MAXIMO_NA_FILA = 100;
+/**
+ * Quantas músicas uma playlist põe na fila. O mesmo teto do app (buscaDeMusica.ts). A que passa
+ * disso é cortada, e o cartão diz: "só couberam 50 de 125".
+ */
+export const MAXIMO_POR_PLAYLIST = 50;
 /**
  * Duas horas: disco e mix longo cabem, live que não acaba não. O mesmo teto do app
  * (buscaDeMusica.ts): acima disso o áudio passa de 130 MB, e atravessa inteiro para a tela.
@@ -68,9 +77,33 @@ export function validarItem(bruto) {
   };
 }
 
+/** As músicas de uma playlist que dá para tocar. Uma ruim fica de fora, sem derrubar as outras. */
+function validarVarias(brutos) {
+  return (Array.isArray(brutos) ? brutos : []).flatMap((b) => {
+    try { return [validarItem(b)]; } catch { return []; }
+  });
+}
+
+/** Um número vindo do app, como inteiro não negativo. */
+const contagem = (v) => Math.max(0, Math.round(Number(v)) || 0);
+
 export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random().toString(36).slice(2, 10) } = {}) {
-  /** salaDeVozId → { itens, anfitriao, comecouEm, salaDoChat } — `itens[0]` é o que toca. */
+  /**
+   * salaDeVozId → { itens, anfitriao, comecouEm, salaDoChat, playlists } — `itens[0]` é o que toca.
+   * `playlists`: id → { nome, pediu, quantas, n }, as que ainda podem receber música (ver `acrescentar`).
+   */
   const salas = new Map();
+
+  /** Põe na fila o que ainda cabe da playlist, numerando. Devolve os itens que entraram. */
+  const empurrar = (s, id, playlist, musicas) => {
+    const espaco = MAXIMO_NA_FILA - s.itens.length;
+    const entram = musicas.slice(0, Math.min(playlist.quantas - playlist.n, espaco));
+    const itens = entram.map((m) => ({
+      ...m, uid: sortearUid(), pediu: playlist.pediu, lote: { id, n: ++playlist.n },
+    }));
+    s.itens.push(...itens);
+    return itens;
+  };
 
   const ver = (salaVoz) => {
     const s = salas.get(salaVoz);
@@ -117,6 +150,82 @@ export function criarFilas({ relogio = Date.now, sortearUid = () => Math.random(
       s.salaDoChat = salaDoChat;
       return { item, posicao: s.itens.length - 1 };
     },
+
+    /**
+     * Põe uma playlist na fila, atrás do que já está nela. `quantas` é quantas ainda vão entrar
+     * no total: no Spotify a primeira chega sozinha, para já tocar, e as outras vêm por
+     * `acrescentar`, à medida que o app as acha no YouTube (cerca de 1 s por música).
+     */
+    tocarPlaylist(salaVoz, lista, { pediu, salaDoChat }) {
+      const musicas = validarVarias(lista?.musicas);
+      if (musicas.length === 0) throw new ErroDeConta('Nenhuma música dessa playlist dá para tocar.', 400);
+      const antes = salas.get(salaVoz);
+      const espaco = MAXIMO_NA_FILA - (antes?.itens.length ?? 0);
+      if (espaco <= 0) throw new ErroDeConta(`A fila já tem ${MAXIMO_NA_FILA} músicas. Espere andar um pouco.`, 409);
+      const quantas = Math.min(MAXIMO_POR_PLAYLIST, espaco, Math.max(musicas.length, contagem(lista?.quantas)));
+      const s = antes ?? { itens: [], anfitriao: pediu.id, comecouEm: relogio(), salaDoChat };
+      if (!antes) salas.set(salaVoz, s);
+      s.salaDoChat = salaDoChat;
+      const posicao = s.itens.length;
+      const id = sortearUid();
+      const playlist = { nome: String(lista?.nome ?? '').trim().slice(0, 120) || 'Playlist', pediu, quantas, n: 0 };
+      (s.playlists ??= new Map()).set(id, playlist);
+      const itens = empurrar(s, id, playlist, musicas);
+      return {
+        id,
+        nome: playlist.nome,
+        quantas,
+        total: Math.max(quantas, contagem(lista?.total)),
+        maisDe: !!lista?.maisDe,
+        // Cortada pela fila cheia, a soma que o app mandou contaria música que não entrou.
+        duracao: quantas < contagem(lista?.quantas)
+          ? itens.reduce((soma, i) => soma + i.duracao, 0)
+          : Math.min(contagem(lista?.duracao), quantas * DURACAO_MAXIMA),
+        origem: lista?.origem === 'spotify' ? 'spotify' : 'youtube',
+        primeira: itens[0],
+        posicao,
+      };
+    },
+
+    /**
+     * As próximas músicas de uma playlist que o app ainda está achando. `ativa: false` quer dizer
+     * "pare de procurar": a playlist foi tirada, o /parar limpou a fila, ou ela já entrou inteira.
+     * Sem isto, as músicas continuariam chegando depois do /parar, e a call voltaria a tocar sozinha.
+     */
+    acrescentar(salaVoz, id, brutos, quem) {
+      const s = salas.get(salaVoz);
+      const playlist = s?.playlists?.get(id);
+      if (!playlist) return { ativa: false, entraram: 0 };
+      if (playlist.pediu.id !== quem) throw new ErroDeConta('Essa playlist foi outra pessoa que pediu.', 403);
+      const itens = empurrar(s, id, playlist, validarVarias(brutos));
+      return { ativa: playlist.n < playlist.quantas && s.itens.length < MAXIMO_NA_FILA, entraram: itens.length };
+    },
+
+    /**
+     * Tira a playlist da fila, inteira: é o desfazer de quem colou o link sem querer. Se ela está
+     * tocando, a música de agora sai junto. Sem `id`, vale a que toca ou a primeira da fila.
+     * As músicas dos outros ficam. Devolve { nome, tirou, tocava, agora }; `agora` é a música que
+     * começou por causa disso.
+     */
+    tirarPlaylist(salaVoz, id) {
+      const s = salas.get(salaVoz);
+      if (!s) throw new ErroDeConta('Não tem nada tocando.', 409);
+      const alvo = id || s.itens.find((i) => i.lote)?.lote.id;
+      const playlist = alvo ? s.playlists?.get(alvo) : null;
+      const tirou = s.itens.filter((i) => i.lote?.id === alvo).length;
+      if (!playlist || (tirou === 0 && playlist.n >= playlist.quantas)) {
+        throw new ErroDeConta('Essa playlist não está mais na fila.', 409);
+      }
+      const tocava = s.itens[0].lote?.id === alvo;
+      s.playlists.delete(alvo);
+      s.itens = s.itens.filter((i) => i.lote?.id !== alvo);
+      if (s.itens.length === 0) { salas.delete(salaVoz); return { nome: playlist.nome, tirou, tocava, agora: null }; }
+      if (tocava) s.comecouEm = relogio();
+      return { nome: playlist.nome, tirou, tocava, agora: tocava ? s.itens[0] : null };
+    },
+
+    /** O nome da playlist: o bot diz quando ela começa. */
+    nomeDaPlaylist: (salaVoz, id) => salas.get(salaVoz)?.playlists?.get(id)?.nome ?? null,
 
     /** Pula a que toca. Devolve { pulou, agora } — `agora` null quando a fila acabou. */
     pular(salaVoz) {

@@ -934,6 +934,7 @@ test('o bot de música não conta a ninguém que uma sala privada existe', async
     ['/musica', (id) => ({ sala: id, comando: 'inventado' })],
     ['/musica/acabou', (id) => ({ sala: id, uid: 'x' })],
     ['/musica/comecou', (id) => ({ sala: id, uid: 'x', posicao: 0 })],
+    ['/musica/playlist', (id) => ({ sala: id, playlist: 'x', musicas: [] })],
   ]) {
     const privada = await chamar('POST', rota, { sessao: bruno.token, corpo: corpo(rota === '/musica' ? texto.id : voz.id) });
     const nenhuma = await chamar('POST', rota, { sessao: bruno.token, corpo: corpo(inexistente) });
