@@ -6,8 +6,9 @@ import type { ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { registrar } from './registro';
 import {
-  ErroDaMusica, alvoDoPedido, argumentosParaBaixar, lerPedido, lerRespostaDoYtDlp, lerSpotify,
-  type MusicaAchada, type Origem,
+  ErroDaMusica, MAXIMO_POR_PLAYLIST, alvoDoPedido, argumentosDaBusca, argumentosDaPlaylist, argumentosParaBaixar,
+  lerEmbedDoSpotify, lerLinhaDaBusca, lerPedido, lerPlaylistDoYtDlp, lerRespostaDoYtDlp, lerSpotify,
+  type MusicaAchada, type Origem, type Pedido, type PlaylistAchada,
 } from './buscaDeMusica';
 
 /**
@@ -59,9 +60,9 @@ function lerEstado(): Estado | null {
   } catch { return null; }
 }
 
-function rodar(binario: string, args: string[], tempo = 120_000): Promise<string> {
+function rodar(binario: string, args: string[], tempo = 120_000, cwd?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(binario, args, { timeout: tempo, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (erro, saida, falha) => {
+    execFile(binario, args, { timeout: tempo, maxBuffer: 64 * 1024 * 1024, windowsHide: true, cwd }, (erro, saida, falha) => {
       if (erro) {
         const motivo = String(falha || erro.message).split('\n').filter(Boolean).slice(-2).join(' | ');
         reject(new Error(motivo));
@@ -295,9 +296,151 @@ async function baixar(alvo: string): Promise<unknown> {
   }
 }
 
+/**
+ * Quanto ler da playlist. Mais que o teto, porque vídeo apagado ou privado não conta; e bem mais
+ * quando o link é de um vídeo do meio dela, que precisa aparecer no trecho lido.
+ */
+const LER_DA_PLAYLIST = MAXIMO_POR_PLAYLIST + 30;
+const LER_ATE_O_VIDEO = 500;
+
+/** A playlist do YouTube inteira, sem baixar nada: a primeira música só baixa quando for tocar. */
+async function acharPlaylistDoYoutube(p: Extract<Pedido, { tipo: 'playlist-youtube' }>): Promise<PlaylistAchada | null> {
+  mkdirSync(pastaDosAudios(), { recursive: true });
+  const teto = p.aPartirDe ? LER_ATE_O_VIDEO : LER_DA_PLAYLIST;
+  const ler = async (forcar: boolean) => {
+    const { binario } = await programa({ forcar });
+    return rodar(binario, argumentosDaPlaylist(p.url, teto), 60_000, pastaDosAudios());
+  };
+  let saida: string;
+  try { saida = await ler(false); } catch (e) {
+    // Lista que não existe ou é privada não melhora com um yt-dlp mais novo.
+    if (!/does not exist|private|unavailable/i.test((e as Error).message)) {
+      registrar('aviso', 'musica', `playlist: tentando com a versão mais nova do yt-dlp: ${(e as Error).message}`);
+      try { saida = await ler(true); } catch { saida = 'null'; }
+    } else saida = 'null';
+  }
+  try { return lerPlaylistDoYtDlp(JSON.parse(saida), p.aPartirDe); } catch (e) {
+    // Veio de um vídeo: a lista não abrir não impede de tocar o vídeo que a pessoa está vendo.
+    if (p.aPartirDe) return null;
+    throw e;
+  }
+}
+
+/** As buscas de playlist do Spotify que seguem por trás, por id. Ver `buscarPorTras`. */
+type BuscaPorTras = { novas: MusicaAchada[]; achadas: number; de: number; acabou: boolean; acordar: (() => void) | null; parar: () => void };
+const buscas = new Map<string, BuscaPorTras>();
+let serieDaBusca = 0;
+
+/**
+ * O resto de uma playlist do Spotify, procurado no YouTube sem baixar nada: ~1 s por música
+ * (medido em 04/11/2026), 50 s para uma lista cheia. Esperar tudo seria deixar a call muda
+ * esse tempo; por isso a primeira já toca e as outras vão para a fila aos poucos (`musica:mais`).
+ */
+async function buscarPorTras(termos: string[]): Promise<string | null> {
+  if (termos.length === 0) return null;
+  const { binario } = await programa();
+  const p = spawn(binario, argumentosDaBusca(termos), { windowsHide: true, cwd: pastaDosAudios() });
+  rodando.add(p);
+  const id = String(++serieDaBusca);
+  const b: BuscaPorTras = { novas: [], achadas: 0, de: termos.length, acabou: false, acordar: null, parar: () => { if (p.exitCode === null) p.kill(); } };
+  buscas.set(id, b);
+  const acordar = () => { b.acordar?.(); b.acordar = null; };
+  const prazo = setTimeout(() => p.kill(), 5 * 60_000);
+  let resto = '';
+  p.stdout.on('data', (d: Buffer) => {
+    resto += d.toString();
+    const linhas = resto.split('\n');
+    resto = linhas.pop() ?? '';
+    for (const linha of linhas) {
+      const m = lerLinhaDaBusca(linha);
+      if (m) { b.novas.push(m); b.achadas += 1; }
+    }
+    acordar();
+  });
+  p.stderr.resume();
+  const fim = () => {
+    clearTimeout(prazo);
+    rodando.delete(p);
+    b.acabou = true;
+    acordar();
+    // Quem pedia pode ter sumido (a tela recarregou): a busca não fica guardada para sempre.
+    setTimeout(() => buscas.delete(id), 60_000).unref();
+  };
+  p.on('error', (e) => { registrar('erro', 'musica', `buscar a playlist: ${e.message}`); fim(); });
+  p.on('close', fim);
+  return id;
+}
+
+/** O que a busca já achou. Junta alguns segundos: um pedido ao servidor por música seria à toa. */
+async function maisDaBusca(id: string): Promise<{ musicas: MusicaAchada[]; fim: boolean; achadas: number; de: number }> {
+  const b = buscas.get(id);
+  if (!b) return { musicas: [], fim: true, achadas: 0, de: 0 };
+  const limite = Date.now() + 4000;
+  while (!b.acabou && b.novas.length < 5) {
+    const falta = limite - Date.now();
+    if (falta <= 0 && b.novas.length > 0) break;
+    await new Promise<void>((pronto) => {
+      const t = setTimeout(pronto, Math.max(falta, 500));
+      b.acordar = () => { clearTimeout(t); pronto(); };
+    });
+  }
+  const musicas = b.novas.splice(0);
+  return { musicas, fim: b.acabou && b.novas.length === 0, achadas: b.achadas, de: b.de };
+}
+
+/**
+ * A playlist do Spotify: acha e já começa a baixar a primeira que der, como numa música só, e
+ * deixa as outras procurando por trás. `quantas` conta as que ainda podem vir: se uma não for
+ * achada, a fila fica com uma a menos do que o cartão disse.
+ */
+async function acharPlaylistDoSpotify(p: Extract<Pedido, { tipo: 'playlist-spotify' }>): Promise<PlaylistAchada & { continuar: string | null }> {
+  const r = await fetch(p.url, { headers: { 'user-agent': 'Saga' }, signal: comPrazo(15_000) });
+  if (!r.ok) throw new ErroDaMusica('Não consegui abrir essa playlist do Spotify.');
+  const { nome, faixas, maisDe } = lerEmbedDoSpotify(await r.text());
+  const lista = faixas.slice(0, MAXIMO_POR_PLAYLIST);
+  const termos = lista.map((f) => `${f.artista} ${f.titulo}`.trim().slice(0, 200));
+  // A primeira que der: uma faixa que o YouTube não acha não pode derrubar a playlist inteira.
+  let primeira: MusicaAchada | null = null, usados = 0, erro: unknown = null;
+  while (!primeira && usados < Math.min(3, termos.length)) {
+    const alvo = `ytsearch1:${termos[usados]}`;
+    usados += 1;
+    try { primeira = lerRespostaDoYtDlp(await baixar(alvo), 'spotify'); } catch (e) { erro = e; }
+  }
+  if (!primeira) throw erro;
+  return {
+    nome,
+    // A faixa que o YouTube não achou não conta: "só couberam 29 de 30" seria falso, nada foi cortado.
+    total: faixas.length - usados + 1,
+    maisDe,
+    quantas: lista.length - usados + 1,
+    duracao: lista.slice(usados - 1).reduce((soma, f) => soma + f.duracao, 0),
+    origem: 'spotify',
+    musicas: [primeira],
+    continuar: await buscarPorTras(termos.slice(usados)),
+  };
+}
+
 /** Do texto do `/tocar` à música achada — o download segue por trás (ver `iniciar`). */
-async function achar(texto: string): Promise<MusicaAchada> {
+async function achar(texto: string): Promise<{ musica: MusicaAchada } | { playlist: PlaylistAchada & { continuar: string | null } }> {
   const pedido = lerPedido(texto);
+  if (pedido.tipo === 'playlist-spotify') {
+    const playlist = await acharPlaylistDoSpotify(pedido);
+    registrar('info', 'musica', `playlist achada: ${playlist.quantas} de ${playlist.total} (spotify)`);
+    return { playlist };
+  }
+  if (pedido.tipo === 'playlist-youtube') {
+    const lida = await acharPlaylistDoYoutube(pedido);
+    if (lida) {
+      registrar('info', 'musica', `playlist achada: ${lida.quantas} de ${lida.total} (youtube)`);
+      return { playlist: { ...lida, continuar: null } };
+    }
+    // A lista não abriu, ou o vídeo não está no trecho lido: toca o vídeo do link.
+    return { musica: await acharUma({ tipo: 'youtube', url: `https://www.youtube.com/watch?v=${pedido.aPartirDe}` }) };
+  }
+  return { musica: await acharUma(pedido) };
+}
+
+async function acharUma(pedido: Extract<Pedido, { tipo: 'youtube' | 'spotify' | 'busca' }>): Promise<MusicaAchada> {
   let spotify: { titulo: string; artista: string } | undefined;
   if (pedido.tipo === 'spotify') {
     // Cabeçalho de programa, e não de navegador: com o de navegador o Spotify manda a página
@@ -330,11 +473,17 @@ export function registrarMusica() {
 
   ipcMain.handle('musica:achar', async (_e, texto: string) => {
     if (!LIGADO) return { ok: false, erro: DESLIGADO };
-    try { return { ok: true, musica: await achar(String(texto ?? '')) }; } catch (e) {
+    try { return { ok: true, ...(await achar(String(texto ?? ''))) }; } catch (e) {
       if (!(e instanceof ErroDaMusica)) registrar('erro', 'musica', `achar: ${(e as Error).message}`);
       return { ok: false, erro: explicar(e) };
     }
   });
+
+  /** O que a busca de uma playlist do Spotify já achou — ver `buscarPorTras`. */
+  ipcMain.handle('musica:mais', (_e, id: string) => maisDaBusca(String(id)));
+
+  /** A playlist foi tirada, ou o /parar limpou a fila: a busca não tem mais para quem achar. */
+  ipcMain.handle('musica:cancelar', (_e, id: string) => { buscas.get(String(id))?.parar(); });
 
   /** Garante o áudio de uma música da fila — é o anfitrião adiantando a próxima. */
   ipcMain.handle('musica:preparar', async (_e, id: string) => {

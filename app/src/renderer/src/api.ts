@@ -1027,6 +1027,8 @@ export type ItemDaMusica = {
   uid: string; id: string; titulo: string; autor: string; duracao: number; capa: string;
   origem: 'youtube' | 'spotify' | 'busca';
   pediu: { id: number; nome: string };
+  /** De que playlist ela é, e em que ponto. Música pedida sozinha não tem. */
+  lote?: { id: string; n: number };
 };
 
 /** A fila de uma sala de voz. `anfitriao` é a identidade do LiveKit de quem está tocando. */
@@ -1039,22 +1041,49 @@ export type EstadoDaMusica = {
 
 /** `nome` null: sala privada — o bot não escreve o nome dela num chat que mais gente lê. */
 type SalaDoBot = { id: number; nome: string | null };
+/** O cartão de uma playlist: ele lê a fila de agora para mostrar o que toca (`situacaoDaPlaylist`). */
+export type PlaylistDoBot = {
+  id: string; nome: string; quantas: number; total: number; maisDe: boolean; duracao: number;
+  origem: 'youtube' | 'spotify';
+  /** A primeira música que entrou e a posição dela na fila, ao nascer: 0 é "tocando agora". */
+  primeira: ItemDaMusica; posicao: number;
+  sala: SalaDoBot; pediu: { id: number; nome: string };
+};
 export type MensagemDoBot =
   | { tipo: 'tocando'; cmd?: string; item: ItemDaMusica; sala: SalaDoBot; pulou?: string }
   | { tipo: 'na-fila'; cmd?: string; item: ItemDaMusica; posicao: number; sala: SalaDoBot }
   | { tipo: 'fila'; cmd?: string; tocando: ItemDaMusica; fila: ItemDaMusica[]; mais?: number; tocouSegundos: number; sala: SalaDoBot }
-  | { tipo: 'texto'; cmd?: string; texto: string };
+  /**
+   * A playlist vai como `texto` com o cartão à parte: a Saga de antes desta versão não conhece
+   * outro tipo e quebraria a sala ao desenhar. Ela lê o texto; esta, o cartão.
+   */
+  | { tipo: 'texto'; cmd?: string; texto: string; playlist?: PlaylistDoBot };
 
-export type NomeDoComandoDeMusica = 'tocar' | 'pular' | 'parar' | 'fila';
+export type NomeDoComandoDeMusica = 'tocar' | 'pular' | 'parar' | 'fila' | 'tirar';
+
+type MusicaParaOServidor = { id: string; titulo: string; autor: string; duracao: number; origem: string };
+type RespostaDoComando = { mensagem: Mensagem; musica: EstadoDaMusica | null; sala?: { id: number }; agora?: number; playlist?: string | null };
 
 /** Um comando do bot, digitado numa sala de texto. O `/tocar` chega com a música já achada. */
 export const comandoDeMusica = (
   sala: number,
   comando: NomeDoComandoDeMusica,
-  musica?: { id: string; titulo: string; autor: string; duracao: number; origem: string },
+  musica?: MusicaParaOServidor,
   /** No /pular: a música que a pessoa via tocando. O servidor só pula se ainda for ela. */
   uid?: string,
-) => pedir<{ mensagem: Mensagem; musica: EstadoDaMusica | null; sala?: { id: number }; agora?: number }>('POST', '/musica', { sala, comando, musica, uid });
+  /** No /tocar de uma playlist: ela inteira; no /tirar: qual playlist tirar. */
+  extra?: {
+    lista?: { nome: string; total: number; maisDe: boolean; quantas: number; duracao: number; origem: string; musicas: MusicaParaOServidor[] };
+    playlist?: string;
+  },
+) => pedir<RespostaDoComando>('POST', '/musica', { sala, comando, musica, uid, ...extra });
+
+/**
+ * As próximas músicas de uma playlist do Spotify. `ativa` falso quer dizer "pode parar de procurar".
+ * `servidor` é o da hora do /tocar: a busca leva quase um minuto, e dá tempo de trocar de servidor.
+ */
+export const acrescentarNaPlaylist = (salaVoz: number, playlist: string, musicas: MusicaParaOServidor[], servidor: number | undefined) =>
+  pedir<{ ativa: boolean; entraram: number; musica: EstadoDaMusica | null; agora?: number }>('POST', '/musica/playlist', { sala: salaVoz, playlist, musicas }, servidor);
 
 /** O anfitrião avisa que o som começou, e em que ponto: o relógio da música passa a ser o dele. */
 export const avisarQueAMusicaComecou = (sala: number, uid: string, posicao: number, servidor: number) =>

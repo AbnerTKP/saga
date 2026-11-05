@@ -27,6 +27,18 @@ export type MusicaAchada = {
   origem: 'youtube' | 'spotify' | 'busca';
 };
 
+/** Uma playlist achada. Com `continuar`, as outras músicas ainda vêm por `musica.mais`. */
+export type PlaylistAchada = {
+  nome: string;
+  total: number;
+  maisDe: boolean;
+  quantas: number;
+  duracao: number;
+  origem: 'youtube' | 'spotify';
+  musicas: MusicaAchada[];
+  continuar: string | null;
+};
+
 declare global {
   interface Window {
     desktop: {
@@ -43,7 +55,14 @@ declare global {
       musica: {
         /** Se ESTE app consegue tocar: falso no navegador e no pacote da Microsoft Store. */
         disponivel: boolean;
-        achar: (texto: string) => Promise<{ ok: true; musica: MusicaAchada } | { ok: false; erro: string }>;
+        achar: (texto: string) => Promise<
+          | { ok: true; musica: MusicaAchada; playlist?: undefined }
+          | { ok: true; playlist: PlaylistAchada; musica?: undefined }
+          | { ok: false; erro: string }
+        >;
+        /** O que a busca de uma playlist do Spotify já achou: a tela vai pedindo até o `fim`. */
+        mais: (id: string) => Promise<{ musicas: MusicaAchada[]; fim: boolean; achadas: number; de: number }>;
+        cancelar: (id: string) => Promise<void>;
         preparar: (id: string) => Promise<{ ok: boolean; erro?: string }>;
         ler: (id: string) => Promise<{ bytes: Uint8Array; tipo: string } | null>;
       };

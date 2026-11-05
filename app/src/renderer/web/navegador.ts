@@ -116,6 +116,8 @@ window.desktop = {
   musica: {
     disponivel: false,
     achar: () => Promise.resolve({ ok: false, erro: NAO_TEM }),
+    mais: () => Promise.resolve({ musicas: [], fim: true, achadas: 0, de: 0 }),
+    cancelar: nada,
     preparar: () => Promise.resolve({ ok: false, erro: NAO_TEM }),
     ler: () => Promise.resolve(null),
   },

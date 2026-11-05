@@ -1,4 +1,4 @@
-import type { EstadoDaMusica, ItemDaMusica } from './api';
+import type { EstadoDaMusica, ItemDaMusica, PlaylistDoBot } from './api';
 
 /**
  * Em que pé está a música de um cartão do bot AGORA — não quando ele foi escrito.
@@ -26,6 +26,43 @@ export function situacaoDoCartao(
   if (i >= 0) return { tipo: 'na-fila', posicao: i + 1 };
   return { tipo: 'tocou' };
 }
+
+/**
+ * Em que pé está uma playlist AGORA. Ela tem um cartão só no chat, escolha do dono na prancheta
+ * (04/11/2026): em vez de um cartão por música, este acompanha a que está tocando.
+ *
+ * - tocando: uma música dela é a de agora;
+ * - na fila: alguma música dela ainda vai tocar, depois de `depoisDe` outras. `continua` é ela já
+ *   ter começado: enquanto as do Spotify chegam, o pedido de um amigo pode entrar no meio;
+ * - tocou: não sobrou nenhuma na fila, porque acabou ou porque tiraram.
+ */
+export type SituacaoDaPlaylist =
+  | { tipo: 'tocando'; item: ItemDaMusica; n: number; botoes: boolean }
+  | { tipo: 'na-fila'; depoisDe: number; continua: boolean }
+  | { tipo: 'tocou' };
+
+export function situacaoDaPlaylist(p: PlaylistDoBot, estado: EstadoDaMusica | null | undefined): SituacaoDaPlaylist {
+  if (estado === undefined) {
+    return p.posicao === 0
+      ? { tipo: 'tocando', item: p.primeira, n: 1, botoes: false }
+      : { tipo: 'na-fila', depoisDe: p.posicao, continua: false };
+  }
+  if (estado?.tocando.lote?.id === p.id) {
+    return { tipo: 'tocando', item: estado.tocando, n: estado.tocando.lote.n, botoes: true };
+  }
+  const i = estado?.fila.findIndex((f) => f.lote?.id === p.id) ?? -1;
+  if (i >= 0) return { tipo: 'na-fila', depoisDe: i + 1, continua: estado!.fila[i].lote!.n > 1 };
+  return { tipo: 'tocou' };
+}
+
+/** "só couberam 50 de 125", quando não coube tudo; o Spotify só diz as primeiras 100. */
+export function avisoDeCorte(p: Pick<PlaylistDoBot, 'quantas' | 'total' | 'maisDe'>): string | null {
+  if (p.total <= p.quantas) return null;
+  return `só couberam ${p.quantas} de ${p.total}${p.maisDe ? ' ou mais' : ''}`;
+}
+
+/** 3 → "3 músicas"; 1 → "1 música". */
+export const quantasMusicas = (n: number) => `${n} ${n === 1 ? 'música' : 'músicas'}`;
 
 /** 213 → "3:33"; uma hora ou mais ganha as horas. */
 export function duracao(segundos: number): string {

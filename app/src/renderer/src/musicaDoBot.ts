@@ -1,4 +1,4 @@
-import { comandoDeMusica, type EstadoDaMusica, type Mensagem } from './api';
+import { acrescentarNaPlaylist, comandoDeMusica, lerServidorAtual, type EstadoDaMusica, type Mensagem } from './api';
 import type { NomeDoComando } from './comandos';
 import { anotar } from './registro';
 
@@ -65,14 +65,50 @@ export function respostaLocal(texto: string, cmd: NomeDoComando): Mensagem {
 }
 
 /**
+ * O resto de uma playlist do Spotify, indo para a fila à medida que é achado no YouTube. Roda
+ * depois de o comando já ter respondido. Falhar aqui não desfaz o que já entrou: a playlist só
+ * fica mais curta do que o cartão disse, e o registro conta. Uma nova tentativa antes de desistir,
+ * porque internet que pisca já foi o caso comum (o Mac do dono, atrás do WARP).
+ */
+async function seguirPlaylist(
+  salaVoz: number, playlist: string, busca: string, servidor: number | undefined,
+  aoAndar?: (texto: string | null) => void,
+) {
+  const enviar = async (musicas: Parameters<typeof acrescentarNaPlaylist>[2]) => {
+    try { return await acrescentarNaPlaylist(salaVoz, playlist, musicas, servidor); } catch {
+      await new Promise((r) => setTimeout(r, 1500));
+      return acrescentarNaPlaylist(salaVoz, playlist, musicas, servidor);
+    }
+  };
+  try {
+    for (;;) {
+      const { musicas, fim, achadas, de } = await window.desktop.musica.mais(busca);
+      if (musicas.length) {
+        const r = await enviar(musicas);
+        contarQueAMusicaMudou(salaVoz, r.musica, r.agora ?? 0);
+        if (!r.ativa) break;
+      }
+      if (fim) break;
+      aoAndar?.(`Achando as outras no YouTube: ${achadas} de ${de}…`);
+    }
+  } catch (e) {
+    anotar('erro', 'musica', `seguir a playlist: ${(e as Error).message}`);
+  } finally {
+    void window.desktop.musica.cancelar(busca);
+    aoAndar?.(null);
+  }
+}
+
+/**
  * Executa um comando numa sala de texto. `aoProcurar` avisa que a busca começou — é só o
  * `/tocar` que demora, e a tela mostra "procurando" enquanto isso. O erro sobe com o texto
- * que a pessoa lê.
+ * que a pessoa lê. `aoAndar` diz como vai o resto de uma playlist do Spotify; `null` é o fim.
  */
 export async function executarComando(
   sala: number,
   c: { nome: NomeDoComando; arg: string },
   aoProcurar?: () => void,
+  aoAndar?: (texto: string | null) => void,
 ): Promise<Mensagem> {
   // Antes de "fora da call" e de "sem permissão": entrar na call não resolveria nada aqui.
   if (c.nome === 'tocar' && !window.desktop?.musica?.disponivel) throw new Error(NAO_TOCA_AQUI);
@@ -86,13 +122,34 @@ export async function executarComando(
     const inicio = performance.now();
     const achada = await window.desktop.musica.achar(c.arg);
     if (!achada.ok) throw new Error(achada.erro);
-    musica = achada.musica;
     // As marcas de tempo ficam no registro: é por elas que se sabe onde a espera foi parar
     // no computador de quem reclamou, sem adivinhar (ver voz-e-live.md, o bot de música).
     anotar('info', 'musica', `/tocar: achada em ${Math.round(performance.now() - inicio)} ms`);
+    if (achada.playlist) {
+      const { continuar, ...lista } = achada.playlist;
+      // Guardado antes da resposta: a busca leva quase um minuto, e dá tempo de trocar de servidor.
+      const servidor = lerServidorAtual() ?? undefined;
+      let r;
+      try { r = await comandoDeMusica(sala, 'tocar', undefined, undefined, { lista }); } catch (e) {
+        if (continuar) void window.desktop.musica.cancelar(continuar);
+        throw e;
+      }
+      anotar('info', 'musica', `/tocar: playlist com ${lista.quantas} no servidor`);
+      if (r.sala) contarQueAMusicaMudou(r.sala.id, r.musica, r.agora ?? 0);
+      if (continuar && r.sala && r.playlist) {
+        aoAndar?.(`Achando as outras no YouTube: 0 de ${lista.quantas - 1}…`);
+        void seguirPlaylist(r.sala.id, r.playlist, continuar, servidor, aoAndar);
+      }
+      return r.mensagem;
+    }
+    musica = achada.musica;
   }
   const antesDoServidor = performance.now();
-  const r = await comandoDeMusica(sala, c.nome, musica, c.nome === 'pular' ? contexto?.tocandoAgora() ?? undefined : undefined);
+  const r = await comandoDeMusica(
+    sala, c.nome, musica,
+    c.nome === 'pular' ? contexto?.tocandoAgora() ?? undefined : undefined,
+    c.nome === 'tirar' ? { playlist: c.arg } : undefined,
+  );
   anotar('info', 'musica', `/${c.nome}: servidor respondeu em ${Math.round(performance.now() - antesDoServidor)} ms`);
   if (r.sala) contarQueAMusicaMudou(r.sala.id, r.musica, r.agora ?? 0);
   return r.mensagem;

@@ -35,8 +35,9 @@ const desktop = {
    */
   musica: {
     disponivel: !process.windowsStore,
-    achar: (texto: string): Promise<{ ok: true; musica: { id: string; titulo: string; autor: string; duracao: number; origem: 'youtube' | 'spotify' | 'busca' } } | { ok: false; erro: string }> =>
-      ipcRenderer.invoke('musica:achar', texto),
+    achar: (texto: string): Promise<unknown> => ipcRenderer.invoke('musica:achar', texto),
+    mais: (id: string): Promise<unknown> => ipcRenderer.invoke('musica:mais', id),
+    cancelar: (id: string): Promise<void> => ipcRenderer.invoke('musica:cancelar', id),
     preparar: (id: string): Promise<{ ok: boolean; erro?: string }> => ipcRenderer.invoke('musica:preparar', id),
     ler: (id: string): Promise<{ bytes: Uint8Array; tipo: string } | null> => ipcRenderer.invoke('musica:ler', id),
   },

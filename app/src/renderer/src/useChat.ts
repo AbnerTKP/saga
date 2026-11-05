@@ -7,7 +7,7 @@ import { vaiComoImagem } from './anexos';
 import { aoDespertar } from './despertar';
 import { mesmoSeIgual } from './igual';
 import { juntarMensagens } from './juntarMensagens';
-import { lerComando } from './comandos';
+import { lerComando, pareceLinkDePlaylist } from './comandos';
 import { executarComando, respostaLocal } from './musicaDoBot';
 
 // Com que frequência buscamos o que chegou. Só o que é novo vem, então a conta é pequena;
@@ -141,9 +141,17 @@ export function useChat(onde: Onde | null) {
       mostrarLocal(respostaLocal('O bot de música só atende nas salas de texto de um servidor.', c.nome));
       return;
     }
-    const procurando = respostaLocal(`Procurando "${c.arg || '…'}"…`, c.nome);
+    const procurando = respostaLocal(pareceLinkDePlaylist(c.arg) ? 'Abrindo a playlist…' : `Procurando "${c.arg || '…'}"…`, c.nome);
+    // O resto de uma playlist do Spotify ainda chega por quase um minuto: uma linha que só quem
+    // pediu vê diz como vai, e some no fim. Na sala em que o pedido foi feito.
+    let andamento: Mensagem | null = null;
+    const aoAndar = (texto: string | null) => {
+      if (andamento) tirarLocal(andamento.id);
+      andamento = texto !== null && chaveDoLugar(lugar.current) === chaveDoLugar(aqui) ? respostaLocal(texto, c.nome) : null;
+      if (andamento) mostrarLocal(andamento);
+    };
     try {
-      const m = await executarComando(aqui.sala, c, () => mostrarLocal(procurando));
+      const m = await executarComando(aqui.sala, c, () => mostrarLocal(procurando), aoAndar);
       tirarLocal(procurando.id);
       // A busca pode levar segundos: quem trocou de sala nesse meio-tempo não recebe a resposta na sala errada.
       if (chaveDoLugar(lugar.current) === chaveDoLugar(aqui)) mostrarJa(m);

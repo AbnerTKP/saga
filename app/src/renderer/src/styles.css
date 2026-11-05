@@ -2094,6 +2094,9 @@ button.selo-na-linha.jogo:hover, .membro-linha:hover .selo-na-linha.jogo:hover {
 .bot-titulo { font-weight: 700; color: var(--cinza-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bot-sub { font-size: 13px; color: var(--cinza-400); }
 .bot-sub b { color: var(--cinza-200); font-weight: 600; }
+/* O mesmo gesto do "apagar" de "Só você vê isto": ação que se usa de vez em quando, sem botão. */
+.bot-link { color: var(--cinza-400); text-decoration: underline; font-size: 13px; padding: 0; }
+.bot-link:hover { color: var(--text); }
 .bot-botoes { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .bot-botoes button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
   border-radius: 8px; background: var(--cinza-800); color: var(--cinza-200); font-size: 13px; font-weight: 600; }

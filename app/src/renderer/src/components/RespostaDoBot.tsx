@@ -1,5 +1,5 @@
-import type { EstadoDaMusica, ItemDaMusica, MensagemDoBot } from '../api';
-import { situacaoDoCartao, duracao } from '../cartaoDoBot';
+import type { EstadoDaMusica, ItemDaMusica, MensagemDoBot, PlaylistDoBot } from '../api';
+import { avisoDeCorte, duracao, quantasMusicas, situacaoDaPlaylist, situacaoDoCartao } from '../cartaoDoBot';
 import { Icon } from './Icon';
 
 /**
@@ -21,6 +21,10 @@ export function RespostaDoBot({ bot, estadoDaSala, soParaVoce, principal = true,
   onComando: (texto: string) => void;
   onApagarLocal?: () => void;
 }) {
+  if (bot.tipo === 'texto' && bot.playlist) {
+    return <CartaoDaPlaylist p={bot.playlist} estado={estadoDaSala(bot.playlist.sala.id)} onComando={onComando} />;
+  }
+
   if (bot.tipo === 'texto') {
     return (
       <>
@@ -74,6 +78,77 @@ export function RespostaDoBot({ bot, estadoDaSala, soParaVoce, principal = true,
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * O cartão de uma playlist: um só no chat, opção A da prancheta (04/11/2026), e ele acompanha a
+ * música que está tocando. Tirar a playlist é um link discreto, e não um quarto botão, porque
+ * apaga a escolha de quem colou; é o mesmo gesto do "apagar" de "Só você vê isto".
+ */
+function CartaoDaPlaylist({ p, estado, onComando }: {
+  p: PlaylistDoBot;
+  estado: EstadoDaMusica | null | undefined;
+  onComando: (texto: string) => void;
+}) {
+  const s = situacaoDaPlaylist(p, estado);
+  const corte = avisoDeCorte(p);
+  const tirar = <button type="button" className="bot-link" onClick={() => onComando(`/tirar ${p.id}`)}>tirar da fila</button>;
+
+  if (s.tipo === 'tocando') {
+    const lugar = p.sala.nome ? ` na ${p.sala.nome}` : '';
+    return (
+      <div className="bot-cartao">
+        <img src={s.item.capa} alt="" loading="lazy" draggable={false} />
+        <div className="bot-info">
+          <span className="bot-rotulo tocando"><Icon name="nota" size={13} /> Tocando {s.n} de {p.quantas}{lugar}</span>
+          <span className="bot-titulo" title={s.item.titulo}>{s.item.titulo}</span>
+          <span className="bot-sub">
+            {s.item.autor && <>{s.item.autor} · </>}{duracao(s.item.duracao)} · pediu <b>{p.pediu.nome}</b>
+            {p.origem === 'spotify' && ' · veio do Spotify'}
+          </span>
+          <span className="bot-sub">
+            {p.nome}{corte && ` · ${corte}`}{s.botoes && <> · {tirar}</>}
+          </span>
+          {s.botoes && (
+            <div className="bot-botoes">
+              <button type="button" onClick={() => onComando('/pular')}><Icon name="pular" size={16} /> Pular</button>
+              <button type="button" onClick={() => onComando('/parar')}><Icon name="parar" size={16} /> Parar</button>
+              <button type="button" onClick={() => onComando('/fila')}><Icon name="fila" size={16} /> Fila</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (s.tipo === 'na-fila') {
+    return (
+      <div className="bot-cartao">
+        <img src={p.primeira.capa} alt="" loading="lazy" draggable={false} />
+        <div className="bot-info">
+          <span className="bot-rotulo na-fila">
+            <Icon name="nota" size={13} /> Playlist na fila — {s.continua ? 'continua' : 'começa'} depois de {s.depoisDe}
+          </span>
+          <span className="bot-titulo" title={p.nome}>{p.nome}</span>
+          <span className="bot-sub">
+            {corte ? corte[0].toUpperCase() + corte.slice(1) : quantasMusicas(p.quantas)}
+            {p.duracao > 0 && ` · ${duracao(p.duracao)}`} · pediu <b>{p.pediu.nome}</b> · {tirar}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bot-cartao passou">
+      <img src={p.primeira.capa} alt="" loading="lazy" draggable={false} />
+      <div className="bot-info">
+        <span className="bot-rotulo tocou"><Icon name="nota" size={13} /> Tocou</span>
+        <span className="bot-titulo" title={p.nome}>{p.nome}</span>
+        <span className="bot-sub">{quantasMusicas(p.quantas)} · pediu <b>{p.pediu.nome}</b></span>
+      </div>
+    </div>
   );
 }
 
