@@ -2,6 +2,17 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **Playlist e álbum no bot de música (04/11/2026).** Medido no Windows dele, sem janela nem som (o
+  `musica.ts` e o `musicaDoBot.ts` de verdade, com `yt-dlp` e internet de verdade, contra o servidor e um
+  LiveKit de mentira): vídeo com e sem `https://`; playlist do YouTube (50 de 125 em 2,4 s, e a primeira
+  baixada em mais 2,7 s); vídeo do meio da lista; mix automático; lista que não existe; playlist do Spotify
+  (a primeira em 3,7 s, 48 das outras 49 em 47 s); álbum do Spotify com `/parar` no meio da busca. O cartão
+  real fotografado em todos os momentos. **Falta**: uma call de verdade com a playlist tocando e andando
+  sozinha até a próxima, os botões do cartão na Saga compilada, o "tirar da fila" com o mouse, e o Mac.
+- **O bot de música no Windows (v0.77.0): confirmado pelo registro dele.** Em 02/11/2026 o `yt-dlp_win.zip`
+  instalou pelo `tar.exe` e 9 pedidos por link do Spotify foram achados em ~3,6 s. Falta só o anfitrião
+  passando a vez para outra pessoa de verdade.
+
 - **A Garagem refeita: a festa do dono, os temas e a Navinha (27/10/2026).** Medido numa bancada
   escondida e muda (o servidor de verdade num banco novo, a TelaDaGaragem de verdade, quatro robôs pela
   rede): sem porta; o botão Festa só na conta do dono; o painel guardando no servidor quem faz

@@ -491,6 +491,55 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
     quem toque. Já são versões de mais de um mês, e o custo é a música mudar de computador.
   `api-livekit.test.mjs` exercita o caminho inteiro contra um LiveKit de mentira, e falha sem a regra
   (a vez ia para quem estava no celular). **Com um LiveKit e dois apps de verdade, não foi exercido.**
+- **Playlist e álbum (04/11/2026).** Antes o `/tocar` recusava de propósito ("uma música por vez"),
+  com medo de uma lista de 300 colada sem querer encher a fila de todo mundo. O dono pediu, e o medo
+  virou três travas: até 50 músicas por playlist (`MAXIMO_POR_PLAYLIST`), o cartão dizendo "só
+  couberam 50 de 125", e "tirar da fila", que desfaz a colagem sem mexer na música dos outros.
+  Escolhas do dono na prancheta:
+  - **Um cartão só (opção A).** Ele lê a fila de agora e mostra "Tocando 3 de 50" com a música da vez
+    (`situacaoDaPlaylist`). Música de playlist não ganha cartão ao começar nem ao ser pulada: seriam 50
+    no chat. O bot só avisa uma vez, em texto, quando a playlist começa depois de esperar a vez.
+  - **Vídeo de dentro de uma lista (`watch?v=…&list=…`) toca a lista dali em diante**: é o link da barra
+    do navegador de quem ouve uma playlist. A exceção é o mix automático (`RD…`, 874 entradas e 21,6 s
+    para ler, medido) e as listas pessoais (`WL`, `LL`), em que toca só o vídeo. Se a lista não abrir,
+    ou o vídeo não estiver nas 500 primeiras, também toca só o vídeo.
+  - **O pedido do amigo vai para o fim da fila.** Recomendei passar na frente do resto da playlist, e
+    o dono preferiu a ordem de chegada. Por isso a fila subiu de 50 para 100 (`MAXIMO_NA_FILA`):
+    com 50, uma playlist cheia deixava os amigos sem lugar nenhum.
+
+  O que não é óbvio:
+  - **YouTube: ler é barato.** `--flat-playlist -J` não baixa nada: 125 músicas em 2,1 s, 239 em 2,7 s,
+    e com `--playlist-end` o `playlist_count` ainda diz o total. Vídeo apagado ou privado vem com título e
+    duração nulos, e fica de fora sem contar como "não coube". As músicas só baixam quando vão tocar:
+    o anfitrião continua adiantando uma de cada vez (`preparar`).
+  - **Spotify: a página de incorporar (`/embed/playlist/…`), não a comum.** A comum traz 30 links sem
+    nome nenhum; a de incorporar traz nome, artista e duração no `__NEXT_DATA__`, de até 100 faixas
+    (mais que isso vem cortado, e o cartão diz "100 ou mais").
+  - **Cada faixa do Spotify custa ~1 s de busca no YouTube, 50 s numa lista cheia.** Esperar seria deixar a
+    call muda esse tempo. A primeira segue o caminho de uma música só, e as outras saem de uma partida só
+    do `yt-dlp` por trás (`buscarPorTras`, `musica:mais`), indo para a fila aos poucos por
+    `POST /musica/playlist`. Medido em 04/11/2026 neste Windows: a primeira em 3,7 s, e 48 das 49
+    restantes em 47 s; uma não foi achada, e aí o cartão diz "de 50" e a lista acaba na 49. Só quem
+    pediu acrescenta, e fechar a Saga no meio deixa a lista mais curta.
+  - **O `/parar` no meio da busca não pode deixar a música voltar sozinha.** O servidor guarda as
+    playlists de cada fila, e o `/parar`, o "tirar" e o fim da fila as esquecem: a próxima leva recebe
+    `ativa: false`, e o app mata o `yt-dlp`. Medido: fila vazia e nenhum `yt-dlp` em 4 s, e continuou vazia.
+    **Se a fila acabar antes de chegar a segunda música, a playlist acaba junto**: é o preço de não ter
+    outro jeito de distinguir isso do /parar, e a janela é de segundos.
+  - **O cartão viaja como `tipo: 'texto'`, com a playlist num campo à parte.** A Saga de antes desta versão
+    desenha todo tipo que não conhece como se fosse música, e quebraria o chat da sala ao ler `bot.item`
+    (lido no código, não reproduzido). Ela mostra o texto, e a nova, o cartão. Música de playlist também toca numa Saga antiga: ela só
+    ignora o campo `lote`.
+  - **`/tirar` é comando, mas só o cartão oferece.** Os botões do cartão mandam o mesmo comando que se
+    digita, a regra de sempre, e ele não entra no menu de `/`. Tirar a playlist que está tocando leva
+    junto a música de agora: é o desfazer de quem colou errado.
+  - **Link sem `https://` e link no meio do texto agora são link.** Antes `youtu.be/…` virava uma busca
+    pelo texto do endereço, e tocava o que o YouTube achasse.
+  - **Medido nesta versão, no Windows e sem janela nem som** (o `musica.ts` e o `musicaDoBot.ts` de
+    verdade no Node, com `yt-dlp` e internet de verdade, contra o servidor e um LiveKit de mentira):
+    os links acima, o áudio da primeira música da playlist baixado e lido (9 MB), e o cartão real
+    fotografado. **Não exercido**: uma call de verdade com a playlist tocando e andando sozinha, a Saga
+    compilada, o Mac e ouvido humano.
 
 ## O bot como pessoa, e mover gente entre calls (23/09/2026)
 
