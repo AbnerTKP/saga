@@ -7,6 +7,7 @@ import { anotar } from './registro';
 import { AJUSTES_PADRAO, CHAVE_DO_MICROFONE, ajustesGuardados, type AjustesDoMicrofone } from './sensibilidade';
 import { MontagemDoMicrofone, type EstadoDoFiltro, type Medida } from './montagemDoMicrofone';
 import { precisaRetomar } from './acordarSom';
+import { noAparelhoEmUso } from './aparelhos';
 
 /**
  * Supressão de ruído e sensibilidade do SEU microfone, na call e fora dela.
@@ -103,9 +104,8 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
     else if (!previa.current) {
       const geracao = Date.now();
       previa.current = { montagem: null, captura: null, geracao };
-      const dispositivo = room.getActiveDevice('audioinput');
       navigator.mediaDevices.getUserMedia({
-        audio: { ...restricoes(ajustesRef.current), ...(dispositivo && dispositivo !== 'default' ? { deviceId: { exact: dispositivo } } : {}) },
+        audio: { ...restricoes(ajustesRef.current), ...noAparelhoEmUso(room.getActiveDevice('audioinput')) },
       }).then(async (stream) => {
         const captura = stream.getAudioTracks()[0];
         if (previa.current?.geracao !== geracao) { captura.stop(); return; }
@@ -198,13 +198,19 @@ export function useMicrofone(room: Room): MicrofoneDaCall & {
     setAjustes(depois);
     try { localStorage.setItem(CHAVE_DO_MICROFONE, JSON.stringify(depois)); } catch { /* sem storage, vale até fechar */ }
 
-    // A supressão do navegador é pedida ao abrir o microfone: mudar pede reabri-lo.
+    // A supressão do navegador é pedida ao abrir o microfone: mudar pede reabri-lo — no MESMO
+    // aparelho, exigido: pedido solto, ele reabria no padrão do sistema (ver `noAparelhoEmUso`).
     room.options.audioCaptureDefaults = { ...room.options.audioCaptureDefaults, ...restricoes(depois) };
     const trocouONavegador = restricoes(antes).noiseSuppression !== restricoes(depois).noiseSuppression;
     if (trocouONavegador) {
       const faixa = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
-      const dispositivo = room.getActiveDevice('audioinput');
-      faixa?.restartTrack({ ...restricoes(depois), ...(dispositivo ? { deviceId: dispositivo } : {}) })
+      faixa?.restartTrack({ ...restricoes(depois), ...noAparelhoEmUso(room.getActiveDevice('audioinput')) })
+        .catch((e) => {
+          // O LiveKit fecha o microfone de antes ANTES de abrir o novo: o aparelho que não abre
+          // (saiu no meio, ocupado) deixaria a pessoa muda. Volta ao padrão, como `trocarAparelho`.
+          anotar('erro', 'microfone', e);
+          return faixa.restartTrack(restricoes(depois));
+        })
         .catch((e) => anotar('erro', 'microfone', e));
       fecharPrevia();
     }

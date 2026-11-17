@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { comEscolha, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, idParaTrocar, opcoesDoSeletor, trocarAparelho, valorNoSeletor } from './aparelhos.ts';
+import { comEscolha, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, idParaTrocar, noAparelhoEmUso, opcoesDoSeletor, trocarAparelho, valorNoSeletor } from './aparelhos.ts';
 
 const mic = (deviceId: string, groupId: string, label = deviceId) => ({ deviceId, groupId, label });
 
@@ -10,6 +10,14 @@ test('o padrão do sistema nunca vira id exato vazio', () => {
   assert.deepEqual(idParaTrocar('audiooutput', ''), { id: 'default', exato: true });
   assert.deepEqual(idParaTrocar('videoinput', ''), { id: '', exato: false });
   assert.deepEqual(idParaTrocar('audioinput', 'abc'), { id: 'abc', exato: true });
+});
+
+test('reabrir o microfone exige o aparelho em uso: solto, o Chromium cai no padrão', () => {
+  // trocar a supressão de ruído trocava o microfone escolhido pelo padrão do sistema
+  assert.deepEqual(noAparelhoEmUso('abc'), { deviceId: { exact: 'abc' } });
+  assert.deepEqual(noAparelhoEmUso('default'), { deviceId: { exact: 'default' } });
+  assert.deepEqual(noAparelhoEmUso('communications'), { deviceId: { exact: 'default' } });
+  assert.deepEqual(noAparelhoEmUso(undefined), {});
 });
 
 test('o seletor mostra o padrão como vazio, venha ele como default ou como nada', () => {

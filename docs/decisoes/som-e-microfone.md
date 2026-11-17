@@ -96,6 +96,15 @@ Supressão de ruído, o corte, soundboard e os sons de aviso.
   desconectam —, e está em `confirmar-com-o-dono.md`. **Os ids dos aparelhos não mudam de uma
   abertura para outra**: medido com o Electron do projeto, uma página `file://` e a mesma pasta de
   dados, aberta duas vezes — os mesmos ids. É o que deixa a escolha guardada valer depois de fechar.
+- **Trocar a supressão de ruído trocava o microfone pelo padrão do sistema** (17/11/2026, o dono:
+  "ao alterar o nível… ele troca qual dispositivo está no input"). Ir de ou para Desligada reabre o
+  microfone (a supressão do navegador só é pedida ao abrir), e ele era reaberto com o id SOLTO
+  (`deviceId: 'x'`), que para o Chromium é preferência e não exigência: ele abria o padrão. Medido
+  numa bancada escondida e muda (Electron 39, microfones falsos, o `restartTrack` do LiveKit com o
+  processador montado): 4 de 4 trocas caíam no padrão; com `exact`, 12 de 12 ficaram no escolhido,
+  inclusive com a prévia da barra aberta. Hoje a reabertura e a prévia exigem o aparelho
+  (`noAparelhoEmUso`), e a que falha volta ao padrão — o LiveKit já fechou o de antes, e medido, a
+  volta deixa a faixa viva. **Não foi exercido com o microfone de verdade do dono.**
 - **Saída de som, câmera e o volume de cada pessoa também são lembrados** (16/09/2026). Os amigos
   do dono reclamaram que tudo voltava ao padrão ao fechar a Saga: o volume de quem eles tinham
   abaixado vivia só na memória, e só o microfone era guardado. Hoje a saída e a câmera escolhidas

@@ -53,6 +53,18 @@ export function idParaTrocar(tipo: TipoDeAparelho, valor: string): { id: string;
 }
 
 /**
+ * O microfone em uso, como restrição para REABRI-LO — trocar a supressão de ruído reabre o
+ * microfone, e a prévia da barra abre outro nele. Solto (`deviceId: 'x'`), o id é só preferência,
+ * e o Chromium reabre no PADRÃO do sistema: medido em 17/11/2026 (Electron 39, os microfones
+ * falsos do Chromium, o `restartTrack` do LiveKit com o processador montado), com o "Microfone 1"
+ * em uso, ir de Forte a Desligada caía no padrão em 4 de 4 trocas; com `exact`, ficou nele em 12 de 12.
+ * Sem aparelho conhecido, nada: vale o padrão.
+ */
+export function noAparelhoEmUso(ativo: string | undefined): { deviceId?: { exact: string } } {
+  return ativo ? { deviceId: { exact: idParaTrocar('audioinput', ativo).id } } : {};
+}
+
+/**
  * A lista do seletor sem os apelidos, e o nome do aparelho que o sistema usa como padrão — o
  * Chromium o põe no rótulo do `default` ("Padrão - Microfone do MacBook Pro").
  */
