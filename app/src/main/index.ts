@@ -5,6 +5,7 @@ import { setupUpdates } from './update';
 import { iniciarRegistro, registrar } from './registro';
 import { registrarMusica } from './musica';
 import { registrarAtividade } from './atividade';
+import { registrarPrioridadeDaVoz } from './voz';
 import { AO_INICIAR, abriuComOSistema, anotarDecisao, deveLigarSozinho, jaDecidiu, podeAbrirComOSistema } from './inicio';
 import {
   ATALHO_PADRAO, atalhoAceito, encaixarNaTela, gravar as gravarOverlay, ler as lerOverlay,
@@ -459,6 +460,8 @@ app.whenReady().then(async () => {
   registrarMusica();
   // O jogo aberto neste computador, para o "Jogando…" do pessoal — ver atividade.ts.
   registrarAtividade(() => principal);
+  // A voz que sai não perde o processador para o jogo — ver voz.ts.
+  registrarPrioridadeDaVoz();
 
   ipcMain.handle('presenca:ociosidade', () => {
     try { return powerMonitor.getSystemIdleTime(); } catch { return 0; }

@@ -56,6 +56,8 @@ const desktop = {
   /** Segundos que a MÁQUINA está parada. É a única forma de saber que a pessoa saiu de
       perto: dentro da janela, ninguém vê teclado nem mouse fora do app. */
   ociosidade: (): Promise<number> => ipcRenderer.invoke('presenca:ociosidade'),
+  /** Entrou ou saiu da call: no Windows, a voz ganha prioridade sobre o jogo (main/voz.ts). */
+  vozEmCall: (emCall: boolean): Promise<void> => ipcRenderer.invoke('voz:emCall', emCall),
   /**
    * O jogo aberto neste computador (ver `main/atividade.ts`). Os ajustes moram na tela; até a
    * tela mandá-los, nada é lido. `aoMudar` devolve como se desinscrever.

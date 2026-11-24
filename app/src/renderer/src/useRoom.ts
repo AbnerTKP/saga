@@ -1219,6 +1219,19 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
   const participants: Participant[] = status === 'idle' ? [] : [room.localParticipant, ...room.remoteParticipants.values()];
 
   /**
+   * Enquanto se está na call, a voz que sai não perde o processador para o jogo. O filtro, o
+   * corte e a codificação rodam AQUI, na tela; com um jogo em tela cheia na frente, o Windows
+   * dava a vez a ele e a voz travava — o Faro, no WoW. Quem sobe a prioridade é o processo
+   * principal (`main/voz.ts`); a tela só diz quando entra e quando sai.
+   */
+  const emCall = status !== 'idle';
+  useEffect(() => {
+    window.desktop.vozEmCall?.(emCall)?.catch((e: Error) => {
+      void window.desktop.registrar('aviso', 'voz', `não deu para avisar que ${emCall ? 'entrei na' : 'saí da'} call: ${e.message}`);
+    });
+  }, [emCall]);
+
+  /**
    * A lista de quem assiste se conserta sozinha a cada volta.
    *
    * O evento não basta, e isso é medido: com o livekit-client deste projeto contra um

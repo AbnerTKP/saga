@@ -95,6 +95,11 @@ declare global {
       /** Segundos que a MÁQUINA está parada — teclado e mouse, fora do app inclusive. */
       ociosidade: () => Promise<number>;
       /**
+       * Entrou ou saiu da call. No Windows, a tela e a rede ganham prioridade sobre o jogo
+       * enquanto se está nela (`main/voz.ts`). Só no app de computador.
+       */
+      vozEmCall?: (emCall: boolean) => Promise<void>;
+      /**
        * O jogo aberto neste computador. Só existe no app de computador: a Saga do navegador
        * não enxerga os programas abertos, e por isso o campo é opcional.
        */
