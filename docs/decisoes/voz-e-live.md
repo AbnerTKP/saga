@@ -14,6 +14,26 @@ Decisões de `useRoom`, palco, live, quadro flutuante e quem está falando.
 - **1080p e 60 quadros são do Berserk**, e a régua (`qualidades.ts`) vale tanto na
   escolha quanto na hora de transmitir. É trava do app, não do servidor: o LiveKit não
   limita bitrate por participante, então é regra de conduta, não cerca.
+- **Compartilhar a tela é de qualquer um na call (24/11/2026).** De 22/09 a 24/11 foi do
+  cargo — a permissão `transmitir`, pedido do dono: "só quem eu autorizar transmite". Ele
+  mesmo a tirou: "qualquer um pode". Saiu inteira: a caixinha do editor de cargos, o botão
+  apagado com "Seu cargo não pode transmitir a tela", e a lista de fontes do crachá da
+  call, que era a trava de verdade. Cargo que ainda a tem guardada perde na leitura, e o
+  app antigo esconde sozinho a caixinha que o servidor não manda mais. O que a trava
+  ensinou, para o dia em que alguma fonte voltar a ser do cargo:
+  - **A trava é no LiveKit (`canPublishSources` no crachá), e não no botão**: botão apagado
+    não segura um app de versão antiga, que nem sabe da permissão.
+  - **A lista precisa levar `unknown`**, que é como o soundboard e o bot de música
+    publicam: com ela ligada só passa o que está escrito, e sem `unknown` os dois calam.
+    O `AccessToken` do SDK se recusa a escrever `unknown` — é por isso que o crachá é
+    assinado à mão (`crachaDaCall`).
+  - **O crachá só vale na entrada**: mudar o cargo de quem já está na call pede um
+    `updateParticipant`, que derruba a tela na hora e deixa o resto tocando (medido num
+    LiveKit de verdade em 22/09/2026). Era o `reaplicarFontesDaCall`, que saiu junto.
+  - **Não segura um app modificado**: o LiveKit confere a fonte que o cliente DECLARA, e
+    dá para publicar a tela dizendo que é câmera. Contra o engano, não contra o ataque.
+  - Quem estava numa call quando o servidor novo subiu continua com o crachá velho até
+    sair e voltar.
 - **Numa cena pesada não cabem nitidez e fluidez — e quem escolhe é a pessoa, no menu.**
   Medido no servidor de produção, sala descartável, dois participantes reais, cena difícil
   (textura fina em panorâmica):
@@ -404,7 +424,7 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
   Google lá, que o YouTube costuma banir. Então quem toca é o APP do **anfitrião** — quem pediu
   a primeira música; se ele sai da call, o servidor passa a quem ficou, e a música continua do
   ponto (pela hora em que começou, no relógio do servidor). A faixa vai como `unknown`, nome
-  `musica`: o crachá sem a permissão de transmitir continua deixando passar, e quem ouve tem
+  `musica` — passava até pelo crachá sem a permissão de transmitir, quando ela existia —, e quem ouve tem
   volume próprio para ela (Configurações › Voz e vídeo › Bot de música), separado de voz e de
   soundboard.
 - **O servidor só guarda a fila** (`musica.mjs`, na memória: reiniciar zera). Ela é conferida
@@ -498,8 +518,8 @@ escolhido na prancheta: opção A, o cartão com capa e botões.
     velhas apagadas só na abertura; prazo em todo pedido à internet; áudios limpos de hora em
     hora; o yt-dlp morre junto com a Saga.
   - **Ficou para depois, de propósito**: o áudio atravessa inteiro para a tela por IPC (o teto
-    de 2 h limita a ~130 MB; servir por protocolo próprio é a saída); e a trava de transmitir
-    não segura um app modificado que declare a tela como câmera.
+    de 2 h limita a ~130 MB; servir por protocolo próprio é a saída). (A trava de transmitir,
+    que não segurava um app modificado, saiu em 24/11/2026 — ver o começo deste arquivo.)
 - **A vez de tocar só passa a quem consegue tocar (01/11/2026).** A Saga no navegador nasceu com
   o bot desligado, e a regra antiga passava a vez ao primeiro da call, fosse quem fosse. O app que
   não toca responde "não deu" e o servidor entende "não consegui tocar — pulei": lido no código, e

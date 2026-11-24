@@ -210,15 +210,12 @@ O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono co
   no celular). Ao religar, nada disso rodou de novo: só os testes, o typecheck e o build.
   **Depois de atualizar, ligue
   "Tocar música" nos cargos** (Configurações do servidor › Cargos › Na call): nasce desligada
-  para todo cargo, como a de transmitir.
+  para todo cargo.
 - **Mutar e desligar o fone, numa call de verdade (22/09/2026).** Medido na bancada: o fone
   segura ao entrar de fone desligado, e o microfone mutado fica mudo em todos os caminhos do
   LiveKit. O que falta: trocar de sala mutado e de fone desligado com os amigos ouvindo. Se
   ainda acontecer depois disso, é outra causa — anotar QUANDO aconteceu (trocou de sala? a
   internet piscou? mexeu no fone Bluetooth?).
-- **Transmitir tela sem a permissão, com o app de verdade.** Medido com o servidor e um LiveKit
-  local: sem a permissão a tela é recusada e o soundboard toca; dar e tirar o cargo com a
-  pessoa na call libera e derruba na hora. Não visto: o botão apagado e o aviso no app.
 - Som, câmera, microfone e compartilhamento de tela em máquinas que não são este Mac.
 - **Se o modo de tela (`detail`) segura os quadros no conteúdo real dele.** O que está
   medido é o extremo: numa cena artificial de ruído fino em panorâmica, protegendo a
