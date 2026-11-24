@@ -2,6 +2,13 @@
 
 O que foi medido e o que não foi exercido, por funcionalidade. Quando o dono confirmar algo, risque aqui.
 
+- **A voz com um jogo na frente (24/11/2026).** O Faro relatou a voz travando com o WoW em tela cheia
+  e parando ao voltar para a Saga. Na call, no Windows, a tela e a rede da Saga agora sobem para "acima
+  do normal" e saem da economia de energia. Medido na Saga compilada, escondida e muda: sobe ao entrar,
+  volta sozinha se alguém baixar (com linha no registro) e desce ao sair. **Falta**: o Faro numa call de
+  verdade com o WoW na frente, já com a versão nova. Se ainda travar, o registro dele diz se alguém
+  baixou a prioridade (`voz: a tela estava em …`) ou se a energia não largou (`voz: a economia de
+  energia do Windows não largou …`) — e aí a causa é outra.
 - **"Jogando Roblox" só com a janela na tela (05/11/2026).** Medido no Windows dele, com o Roblox de verdade
   rodando escondido pelo arranque (`--launch-to-tray`) e o `tasklist` de verdade: o código de antes dizia
   "Roblox", o de agora, nenhum jogo. A janela do Roblox foi simulada, porque não se abriu o jogo nesta

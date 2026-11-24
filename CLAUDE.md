@@ -172,7 +172,7 @@ errado":
 |---|---|---|
 | Servidor: cargos, permissões, contas e recuperação de senha, salas, arquivos, amizade, desempenho, notas, relatos, administração | `server/CLAUDE.md` | sim, ao abrir arquivo de `server/` |
 | Electron: janela, arranque, uma Saga por computador, captura de tela e som do sistema, assinatura no Mac, barra do Windows, overlay, CSP, o jogo aberto (atividade) | `app/src/main/CLAUDE.md` | sim, ao abrir arquivo de `app/src/main/` |
-| Voz, call, live, palco, quadro flutuante, quem está falando, bot de música (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`, `useMusica`, `musica.mjs`, `main/musica.ts`) | `docs/decisoes/voz-e-live.md` | não — leia |
+| Voz, call, live, palco, quadro flutuante, quem está falando, bot de música, a voz com um jogo na frente (`useRoom`, `Stage`, `audivel`, `espectadores`, `queda`, `useMusica`, `musica.mjs`, `main/musica.ts`, `main/voz.ts`) | `docs/decisoes/voz-e-live.md` | não — leia |
 | Microfone, supressão de ruído, soundboard, sons de aviso (`useMicrofone`, `sensibilidade`, `embutir`, `sons/`) | `docs/decisoes/som-e-microfone.md` | não — leia |
 | Chat, anexos, apagar mensagem, conversas privadas e amigos na tela (`Chat`, `useChat`, `TelaDeAmigos`) | `docs/decisoes/chat-e-conversas.md` | não — leia |
 | Xadrez, Dama, Catan, a Garagem e o menu de jogos, app e servidor (`xadrez`, `dama`, `TabuleiroDaDama`, `catan`, `desenhoDoCatan`, `garagem`, `desenhoDaGaragem`, `jogos.mjs`, `dama.mjs`, `catan.mjs`, `catans.mjs`, `garagem.mjs`); a Fórmula 1, que saiu em 07/10/2026, e a Urna e o Dragão Quadrado, que saíram em 26/10/2026 | `docs/decisoes/jogos.md` | não — leia |

@@ -319,6 +319,31 @@ ao vivo, com o Blankito transmitindo para o Bagre (diagnóstico em `/root/diagno
   ping, média, pior, perda 0,0% e servidor saem, a mira mostra o valor e o cartão some ao
   sair. **Não medido numa call real pela internet**, com ping de verdade e perda.
 
+## A voz com um jogo na frente (24/11/2026)
+
+- **A voz do Faro travava com o WoW em tela cheia na frente, e parava ao voltar para a Saga.**
+  Não era o estrangulamento do Chromium: o `backgroundThrottling: false` já estava lá, e numa
+  bancada escondida o Chromium não mexeu na prioridade da tela nem com o microfone aberto, nem
+  ligando e desligando o estrangulamento. O que sobra é o Windows: o caminho da voz que sai
+  mora inteiro na Saga (filtro e corte na tela, codificação na tela, pacotes no serviço de
+  rede), e lido na Saga aberta no Windows do dono, a tela e a rede estavam em prioridade
+  **normal** e com a energia **a critério do Windows** — enquanto o próprio Chromium põe a GPU
+  acima do normal e protege o áudio e a GPU. Com o jogo na frente, a vez é dele; ao voltar
+  para a Saga, a vez troca e o WoW cai para o limite de quadros de segundo plano.
+- **Durante a call, no Windows, a tela e a rede sobem para "acima do normal" e saem da economia
+  de energia** (`main/voz.ts`, a regra em `prioridadeDaVoz.ts`, testada). A tela só avisa
+  quando entra e sai (`vozEmCall`). Acima do normal, e não alta: é o degrau da GPU, e a tela
+  também desenha — alta tiraria quadro do jogo quando a Saga estiver noutro monitor. A energia
+  é `SetProcessInformation` por um PowerShell montado por reflexão (sem compilador, ~240 ms,
+  uma vez por processo), porque o Node não chama a API do Windows; ela não volta no fim da
+  call, porque fora da call a tela parada não gasta o que a economia pouparia. A conferência
+  se repete a cada 10 s e **anota no registro quem baixou e para onde** — se o Faro ainda
+  travar, é essa linha que diz se o problema é outro.
+- **Medido** na Saga compilada, escondida e muda, pela ponte de verdade: entrar na call levou
+  os dois de normal para acima do normal e o controle de energia de 0 para 5; a tela baixada à
+  mão voltou em menos de 10 s, com a linha no registro; sair devolveu os dois ao normal.
+  **Não exercido**: uma call de verdade com o WoW na frente. Ver `confirmar-com-o-dono.md`.
+
 ## Quem está falando
 
 - **A minha presença na barra lateral sai do LiveKit; a dos outros, da busca.** As duas
