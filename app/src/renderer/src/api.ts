@@ -27,7 +27,7 @@ const BASE = /^https?:\/\//i.test(SERVIDOR)
 export type Permissao =
   | 'mutar' | 'desconectar' | 'timeout' | 'expulsar' | 'banir'
   | 'definirCargo' | 'gerirCargos' | 'gerirSalas' | 'gerirSons'
-  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'transmitir' | 'tocarMusica' | 'moverPessoas';
+  | 'gerirServidor' | 'convidar' | 'definirId' | 'apagarMensagens' | 'tocarMusica' | 'moverPessoas';
 
 export type Cargo = {
   id: number;

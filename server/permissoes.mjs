@@ -26,11 +26,8 @@ export const PERMISSOES = {
   convidar: 'Convidar gente para o servidor',
   definirId: 'Definir o identificador de alguém',
   apagarMensagens: 'Apagar mensagens dos outros',
-  // Nasce desligada em todo cargo, inclusive nos que já existiam: foi o pedido do dono
-  // (22/09/2026) — "só quem eu autorizar transmite". Ligar em cargo antigo é trabalho dele.
-  transmitir: 'Transmitir a tela',
-  // O bot de música: pôr, pular e parar. Nasce desligada pelo mesmo motivo da de cima — é o
-  // dono quem escolhe quem mexe no que a call inteira ouve.
+  // O bot de música: pôr, pular e parar. Nasce desligada — é o dono quem escolhe quem mexe
+  // no que a call inteira ouve.
   tocarMusica: 'Tocar música',
   // Mover alguém de uma sala de voz para outra, arrastando na barra — como no Discord
   // (23/09/2026). Nasce desligada, como as outras de hoje. É ação sobre alguém: só alcança
@@ -43,27 +40,15 @@ export const PERMISSOES = {
 // qualquer distribuiria distinção que aparece em todos os outros. Hoje é do dono da Saga,
 // em `plataforma.mjs`. Cargo antigo que ainda a tenha guardada perde na leitura, pela
 // regra de sempre: permissão que não existe é descartada.
+//
+// `transmitir` ("Transmitir a tela") também viveu aqui, de 22/09 a 24/11/2026, e saiu a
+// pedido do dono: compartilhar a tela é de qualquer um na call, como a câmera. Cargo que
+// ainda a tenha guardada perde na leitura, pela mesma regra. O que a trava ensinou, para o
+// dia em que alguma fonte voltar a ser do cargo, está em docs/decisoes/voz-e-live.md.
 export const TODAS = Object.keys(PERMISSOES);
 
 /** Ações que recaem sobre outra pessoa. Só estas passam pela regra de hierarquia. */
 export const SOBRE_ALGUEM = ['mutar', 'desconectar', 'timeout', 'expulsar', 'banir', 'definirCargo', 'moverPessoas'];
-
-/**
- * O que a pessoa pode publicar na call, no formato do crachá do LiveKit. `null` é sem
- * lista, e sem lista o LiveKit aceita tudo.
- *
- * A trava é no LiveKit, e não no botão: botão apagado não segura um app de versão antiga,
- * que nem sabe da permissão. O que ela NÃO segura é um app modificado de propósito: o
- * LiveKit confere a FONTE que o cliente declara, e quem mexer no app pode publicar a tela
- * dizendo que é câmera (visto na revisão de 23/09/2026 — não há como conferir o conteúdo da
- * faixa). Para cinco amigos, a trava é contra o engano, não contra o ataque. E a lista
- * precisa levar `unknown`, que é como o soundboard publica — com ela
- * ligada, só passa o que está escrito, e sem `unknown` o soundboard cala. Medido num
- * LiveKit de verdade em 22/09/2026, junto com a outra metade: tirar a permissão com a tela
- * no ar derruba a tela na hora e deixa o soundboard tocando.
- */
-export const fontesDaCall = (cargo) =>
-  temPermissao(cargo, 'transmitir') ? null : ['camera', 'microphone', 'unknown'];
 
 export const ehPermissaoConhecida = (p) => TODAS.includes(p);
 

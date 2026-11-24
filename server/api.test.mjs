@@ -288,21 +288,21 @@ test('o crachá da sala deixa o app contar a quem ele assiste', async () => {
   assert.equal(grant.canUpdateOwnMetadata, true);
 });
 
-test('transmitir tela é do cargo: o crachá de quem não pode leva a lista sem a tela', async () => {
+test('transmitir a tela é de qualquer um: o crachá não leva lista de fontes, nem para quem não tem cargo', async () => {
   const { TokenVerifier } = await import('livekit-server-sdk');
   const verificar = (t) => new TokenVerifier('devkey', 'secret-de-teste-bem-longo').verify(t);
   const dono = await sessaoDe('abner');
   const bruno = await sessaoDe('bruno');
 
-  // O crachá é assinado à mão (o SDK não escreve `unknown`); o LiveKit tem de aceitá-lo.
+  // O crachá é assinado à mão (ver `crachaDaCall`); o LiveKit tem de aceitá-lo.
   const doDono = await verificar((await chamar('POST', '/token', { sessao: dono.token, corpo: { room: 'Geral' } })).corpo.token);
   assert.equal(doDono.video.canPublishSources, undefined, 'o dono transmite sem lista');
   assert.match(doDono.sub, /^u\d+$/);
   assert.equal(doDono.name, dono.eu.nome ?? doDono.name);
 
+  // Sem lista o LiveKit aceita tudo; com uma, a tela (e o soundboard, se faltar `unknown`) cala.
   const doBruno = await verificar((await chamar('POST', '/token', { sessao: bruno.token, corpo: { room: 'Geral' } })).corpo.token);
-  assert.deepEqual(doBruno.video.canPublishSources, ['camera', 'microphone', 'unknown'],
-    'sem `unknown` o soundboard cala junto com a tela');
+  assert.equal(doBruno.video.canPublishSources, undefined, 'membro comum transmite sem pedir a ninguém');
   assert.equal(doBruno.video.canUpdateOwnMetadata, true);
 });
 

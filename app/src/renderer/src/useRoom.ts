@@ -11,7 +11,6 @@ import { falando, nivelDe, LIMIAR } from './niveis';
 import { porTransmissao, quemChegou, ASSISTINDO, SURDO, TOCA_MUSICA } from './espectadores';
 import { deveVoltarParaACall } from './queda';
 import { ESPERAS_PARA_REABRIR_MS, deveReabrirMicrofone } from './microfoneCaido';
-import { podeTransmitir } from './transmitir';
 import { useMicrofone } from './useMicrofone';
 import { comLimite } from './limite';
 import { CHAVE_DOS_APARELHOS, decidirMicrofone, escolhaParaVoltar, escolhasGuardadas, trocarAparelho } from './aparelhos';
@@ -245,9 +244,7 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
    * inventado.
    */
   const querFalar = useRef(true);
-  /** Ver o efeito principal: é ele quem ouve a mudança de permissão, e chama isto. */
-  const aoMudarPermissao = useRef<() => void>(() => undefined);
-  /** Idem para o microfone que o LiveKit mutou sozinho; ver `microfoneCaido.ts`. */
+  /** Ver o efeito principal: é ele quem ouve o microfone que o LiveKit mutou sozinho, e chama isto (`microfoneCaido.ts`). */
   const aoMutarOMicrofone = useRef<() => void>(() => undefined);
 
   // Soundboard. O som vai para a sala numa faixa própria, e não misturado ao microfone:
@@ -656,13 +653,6 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
       .on(RoomEvent.DataReceived, (_dados: Uint8Array, _quem?: Participant, _tipo?: unknown, topico?: string) => {
         if (topico === 'saga') aoReceberOrdemRef.current?.();
       })
-      // A permissão de transmitir mudou (o dono mexeu no cargo com a pessoa na call). Mora
-      // AQUI, e não num efeito à parte: o `removeAllListeners` da volta deste efeito apagaria
-      // o de fora calado — a regra dos eventos da sala, em som-e-microfone.md.
-      .on(RoomEvent.ParticipantPermissionsChanged, (_antes: unknown, quem: Participant) => {
-        bump();
-        if (quem === room.localParticipant) aoMudarPermissao.current();
-      })
       .on(RoomEvent.MediaDevicesError, (e: Error) => { anotar('erro', 'aparelhos', e); onError(e); })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => setSomTravado(!room.canPlaybackAudio));
 
@@ -1025,19 +1015,6 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     await recolherSomDaTela('ao parar');
     bump();
   }, [room, pararMedicoes, recolherSomDaTela]);
-
-  // O dono tirou a permissão com a tela no ar: o LiveKit já derrubou a transmissão, mas a
-  // captura continua ligada aqui (e o aviso de gravação do sistema também) até alguém
-  // desligá-la. Ganhar a permissão só redesenha o botão. Quem chama é o efeito principal.
-  aoMudarPermissao.current = () => {
-    const lp = room.localParticipant;
-    if (podeTransmitir(lp.permissions?.canPublishSources)) return;
-    // O LiveKit pode ter tirado a publicação antes deste aviso: a mixagem que é nossa conta.
-    const transmitia = lp.isScreenShareEnabled || !!faixaDeMixagem.current;
-    if (!transmitia) return;
-    void stopScreen().catch(() => undefined);
-    avisar('aviso', 'Seu cargo deixou de poder transmitir a tela.');
-  };
 
   const toggleDeafen = useCallback(async () => {
     const next = !deafenedRef.current;
@@ -1491,7 +1468,6 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     micOn: status !== 'idle' && room.localParticipant.isMicrophoneEnabled,
     camOn: status !== 'idle' && room.localParticipant.isCameraEnabled,
     screenOn: status !== 'idle' && room.localParticipant.isScreenShareEnabled,
-    podeTransmitir: podeTransmitir(room.localParticipant.permissions?.canPublishSources),
     join, leave, toggleMic, toggleCam, startScreen, stopScreen, toggleDeafen, volumeDe, definirVolume,
     tocarSom, pararSom, somTocando, volumeDoSoundboard, definirVolumeDoSoundboard,
     volumeDaMusica, definirVolumeDaMusica,

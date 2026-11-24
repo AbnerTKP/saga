@@ -13,8 +13,7 @@ import { anotar } from './registro';
  * Quem toca é o app do ANFITRIÃO — quem pediu a primeira música, ou quem ficou quando ele saiu
  * da call (o servidor decide; ver musica.mjs). Esse app lê o áudio que o processo principal
  * baixou, toca num `<audio>` e manda a saída para a call como uma faixa própria, `musica`,
- * publicada como `unknown` — o mesmo caminho do soundboard, que o crachá sem a permissão de
- * transmitir continua deixando passar. Os outros só recebem a faixa, com volume próprio
+ * publicada como `unknown` — o mesmo caminho do soundboard. Os outros só recebem a faixa, com volume próprio
  * (`volumeDaMusica`, no useRoom).
  *
  * Também guarda a fila de cada sala, juntando a busca de salas com as respostas dos comandos

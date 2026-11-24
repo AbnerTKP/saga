@@ -4,7 +4,7 @@
 // grupo virou só o convite, exigida uma vez, no cadastro. Sem isso não haveria como saber
 // *quem* está pedindo, e sem saber quem, não há cargo, banimento nem moderação.
 import http from 'node:http';
-import { RoomServiceClient, TrackSource, DataPacket_Kind } from 'livekit-server-sdk';
+import { RoomServiceClient, DataPacket_Kind } from 'livekit-server-sdk';
 import { SignJWT } from 'jose';
 import { createReadStream, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,7 +38,7 @@ import {
   esquecerCodigoDeSenha,
 } from './contas.mjs';
 import * as email from './email.mjs';
-import { temPermissao, PERMISSOES, fontesDaCall } from './permissoes.mjs';
+import { temPermissao, PERMISSOES } from './permissoes.mjs';
 import * as cargosM from './cargos.mjs';
 import * as membros from './membros.mjs';
 
@@ -630,49 +630,23 @@ async function tirarDeTodasAsCalls(usuarioId) {
 }
 
 /**
- * O crachá da call. É assinado aqui, e não pelo `AccessToken` do SDK, por um motivo só: o
- * SDK se recusa a escrever `unknown` na lista de fontes, e é como o soundboard publica — sem
- * ele, quem não transmite tela ficaria também sem soundboard (ver `fontesDaCall`). O resto
- * é o mesmo JWT que o SDK monta: HS256, emissor = chave, assunto = identidade.
+ * O crachá da call. Sem lista de fontes: qualquer um publica microfone, câmera, tela e
+ * soundboard (desde 24/11/2026 — ver docs/decisoes/voz-e-live.md). É assinado aqui, e não
+ * pelo `AccessToken` do SDK, porque nasceu levando a lista, e o SDK se recusa a escrever
+ * `unknown` nela — que é como o soundboard publica. Se alguma fonte voltar a ser do cargo,
+ * é por aqui. O resto é o mesmo JWT que o SDK monta: HS256, emissor = chave, assunto =
+ * identidade.
  */
-function crachaDaCall({ identity, name, sala, fontes }) {
+function crachaDaCall({ identity, name, sala }) {
   const video = {
     room: sala, roomJoin: true, roomCreate: true, canPublish: true, canSubscribe: true,
     canPublishData: true, canUpdateOwnMetadata: true,
-    ...(fontes ? { canPublishSources: fontes } : {}),
   };
   return new SignJWT({ video, name })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(KEY).setSubject(identity)
     .setNotBefore(new Date()).setExpirationTime('12h')
     .sign(new TextEncoder().encode(SECRET));
-}
-
-const FONTE_NO_LIVEKIT = { camera: TrackSource.CAMERA, microphone: TrackSource.MICROPHONE, unknown: TrackSource.UNKNOWN };
-
-/**
- * Leva a quem JÁ está na call o que o cargo dele permite publicar agora. O crachá só vale
- * na entrada: sem isto, ganhar a permissão de transmitir pediria sair e voltar, e perdê-la
- * não tiraria do ar a tela de ninguém. O LiveKit derruba sozinho a tela de quem perdeu, e
- * deixa o resto tocando.
- */
-async function reaplicarFontesDaCall(sid) {
-  // Só as salas que existem, e todas de uma vez: uma por uma, com o LiveKit lento, a edição do
-  // cargo esperava segundos por sala para responder (achado na revisão de 23/09/2026).
-  const vivas = await nomesDasSalasVivas();
-  const salas = salasM.listarSalas(db, sid).filter((s) => s.tipo === 'voz' && vivas.has(salaNoLiveKit(s)));
-  await Promise.all(salas.map(async (sala) => {
-    const nome = salaNoLiveKit(sala);
-    for (const p of await svc.listParticipants(nome).catch(() => [])) {
-      const membro = membros.buscarMembro(db, sid, idDaIdentidade(p.identity));
-      if (!membro) continue;
-      const querido = (fontesDaCall(membro.cargo) ?? []).map((f) => FONTE_NO_LIVEKIT[f]).sort();
-      const atual = [...(p.permission?.canPublishSources ?? [])].sort();
-      if (querido.join() === atual.join()) continue;
-      await svc.updateParticipant(nome, p.identity, { permission: { ...p.permission, canPublishSources: querido } })
-        .catch((e) => console.error('[call] não deu para atualizar as fontes de', p.identity, e.message));
-    }
-  }));
 }
 
 // --- o bot de música ----------------------------------------------------------------
@@ -1809,7 +1783,7 @@ const ROTAS = {
     // assistindo (o atributo `assistindo`, em espectadores.ts). Sem isso quem transmite não
     // teria como saber quem está vendo: o LiveKit não conta a ninguém quem se inscreveu na
     // faixa dele. É permissão de mexer nos PRÓPRIOS atributos, não nos de outra pessoa.
-    const token = await crachaDaCall({ identity: identidadeDe(eu.id), name: eu.nome, sala: nome, fontes: fontesDaCall(eu.cargo) });
+    const token = await crachaDaCall({ identity: identidadeDe(eu.id), name: eu.nome, sala: nome });
     return { url: urlDoLiveKit(req.headers), token, identity: identidadeDe(eu.id) };
   },
 
@@ -1881,18 +1855,13 @@ const ROTAS = {
     const { sid, membro: eu } = exigirMembro(req);
     const c = await lerCorpo(req);
     const cargo = cargosM.editarCargo(db, sid, eu, c.id, c);
-    // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
-    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
     return { cargo };
   },
 
   'POST /cargos/apagar': async (req) => {
     const { sid, membro: eu } = exigirMembro(req);
     const { id } = await lerCorpo(req);
-    const r = cargosM.apagarCargo(db, sid, eu, id);
-    // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
-    reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
-    return r;
+    return cargosM.apagarCargo(db, sid, eu, id);
   },
 
   'GET /giphy': async (req) => {
@@ -1948,10 +1917,7 @@ const ROTAS = {
       case 'desbanir':   return { alvo: verMembro(membros.desbanir(db, sid, eu.id, alvo)) };
       case 'tirarTimeout': return { alvo: verMembro(membros.tirarTimeout(db, sid, eu.id, alvo)) };
       case 'cargo': {
-        const r = membros.definirCargo(db, sid, eu.id, alvo, cargo);
-        // Sem esperar: o cargo já mudou, e a resposta não depende de o LiveKit responder.
-        reaplicarFontesDaCall(sid).catch((e) => console.error('[call] reaplicar fontes:', e.message));
-        return { alvo: verMembro(r) };
+        return { alvo: verMembro(membros.definirCargo(db, sid, eu.id, alvo, cargo)) };
       }
       case 'id':         return { alvo: verMembro(membros.definirIdExibido(db, sid, eu.id, alvo, idExibido)) };
 
