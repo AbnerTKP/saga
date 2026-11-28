@@ -52,7 +52,9 @@ export function TelaDeAtualizacao({ estado, onPular }: { estado: UpdateState; on
           <p className="muted">Não consegui verificar atualizações. Entrando assim mesmo…</p>
         )}
 
-        {demorou && estado.fase !== 'pronto' && (
+        {/* Também no "Reiniciando…": a instalação é calada, e se ela não começar, sem esta
+            saída a pessoa ficaria presa numa tela que não muda nunca. */}
+        {demorou && (
           <button className="link" onClick={onPular}>Entrar sem atualizar</button>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, powerMonitor, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 // Repositório público no GitHub onde os instaladores são publicados (Releases).
@@ -19,7 +19,15 @@ export type UpdateState = {
   mensagem?: string;
 };
 
-const SEIS_HORAS = 6 * 60 * 60 * 1000;
+/**
+ * De quanto em quanto se pergunta ao GitHub com o app aberto. Eram 6 h — e com a Saga aberta
+ * o dia inteiro, versão nova só aparecia na abertura seguinte: o dono pediu que ela apareça
+ * "dinamicamente" (28/11/2026). No Windows a consulta é o `releases.atom` do GitHub, que não
+ * entra na cota da API; no Mac é a API, 60 por hora por IP, e 4 por hora cabe folgado.
+ */
+const QUINZE_MINUTOS = 15 * 60 * 1000;
+/** Acordar a máquina pergunta na hora, mas não mais que uma vez a cada 2 min. */
+const INTERVALO_MINIMO = 2 * 60 * 1000;
 // Sem internet, o GitHub simplesmente não responde. Não dá para segurar o app por isso.
 const LIMITE_DA_CONSULTA = 15_000;
 
@@ -69,8 +77,25 @@ export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () 
     if (s.fase !== 'procurando') mostrar();
   };
 
+  /**
+   * Pergunta de novo de 15 em 15 min, e também quando a máquina acorda: dormindo, o relógio
+   * para, e quem abre o notebook de manhã esperaria até 15 min por uma versão que já saiu.
+   */
+  let ultimaConsulta = Date.now();
+  const periodicamente = (consultar: () => void) => {
+    const vez = () => { ultimaConsulta = Date.now(); consultar(); };
+    setInterval(vez, QUINZE_MINUTOS);
+    const acordou = () => { if (Date.now() - ultimaConsulta >= INTERVALO_MINIMO) vez(); };
+    powerMonitor.on('resume', acordou);
+    powerMonitor.on('unlock-screen', acordou);
+  };
+
   ipcMain.handle('update:atual', () => ultimo);
-  ipcMain.handle('update:install', () => autoUpdater.quitAndInstall());
+  // Sem a janela do instalador (28/11/2026, pedido do dono: "o Discord faz tão bonitinho
+  // usando a própria interface"). `quitAndInstall()` sem argumentos roda o NSIS COM a
+  // janela de "Instalando a Saga"; `(true, true)` passa `/S --force-run` — instala calado
+  // e abre a Saga de volta. Quem fala com a pessoa no meio é a nossa tela de "Reiniciando…".
+  ipcMain.handle('update:install', () => autoUpdater.quitAndInstall(true, true));
   ipcMain.handle('open:external', (_e, url: string) => {
     if (/^https:\/\//.test(url)) shell.openExternal(url);
   });
@@ -107,7 +132,12 @@ export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () 
     });
 
     autoUpdater.checkForUpdates().catch(() => undefined);
-    setInterval(() => autoUpdater.checkForUpdates().catch(() => undefined), SEIS_HORAS);
+    periodicamente(() => {
+      // Baixando ou já baixada, perguntar de novo só faria o aviso piscar de "pronta" para
+      // "baixando 0%" e voltar — e a que está ali já é a mais nova.
+      if (ultimo.fase === 'baixando' || ultimo.fase === 'pronto') return;
+      autoUpdater.checkForUpdates().catch(() => undefined);
+    });
     return;
   }
 
@@ -134,5 +164,5 @@ export function setupUpdates(win: BrowserWindow, mostrarJanela: () => void = () 
   };
 
   consultar(true);
-  setInterval(() => consultar(false), SEIS_HORAS);
+  periodicamente(() => consultar(false));
 }

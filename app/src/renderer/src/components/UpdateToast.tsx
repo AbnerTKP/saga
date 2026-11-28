@@ -6,7 +6,7 @@ import type { UpdateState } from '../desktop';
  * tratada pela tela de partida. No Mac também é por aqui que se baixa à mão, já que o
  * app não é assinado pela Apple e não pode se substituir sozinho.
  */
-export function UpdateToast({ estado }: { estado: UpdateState }) {
+export function UpdateToast({ estado, onReiniciar }: { estado: UpdateState; onReiniciar?: () => void }) {
   const [escondido, setEscondido] = useState(false);
 
   // Uma versão nova reabre o aviso mesmo que a anterior tenha sido dispensada.
@@ -22,7 +22,11 @@ export function UpdateToast({ estado }: { estado: UpdateState }) {
       {estado.fase === 'pronto' && (
         <>
           <span>Versão {estado.version} pronta.</span>
-          <button className="primary sm" onClick={() => window.desktop.installUpdate()}>Reiniciar e atualizar</button>
+          {/* Com `onReiniciar`, quem reinicia é a tela de partida ("Reiniciando…"): a
+              instalação é calada, e sem ela a Saga só sumiria por alguns segundos. */}
+          <button className="primary sm" onClick={() => (onReiniciar ? onReiniciar() : window.desktop.installUpdate())}>
+            Reiniciar e atualizar
+          </button>
         </>
       )}
 

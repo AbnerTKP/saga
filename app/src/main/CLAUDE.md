@@ -12,6 +12,16 @@ Janela, arranque, captura de tela, assinatura no Mac, overlay. O geral está no 
   refazem sozinhos.
 - **A janela nasce escondida** e só aparece quando a consulta de atualização resolve — ou
   já com a barra de progresso. Quem clica no ícone espera um app já atualizado.
+- **A atualização instala calada, com a NOSSA tela (28/11/2026).** O dono: "o Discord faz tão
+  bonitinho usando a própria interface". `quitAndInstall()` sem argumentos roda o NSIS COM a
+  janela de "Instalando a Saga"; `quitAndInstall(true, true)` passa `/S --force-run` (conferido
+  no `NsisUpdater` do electron-updater 6.8.9): instala sem janela e abre a Saga de volta. O
+  "Reiniciar e atualizar" do aviso volta para a tela de partida ("Reiniciando…"), que chama a
+  instalação; se ela não começar em 20 s, aparece "Entrar sem atualizar". **E a consulta é de 15
+  em 15 min, e ao acordar a máquina** (eram 6 h): com a Saga aberta o dia inteiro, versão nova
+  só aparecia na abertura seguinte. Baixando ou já baixada, não se pergunta de novo, senão o
+  aviso piscaria de "pronta" para "baixando 0%". **Não exercido**: só uma atualização de
+  verdade, de uma versão com isto para a seguinte, mostra a instalação calada.
 - **Abrir junto com o Windows nasce ligado, e é uma chave que a pessoa desliga.** O app
   existe para você estar lá, então o padrão é abrir; quem não quiser desliga em "Sua
   conta". Mas ligar sozinho acontece UMA vez, na primeira abertura do app instalado no

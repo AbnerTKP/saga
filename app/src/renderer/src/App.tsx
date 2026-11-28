@@ -1388,7 +1388,7 @@ export function App() {
         <ConnectScreen apelidoInicial={ultimo} onPronto={entrou} onRegistro={() => setRegistro(true)} />
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
         <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
-      <UpdateToast estado={atualizacao} />
+      <UpdateToast estado={atualizacao} onReiniciar={() => setPartidaResolvida(false)} />
         <Versao />
       </>
     );
@@ -1408,7 +1408,7 @@ export function App() {
         />
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
         <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
-        <UpdateToast estado={atualizacao} />
+        <UpdateToast estado={atualizacao} onReiniciar={() => setPartidaResolvida(false)} />
         <Versao />
       </>
     );
@@ -1491,7 +1491,7 @@ export function App() {
         )}
         {registro && <RegistroDeErros onClose={() => setRegistro(false)} />}
         <Avisos avisos={notas.avisos} onFechar={notas.fechar} onRegistro={() => setRegistro(true)} />
-        <UpdateToast estado={atualizacao} />
+        <UpdateToast estado={atualizacao} onReiniciar={() => setPartidaResolvida(false)} />
         <Versao />
       </div>
     );
@@ -2000,7 +2000,7 @@ export function App() {
         onFechar={notas.fechar}
         onRegistro={() => setRegistro(true)}
       />
-      <UpdateToast estado={atualizacao} />
+      <UpdateToast estado={atualizacao} onReiniciar={() => setPartidaResolvida(false)} />
       <Versao />
     </div>
     </div>
