@@ -96,7 +96,37 @@
 
 /* ---- o conteúdo ------------------------------------------------------------------------ */
 
-.cfg-conteudo { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.cfg-conteudo { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+
+/* A barra de alterações (opção A, "como o Discord", 28/11/2026): flutua no pé do conteúdo,
+   fora do corpo que rola, alinhada com a página. O lugar não pega clique; só a barra. */
+.cfg-pendente-lugar {
+  position: absolute; left: var(--e6); right: var(--e6); bottom: var(--e4);
+  pointer-events: none; z-index: 1;
+}
+@media (max-width: 1000px) { .cfg-pendente-lugar { left: var(--e5); right: var(--e5); } }
+.cfg-pendente {
+  pointer-events: auto; max-width: 880px;
+  display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e2) var(--e2) var(--e2) var(--e4);
+  background: var(--superficie-0); border: 1px solid var(--borda); border-radius: var(--raio-4);
+  box-shadow: var(--sombra-2);
+  animation: cfg-pendente-sobe .18s ease-out;
+}
+.cfg-pendente-frase { flex: 1; min-width: 0; font-size: var(--letra-painel); font-weight: var(--peso-medio); color: var(--texto-forte); }
+/* Tentou sair com alteração por salvar: treme e fica vermelha, em vez de perder o que se mexeu. */
+.cfg-pendente[data-tremendo] { border-color: var(--perigo); background: var(--perigo-cheio); animation: cfg-pendente-treme .5s ease-in-out; }
+.cfg-pendente[data-tremendo] .cfg-pendente-frase { color: var(--sobre-acento); }
+.cfg-pendente[data-tremendo] .cfg-botao[data-variante="fantasma"] { color: var(--sobre-acento); }
+/* Com a barra à mostra, o fim da página rola para cima dela em vez de ficar escondido atrás. */
+.cfg-conteudo:has(.cfg-pendente) .cfg-corpo { padding-bottom: 112px; }
+@keyframes cfg-pendente-sobe { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes cfg-pendente-treme {
+  0%, 100% { transform: translateX(0); }
+  15%, 55% { transform: translateX(-8px); }
+  35%, 75% { transform: translateX(8px); }
+}
+@media (prefers-reduced-motion: reduce) { .cfg-pendente, .cfg-pendente[data-tremendo] { animation: none; } }
 .cfg-cabeca {
   flex: none; display: flex; align-items: center; gap: var(--e3);
   height: 56px; padding: 0 var(--e3) 0 var(--e6); border-bottom: 1px solid var(--borda-sutil);

@@ -527,6 +527,15 @@ async function roteiro(dados) {
     await esperar({ sel: '.cfg-titulo', texto: 'Cargos' });
     await moverMouse(640, 20);
     await foto('04b-cargos', 'Configurações do servidor › Cargos: a lista e o editor, com as permissões em chaves e o que cada uma faz.');
+    // A barra de alterações (28/11/2026): aparece ao mexer numa chave, e treme em vermelho ao
+    // tentar sair com ela à mostra. Desfazer a tira, e o resto do passo segue como antes.
+    await clicar({ sel: '.cfg-chave:not(:disabled)' });
+    await esperar('.cfg-pendente');
+    await foto('04b2-cargos-alterado', 'Cargos com uma chave mexida: a barra "alterações que não foram salvas" flutua no pé.');
+    await tecla('Escape');
+    await esperar('.cfg-pendente[data-tremendo]');
+    await foto('04b3-cargos-tremendo', 'Esc com alteração por salvar: a caixa não fecha, a barra treme e avisa em vermelho.');
+    await clicar({ sel: '.cfg-pendente button', texto: 'Desfazer' });
     const paginas = [['Perfil do servidor', '04c-perfil'], ['Pessoas', '04d-pessoas'], ['Convites', '04f-convites'], ['Banidos', '04g-banidos'], ['Salas e categorias', '04h-salas']];
     for (const [titulo, nome] of paginas) {
       await clicar({ sel: '.cfg-item', texto: titulo });

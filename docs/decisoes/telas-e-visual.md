@@ -4,6 +4,21 @@ Paleta, camadas, painéis, cargos na tela, perfis, administração da Saga, rela
 
 ## Decisões que não são óbvias no código
 
+- **Salvar e desfazer flutuam no pé das configurações (28/11/2026), "como o Discord".** O dono
+  escolheu a opção A entre três desenhadas (barra flutuante com a frase, pílula no canto, faixa
+  presa no rodapé). Nos Cargos o Salvar morava depois de dezenas de chaves, e era preciso rolar
+  até o fim para achá-lo. `BarraDeAlteracoes` (em `Configuracoes.tsx`) só existe enquanto há o
+  que salvar e vai por portal para fora do corpo que rola. **Sair com ela à mostra não sai**:
+  fechar, Esc, outra página, a busca, ou escolher outro cargo na lista (`useGuardarAlteracoes`)
+  fazem a barra tremer e ficar vermelha com "Cuidado". Antes, trocar de página jogava fora, sem
+  aviso, o que se tinha mexido num cargo. Cargo novo só prende depois que alguém mexeu nele, e o
+  "Apagar cargo" continua na página: é outra decisão, e não fica a um clique do Salvar. Vale em
+  Cargos e no nome do servidor; o "Quem pode ver" é um modal pequeno, com o Salvar à vista, e
+  ficou como estava. Fotografado (`04b2`, `04b3`); **não exercido com o mouse na mão do dono**.
+- **O submenu das configurações não fecha no vão (28/11/2026).** Entre o item e o submenu há
+  17 px (o recuo do menu, a borda e a margem), e o mouse a caminho das páginas saía do item e
+  derrubava o submenu — o dono não chegava em "Cargos". Hoje uma ponte invisível cobre o vão na
+  altura do item, e sair do item espera 300 ms antes de fechar, para quem desce na diagonal.
 - **A marca do Berserk é o S da Saga.** Foi o Mjölnir, e antes dele um raio; um valknut e
   uma runa Thurisaz chegaram a ser desenhados e viraram triângulo e seta a 13 px. O que
   faltava a todos era o mesmo: eram símbolo à parte, e a distinção é do app. O desenho

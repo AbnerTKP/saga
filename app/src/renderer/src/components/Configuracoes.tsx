@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 import { useFecharComEsc } from '../useFechar';
 import { buscarPaginas, type Pagina } from '../paginasDeConfiguracao';
@@ -27,8 +28,22 @@ export function Configuracoes<Id extends string>({ casa, escopo, paginas, atual,
   onClose: () => void;
   children: ReactNode;
 }) {
+  // Com alteração por salvar, sair daqui (fechar, Esc, outra página) não sai: a barra de
+  // alterações treme e diz "Cuidado", como no Discord. Antes, trocar de página jogava fora
+  // o que se tinha mexido num cargo, sem aviso nenhum.
+  const pendente = useRef(false);
+  const [tremor, setTremor] = useState(0);
+  const [lugarDaBarra, setLugarDaBarra] = useState<HTMLElement | null>(null);
+  const guardar = useCallback((acao: () => void) => {
+    if (pendente.current) { setTremor((t) => t + 1); return; }
+    acao();
+  }, []);
+  const fechar = useCallback(() => guardar(onClose), [guardar, onClose]);
+  const ir = (id: Id) => guardar(() => onIr(id));
+  const alteracoes = useMemo(() => ({ pendente, tremor, lugar: lugarDaBarra, guardar }), [tremor, lugarDaBarra, guardar]);
+
   // Esc fecha: uma saída que não depende de acertar o X — ver useFechar.ts.
-  useFecharComEsc(onClose);
+  useFecharComEsc(fechar);
   const [busca, setBusca] = useState('');
   const achadas = useMemo(() => buscarPaginas(paginas, busca), [paginas, busca]);
   const aberta = paginas.find((p) => p.id === atual);
@@ -49,7 +64,7 @@ export function Configuracoes<Id extends string>({ casa, escopo, paginas, atual,
       aria-current={p.id === atual && !p.acao ? 'page' : undefined}
       data-tom={p.tom}
       data-armado={p.armado ? '' : undefined}
-      onClick={() => { if (p.acao) p.acao(); else { onIr(p.id); setBusca(''); } }}
+      onClick={() => { if (p.acao) guardar(p.acao); else { ir(p.id); setBusca(''); } }}
     >
       <Icon name={p.icone} size={16} />
       <span className="cfg-item-nome">{nome}</span>
@@ -58,7 +73,7 @@ export function Configuracoes<Id extends string>({ casa, escopo, paginas, atual,
   );
 
   return (
-    <div className="cfg-veu" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="cfg-veu" onMouseDown={(e) => { if (e.target === e.currentTarget) fechar(); }}>
       <div className="cfg-caixa" role="dialog" aria-label={casa}>
         <nav className="cfg-menu" aria-label={casa}>
           <div className="cfg-escopo">
@@ -76,7 +91,12 @@ export function Configuracoes<Id extends string>({ casa, escopo, paginas, atual,
               placeholder="Buscar nas configurações"
               onChange={(e) => setBusca(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && achadas[0]) { e.preventDefault(); achadas[0].acao ? achadas[0].acao() : onIr(achadas[0].id); setBusca(''); }
+                if (e.key === 'Enter' && achadas[0]) {
+                  e.preventDefault();
+                  const p = achadas[0];
+                  if (p.acao) guardar(p.acao); else ir(p.id);
+                  setBusca('');
+                }
                 // O Esc da busca só limpa a busca; com ela vazia, fecha a caixa (useFechar).
                 if (e.key === 'Escape' && busca) { e.stopPropagation(); setBusca(''); }
               }}
@@ -110,16 +130,90 @@ export function Configuracoes<Id extends string>({ casa, escopo, paginas, atual,
             </div>
             <span className="cfg-fechar">
               <span className="cfg-tecla" aria-hidden>ESC</span>
-              <button className="cfg-botao-icone" aria-label="Fechar" title="Fechar (Esc)" onClick={onClose}>
+              <button className="cfg-botao-icone" aria-label="Fechar" title="Fechar (Esc)" onClick={fechar}>
                 <Icon name="close" size={18} />
               </button>
             </span>
           </div>
-          <div className="cfg-corpo">{children}</div>
+          <ContextoDeAlteracoes.Provider value={alteracoes}>
+            <div className="cfg-corpo">{children}</div>
+          </ContextoDeAlteracoes.Provider>
+          {/* Onde a barra de alterações flutua: fora do corpo que rola, para ficar no pé da
+              página em qualquer altura da rolagem — o Salvar dos cargos morava depois de
+              dezenas de chaves, e era preciso rolar até o fim para achá-lo. */}
+          <div className="cfg-pendente-lugar" ref={setLugarDaBarra} />
         </section>
       </div>
     </div>
   );
+}
+
+type Alteracoes = {
+  /** Se a página aberta tem alteração por salvar. Ref, e não estado: só a trava lê. */
+  pendente: { current: boolean };
+  /** Sobe a cada tentativa de sair com alteração por salvar: é o que faz a barra tremer. */
+  tremor: number;
+  lugar: HTMLElement | null;
+  guardar: (acao: () => void) => void;
+};
+const ContextoDeAlteracoes = createContext<Alteracoes | null>(null);
+
+/**
+ * A mesma trava do fechar e do trocar de página, para o que a PÁGINA faz e também perde o
+ * que foi mexido — escolher outro cargo na lista, por exemplo. Fora das configurações, roda
+ * direto.
+ */
+export function useGuardarAlteracoes(): (acao: () => void) => void {
+  const ctx = useContext(ContextoDeAlteracoes);
+  return ctx?.guardar ?? ((acao) => acao());
+}
+
+/**
+ * A barra de "alterações que não foram salvas", flutuando no pé da página — a opção A que o
+ * dono escolheu em 28/11/2026, "como o Discord". Só existe enquanto há o que salvar; tentar
+ * sair com ela à mostra faz tremer e avisar em vermelho em vez de jogar fora o que se mexeu.
+ */
+export function BarraDeAlteracoes({ mudou, podeSalvar = true, ocupado = false, onSalvar, onDesfazer, salvar = 'Salvar alterações', desfazer = 'Desfazer', frase = 'Você tem alterações que não foram salvas' }: {
+  mudou: boolean;
+  podeSalvar?: boolean;
+  ocupado?: boolean;
+  onSalvar: () => void;
+  onDesfazer: () => void;
+  salvar?: string;
+  desfazer?: string;
+  frase?: string;
+}) {
+  const ctx = useContext(ContextoDeAlteracoes);
+  useEffect(() => {
+    if (!ctx) return;
+    ctx.pendente.current = mudou;
+    return () => { ctx.pendente.current = false; };
+  }, [ctx?.pendente, mudou]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const tremor = ctx?.tremor ?? 0;
+  const tremorVisto = useRef(tremor);
+  const [tremendo, setTremendo] = useState(false);
+  useEffect(() => {
+    if (tremor === tremorVisto.current) return;
+    tremorVisto.current = tremor;
+    if (!mudou) return;
+    setTremendo(true);
+    const id = setTimeout(() => setTremendo(false), 700);
+    return () => clearTimeout(id);
+  }, [tremor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!mudou) return null;
+  const barra = (
+    <div className="cfg-pendente" role="region" aria-label="Alterações não salvas" aria-live="polite"
+      data-tremendo={tremendo ? '' : undefined}>
+      <span className="cfg-pendente-frase">{tremendo ? 'Cuidado — você tem alterações que não foram salvas!' : frase}</span>
+      <button className="cfg-botao" data-variante="fantasma" disabled={ocupado} onClick={onDesfazer}>{desfazer}</button>
+      <button className="cfg-botao" data-variante="primario" disabled={ocupado || !podeSalvar} onClick={onSalvar}>
+        {ocupado ? 'Salvando…' : salvar}
+      </button>
+    </div>
+  );
+  return ctx?.lugar ? createPortal(barra, ctx.lugar) : barra;
 }
 
 /** O pedaço buscado, aceso dentro do nome da página. */

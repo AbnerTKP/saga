@@ -13,7 +13,7 @@ import type { Enquadramento } from '../enquadramento';
 import { moverSala } from '../ordenacao';
 import { paginasDoServidor, type Pagina, type PaginaDoServidor } from '../paginasDeConfiguracao';
 import { useFecharComEsc } from '../useFechar';
-import { Configuracoes, Linha, Pagina as Folha, Secao } from './Configuracoes';
+import { BarraDeAlteracoes, Configuracoes, Linha, Pagina as Folha, Secao, useGuardarAlteracoes } from './Configuracoes';
 import { Icon } from './Icon';
 import { Avatar } from './Avatar';
 import { Nome } from './Nome';
@@ -213,11 +213,14 @@ function PaginaPerfil({ servidor, ocupado, onServidor, setErro, setAviso }: Ctx)
           <label htmlFor="cfg-nome-servidor">Nome</label>
           <div className="cfg-campo-linha">
             <input id="cfg-nome-servidor" value={nome} maxLength={40} onChange={(e) => setNome(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && mudou) salvar(); }} />
-            <button className="cfg-botao" data-variante="primario" disabled={ocupado || !mudou || !nome.trim()} onClick={salvar}>Salvar</button>
+              onKeyDown={(e) => { if (e.key === 'Enter' && mudou && nome.trim()) salvar(); }} />
           </div>
         </div>
       </Secao>
+      {/* O nome salva pela barra do pé da página, como os cargos; as imagens continuam salvando
+          sozinhas ao escolher, que é o que elas sempre fizeram. */}
+      <BarraDeAlteracoes mudou={mudou} ocupado={ocupado} podeSalvar={!!nome.trim()}
+        onSalvar={salvar} onDesfazer={() => setNome(servidor.nome)} />
       <Secao titulo="Imagens">
         <div className="imagens">
           <EscolherImagem
@@ -408,6 +411,11 @@ function PaginaCargos({ eu, cargos, membros, permissoes, ocupado, fazer }: Ctx) 
   const pessoasNo = (id: number) => membros.filter((m) => !m.banido && m.cargo?.id === id).length;
   const travado = !!original && !souDono && original.nivel >= meuNivel;
   const mudou = !original || JSON.stringify({ ...original, permissoes: [...original.permissoes].sort() }) !== JSON.stringify({ ...original, ...editando, permissoes: [...editando.permissoes].sort() });
+  // Cargo novo só pede "salvar ou descartar" depois que alguém mexeu nele: clicar em "Criar
+  // cargo" e mudar de ideia não pode prender a pessoa na página.
+  const pendente = original ? mudou : !!editando.nome.trim() || editando.permissoes.length > 0;
+  const guardar = useGuardarAlteracoes();
+  const escolher = (id: number | 'novo' | null) => guardar(() => setEscolhido(id));
   const empatados = empatadosCom(editando.nivel, cargos, editando.id);
   const perdem = destronados(editando.nivel, cargos, editando.id);
 
@@ -422,13 +430,13 @@ function PaginaCargos({ eu, cargos, membros, permissoes, ocupado, fazer }: Ctx) 
       <div className="cfg-lista-e-detalhe">
         <div className="cfg-lista">
           {cargos.map((c) => (
-            <button key={c.id} className="cfg-lista-linha" aria-selected={escolhido === c.id} onClick={() => setEscolhido(c.id)}>
+            <button key={c.id} className="cfg-lista-linha" aria-selected={escolhido === c.id} onClick={() => escolher(c.id)}>
               <span className="cfg-cor" style={{ ['--cor-do-cargo' as string]: c.cor ?? undefined }} />
               <span className="cfg-lista-nome">{c.nome}</span>
               <span className="cfg-item-fim">{pessoasNo(c.id)}</span>
             </button>
           ))}
-          <button className="cfg-botao" data-variante="fantasma" data-tamanho="pequeno" style={{ justifyContent: 'flex-start', marginTop: 8 }} onClick={() => setEscolhido('novo')}>
+          <button className="cfg-botao" data-variante="fantasma" data-tamanho="pequeno" style={{ justifyContent: 'flex-start', marginTop: 8 }} onClick={() => escolher('novo')}>
             <Icon name="maisSimples" size={16} /> Criar cargo
           </button>
         </div>
@@ -480,21 +488,30 @@ function PaginaCargos({ eu, cargos, membros, permissoes, ocupado, fazer }: Ctx) 
             ))}
             </div>
 
+            {/* Salvar e desfazer moram na barra que flutua no pé da página — antes ficavam aqui,
+                depois de todas as chaves, e era preciso rolar até o fim para salvar. Apagar fica:
+                é outra decisão, e não pode estar a um clique de distância do Salvar. */}
             {!travado && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16 }}>
-                <button className="cfg-botao" data-variante="primario" disabled={ocupado || !mudou || !editando.nome.trim()} onClick={salvar}>
-                  {editando.id ? 'Salvar' : 'Criar cargo'}
+              <BarraDeAlteracoes
+                mudou={pendente}
+                ocupado={ocupado}
+                podeSalvar={!!editando.nome.trim()}
+                onSalvar={salvar}
+                onDesfazer={() => (original ? setEditando({ ...original }) : setEscolhido(cargos[0]?.id ?? null))}
+                salvar={original ? 'Salvar alterações' : 'Criar cargo'}
+                desfazer={original ? 'Desfazer' : 'Descartar'}
+                frase={original ? undefined : 'Este cargo ainda não foi criado'}
+              />
+            )}
+            {!travado && editando.id && (
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 16 }}>
+                <button className="cfg-botao" data-variante="perigo" data-armado={apagando ? '' : undefined} style={{ marginLeft: 'auto' }} disabled={ocupado}
+                  onClick={async () => {
+                    if (!apagando) { setApagando(true); return; }
+                    if (await fazer(() => apagarCargo(editando.id!), 'Cargo apagado.')) setEscolhido(null);
+                  }}>
+                  {apagando ? `Apagar mesmo (${pessoasNo(editando.id)} descem para o mais baixo)` : 'Apagar cargo'}
                 </button>
-                {editando.id && mudou && <button className="cfg-botao" data-variante="fantasma" onClick={() => setEditando(original ? { ...original } : novo())}>Desfazer</button>}
-                {editando.id && (
-                  <button className="cfg-botao" data-variante="perigo" data-armado={apagando ? '' : undefined} style={{ marginLeft: 'auto' }} disabled={ocupado}
-                    onClick={async () => {
-                      if (!apagando) { setApagando(true); return; }
-                      if (await fazer(() => apagarCargo(editando.id!), 'Cargo apagado.')) setEscolhido(null);
-                    }}>
-                    {apagando ? `Apagar mesmo (${pessoasNo(editando.id)} descem para o mais baixo)` : 'Apagar cargo'}
-                  </button>
-                )}
               </div>
             )}
           </div>
