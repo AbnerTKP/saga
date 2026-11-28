@@ -45,6 +45,19 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
   const [confirmandoSaida, setConfirmandoSaida] = useState(false);
   // O submenu com as páginas: qualquer uma a dois cliques de qualquer tela (como no Discord).
   const [submenu, setSubmenu] = useState(false);
+  /**
+   * Sair do item não fecha na hora (28/11/2026): entre ele e o submenu há 17 px de vão (o
+   * recuo do menu, a borda e a margem), e o mouse a caminho das páginas atravessava esse vão
+   * e derrubava o submenu — o dono não conseguia chegar em "Cargos". A ponte do CSS cobre o
+   * vão em linha reta; esta folga cobre quem desce na diagonal, por cima de "Convidar gente".
+   */
+  const fechandoSubmenu = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const abrirSubmenu = () => { clearTimeout(fechandoSubmenu.current); setSubmenu(true); };
+  const soltarSubmenu = () => {
+    clearTimeout(fechandoSubmenu.current);
+    fechandoSubmenu.current = setTimeout(() => setSubmenu(false), 300);
+  };
+  useEffect(() => () => clearTimeout(fechandoSubmenu.current), []);
   const paginas = paginasDoServidor(eu.cargo);
 
   useEffect(() => {
@@ -76,7 +89,7 @@ export function MenuDoServidor({ em, eu, nomeDoServidor, podeGerirSalas, onAcao,
       <div className="menu-titulo">{nomeDoServidor}</div>
 
       {configura && (
-        <div className="com-submenu" onMouseEnter={() => setSubmenu(true)} onMouseLeave={() => setSubmenu(false)}>
+        <div className="com-submenu" onMouseEnter={abrirSubmenu} onMouseLeave={soltarSubmenu}>
           <button className="configurar" aria-haspopup="menu" aria-expanded={submenu} onClick={() => fazer({ tipo: 'configurar' })}>
             <Icon name="gear" size={15} /> Configurações do servidor <span className="seta-do-submenu"><Icon name="setaDir" size={15} /></span>
           </button>

@@ -1370,6 +1370,11 @@ button.selo-na-linha.assistindo:hover { background: rgba(63,127,224,.32); color:
 .menu-do-servidor .com-submenu > .configurar { width: 100%; }
 .seta-do-submenu { margin-left: auto; display: grid; color: var(--text3); }
 .menu-do-servidor .submenu-do-servidor { position: absolute; left: 100%; top: -10px; margin-left: 6px; width: 224px; }
+/* A ponte: cobre os 17 px entre o item e o submenu (recuo do menu + borda + margem), na
+   altura do item. Sem ela o mouse saía do item no meio do caminho e o submenu fechava. */
+.menu-do-servidor .submenu-do-servidor::before {
+  content: ''; position: absolute; right: 100%; top: 10px; width: 18px; height: 36px;
+}
 /* "Configurações do servidor" vem em primeiro e em peso de título: é a porta que o dono
    procurava no botão direito do quadrado. */
 .menu-do-servidor .configurar { color: var(--white); font-weight: 600; }
