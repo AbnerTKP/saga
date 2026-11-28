@@ -5,9 +5,12 @@
  * computador por ela. No navegador não há processo principal: cada função faz o que o
  * navegador sabe fazer, e o resto responde "não há" do jeito que a tela já entende — a
  * mesma coisa que o preload de mentira do `ferramentas/fotografar` sempre fez para as fotos,
- * agora de verdade. O que só existe no computador (transmitir a tela com o som, overlay,
- * atualizar, abrir junto com o sistema, bot de música) fica desligado aqui; a tela esconde os
- * botões pelo `platform: 'web'` — ver `recursosDaTela`, em celular.ts.
+ * agora de verdade. O que só existe no computador (overlay, atualizar, abrir junto com o
+ * sistema, bot de música) fica desligado aqui; a tela esconde os botões pelo `platform: 'web'`
+ * — ver `recursosDaTela`, em celular.ts.
+ *
+ * Transmitir a tela existe aqui desde 28/11/2026, pelo seletor do PRÓPRIO navegador: é o
+ * "seletor do sistema" da Saga (`usaSeletorDoSistema`), e o nosso ScreenPicker não abre.
  *
  * Tem de ser importado ANTES do app: há módulos que leem `window.desktop` ao carregar.
  */
@@ -108,8 +111,9 @@ window.desktop = {
   platform: 'web',
   listSources: () => Promise.resolve([]),
   chooseSource: () => Promise.reject(new Error(NAO_TEM)),
-  screenPermission: () => Promise.resolve('denied'),
-  usaSeletorDoSistema: () => Promise.resolve(false),
+  // Quem pergunta é o navegador, na hora de transmitir — não há permissão para conferir antes.
+  screenPermission: () => Promise.resolve('granted'),
+  usaSeletorDoSistema: () => Promise.resolve(true),
   openScreenSettings: nada,
   // Fora do build da web (o servidor de fotos, por exemplo) a versão não foi carimbada.
   version: () => Promise.resolve(typeof __VERSAO__ === 'string' ? __VERSAO__ : 'dev'),

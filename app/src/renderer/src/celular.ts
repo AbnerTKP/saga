@@ -12,7 +12,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export const LARGURA_DO_CELULAR = 760;
 
 export type Recursos = {
-  /** Transmitir a tela: o navegador não tem a captura com o som do sistema do app instalado. */
+  /**
+   * Transmitir a tela. No app instalado, sempre. No navegador, onde ele sabe capturar
+   * (`getDisplayMedia`) e fora do arranjo do celular — o navegador de celular não captura tela.
+   */
   transmitir: boolean;
   /** Ligar a própria câmera. Ver a dos outros vale em qualquer lugar. */
   ligarCamera: boolean;
@@ -24,11 +27,18 @@ export type Recursos = {
 
 /**
  * O que cada tela oferece. No celular, a primeira versão deixa de fora os jogos, a
- * soundboard e a câmera própria (decisão do dono); transmitir não existe em navegador nenhum.
+ * soundboard e a câmera própria (decisão do dono).
+ *
+ * Transmitir a tela no navegador do computador existe desde 28/11/2026: o criador de um
+ * servidor usava a Saga pelo navegador e simplesmente não tinha o botão — "todos podem
+ * streamar" valia para todo mundo, menos para ele. A captura é a do próprio navegador, com
+ * o seletor dele; o som vai quando a pessoa marca "compartilhar áudio" lá.
  */
-export function recursosDaTela({ web, celular }: { web: boolean; celular: boolean }): Recursos {
+export function recursosDaTela({ web, celular, capturaNoNavegador = false }: {
+  web: boolean; celular: boolean; capturaNoNavegador?: boolean;
+}): Recursos {
   return {
-    transmitir: !web,
+    transmitir: !web || (capturaNoNavegador && !celular),
     ligarCamera: !celular,
     soundboard: !celular,
     jogos: !celular,
@@ -36,6 +46,10 @@ export function recursosDaTela({ web, celular }: { web: boolean; celular: boolea
 }
 
 const naWeb = () => typeof window !== 'undefined' && window.desktop?.platform === 'web';
+
+/** Se este navegador sabe capturar a tela. Safari do iPhone e navegador do Android não sabem. */
+export const navegadorCapturaTela = (): boolean =>
+  typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 
 /** Se a Saga está no arranjo do celular agora. Muda ao girar o tablet ou estreitar a janela. */
 export function useCelular(): boolean {

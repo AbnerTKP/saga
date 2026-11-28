@@ -75,7 +75,7 @@ import { alternarMudo } from './volume';
 import { mesmoSeIgual } from './igual';
 import type { UpdateState } from './desktop';
 
-import { recursosDaTela, useCelular, useTelaDoCelular } from './celular';
+import { navegadorCapturaTela, recursosDaTela, useCelular, useTelaDoCelular } from './celular';
 import { BarraDoCelular, type AbaDoCelular } from './components/BarraDoCelular';
 import { TelaDoVoce } from './components/TelaDoVoce';
 
@@ -982,7 +982,9 @@ export function App() {
   }, [pedido, notas]);
 
   const salaAberta = rooms.find((s) => s.id === salaAbertaId) ?? null;
-  const recursos = recursosDaTela({ web: window.desktop.platform === 'web', celular });
+  const recursos = recursosDaTela({
+    web: window.desktop.platform === 'web', celular, capturaNoNavegador: navegadorCapturaTela(),
+  });
   const abaDoCelular: AbaDoCelular = voceNoCelular ? 'voce' : modoConversas ? 'conversas' : 'servidores';
   /** No celular, abrir um lugar troca a tela; no computador, `abrirLugar` não faz nada. */
   const abrirLugar = telaDoCelular.abrirLugar;

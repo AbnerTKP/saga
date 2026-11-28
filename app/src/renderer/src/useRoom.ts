@@ -903,10 +903,18 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
     //
     // Depois dele, o caminho de sempre: 'loopback', e no Windows o 'loopbackWithMute' para
     // quando a placa de som recusa o primeiro. Ver o comentário de ModoDeAudio no main.
+    //
+    // No navegador é UMA tentativa só: cada `setScreenShareEnabled` abre o seletor dele de
+    // novo, e cair de modo em modo faria a pessoa escolher a tela três vezes. O som lá é a
+    // caixinha "compartilhar áudio" do próprio seletor; o modo não muda nada.
+    const naWeb = window.desktop.platform === 'web';
     const modos: ModoDeAudio[] = !audio ? ['nao']
+      : naWeb ? ['loopback']
       : sourceId && window.desktop.platform === 'win32'
         ? ['loopbackWithoutChrome', 'loopback', 'loopbackWithMute', 'nao']
         : ['loopbackWithoutChrome', 'loopback', 'nao'];
+    // A própria aba da Saga fica fora do seletor: transmiti-la seria um espelho dentro do espelho.
+    if (naWeb) Object.assign(captura, { selfBrowserSurface: 'exclude', systemAudio: 'include', surfaceSwitching: 'include' });
 
     let ultimoMotivo = '';
     for (const modo of modos) {
@@ -978,6 +986,12 @@ export function useRoom(souBerserk = false, aoChegarAlguem?: (nome: string) => v
         return;
       } catch (e) {
         ultimoMotivo = (e as Error).message || String(e);
+        // No navegador, fechar o seletor sem escolher é desistir, não falha.
+        if (naWeb && (e as Error).name === 'NotAllowedError') {
+          anotar('info', 'tela', 'o seletor do navegador foi fechado sem escolher');
+          bump();
+          return;
+        }
         // O modo que exclui o próprio app não existe em Windows 10 nem em macOS antigo, e
         // falhar ali é o esperado, não defeito: fica como informação para não encher o
         // registro de vermelho em máquina que nunca teve como aceitar.

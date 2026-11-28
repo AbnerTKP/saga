@@ -26,7 +26,7 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
   Electron, `src/renderer/web/navegador.ts` monta um `window.desktop` com o que o navegador
   sabe fazer — copiar pelo `navigator.clipboard` (aqui não há porteiro de permissões), baixar
   o anexo como arquivo, "acordar" quando a aba volta para a frente, registro de erros na
-  memória da aba — e responde "não há" no resto (transmitir, overlay, atualizar, abrir com o
+  memória da aba — e responde "não há" no resto (overlay, atualizar, abrir com o
   sistema, tocar o bot de música — ouvir, pular e parar valem). A tela esconde os botões pelo `platform: 'web'`
   (`recursosDaTela`, em `celular.ts`). É o mesmo truque do preload de mentira do
   `ferramentas/fotografar`, que sempre rodou a tela num navegador comum.
@@ -61,8 +61,16 @@ renderizadas com o CSS de verdade; o dono escolheu a **A, "como o Discord"**.
   embaixo — só CSS. Atalhos e Inicialização somem no navegador (`paginasDaConta`).
 - **Fica de fora na primeira versão** (decisão do dono): jogos (nem o menu, nem os convites —
   um "aceitar" que não leva a nada é pior que nada), tocar a soundboard e ligar a própria
-  câmera. Transmitir a tela não existe em navegador nenhum: falta a captura com o som do
-  sistema do app instalado.
+  câmera. Transmitir a tela também fica de fora do celular: o navegador de lá não captura.
+- **Transmitir a tela no navegador do COMPUTADOR (28/11/2026).** Não existia, e o criador de
+  um servidor que usava a Saga pelo navegador ficou sem o botão justo quando "todos podem
+  streamar" virou regra. Vale onde houver `getDisplayMedia` e fora do arranjo do celular
+  (`recursosDaTela`). O seletor é o do navegador (`usaSeletorDoSistema: true` na ponte), uma
+  tentativa só — cada nova tentativa reabriria o seletor —, sem a própria aba da Saga na lista
+  (`selfBrowserSurface: 'exclude'`). O som vai quando a pessoa marca "Compartilhar áudio": aba
+  em qualquer navegador Chromium, tela inteira só no Windows; sem a marca, transmite mudo e
+  avisa como marcar. Fechar o seletor sem escolher não é erro. **Não testado em navegador de
+  verdade com outra pessoa assistindo** — conferir com o dono.
 
 ## Peso
 

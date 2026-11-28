@@ -53,5 +53,9 @@ export function explicarTelaMuda(plataforma: string): string {
       + 'desligue e ligue de novo, porque depois de atualizar o macOS guarda a permissão da '
       + 'versão anterior. Depois feche e abra o app.';
   }
+  if (plataforma === 'web') {
+    return 'Transmitindo sem som. Para levar o som, pare e compartilhe de novo marcando '
+      + '"Compartilhar áudio" na janela do navegador — vale para uma aba, e para a tela inteira no Windows.';
+  }
   return 'Transmitindo sem o áudio do sistema: ele foi pedido, mas não veio junto com a tela.';
 }
